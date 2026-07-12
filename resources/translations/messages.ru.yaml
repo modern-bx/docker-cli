@@ -5,7 +5,7 @@ command.seed.description: 'Записать случайные пароли и �
 command.seed.yes_option: 'Не задавать вопрос подтверждения.'
 command.seed.confirm: 'Команда перезапишет значения сидируемых секретов в .env. Продолжить? [y/N]'
 command.seed.cancelled: 'Операция отменена.'
-command.seed.completed: 'Секреты записаны в %file%. Логин Dockge: %username%.'
+command.seed.completed: 'Секреты записаны в %file%. Логин Dockge: %username%. Пароли MySQL и PostgreSQL обновлены.'
 config.created: 'Файлы настроек созданы в %directory%.'
 config.exists: 'Файлы настроек уже существуют в %directory%, существующие файлы не изменены.'
 config.using: 'Используется compose-файл: %file%'
