@@ -45,6 +45,77 @@ services:
           - dockge.${BASE_HOST}
     restart: unless-stopped
 
+  dockge-seed:
+    image: node:22-alpine
+    container_name: dockge-seed
+    depends_on:
+      - dockge
+    environment:
+      DOCKGE_ADMIN_USERNAME: ${DOCKGE_ADMIN_USERNAME:-admin}
+      DOCKGE_ADMIN_PASSWORD: ${DOCKGE_ADMIN_PASSWORD}
+    command:
+      - sh
+      - -ec
+      - |
+        if [ -z "$${DOCKGE_ADMIN_PASSWORD}" ]; then
+          echo "DOCKGE_ADMIN_PASSWORD is empty. Run docker-cli seed before start." >&2
+          exit 1
+        fi
+
+        cd /tmp
+        npm --silent --no-update-notifier --no-fund install socket.io-client@4
+        node <<'NODE'
+        const { io } = require("socket.io-client");
+
+        const username = process.env.DOCKGE_ADMIN_USERNAME || "admin";
+        const password = process.env.DOCKGE_ADMIN_PASSWORD;
+        const socket = io("http://dockge:5001", {
+          reconnectionAttempts: 30,
+          reconnectionDelay: 1000,
+          timeout: 5000,
+          transports: ["websocket", "polling"],
+        });
+
+        const finish = (code, message) => {
+          if (message) {
+            console.log(message);
+          }
+          socket.close();
+          process.exit(code);
+        };
+
+        socket.on("connect", () => {
+          socket.timeout(10000).emit("setup", username, password, (error, response) => {
+            if (error) {
+              finish(1, `Dockge setup request failed: $${error.message || error}`);
+              return;
+            }
+
+            if (response && response.ok) {
+              finish(0, `Dockge admin user '$${username}' has been created.`);
+              return;
+            }
+
+            const message = String((response && (response.msg || response.error)) || "");
+            if (message.toLowerCase().includes("initialized")) {
+              finish(0, "Dockge has already been initialized; seed skipped.");
+              return;
+            }
+
+            finish(1, `Dockge setup failed: $${message || JSON.stringify(response)}`);
+          });
+        });
+
+        socket.on("connect_error", (error) => {
+          console.log(`Waiting for Dockge: $${error.message}`);
+        });
+
+        setTimeout(() => finish(1, "Dockge setup timed out."), 45000);
+        NODE
+    networks:
+      docker-cli:
+    restart: "no"
+
   dockge:
     image: louislam/dockge:1
     container_name: dockge-app
