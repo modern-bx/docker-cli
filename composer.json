@@ -18,6 +18,6 @@
         "bin/docker-cli"
     ],
     "scripts": {
-        "build-phar": "php scripts/build-phar.php"
+        "build-phar": "php -d phar.readonly=0 scripts/build-phar.php"
     }
 }
