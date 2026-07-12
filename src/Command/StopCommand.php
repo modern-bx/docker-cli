@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DockerCli\Command;
+
+use DockerCli\Config\SystemCompose;
+use DockerCli\Service\TranslatorFactory;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
+
+final class StopCommand extends Command
+{
+    use DockerComposeRunner;
+
+    private TranslatorInterface $translator;
+
+    public function __construct(?TranslatorInterface $translator = null)
+    {
+        $this->translator = $translator ?? TranslatorFactory::create();
+        parent::__construct('stop');
+        $this->setDescription($this->translator->trans('command.stop.description'));
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        return $this->runOperation(new SystemCompose(), 'down', ['--remove-orphans'], $output, $this->translator);
+    }
+}
