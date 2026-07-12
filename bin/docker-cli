@@ -2,7 +2,9 @@
 <?php
 
 use DockerCli\Command\InitCommand;
+use DockerCli\Command\RegisterCommand;
 use DockerCli\Command\SeedCommand;
+use DockerCli\Command\UnregisterCommand;
 use DockerCli\Command\StartCommand;
 use DockerCli\Command\StopCommand;
 use Symfony\Component\Console\Application;
@@ -11,8 +13,10 @@ require __DIR__ . '/../vendor/autoload.php';
 
 $application = new Application('docker-cli', '0.1.0');
 $application->add(new InitCommand());
+$application->add(new RegisterCommand());
 $application->add(new SeedCommand());
 $application->add(new StartCommand());
 $application->add(new StopCommand());
+$application->add(new UnregisterCommand());
 $application->setDefaultCommand('list');
 $application->run();

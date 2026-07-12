@@ -42,14 +42,21 @@ final class FrameworkDetectionService
     {
         $projectRoot = $this->normalizeProjectRoot($projectRoot ?? getcwd() ?: '.');
 
-        foreach ($this->detectors as $detector) {
-            $framework = $detector->detect($projectRoot);
-            if ($framework !== null) {
-                return $framework;
+        do {
+            foreach ($this->detectors as $detector) {
+                $framework = $detector->detect($projectRoot);
+                if ($framework !== null) {
+                    return $framework;
+                }
             }
-        }
 
-        return null;
+            $parent = dirname($projectRoot);
+            if ($parent === $projectRoot) {
+                return null;
+            }
+
+            $projectRoot = $parent;
+        } while (true);
     }
 
     private function normalizeProjectRoot(string $projectRoot): string

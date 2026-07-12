@@ -15,10 +15,10 @@ final class FrameworkDescriptionService
     public function describe(DetectedFramework $framework): FrameworkDescription
     {
         return match (true) {
-            $framework instanceof Bitrix24 => new FrameworkDescription('Bitrix24'),
-            $framework instanceof Bitrix => new FrameworkDescription('Bitrix'),
-            $framework instanceof Laravel => new FrameworkDescription('Laravel'),
-            $framework instanceof Symfony => new FrameworkDescription('Symfony'),
+            $framework instanceof Bitrix24 => new FrameworkDescription(FrameworkName::Bitrix24, FrameworkCodeName::Bitrix24),
+            $framework instanceof Bitrix => new FrameworkDescription(FrameworkName::Bitrix, FrameworkCodeName::Bitrix),
+            $framework instanceof Laravel => new FrameworkDescription(FrameworkName::Laravel, FrameworkCodeName::Laravel),
+            $framework instanceof Symfony => new FrameworkDescription(FrameworkName::Symfony, FrameworkCodeName::Symfony),
             default => throw new \InvalidArgumentException(sprintf('Unknown framework class "%s".', $framework::class)),
         };
     }
