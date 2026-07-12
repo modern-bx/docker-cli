@@ -25,6 +25,9 @@ services:
       - --providers.docker.network=docker-cli
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls.certresolver=cloudflare
+      - --entrypoints.websecure.http.tls.domains[0].main=${BASE_HOST}
+      - --entrypoints.websecure.http.tls.domains[0].sans=*.${BASE_HOST}
       - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL}
       - --certificatesresolvers.cloudflare.acme.storage=/letsencrypt/acme.json
       - --certificatesresolvers.cloudflare.acme.dnschallenge=true
@@ -163,6 +166,7 @@ services:
       traefik.enable: "true"
       traefik.http.routers.adminer.rule: Host(`adminer.${BASE_HOST}`)
       traefik.http.routers.adminer.entrypoints: websecure
+      traefik.http.routers.adminer.tls: "true"
       traefik.http.routers.adminer.tls.certresolver: cloudflare
       traefik.http.services.adminer.loadbalancer.server.port: "8080"
     networks:
