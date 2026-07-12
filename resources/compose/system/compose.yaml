@@ -3,7 +3,7 @@ name: docker-cli
 services:
   dnsdock:
     image: aacebedo/dnsdock:v1.18.0-rc2-amd64
-    container_name: dnsdock
+    container_name: docker-cli-dnsdock
     command: ["--domain", "${BASE_HOST}"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -17,7 +17,7 @@ services:
 
   traefik:
     image: traefik:v3.6
-    container_name: traefik
+    container_name: docker-cli-traefik
     command:
       - --api.dashboard=true
       - --providers.docker=true
@@ -52,7 +52,7 @@ services:
 
   dockge-seed:
     image: node:22-alpine
-    container_name: dockge-seed
+    container_name: docker-cli-dockge-seed
     depends_on:
       - dockge
     environment:
@@ -126,8 +126,8 @@ services:
     container_name: docker-cli-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-app}
-      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-system}
+      MYSQL_USER: ${MYSQL_USER:-system}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       DNSDOCK_NAME: mysql
       DNSDOCK_IMAGE: system
@@ -136,6 +136,7 @@ services:
     networks:
       docker-cli:
         aliases:
+          - mysql
           - mysql.${BASE_HOST}
     restart: unless-stopped
 
@@ -143,8 +144,8 @@ services:
     image: postgres:18
     container_name: docker-cli-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-app}
-      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-system}
+      POSTGRES_USER: ${POSTGRES_USER:-system}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       DNSDOCK_NAME: postgres
       DNSDOCK_IMAGE: system
@@ -153,6 +154,7 @@ services:
     networks:
       docker-cli:
         aliases:
+          - postgres
           - postgres.${BASE_HOST}
     restart: unless-stopped
 
@@ -176,7 +178,7 @@ services:
 
   dockge:
     image: louislam/dockge:1
-    container_name: dockge-app
+    container_name: docker-cli-dockge
     environment:
       DOCKGE_STACKS_DIR: /opt/stacks
       DNSDOCK_NAME: dockge-app

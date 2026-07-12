@@ -18,7 +18,7 @@ bin/docker-cli init
 bin/docker-cli seed
 ```
 
-Команда спросит подтверждение и перезапишет сидируемые значения в `.env`. Сейчас она заполняет `DOCKGE_ADMIN_USERNAME=admin`, случайный `DOCKGE_ADMIN_PASSWORD`, а также случайные пароли `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` и `POSTGRES_PASSWORD`. Имена баз и пользователей MySQL/PostgreSQL предзаполнены в `.env`, их можно поменять вручную до первого запуска. Для автоматических сценариев можно использовать `bin/docker-cli seed --yes`.
+Команда спросит подтверждение и перезапишет сидируемые значения в `.env`. Сейчас она заполняет `DOCKGE_ADMIN_USERNAME=admin`, случайный `DOCKGE_ADMIN_PASSWORD`, а также случайные пароли `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` и `POSTGRES_PASSWORD`. Имена баз и пользователей MySQL/PostgreSQL предзаполнены в `.env` значением `system`, их можно поменять вручную до первого запуска. Для автоматических сценариев можно использовать `bin/docker-cli seed --yes`.
 
 После этого можно запускать и останавливать системное окружение:
 
@@ -43,7 +43,7 @@ bin/docker-cli stop
 
 Dockge не предоставляет штатные переменные окружения для bootstrap-администратора: в upstream это обсуждалось как feature request. Поэтому bootstrap реализован отдельным одноразовым seed-контейнером, а логин/пароль берутся из `.env`.
 
-MySQL и PostgreSQL не публикуют порты на хост: они доступны только из сети `docker-cli` по стандартным портам `3306` и `5432` и DNS-именам `mysql.${BASE_HOST}` / `postgres.${BASE_HOST}`. Adminer публикуется только через Traefik с TLS.
+MySQL и PostgreSQL не публикуют порты на хост: они доступны только из сети `docker-cli` по стандартным портам `3306` и `5432` и коротким алиасам `mysql` / `postgres` либо DNS-именам `mysql.${BASE_HOST}` / `postgres.${BASE_HOST}`. Adminer публикуется только через Traefik с TLS.
 
 По умолчанию `BASE_HOST=local.kubehut.top`, поэтому Dockge будет доступен по адресу:
 
