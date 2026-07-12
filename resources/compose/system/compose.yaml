@@ -31,6 +31,7 @@ services:
       - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
     environment:
       CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
+      DNSDOCK_ALIAS: dockge.${BASE_HOST}
     ports:
       - "80:80"
       - "443:443"
@@ -41,13 +42,16 @@ services:
       docker-cli:
         aliases:
           - traefik.${BASE_HOST}
+          - dockge.${BASE_HOST}
     restart: unless-stopped
 
   dockge:
     image: louislam/dockge:1
-    container_name: dockge
+    container_name: dockge-app
     environment:
       DOCKGE_STACKS_DIR: /opt/stacks
+      DNSDOCK_NAME: dockge-app
+      DNSDOCK_IMAGE: system
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - dockge-data:/app/data
@@ -60,8 +64,6 @@ services:
       traefik.http.services.dockge.loadbalancer.server.port: "5001"
     networks:
       docker-cli:
-        aliases:
-          - dockge.${BASE_HOST}
     restart: unless-stopped
 
 networks:
