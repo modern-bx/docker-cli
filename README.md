@@ -45,6 +45,8 @@ Dockge не предоставляет штатные переменные ок�
 
 MySQL и PostgreSQL не публикуют порты на хост: они доступны только из сети `docker-cli` по стандартным портам `3306` и `5432` и коротким алиасам `mysql` / `postgres` либо DNS-именам `mysql.${BASE_HOST}` / `postgres.${BASE_HOST}`. Adminer публикуется только через Traefik с TLS.
 
+Файлы, генерируемые системными контейнерами баз данных, лежат рядом с системным compose-файлом в `~/.config/docker-cli/compose/system/data`: для MySQL используются `data/mysql/data` и `data/mysql/logs`, для PostgreSQL — `data/postgres/data` и `data/postgres/logs`.
+
 По умолчанию `BASE_HOST=local.kubehut.top`, поэтому Dockge будет доступен по адресу:
 
 ```text

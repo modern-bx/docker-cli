@@ -132,7 +132,8 @@ services:
       DNSDOCK_NAME: mysql
       DNSDOCK_IMAGE: system
     volumes:
-      - mysql-data:/var/lib/mysql
+      - ./data/mysql/data:/var/lib/mysql
+      - ./data/mysql/logs:/var/log/mysql
     networks:
       docker-cli:
         aliases:
@@ -150,7 +151,8 @@ services:
       DNSDOCK_NAME: postgres
       DNSDOCK_IMAGE: system
     volumes:
-      - postgres-data:/var/lib/postgresql
+      - ./data/postgres/data:/var/lib/postgresql
+      - ./data/postgres/logs:/var/log/postgresql
     networks:
       docker-cli:
         aliases:
@@ -205,5 +207,3 @@ networks:
 volumes:
   dockge-data:
   traefik-letsencrypt:
-  mysql-data:
-  postgres-data:
