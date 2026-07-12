@@ -1,0 +1,74 @@
+name: docker-cli
+
+services:
+  dnsdock:
+    image: aacebedo/dnsdock:v1.18.0-rc2-amd64
+    container_name: dnsdock
+    command: ["--domain", "${BASE_HOST}"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "172.17.0.1:53:53/udp"
+    networks:
+      docker-cli:
+        aliases:
+          - dnsdock.${BASE_HOST}
+    restart: unless-stopped
+
+  traefik:
+    image: traefik:v3.6
+    container_name: traefik
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=docker-cli
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.cloudflare.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.cloudflare.acme.dnschallenge=true
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
+    environment:
+      CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-letsencrypt:/letsencrypt
+    networks:
+      docker-cli:
+        aliases:
+          - traefik.${BASE_HOST}
+    restart: unless-stopped
+
+  dockge:
+    image: louislam/dockge:1
+    container_name: dockge
+    environment:
+      DOCKGE_STACKS_DIR: /opt/stacks
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dockge-data:/app/data
+      - ./stacks:/opt/stacks
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.dockge.rule: Host(`dockge.${BASE_HOST}`)
+      traefik.http.routers.dockge.entrypoints: websecure
+      traefik.http.routers.dockge.tls.certresolver: cloudflare
+      traefik.http.services.dockge.loadbalancer.server.port: "5001"
+    networks:
+      docker-cli:
+        aliases:
+          - dockge.${BASE_HOST}
+    restart: unless-stopped
+
+networks:
+  docker-cli:
+    name: docker-cli
+    driver: bridge
+
+volumes:
+  dockge-data:
+  traefik-letsencrypt:

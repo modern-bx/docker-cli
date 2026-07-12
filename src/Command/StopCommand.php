@@ -5,35 +5,27 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Config\SystemCompose;
-use Symfony\Component\Console\Attribute\AsCommand;
+use DockerCli\Service\TranslatorFactory;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
-#[AsCommand(name: 'stop', description: 'Stop system services and remove the shared docker-cli network.')]
 final class StopCommand extends Command
 {
-    protected function execute(InputInterface $input, OutputInterface $output): int
+    use DockerComposeRunner;
+
+    private TranslatorInterface $translator;
+
+    public function __construct(?TranslatorInterface $translator = null)
     {
-        $compose = new SystemCompose();
-        $compose->ensure();
-
-        $output->writeln(sprintf('<info>Using system compose file:</info> %s', $compose->composeFile()));
-
-        return $this->runDockerCompose($compose->dockerComposeCommand('down'), ['--remove-orphans'], $output);
+        $this->translator = $translator ?? TranslatorFactory::create();
+        parent::__construct('stop');
+        $this->setDescription($this->translator->trans('command.stop.description'));
     }
 
-    /** @param list<string> $command @param list<string> $arguments */
-    private function runDockerCompose(array $command, array $arguments, OutputInterface $output): int
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $fullCommand = array_merge($command, $arguments);
-        $output->writeln('<comment>Running:</comment> ' . implode(' ', array_map('escapeshellarg', $fullCommand)));
-
-        $process = proc_open($fullCommand, [STDIN, STDOUT, STDERR], $pipes);
-        if (!is_resource($process)) {
-            throw new \RuntimeException('Unable to start docker compose process.');
-        }
-
-        return proc_close($process);
+        return $this->runOperation(new SystemCompose(), 'down', ['--remove-orphans'], $output, $this->translator);
     }
 }

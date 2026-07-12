@@ -46,7 +46,7 @@ foreach ($files as $file) {
 
     $path = $file->getPathname();
     $relativePath = substr($path, strlen($root) + 1);
-    if ($relativePath === 'LICENSE' || $relativePath === 'bin/docker-cli' || preg_match('/^(?:src|scripts|vendor)\//', $relativePath) || preg_match('/\.(?:json|lock)$/', $relativePath)) {
+    if ($relativePath === 'LICENSE' || $relativePath === 'bin/docker-cli' || preg_match('/^(?:resources|src|scripts|vendor)\//', $relativePath) || preg_match('/\.(?:json|lock)$/', $relativePath)) {
         $phar->addFile($path, $relativePath);
     }
 }

@@ -28,20 +28,41 @@ final class SystemCompose
         return $this->directory() . DIRECTORY_SEPARATOR . self::ENV_FILE;
     }
 
-    public function ensure(): void
+    public function init(): bool
     {
         $directory = $this->directory();
         if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf('Unable to create config directory "%s".', $directory));
         }
 
-        if (!file_exists($this->envFile())) {
-            file_put_contents($this->envFile(), $this->defaultEnv());
+        $created = false;
+        foreach ($this->templateMap() as $target => $template) {
+            if (file_exists($target)) {
+                continue;
+            }
+
+            copy($template, $target);
+            $created = true;
         }
 
-        if (!file_exists($this->composeFile())) {
-            file_put_contents($this->composeFile(), $this->composeYaml());
+        return $created;
+    }
+
+    public function assertInitialized(): void
+    {
+        $missingFiles = $this->missingFiles();
+        if ($missingFiles !== []) {
+            throw new MissingConfigException($missingFiles, $this->directory());
         }
+    }
+
+    /** @return list<string> */
+    public function missingFiles(): array
+    {
+        return array_values(array_filter(
+            [$this->envFile(), $this->composeFile()],
+            static fn (string $file): bool => !is_file($file)
+        ));
     }
 
     /** @return list<string> */
@@ -60,92 +81,14 @@ final class SystemCompose
         ];
     }
 
-    private function defaultEnv(): string
+    /** @return array<string, string> */
+    private function templateMap(): array
     {
-        return <<<'ENV'
-BASE_HOST=local.kubehut.top
-CLOUDFLARE_DNS_API_TOKEN=change-me
-ACME_EMAIL=admin@local.kubehut.top
-ENV;
-    }
+        $resources = dirname(__DIR__, 2) . '/resources/compose/system';
 
-    private function composeYaml(): string
-    {
-        return <<<'YAML'
-name: docker-cli
-
-services:
-  dnsdock:
-    image: aacebedo/dnsdock:latest
-    container_name: dnsdock
-    command: ["--domain", "${BASE_HOST}"]
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    ports:
-      - "172.17.0.1:53:53/udp"
-    networks:
-      docker-cli:
-        aliases:
-          - dnsdock.system.${BASE_HOST}
-    restart: unless-stopped
-
-  traefik:
-    image: traefik:v3.6
-    container_name: traefik
-    command:
-      - --api.dashboard=true
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --providers.docker.network=docker-cli
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL}
-      - --certificatesresolvers.cloudflare.acme.storage=/letsencrypt/acme.json
-      - --certificatesresolvers.cloudflare.acme.dnschallenge=true
-      - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
-    environment:
-      CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - traefik-letsencrypt:/letsencrypt
-    networks:
-      docker-cli:
-        aliases:
-          - traefik.system.${BASE_HOST}
-    restart: unless-stopped
-
-  dockge:
-    image: louislam/dockge:1
-    container_name: dockge
-    environment:
-      DOCKGE_STACKS_DIR: /opt/stacks
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - dockge-data:/app/data
-      - ./stacks:/opt/stacks
-    labels:
-      traefik.enable: "true"
-      traefik.http.routers.dockge.rule: Host(`dockge.system.${BASE_HOST}`)
-      traefik.http.routers.dockge.entrypoints: websecure
-      traefik.http.routers.dockge.tls.certresolver: cloudflare
-      traefik.http.services.dockge.loadbalancer.server.port: "5001"
-    networks:
-      docker-cli:
-        aliases:
-          - dockge.system.${BASE_HOST}
-    restart: unless-stopped
-
-networks:
-  docker-cli:
-    name: docker-cli
-    driver: bridge
-
-volumes:
-  dockge-data:
-  traefik-letsencrypt:
-YAML;
+        return [
+            $this->envFile() => $resources . '/' . self::ENV_FILE,
+            $this->composeFile() => $resources . '/' . self::COMPOSE_FILE,
+        ];
     }
 }

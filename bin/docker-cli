@@ -1,6 +1,7 @@
 #!/usr/bin/env php
 <?php
 
+use DockerCli\Command\InitCommand;
 use DockerCli\Command\StartCommand;
 use DockerCli\Command\StopCommand;
 use Symfony\Component\Console\Application;
@@ -8,6 +9,7 @@ use Symfony\Component\Console\Application;
 require __DIR__ . '/../vendor/autoload.php';
 
 $application = new Application('docker-cli', '0.1.0');
+$application->add(new InitCommand());
 $application->add(new StartCommand());
 $application->add(new StopCommand());
 $application->setDefaultCommand('list');

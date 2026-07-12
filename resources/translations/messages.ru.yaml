@@ -1,0 +1,8 @@
+command.init.description: 'Создать файлы настроек docker-cli.'
+command.start.description: 'Запустить общую сеть docker-cli и системные сервисы.'
+command.stop.description: 'Остановить системные сервисы и удалить общую сеть docker-cli.'
+config.created: 'Файлы настроек созданы в %directory%.'
+config.exists: 'Файлы настроек уже существуют в %directory%, существующие файлы не изменены.'
+config.using: 'Используется compose-файл: %file%'
+config.missing: 'Не найдены необходимые файлы настроек docker-cli: %files%. Выполните команду `docker-cli init`, затем проверьте параметры в %directory%.'
+process.running: 'Выполняется: %command%'
