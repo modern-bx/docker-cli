@@ -51,7 +51,7 @@ MySQL и PostgreSQL не публикуют порты на хост: они д�
 https://dockge.local.kubehut.top
 ```
 
-DNS-имя Adminer регистрируется на контейнер Traefik через `DNSDOCK_ALIAS`, поэтому браузер попадает в HTTPS-router Traefik, а не напрямую в контейнер Adminer. Для `websecure` включён wildcard-сертификат `*.${BASE_HOST}` через Cloudflare DNS challenge, чтобы новые HTTPS-сервисы не получали дефолтный сертификат Traefik.
+DNS-имя Adminer регистрируется на контейнер Traefik через `DNSDOCK_ALIAS`, поэтому браузер попадает в HTTPS-router Traefik, а не напрямую в контейнер Adminer. Для `websecure` включён wildcard-сертификат `*.${BASE_HOST}` через Cloudflare DNS challenge, чтобы новые HTTPS-сервисы не получали дефолтный сертификат Traefik. ACME DNS challenge использует публичные резолверы `1.1.1.1` и `8.8.8.8`, чтобы Traefik не определял локальную зону dnsdock как Cloudflare-зону.
 
 Adminer доступен по адресу:
 
