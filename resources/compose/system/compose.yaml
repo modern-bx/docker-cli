@@ -31,7 +31,7 @@ services:
       - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
     environment:
       CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
-      DNSDOCK_ALIAS: dockge.${BASE_HOST}
+      DNSDOCK_ALIAS: dockge.${BASE_HOST},adminer.${BASE_HOST}
     ports:
       - "80:80"
       - "443:443"
@@ -43,6 +43,7 @@ services:
         aliases:
           - traefik.${BASE_HOST}
           - dockge.${BASE_HOST}
+          - adminer.${BASE_HOST}
     restart: unless-stopped
 
   dockge-seed:
@@ -166,8 +167,6 @@ services:
       traefik.http.services.adminer.loadbalancer.server.port: "8080"
     networks:
       docker-cli:
-        aliases:
-          - adminer.${BASE_HOST}
     restart: unless-stopped
 
   dockge:

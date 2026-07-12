@@ -51,6 +51,8 @@ MySQL и PostgreSQL не публикуют порты на хост: они д�
 https://dockge.local.kubehut.top
 ```
 
+DNS-имя Adminer регистрируется на контейнер Traefik через `DNSDOCK_ALIAS`, поэтому браузер попадает в HTTPS-router Traefik, а не напрямую в контейнер Adminer.
+
 Adminer доступен по адресу:
 
 ```text
