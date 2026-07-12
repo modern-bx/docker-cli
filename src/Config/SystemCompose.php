@@ -45,6 +45,18 @@ final class SystemCompose
             $created = true;
         }
 
+        foreach ($this->dataDirectories() as $dataDirectory) {
+            if (is_dir($dataDirectory)) {
+                continue;
+            }
+
+            if (!mkdir($dataDirectory, 0755, true) && !is_dir($dataDirectory)) {
+                throw new \RuntimeException(sprintf('Unable to create data directory "%s".', $dataDirectory));
+            }
+
+            $created = true;
+        }
+
         return $created;
     }
 
@@ -78,6 +90,19 @@ final class SystemCompose
             '--file',
             $this->composeFile(),
             $operation,
+        ];
+    }
+
+    /** @return list<string> */
+    private function dataDirectories(): array
+    {
+        $data = $this->directory() . DIRECTORY_SEPARATOR . 'data';
+
+        return [
+            $data . DIRECTORY_SEPARATOR . 'mysql' . DIRECTORY_SEPARATOR . 'data',
+            $data . DIRECTORY_SEPARATOR . 'mysql' . DIRECTORY_SEPARATOR . 'logs',
+            $data . DIRECTORY_SEPARATOR . 'postgres' . DIRECTORY_SEPARATOR . 'data',
+            $data . DIRECTORY_SEPARATOR . 'postgres' . DIRECTORY_SEPARATOR . 'logs',
         ];
     }
 

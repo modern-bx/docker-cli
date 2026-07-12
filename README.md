@@ -18,7 +18,7 @@ bin/docker-cli init
 bin/docker-cli seed
 ```
 
-Команда спросит подтверждение и перезапишет сидируемые значения в `.env`. Сейчас она заполняет `DOCKGE_ADMIN_USERNAME=admin` и случайный `DOCKGE_ADMIN_PASSWORD`. Для автоматических сценариев можно использовать `bin/docker-cli seed --yes`.
+Команда спросит подтверждение и перезапишет сидируемые значения в `.env`. Сейчас она заполняет `DOCKGE_ADMIN_USERNAME=admin`, случайный `DOCKGE_ADMIN_PASSWORD`, а также случайные пароли `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` и `POSTGRES_PASSWORD`. Имена баз и пользователей MySQL/PostgreSQL предзаполнены в `.env` значением `system`, их можно поменять вручную до первого запуска. Для автоматических сценариев можно использовать `bin/docker-cli seed --yes`.
 
 После этого можно запускать и останавливать системное окружение:
 
@@ -36,14 +36,29 @@ bin/docker-cli stop
 - `dnsdock` для автоматических DNS-имён контейнеров;
 - `traefik` для HTTPS-доступа и выпуска сертификатов через Cloudflare DNS challenge;
 - `dockge` как веб-интерфейс мониторинга и управления compose-стеками;
-- `dockge-seed` как одноразовый контейнер, который при первом запуске создаёт администратора Dockge через setup-событие Socket.IO и спокойно завершается, если Dockge уже инициализирован.
+- `dockge-seed` как одноразовый контейнер, который при первом запуске создаёт администратора Dockge через setup-событие Socket.IO и спокойно завершается, если Dockge уже инициализирован;
+- `mysql` на образе `mysql:8.0`;
+- `postgres` на образе `postgres:18`, актуальной стабильной ветке PostgreSQL на 12 июля 2026 года;
+- `adminer` как HTTPS web-интерфейс для работы с базами данных.
 
 Dockge не предоставляет штатные переменные окружения для bootstrap-администратора: в upstream это обсуждалось как feature request. Поэтому bootstrap реализован отдельным одноразовым seed-контейнером, а логин/пароль берутся из `.env`.
+
+MySQL и PostgreSQL не публикуют порты на хост: они доступны только из сети `docker-cli` по стандартным портам `3306` и `5432` и коротким алиасам `mysql` / `postgres` либо DNS-именам `mysql.${BASE_HOST}` / `postgres.${BASE_HOST}`. Adminer публикуется только через Traefik с TLS.
+
+Файлы, генерируемые системными контейнерами баз данных, лежат рядом с системным compose-файлом в `~/.config/docker-cli/compose/system/data`: для MySQL используются `data/mysql/data` и `data/mysql/logs`, для PostgreSQL — `data/postgres/data` и `data/postgres/logs`.
 
 По умолчанию `BASE_HOST=local.kubehut.top`, поэтому Dockge будет доступен по адресу:
 
 ```text
 https://dockge.local.kubehut.top
+```
+
+DNS-имя Adminer регистрируется на контейнер Traefik через `DNSDOCK_ALIAS`, поэтому браузер попадает в HTTPS-router Traefik, а не напрямую в контейнер Adminer. Для `websecure` включён wildcard-сертификат `*.${BASE_HOST}` через Cloudflare DNS challenge, чтобы новые HTTPS-сервисы не получали дефолтный сертификат Traefik. ACME DNS challenge использует публичные резолверы `1.1.1.1` и `8.8.8.8`, чтобы Traefik не определял локальную зону dnsdock как Cloudflare-зону.
+
+Adminer доступен по адресу:
+
+```text
+https://adminer.local.kubehut.top
 ```
 
 Язык сообщений CLI задаётся параметром `APP_LOCALE` в сгенерированном `.env`. По умолчанию используется русский (`ru`). Логин администратора Dockge по умолчанию — `admin`, пароль записывает команда `seed`.

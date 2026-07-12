@@ -53,6 +53,9 @@ final class SeedCommand extends Command
         $values = $this->readEnvFile($compose->envFile());
         $values['DOCKGE_ADMIN_USERNAME'] = 'admin';
         $values['DOCKGE_ADMIN_PASSWORD'] = $this->randomSecret();
+        $values['MYSQL_ROOT_PASSWORD'] = $this->randomSecret();
+        $values['MYSQL_PASSWORD'] = $this->randomSecret();
+        $values['POSTGRES_PASSWORD'] = $this->randomSecret();
         $this->writeEnvFile($compose->envFile(), $values);
 
         $output->writeln('<info>' . $this->translator->trans('command.seed.completed', [
@@ -90,6 +93,13 @@ final class SeedCommand extends Command
             'ACME_EMAIL',
             'DOCKGE_ADMIN_USERNAME',
             'DOCKGE_ADMIN_PASSWORD',
+            'MYSQL_ROOT_PASSWORD',
+            'MYSQL_DATABASE',
+            'MYSQL_USER',
+            'MYSQL_PASSWORD',
+            'POSTGRES_DB',
+            'POSTGRES_USER',
+            'POSTGRES_PASSWORD',
         ];
 
         $lines = [];

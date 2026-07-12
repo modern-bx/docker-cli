@@ -3,7 +3,7 @@ name: docker-cli
 services:
   dnsdock:
     image: aacebedo/dnsdock:v1.18.0-rc2-amd64
-    container_name: dnsdock
+    container_name: docker-cli-dnsdock
     command: ["--domain", "${BASE_HOST}"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -17,7 +17,7 @@ services:
 
   traefik:
     image: traefik:v3.6
-    container_name: traefik
+    container_name: docker-cli-traefik
     command:
       - --api.dashboard=true
       - --providers.docker=true
@@ -25,13 +25,17 @@ services:
       - --providers.docker.network=docker-cli
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls.certresolver=cloudflare
+      - --entrypoints.websecure.http.tls.domains[0].main=${BASE_HOST}
+      - --entrypoints.websecure.http.tls.domains[0].sans=*.${BASE_HOST}
       - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL}
       - --certificatesresolvers.cloudflare.acme.storage=/letsencrypt/acme.json
       - --certificatesresolvers.cloudflare.acme.dnschallenge=true
       - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
     environment:
       CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
-      DNSDOCK_ALIAS: dockge.${BASE_HOST}
+      DNSDOCK_ALIAS: dockge.${BASE_HOST},adminer.${BASE_HOST}
     ports:
       - "80:80"
       - "443:443"
@@ -43,11 +47,12 @@ services:
         aliases:
           - traefik.${BASE_HOST}
           - dockge.${BASE_HOST}
+          - adminer.${BASE_HOST}
     restart: unless-stopped
 
   dockge-seed:
     image: node:22-alpine
-    container_name: dockge-seed
+    container_name: docker-cli-dockge-seed
     depends_on:
       - dockge
     environment:
@@ -116,9 +121,66 @@ services:
       docker-cli:
     restart: "no"
 
+  mysql:
+    image: mysql:8.0
+    container_name: docker-cli-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-system}
+      MYSQL_USER: ${MYSQL_USER:-system}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      DNSDOCK_NAME: mysql
+      DNSDOCK_IMAGE: system
+    volumes:
+      - ./data/mysql/data:/var/lib/mysql
+      - ./data/mysql/logs:/var/log/mysql
+    networks:
+      docker-cli:
+        aliases:
+          - mysql
+          - mysql.${BASE_HOST}
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18
+    container_name: docker-cli-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-system}
+      POSTGRES_USER: ${POSTGRES_USER:-system}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DNSDOCK_NAME: postgres
+      DNSDOCK_IMAGE: system
+    volumes:
+      - ./data/postgres/data:/var/lib/postgresql
+      - ./data/postgres/logs:/var/log/postgresql
+    networks:
+      docker-cli:
+        aliases:
+          - postgres
+          - postgres.${BASE_HOST}
+    restart: unless-stopped
+
+  adminer:
+    image: adminer:latest
+    container_name: docker-cli-adminer
+    environment:
+      ADMINER_DEFAULT_SERVER: mysql
+      DNSDOCK_NAME: adminer
+      DNSDOCK_IMAGE: system
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.adminer.rule: Host(`adminer.${BASE_HOST}`)
+      traefik.http.routers.adminer.entrypoints: websecure
+      traefik.http.routers.adminer.tls: "true"
+      traefik.http.routers.adminer.tls.certresolver: cloudflare
+      traefik.http.services.adminer.loadbalancer.server.port: "8080"
+    networks:
+      docker-cli:
+    restart: unless-stopped
+
   dockge:
     image: louislam/dockge:1
-    container_name: dockge-app
+    container_name: docker-cli-dockge
     environment:
       DOCKGE_STACKS_DIR: /opt/stacks
       DNSDOCK_NAME: dockge-app
