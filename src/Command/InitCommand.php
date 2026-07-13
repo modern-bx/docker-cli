@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Config\SystemCompose;
+use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Service\TranslatorFactory;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -24,12 +25,14 @@ final class InitCommand extends Command
         $this->setDescription($this->translator->trans('command.init.description'));
         $this->addOption('update', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.update_option'));
         $this->addOption('migrate', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.migrate_option'));
+        $this->addOption('rebuild', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.rebuild_option'));
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $update = (bool) $input->getOption('update');
         $migrate = (bool) $input->getOption('migrate');
+        $rebuild = (bool) $input->getOption('rebuild');
 
         if ($update) {
             $question = new ConfirmationQuestion($this->translator->trans('command.init.update_confirm') . ' ', false);
@@ -47,6 +50,11 @@ final class InitCommand extends Command
         $output->writeln('<info>' . $this->translator->trans($message, [
             '%directory%' => $compose->directory(),
         ]) . '</info>');
+
+        if ($rebuild) {
+            (new OpenRestyHostRenderer())->render();
+            $output->writeln('<info>' . $this->translator->trans('config.rebuilt') . '</info>');
+        }
 
         return Command::SUCCESS;
     }
