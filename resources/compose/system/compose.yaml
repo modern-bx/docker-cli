@@ -160,6 +160,26 @@ services:
           - postgres.${BASE_HOST}
     restart: unless-stopped
 
+  openresty:
+    image: openresty/openresty:1.27.1.2-alpine
+    container_name: docker-cli-openresty
+    environment:
+      DNSDOCK_NAME: openresty
+      DNSDOCK_IMAGE: system
+    volumes:
+      - ./config/openresty/hosts:/etc/nginx/conf.d:ro
+      - /:/host:ro
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.openresty.rule: HostRegexp(`^web-.+\.${BASE_HOST}$`)
+      traefik.http.routers.openresty.entrypoints: websecure
+      traefik.http.routers.openresty.tls: "true"
+      traefik.http.routers.openresty.tls.certresolver: cloudflare
+      traefik.http.services.openresty.loadbalancer.server.port: "80"
+    networks:
+      docker-cli:
+    restart: unless-stopped
+
   adminer:
     image: adminer:latest
     container_name: docker-cli-adminer

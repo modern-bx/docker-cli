@@ -103,6 +103,7 @@ final class SystemCompose
             $data . DIRECTORY_SEPARATOR . 'mysql' . DIRECTORY_SEPARATOR . 'logs',
             $data . DIRECTORY_SEPARATOR . 'postgres' . DIRECTORY_SEPARATOR . 'data',
             $data . DIRECTORY_SEPARATOR . 'postgres' . DIRECTORY_SEPARATOR . 'logs',
+            $this->directory() . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'openresty' . DIRECTORY_SEPARATOR . 'hosts',
         ];
     }
 

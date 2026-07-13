@@ -6,8 +6,11 @@ namespace DockerCli\Command;
 
 use DockerCli\Framework\Description\FrameworkDescriptionService;
 use DockerCli\Framework\FrameworkDetectionService;
+use DockerCli\Project\ConfigurableServicesRestarter;
+use DockerCli\Project\OpenRestyHostRenderer;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
@@ -21,6 +24,7 @@ final class RegisterCommand extends Command
         parent::__construct('register');
         $this->setDescription('Зарегистрировать проект docker-cli.');
         $this->addArgument('project-name', InputArgument::REQUIRED, 'Имя проекта.');
+        $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -67,6 +71,7 @@ final class RegisterCommand extends Command
                     'name' => $projectName,
                     'framework' => $description->getCodeName()->value,
                     'root' => $projectRoot,
+                    'document_root' => $framework->getDocumentRoot(),
                 ],
             ],
         ]);
@@ -82,6 +87,15 @@ final class RegisterCommand extends Command
                 ],
             ],
         ]);
+
+        (new OpenRestyHostRenderer())->render();
+
+        if (!$input->getOption('no-restart')) {
+            $restartCode = (new ConfigurableServicesRestarter())->restart($output);
+            if ($restartCode !== Command::SUCCESS) {
+                return $restartCode;
+            }
+        }
 
         $output->writeln(sprintf('<info>Проект "%s" зарегистрирован.</info>', $projectName));
 
