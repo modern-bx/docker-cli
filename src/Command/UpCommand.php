@@ -15,15 +15,15 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
-final class RegisterCommand extends Command
+final class UpCommand extends Command
 {
     public function __construct(
         private readonly ?FrameworkDetectionService $detectionService = null,
         private readonly ?FrameworkDescriptionService $descriptionService = null,
     ) {
-        parent::__construct('register');
+        parent::__construct('up');
         $this->setDescription('Зарегистрировать проект docker-cli.');
-        $this->addArgument('project-name', InputArgument::REQUIRED, 'Имя проекта.');
+        $this->addArgument('project-name', InputArgument::OPTIONAL, 'Имя проекта. По умолчанию используется имя папки проекта.');
         $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
     }
 
@@ -36,7 +36,13 @@ final class RegisterCommand extends Command
             return Command::FAILURE;
         }
 
-        $projectName = (string) $input->getArgument('project-name');
+        $projectName = $this->resolveProjectName($input, $framework->getProjectRoot());
+        if (!$this->isValidProjectName($projectName)) {
+            $output->writeln(sprintf('<error>Имя проекта "%s" не соответствует конвенции: используйте строчные латинские буквы, цифры и дефисы; имя должно начинаться и заканчиваться буквой или цифрой.</error>', $projectName));
+
+            return Command::FAILURE;
+        }
+
         $projectsDirectory = $this->projectsDirectory();
         $projectDirectory = $projectsDirectory . DIRECTORY_SEPARATOR . $projectName;
 
@@ -100,6 +106,21 @@ final class RegisterCommand extends Command
         $output->writeln(sprintf('<info>Проект "%s" зарегистрирован.</info>', $projectName));
 
         return Command::SUCCESS;
+    }
+
+    private function resolveProjectName(InputInterface $input, string $projectRoot): string
+    {
+        $projectName = $input->getArgument('project-name');
+        if (is_string($projectName) && $projectName !== '') {
+            return $projectName;
+        }
+
+        return basename($projectRoot);
+    }
+
+    private function isValidProjectName(string $projectName): bool
+    {
+        return (bool) preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $projectName);
     }
 
     private function projectsDirectory(): string

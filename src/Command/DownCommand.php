@@ -13,11 +13,11 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
-final class UnregisterCommand extends Command
+final class DownCommand extends Command
 {
     public function __construct(private readonly ?FrameworkDetectionService $detectionService = null)
     {
-        parent::__construct('unregister');
+        parent::__construct('down');
         $this->setDescription('Удалить регистрацию проекта docker-cli.');
         $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
     }
