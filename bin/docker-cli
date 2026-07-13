@@ -9,30 +9,7 @@ use DockerCli\Command\StartCommand;
 use DockerCli\Command\StopCommand;
 use Symfony\Component\Console\Application;
 
-$autoloadFiles = [];
-if (class_exists(Phar::class, false) && Phar::running(false) !== '') {
-    $autoloadFiles[] = 'phar://' . Phar::running(false) . '/vendor/autoload.php';
-}
-$autoloadFiles[] = __DIR__ . '/../vendor/autoload.php';
-$autoloadFiles[] = __DIR__ . '/vendor/autoload.php';
-
-$autoloadFile = null;
-foreach ($autoloadFiles as $candidate) {
-    if (is_file($candidate)) {
-        $autoloadFile = $candidate;
-        break;
-    }
-}
-
-if ($autoloadFile === null) {
-    fwrite(STDERR, implode(PHP_EOL, [
-        'Unable to find Composer autoload.php for docker-cli.',
-        'Run docker-cli from the project checkout after `composer install`, or use the self-contained PHAR built by `php -d phar.readonly=0 scripts/build-phar.php`.',
-    ]) . PHP_EOL);
-    exit(1);
-}
-
-require $autoloadFile;
+require __DIR__ . '/../vendor/autoload.php';
 
 $application = new Application('docker-cli', '0.1.0');
 $application->add(new InitCommand());
