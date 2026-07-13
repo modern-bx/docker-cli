@@ -167,4 +167,4 @@ cat /etc/resolv.conf
 php -d phar.readonly=0 scripts/build-phar.php
 ```
 
-Команда создаёт `build/docker-cli.phar`.
+Команда создаёт самодостаточный исполняемый файл `build/docker-cli`, который можно скопировать в папку проекта и запускать как `php docker-cli` или `./docker-cli`. Обычный `bin/docker-cli` предназначен для запуска из checkout-а репозитория с установленными Composer-зависимостями.

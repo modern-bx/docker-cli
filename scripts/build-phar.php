@@ -5,6 +5,7 @@ declare(strict_types=1);
 $root = dirname(__DIR__);
 $buildDir = $root . '/build';
 $pharPath = $buildDir . '/docker-cli.phar';
+$executablePath = $buildDir . '/docker-cli';
 
 if (!extension_loaded('phar')) {
     fwrite(STDERR, "The phar extension is required.\n");
@@ -21,8 +22,10 @@ if (!is_dir($buildDir) && !mkdir($buildDir, 0755, true) && !is_dir($buildDir)) {
     exit(1);
 }
 
-if (file_exists($pharPath)) {
-    unlink($pharPath);
+foreach ([$pharPath, $executablePath] as $path) {
+    if (file_exists($path)) {
+        unlink($path);
+    }
 }
 
 $phar = new Phar($pharPath);
@@ -53,6 +56,8 @@ foreach ($files as $file) {
 
 $phar->setStub("#!/usr/bin/env php\n" . $phar->createDefaultStub('bin/docker-cli'));
 $phar->stopBuffering();
+copy($pharPath, $executablePath);
 chmod($pharPath, 0755);
+chmod($executablePath, 0755);
 
-echo "Built {$pharPath}\n";
+echo "Built {$executablePath}\n";
