@@ -44,7 +44,7 @@ final class OpenRestyHostRenderer
             file_put_contents($target, strtr($contents, [
                 '{{ project_name }}' => $project['name'],
                 '{{ host_name }}' => $hostName,
-                '{{ document_root }}' => join_path('/host', $project['document_root']),
+                '{{ document_root }}' => $this->containerDocumentRoot($project['document_root']),
             ]));
         }
 
@@ -101,6 +101,15 @@ final class OpenRestyHostRenderer
     private function templateFile(string $framework): string
     {
         return join_path(dirname(__DIR__, 2), 'resources', 'compose', 'system', self::HOSTS_RELATIVE_PATH, $framework, 'web.conf');
+    }
+
+    private function containerDocumentRoot(string $documentRoot): string
+    {
+        if ($documentRoot === '/home' || str_starts_with($documentRoot, '/home/')) {
+            return $documentRoot;
+        }
+
+        return join_path('/host', $documentRoot);
     }
 
     private function readBaseHost(string $envFile): string
