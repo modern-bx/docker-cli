@@ -30,7 +30,7 @@ final class SystemCompose
         return join_path($this->directory(), self::ENV_FILE);
     }
 
-    public function init(): bool
+    public function init(bool $updateStatic = false, bool $migrateEditable = false): bool
     {
         $directory = $this->directory();
         if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
@@ -45,6 +45,21 @@ final class SystemCompose
 
             copy($template, $target);
             $created = true;
+        }
+
+        if ($updateStatic) {
+            foreach ($this->staticTemplateMap() as $target => $template) {
+                copy($template, $target);
+                $created = true;
+            }
+        }
+
+        if ($migrateEditable) {
+            foreach ($this->editableTemplateMap() as $target => $template) {
+                if ($this->migrateEnvFile($target, $template)) {
+                    $created = true;
+                }
+            }
         }
 
         foreach ($this->dataDirectories() as $dataDirectory) {
@@ -112,11 +127,81 @@ final class SystemCompose
     /** @return array<string, string> */
     private function templateMap(): array
     {
+        return $this->editableTemplateMap() + $this->staticTemplateMap();
+    }
+
+    /** @return array<string, string> */
+    private function staticTemplateMap(): array
+    {
+        $resources = join_path(dirname(__DIR__, 2), 'resources', 'compose', 'system');
+
+        return [
+            $this->composeFile() => join_path($resources, self::COMPOSE_FILE),
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function editableTemplateMap(): array
+    {
         $resources = join_path(dirname(__DIR__, 2), 'resources', 'compose', 'system');
 
         return [
             $this->envFile() => join_path($resources, self::ENV_FILE),
-            $this->composeFile() => join_path($resources, self::COMPOSE_FILE),
         ];
     }
+
+    private function migrateEnvFile(string $target, string $template): bool
+    {
+        if (!is_file($target)) {
+            copy($template, $target);
+
+            return true;
+        }
+
+        $currentContents = file_get_contents($target);
+        if ($currentContents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $target));
+        }
+
+        $templateContents = file_get_contents($template);
+        if ($templateContents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env template "%s".', $template));
+        }
+
+        $currentValues = $this->readEnvValues($currentContents);
+        $templateValues = $this->readEnvValues($templateContents);
+        $missingLines = [];
+        foreach ($templateValues as $key => $value) {
+            if (!array_key_exists($key, $currentValues)) {
+                $missingLines[] = $key . '=' . $value;
+            }
+        }
+
+        if ($missingLines === []) {
+            return false;
+        }
+
+        $separator = str_ends_with($currentContents, PHP_EOL) || $currentContents === '' ? '' : PHP_EOL;
+        file_put_contents($target, $currentContents . $separator . implode(PHP_EOL, $missingLines) . PHP_EOL);
+
+        return true;
+    }
+
+    /** @return array<string, string> */
+    private function readEnvValues(string $contents): array
+    {
+        $values = [];
+        foreach (explode(PHP_EOL, $contents) as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+                continue;
+            }
+
+            [$key, $value] = explode('=', $line, 2);
+            $values[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
+        }
+
+        return $values;
+    }
 }
+

@@ -51,11 +51,11 @@ final class SeedCommand extends Command
         }
 
         $values = $this->readEnvFile($compose->envFile());
-        $values['DOCKGE_ADMIN_USERNAME'] = 'admin';
-        $values['DOCKGE_ADMIN_PASSWORD'] = $this->randomSecret();
-        $values['MYSQL_ROOT_PASSWORD'] = $this->randomSecret();
-        $values['MYSQL_PASSWORD'] = $this->randomSecret();
-        $values['POSTGRES_PASSWORD'] = $this->randomSecret();
+        $this->setDefaultIfEmpty($values, 'DOCKGE_ADMIN_USERNAME', 'admin');
+        $this->setDefaultIfEmpty($values, 'DOCKGE_ADMIN_PASSWORD', $this->randomSecret());
+        $this->setDefaultIfEmpty($values, 'MYSQL_ROOT_PASSWORD', $this->randomSecret());
+        $this->setDefaultIfEmpty($values, 'MYSQL_PASSWORD', $this->randomSecret());
+        $this->setDefaultIfEmpty($values, 'POSTGRES_PASSWORD', $this->randomSecret());
         $this->writeEnvFile($compose->envFile(), $values);
 
         $output->writeln('<info>' . $this->translator->trans('command.seed.completed', [
@@ -115,6 +115,14 @@ final class SeedCommand extends Command
         }
 
         file_put_contents($file, implode(PHP_EOL, $lines) . PHP_EOL);
+    }
+
+    /** @param array<string, string> $values */
+    private function setDefaultIfEmpty(array &$values, string $key, string $default): void
+    {
+        if (($values[$key] ?? '') === '') {
+            $values[$key] = $default;
+        }
     }
 
     private function randomSecret(): string
