@@ -170,7 +170,12 @@ services:
       - sh
       - -ec
       - |
-        sed -i 's/^user .*/user root;/' /usr/local/openresty/nginx/conf/nginx.conf
+        tmp_conf="$$(mktemp)"
+        {
+          echo 'user root;'
+          sed '/^[[:space:]]*user[[:space:]]/d' /usr/local/openresty/nginx/conf/nginx.conf
+        } > "$${tmp_conf}"
+        cat "$${tmp_conf}" > /usr/local/openresty/nginx/conf/nginx.conf
         exec /usr/local/openresty/bin/openresty -g 'daemon off;'
     volumes:
       - ./config/openresty/hosts:/etc/nginx/conf.d:ro
