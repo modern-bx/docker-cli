@@ -6,6 +6,7 @@ namespace DockerCli\Project;
 
 use DockerCli\Config\SystemCompose;
 use Symfony\Component\Yaml\Yaml;
+use function DockerCli\Util\join_path;
 
 final class OpenRestyHostRenderer
 {
@@ -19,7 +20,7 @@ final class OpenRestyHostRenderer
             throw new \RuntimeException(sprintf('Unable to create OpenResty hosts directory "%s".', $hostsDirectory));
         }
 
-        foreach (glob($hostsDirectory . DIRECTORY_SEPARATOR . '*.web.conf') ?: [] as $hostFile) {
+        foreach (glob(join_path($hostsDirectory, '*.web.conf')) ?: [] as $hostFile) {
             unlink($hostFile);
         }
 
@@ -36,18 +37,18 @@ final class OpenRestyHostRenderer
             }
 
             $hostName = sprintf('web-%s.%s', $project['name'], $baseHost);
-            $target = $hostsDirectory . DIRECTORY_SEPARATOR . $project['name'] . '.web.conf';
+            $target = join_path($hostsDirectory, $project['name'] . '.web.conf');
             file_put_contents($target, strtr($contents, [
                 '{{ project_name }}' => $project['name'],
                 '{{ host_name }}' => $hostName,
-                '{{ document_root }}' => '/host' . $project['document_root'],
+                '{{ document_root }}' => join_path('/host', $project['document_root']),
             ]));
         }
     }
 
     public function hostsDirectory(SystemCompose $compose): string
     {
-        return $compose->directory() . DIRECTORY_SEPARATOR . self::HOSTS_RELATIVE_PATH;
+        return join_path($compose->directory(), self::HOSTS_RELATIVE_PATH);
     }
 
     /** @return list<array{name: string, framework: string, document_root: string}> */
@@ -59,7 +60,7 @@ final class OpenRestyHostRenderer
         }
 
         $projects = [];
-        foreach (glob($projectsDirectory . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR . 'project.yaml') ?: [] as $projectFile) {
+        foreach (glob(join_path($projectsDirectory, '*', 'project.yaml')) ?: [] as $projectFile) {
             $data = Yaml::parseFile($projectFile);
             if (!is_array($data)) {
                 continue;
@@ -89,12 +90,12 @@ final class OpenRestyHostRenderer
     {
         $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
 
-        return rtrim($home, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.config' . DIRECTORY_SEPARATOR . 'docker-cli' . DIRECTORY_SEPARATOR . 'projects';
+        return join_path($home, '.config', 'docker-cli', 'projects');
     }
 
     private function templateFile(string $framework): string
     {
-        return dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'compose' . DIRECTORY_SEPARATOR . 'system' . DIRECTORY_SEPARATOR . self::HOSTS_RELATIVE_PATH . DIRECTORY_SEPARATOR . $framework . DIRECTORY_SEPARATOR . 'web.conf';
+        return join_path(dirname(__DIR__, 2), 'resources', 'compose', 'system', self::HOSTS_RELATIVE_PATH, $framework, 'web.conf');
     }
 
     private function readBaseHost(string $envFile): string

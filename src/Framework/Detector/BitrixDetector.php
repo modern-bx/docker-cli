@@ -6,6 +6,7 @@ namespace DockerCli\Framework\Detector;
 
 use DockerCli\Framework\Detected\Bitrix;
 use DockerCli\Framework\Detected\DetectedFramework;
+use function DockerCli\Util\join_path;
 
 final class BitrixDetector implements FrameworkDetectorInterface
 {
@@ -18,7 +19,7 @@ final class BitrixDetector implements FrameworkDetectorInterface
         ];
 
         foreach ($bitrixMarkers as $marker) {
-            if (is_file($projectRoot . DIRECTORY_SEPARATOR . $marker)) {
+            if (is_file(join_path($projectRoot, $marker))) {
                 return new Bitrix($projectRoot);
             }
         }

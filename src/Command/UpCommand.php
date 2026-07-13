@@ -14,6 +14,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
+use function DockerCli\Util\join_path;
 
 final class UpCommand extends Command
 {
@@ -44,7 +45,7 @@ final class UpCommand extends Command
         }
 
         $projectsDirectory = $this->projectsDirectory();
-        $projectDirectory = $projectsDirectory . DIRECTORY_SEPARATOR . $projectName;
+        $projectDirectory = join_path($projectsDirectory, $projectName);
 
         if (is_dir($projectDirectory)) {
             $output->writeln(sprintf('<error>Проект "%s" уже зарегистрирован.</error>', $projectName));
@@ -67,7 +68,7 @@ final class UpCommand extends Command
         $description = ($this->descriptionService ?? new FrameworkDescriptionService())->describe($framework);
         $projectRoot = $framework->getProjectRoot();
 
-        $this->writeYaml($projectDirectory . DIRECTORY_SEPARATOR . 'project.yaml', [
+        $this->writeYaml(join_path($projectDirectory, 'project.yaml'), [
             'meta' => [
                 'schema' => 'project',
                 'version' => 0.1,
@@ -82,7 +83,7 @@ final class UpCommand extends Command
             ],
         ]);
 
-        $this->writeYaml($projectRoot . DIRECTORY_SEPARATOR . '.docker-cli.yaml', [
+        $this->writeYaml(join_path($projectRoot, '.docker-cli.yaml'), [
             'meta' => [
                 'schema' => 'project-meta',
                 'version' => 0.1,
@@ -130,7 +131,7 @@ final class UpCommand extends Command
             throw new \RuntimeException('Unable to determine HOME directory.');
         }
 
-        return rtrim($home, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.config' . DIRECTORY_SEPARATOR . 'docker-cli' . DIRECTORY_SEPARATOR . 'projects';
+        return join_path($home, '.config', 'docker-cli', 'projects');
     }
 
     /** @param array<string, mixed> $data */

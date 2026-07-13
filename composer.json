@@ -12,7 +12,10 @@
     "autoload": {
         "psr-4": {
             "DockerCli\\": "src/"
-        }
+        },
+        "files": [
+            "src/Util/functions.php"
+        ]
     },
     "bin": [
         "bin/docker-cli"

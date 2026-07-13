@@ -12,6 +12,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
+use function DockerCli\Util\join_path;
 
 final class DownCommand extends Command
 {
@@ -32,7 +33,7 @@ final class DownCommand extends Command
         }
 
         $projectRoot = $framework->getProjectRoot();
-        $metaFile = $projectRoot . DIRECTORY_SEPARATOR . '.docker-cli.yaml';
+        $metaFile = join_path($projectRoot, '.docker-cli.yaml');
         if (!is_file($metaFile)) {
             $output->writeln(sprintf('<error>Файл "%s" не найден.</error>', $metaFile));
 
@@ -46,7 +47,7 @@ final class DownCommand extends Command
             return Command::FAILURE;
         }
 
-        $projectDirectory = $this->projectsDirectory() . DIRECTORY_SEPARATOR . $projectName;
+        $projectDirectory = join_path($this->projectsDirectory(), $projectName);
         if (is_dir($projectDirectory)) {
             $this->removeDirectory($projectDirectory);
         }
@@ -73,7 +74,7 @@ final class DownCommand extends Command
             throw new \RuntimeException('Unable to determine HOME directory.');
         }
 
-        return rtrim($home, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.config' . DIRECTORY_SEPARATOR . 'docker-cli' . DIRECTORY_SEPARATOR . 'projects';
+        return join_path($home, '.config', 'docker-cli', 'projects');
     }
 
     private function readProjectName(string $file): ?string

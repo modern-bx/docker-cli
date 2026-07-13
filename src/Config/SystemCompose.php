@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace DockerCli\Config;
 
+use function DockerCli\Util\join_path;
+
 final class SystemCompose
 {
     public const PROJECT_NAME = 'docker-cli';
@@ -15,17 +17,17 @@ final class SystemCompose
     {
         $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
 
-        return rtrim($home, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . self::CONFIG_RELATIVE_PATH;
+        return join_path($home, self::CONFIG_RELATIVE_PATH);
     }
 
     public function composeFile(): string
     {
-        return $this->directory() . DIRECTORY_SEPARATOR . self::COMPOSE_FILE;
+        return join_path($this->directory(), self::COMPOSE_FILE);
     }
 
     public function envFile(): string
     {
-        return $this->directory() . DIRECTORY_SEPARATOR . self::ENV_FILE;
+        return join_path($this->directory(), self::ENV_FILE);
     }
 
     public function init(): bool
@@ -96,25 +98,25 @@ final class SystemCompose
     /** @return list<string> */
     private function dataDirectories(): array
     {
-        $data = $this->directory() . DIRECTORY_SEPARATOR . 'data';
+        $data = join_path($this->directory(), 'data');
 
         return [
-            $data . DIRECTORY_SEPARATOR . 'mysql' . DIRECTORY_SEPARATOR . 'data',
-            $data . DIRECTORY_SEPARATOR . 'mysql' . DIRECTORY_SEPARATOR . 'logs',
-            $data . DIRECTORY_SEPARATOR . 'postgres' . DIRECTORY_SEPARATOR . 'data',
-            $data . DIRECTORY_SEPARATOR . 'postgres' . DIRECTORY_SEPARATOR . 'logs',
-            $this->directory() . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'openresty' . DIRECTORY_SEPARATOR . 'hosts',
+            join_path($data, 'mysql', 'data'),
+            join_path($data, 'mysql', 'logs'),
+            join_path($data, 'postgres', 'data'),
+            join_path($data, 'postgres', 'logs'),
+            join_path($this->directory(), 'config', 'openresty', 'hosts'),
         ];
     }
 
     /** @return array<string, string> */
     private function templateMap(): array
     {
-        $resources = dirname(__DIR__, 2) . '/resources/compose/system';
+        $resources = join_path(dirname(__DIR__, 2), 'resources', 'compose', 'system');
 
         return [
-            $this->envFile() => $resources . '/' . self::ENV_FILE,
-            $this->composeFile() => $resources . '/' . self::COMPOSE_FILE,
+            $this->envFile() => join_path($resources, self::ENV_FILE),
+            $this->composeFile() => join_path($resources, self::COMPOSE_FILE),
         ];
     }
 }

@@ -6,6 +6,7 @@ namespace DockerCli\Service;
 
 use DockerCli\Config\SystemCompose;
 use Symfony\Component\Translation\Loader\YamlFileLoader;
+use function DockerCli\Util\join_path;
 use Symfony\Component\Translation\Translator;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
@@ -17,7 +18,7 @@ final class TranslatorFactory
         $translator = new Translator($locale);
         $translator->setFallbackLocales(['ru']);
         $translator->addLoader('yaml', new YamlFileLoader());
-        $translator->addResource('yaml', dirname(__DIR__, 2) . '/resources/translations/messages.ru.yaml', 'ru');
+        $translator->addResource('yaml', join_path(dirname(__DIR__, 2), 'resources', 'translations', 'messages.ru.yaml'), 'ru');
 
         return $translator;
     }

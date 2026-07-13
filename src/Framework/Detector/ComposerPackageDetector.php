@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace DockerCli\Framework\Detector;
 
+use function DockerCli\Util\join_path;
+
 abstract class ComposerPackageDetector implements FrameworkDetectorInterface
 {
     protected function hasComposerPackage(string $projectRoot, string $packageName): bool
     {
-        $composerJson = $projectRoot . DIRECTORY_SEPARATOR . 'composer.json';
+        $composerJson = join_path($projectRoot, 'composer.json');
         if (!is_file($composerJson)) {
             return false;
         }
