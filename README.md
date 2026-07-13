@@ -62,6 +62,8 @@ Dockge не предоставляет штатные переменные ок�
 
 MySQL и PostgreSQL не публикуют порты на хост: они доступны только из сети `docker-cli` по стандартным портам `3306` и `5432` и коротким алиасам `mysql` / `postgres` либо DNS-именам `mysql.${BASE_HOST}` / `postgres.${BASE_HOST}`. Adminer публикуется только через Traefik с TLS.
 
+OpenResty запускает nginx worker от root, потому что проектные файлы монтируются read-only из `/host`, а локальные директории проектов часто лежат внутри домашней директории с правами, недоступными пользователю `nobody` внутри контейнера.
+
 Файлы, генерируемые системными контейнерами баз данных, лежат рядом с системным compose-файлом в `~/.config/docker-cli/compose/system/data`: для MySQL используются `data/mysql/data` и `data/mysql/logs`, для PostgreSQL — `data/postgres/data` и `data/postgres/logs`.
 
 По умолчанию `BASE_HOST=local.kubehut.top`, поэтому Dockge будет доступен по адресу:
@@ -70,7 +72,7 @@ MySQL и PostgreSQL не публикуют порты на хост: они д�
 https://dockge.local.kubehut.top
 ```
 
-DNS-имена Adminer и проектные имена вида `web-<project-name>.${BASE_HOST}` регистрируются на контейнер Traefik через `DNSDOCK_ALIAS`, поэтому браузер попадает в HTTPS-router Traefik, а не напрямую в контейнер приложения. Для `websecure` включён wildcard-сертификат `*.${BASE_HOST}` через Cloudflare DNS challenge, чтобы новые HTTPS-сервисы не получали дефолтный сертификат Traefik. ACME DNS challenge использует публичные резолверы `1.1.1.1` и `8.8.8.8`, чтобы Traefik не определял локальную зону dnsdock как Cloudflare-зону.
+DNS-имена Adminer и проектные имена вида `web-<project-name>.${BASE_HOST}` регистрируются на контейнер Traefik через `DNSDOCK_ALIAS`, поэтому браузер попадает в HTTPS-router Traefik, а не напрямую в контейнер приложения. Для `websecure` и router-а OpenResty явно указан wildcard-домен `*.${BASE_HOST}` через Cloudflare DNS challenge, чтобы regex-router проектных доменов получал LE-сертификат, а не дефолтный самоподписанный сертификат Traefik. ACME DNS challenge использует публичные резолверы `1.1.1.1` и `8.8.8.8`, чтобы Traefik не определял локальную зону dnsdock как Cloudflare-зону.
 
 Adminer доступен по адресу:
 
