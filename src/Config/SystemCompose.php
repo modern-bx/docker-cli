@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace DockerCli\Config;
 
+use function DockerCli\Util\join_path;
+
 final class SystemCompose
 {
     public const PROJECT_NAME = 'docker-cli';
@@ -15,20 +17,20 @@ final class SystemCompose
     {
         $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
 
-        return rtrim($home, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . self::CONFIG_RELATIVE_PATH;
+        return join_path($home, self::CONFIG_RELATIVE_PATH);
     }
 
     public function composeFile(): string
     {
-        return $this->directory() . DIRECTORY_SEPARATOR . self::COMPOSE_FILE;
+        return join_path($this->directory(), self::COMPOSE_FILE);
     }
 
     public function envFile(): string
     {
-        return $this->directory() . DIRECTORY_SEPARATOR . self::ENV_FILE;
+        return join_path($this->directory(), self::ENV_FILE);
     }
 
-    public function init(): bool
+    public function init(bool $updateStatic = false, bool $migrateEditable = false): bool
     {
         $directory = $this->directory();
         if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
@@ -43,6 +45,21 @@ final class SystemCompose
 
             copy($template, $target);
             $created = true;
+        }
+
+        if ($updateStatic) {
+            foreach ($this->staticTemplateMap() as $target => $template) {
+                copy($template, $target);
+                $created = true;
+            }
+        }
+
+        if ($migrateEditable) {
+            foreach ($this->editableTemplateMap() as $target => $template) {
+                if ($this->migrateEnvFile($target, $template)) {
+                    $created = true;
+                }
+            }
         }
 
         foreach ($this->dataDirectories() as $dataDirectory) {
@@ -96,24 +113,95 @@ final class SystemCompose
     /** @return list<string> */
     private function dataDirectories(): array
     {
-        $data = $this->directory() . DIRECTORY_SEPARATOR . 'data';
+        $data = join_path($this->directory(), 'data');
 
         return [
-            $data . DIRECTORY_SEPARATOR . 'mysql' . DIRECTORY_SEPARATOR . 'data',
-            $data . DIRECTORY_SEPARATOR . 'mysql' . DIRECTORY_SEPARATOR . 'logs',
-            $data . DIRECTORY_SEPARATOR . 'postgres' . DIRECTORY_SEPARATOR . 'data',
-            $data . DIRECTORY_SEPARATOR . 'postgres' . DIRECTORY_SEPARATOR . 'logs',
+            join_path($data, 'mysql', 'data'),
+            join_path($data, 'mysql', 'logs'),
+            join_path($data, 'postgres', 'data'),
+            join_path($data, 'postgres', 'logs'),
+            join_path($this->directory(), 'config', 'openresty', 'hosts'),
         ];
     }
 
     /** @return array<string, string> */
     private function templateMap(): array
     {
-        $resources = dirname(__DIR__, 2) . '/resources/compose/system';
+        return $this->editableTemplateMap() + $this->staticTemplateMap();
+    }
+
+    /** @return array<string, string> */
+    private function staticTemplateMap(): array
+    {
+        $resources = join_path(dirname(__DIR__, 2), 'resources', 'compose', 'system');
 
         return [
-            $this->envFile() => $resources . '/' . self::ENV_FILE,
-            $this->composeFile() => $resources . '/' . self::COMPOSE_FILE,
+            $this->composeFile() => join_path($resources, self::COMPOSE_FILE),
         ];
     }
+
+    /** @return array<string, string> */
+    private function editableTemplateMap(): array
+    {
+        $resources = join_path(dirname(__DIR__, 2), 'resources', 'compose', 'system');
+
+        return [
+            $this->envFile() => join_path($resources, self::ENV_FILE),
+        ];
+    }
+
+    private function migrateEnvFile(string $target, string $template): bool
+    {
+        if (!is_file($target)) {
+            copy($template, $target);
+
+            return true;
+        }
+
+        $currentContents = file_get_contents($target);
+        if ($currentContents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $target));
+        }
+
+        $templateContents = file_get_contents($template);
+        if ($templateContents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env template "%s".', $template));
+        }
+
+        $currentValues = $this->readEnvValues($currentContents);
+        $templateValues = $this->readEnvValues($templateContents);
+        $missingLines = [];
+        foreach ($templateValues as $key => $value) {
+            if (!array_key_exists($key, $currentValues)) {
+                $missingLines[] = $key . '=' . $value;
+            }
+        }
+
+        if ($missingLines === []) {
+            return false;
+        }
+
+        $separator = str_ends_with($currentContents, PHP_EOL) || $currentContents === '' ? '' : PHP_EOL;
+        file_put_contents($target, $currentContents . $separator . implode(PHP_EOL, $missingLines) . PHP_EOL);
+
+        return true;
+    }
+
+    /** @return array<string, string> */
+    private function readEnvValues(string $contents): array
+    {
+        $values = [];
+        foreach (explode(PHP_EOL, $contents) as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+                continue;
+            }
+
+            [$key, $value] = explode('=', $line, 2);
+            $values[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
+        }
+
+        return $values;
+    }
 }
+

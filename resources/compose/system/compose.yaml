@@ -35,7 +35,7 @@ services:
       - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
     environment:
       CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
-      DNSDOCK_ALIAS: dockge.${BASE_HOST},adminer.${BASE_HOST}
+      DNSDOCK_ALIAS: dockge.${BASE_HOST},adminer.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
     ports:
       - "80:80"
       - "443:443"
@@ -158,6 +158,40 @@ services:
         aliases:
           - postgres
           - postgres.${BASE_HOST}
+    restart: unless-stopped
+
+  openresty:
+    image: openresty/openresty:1.27.1.2-alpine
+    container_name: docker-cli-openresty
+    environment:
+      DNSDOCK_NAME: openresty
+      DNSDOCK_IMAGE: system
+    command:
+      - sh
+      - -ec
+      - |
+        tmp_conf="$$(mktemp)"
+        {
+          echo 'user root;'
+          sed '/^[[:space:]]*user[[:space:]]/d' /usr/local/openresty/nginx/conf/nginx.conf
+        } > "$${tmp_conf}"
+        cat "$${tmp_conf}" > /usr/local/openresty/nginx/conf/nginx.conf
+        exec /usr/local/openresty/bin/openresty -g 'daemon off;'
+    volumes:
+      - ./config/openresty/hosts:/etc/nginx/conf.d:ro
+      - /home:/home:ro
+      - /:/host:ro
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.openresty.rule: HostRegexp(`^web-.+\.${BASE_HOST}$`)
+      traefik.http.routers.openresty.entrypoints: websecure
+      traefik.http.routers.openresty.tls: "true"
+      traefik.http.routers.openresty.tls.certresolver: cloudflare
+      traefik.http.routers.openresty.tls.domains[0].main: ${BASE_HOST}
+      traefik.http.routers.openresty.tls.domains[0].sans: '*.${BASE_HOST}'
+      traefik.http.services.openresty.loadbalancer.server.port: "80"
+    networks:
+      docker-cli:
     restart: unless-stopped
 
   adminer:

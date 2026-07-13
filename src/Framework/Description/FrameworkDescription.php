@@ -7,12 +7,18 @@ namespace DockerCli\Framework\Description;
 final class FrameworkDescription
 {
     public function __construct(
-        private readonly string $name,
+        private readonly FrameworkName $name,
+        private readonly FrameworkCodeName $codeName,
     ) {
     }
 
-    public function getName(): string
+    public function getName(): FrameworkName
     {
         return $this->name;
+    }
+
+    public function getCodeName(): FrameworkCodeName
+    {
+        return $this->codeName;
     }
 }
