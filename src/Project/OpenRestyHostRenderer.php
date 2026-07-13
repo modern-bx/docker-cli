@@ -11,6 +11,7 @@ use function DockerCli\Util\join_path;
 final class OpenRestyHostRenderer
 {
     private const HOSTS_RELATIVE_PATH = 'config/openresty/hosts';
+    private const PROJECT_WEB_DNSDOCK_ALIAS = 'PROJECT_WEB_DNSDOCK_ALIAS';
 
     public function render(): void
     {
@@ -25,6 +26,7 @@ final class OpenRestyHostRenderer
         }
 
         $baseHost = $this->readBaseHost($compose->envFile());
+        $hostNames = [];
         foreach ($this->registeredProjects() as $project) {
             $template = $this->templateFile($project['framework']);
             if (!is_file($template)) {
@@ -37,6 +39,7 @@ final class OpenRestyHostRenderer
             }
 
             $hostName = sprintf('web-%s.%s', $project['name'], $baseHost);
+            $hostNames[] = $hostName;
             $target = join_path($hostsDirectory, $project['name'] . '.web.conf');
             file_put_contents($target, strtr($contents, [
                 '{{ project_name }}' => $project['name'],
@@ -44,6 +47,8 @@ final class OpenRestyHostRenderer
                 '{{ document_root }}' => join_path('/host', $project['document_root']),
             ]));
         }
+
+        $this->writeProjectWebDnsdockAliases($compose->envFile(), $hostNames);
     }
 
     public function hostsDirectory(SystemCompose $compose): string
@@ -117,5 +122,33 @@ final class OpenRestyHostRenderer
         }
 
         return 'local.kubehut.top';
+    }
+
+    /** @param list<string> $hostNames */
+    private function writeProjectWebDnsdockAliases(string $envFile, array $hostNames): void
+    {
+        if (!is_file($envFile)) {
+            return;
+        }
+
+        $contents = file_get_contents($envFile);
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $envFile));
+        }
+
+        $line = self::PROJECT_WEB_DNSDOCK_ALIAS . '=' . implode(',', $hostNames);
+        if (preg_match('/^' . self::PROJECT_WEB_DNSDOCK_ALIAS . '=.*$/m', $contents) === 1) {
+            $updated = preg_replace('/^' . self::PROJECT_WEB_DNSDOCK_ALIAS . '=.*$/m', $line, $contents);
+            if ($updated === null) {
+                throw new \RuntimeException(sprintf('Unable to update env file "%s".', $envFile));
+            }
+
+            file_put_contents($envFile, $updated);
+
+            return;
+        }
+
+        $separator = str_ends_with($contents, PHP_EOL) || $contents === '' ? '' : PHP_EOL;
+        file_put_contents($envFile, $contents . $separator . $line . PHP_EOL);
     }
 }

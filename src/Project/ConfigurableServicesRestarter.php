@@ -12,7 +12,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class ConfigurableServicesRestarter
 {
     /** @var list<string> */
-    private const SERVICES = ['openresty'];
+    private const SERVICES = ['traefik', 'openresty'];
 
     public function restart(OutputInterface $output): int
     {
@@ -25,7 +25,7 @@ final class ConfigurableServicesRestarter
             return Command::FAILURE;
         }
 
-        $command = array_merge($compose->dockerComposeCommand('restart'), self::SERVICES);
+        $command = array_merge($compose->dockerComposeCommand('up'), ['--detach', '--force-recreate'], self::SERVICES);
         $output->writeln('<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
 
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes);
