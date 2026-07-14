@@ -39,12 +39,15 @@ final class SystemCompose
 
         $created = false;
         foreach ($this->templateMap() as $target => $template) {
-            if (file_exists($target)) {
+            if (file_exists($target) && !is_dir($template)) {
                 continue;
             }
 
+            $before = $this->snapshotFiles($target);
             $this->copyTemplate($template, $target);
-            $created = true;
+            if ($before !== $this->snapshotFiles($target)) {
+                $created = true;
+            }
         }
 
         if ($updateStatic) {
@@ -112,6 +115,32 @@ final class SystemCompose
             $this->composeFile(),
             $operation,
         ];
+    }
+
+    /** @return list<string> */
+    private function snapshotFiles(string $path): array
+    {
+        if (!file_exists($path)) {
+            return [];
+        }
+
+        if (is_file($path)) {
+            return [$path];
+        }
+
+        $files = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($iterator as $file) {
+            if ($file instanceof \SplFileInfo && $file->isFile()) {
+                $files[] = $file->getPathname();
+            }
+        }
+
+        sort($files);
+
+        return $files;
     }
 
     private function ensureHostIdentityEnv(): bool
