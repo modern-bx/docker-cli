@@ -159,8 +159,13 @@ final class SystemCompose
             'HOST_UID' => (string) $this->hostUserId(),
             'HOST_GID' => (string) $this->hostGroupId(),
         ];
+        $currentValues = $this->readEnvValues($contents);
         $updated = $contents;
         foreach ($replacements as $key => $value) {
+            if (($currentValues[$key] ?? '') !== '') {
+                continue;
+            }
+
             if (preg_match('/^' . $key . '=.*$/m', $updated) === 1) {
                 $updated = preg_replace('/^' . $key . '=.*$/m', $key . '=' . $value, $updated) ?? $updated;
                 continue;
