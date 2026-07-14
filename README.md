@@ -60,9 +60,26 @@ docker-cli src:build
 docker-cli src:publish
 ```
 
-Сейчас кастомный образ один: `php-fpm-8.2`. По умолчанию команды используют registry `ghcr.io`, namespace `docker-cli` и имя образа `php-fpm-8.2`, то есть публикуемый ref выглядит как `ghcr.io/docker-cli/php-fpm-8.2:<tag>`. Тег берётся из `SOURCE_IMAGE_TAG`, если он задан; иначе используется самый новый semver-тег, достижимый из текущей ветки git-репозитория, без префикса `v`; если подходящий git-тег не найден, используется `default`. Для ручной проверки команд без запуска Docker используйте `--dry-run`, для явного тега — `--tag=1.0.0`.
+Сейчас кастомный образ один: `php-fpm-8.2`. По умолчанию команды используют registry `ghcr.io`, namespace `whiskyjs` и составное имя образа `docker-cli/php-fpm-8.2`, то есть публикуемый ref выглядит как `ghcr.io/whiskyjs/docker-cli/php-fpm-8.2:<tag>`. Тег берётся из `SOURCE_IMAGE_TAG`, если он задан; иначе используется самый новый semver-тег, достижимый из текущей ветки git-репозитория, без префикса `v`; если подходящий git-тег не найден, используется `default`. Для ручной проверки команд без запуска Docker используйте `--dry-run`, для явного тега — `--tag=1.0.0`.
 
 Настройки сборки и публикации лежат в системном `.env`: `SOURCE_IMAGE_REGISTRY`, `SOURCE_IMAGE_NAMESPACE`, `SOURCE_IMAGE_TAG` и `SOURCE_IMAGE_DOCKER_BUILDKIT`. По умолчанию `SOURCE_IMAGE_DOCKER_BUILDKIT=0`, чтобы обойти сетевые проблемы BuildKit при сборке PHP-FPM.
+
+### Публикация в GHCR
+
+Для публикации нужен GitHub Personal Access Token с правами `write:packages` и, если образ приватный, `read:packages`. Войдите в GHCR под своим GitHub-логином:
+
+```bash
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u <github-login> --password-stdin
+```
+
+После логина соберите и опубликуйте образы:
+
+```bash
+docker-cli src:build
+docker-cli src:publish
+```
+
+Если нужно опубликовать образ в другой GitHub namespace или organization, измените `SOURCE_IMAGE_NAMESPACE` в `~/.config/docker-cli/compose/system/.env`. Для проверки без Docker-команд используйте `docker-cli src:build --dry-run` и `docker-cli src:publish --dry-run`.
 
 ## Базовые сервисы
 

@@ -58,12 +58,12 @@ abstract class SourceImageCommand extends Command
 
     protected function localImageReference(string $name, string $tag): string
     {
-        return sprintf('%s/%s:%s', $this->imageNamespace(), $name, $tag);
+        return sprintf('%s/%s:%s', $this->imageNamespace(), $this->imageName($name), $tag);
     }
 
     protected function remoteImageReference(string $name, string $tag): string
     {
-        return sprintf('%s/%s/%s:%s', $this->imageRegistry(), $this->imageNamespace(), $name, $tag);
+        return sprintf('%s/%s/%s:%s', $this->imageRegistry(), $this->imageNamespace(), $this->imageName($name), $tag);
     }
 
     /** @param list<string> $command */
@@ -100,9 +100,14 @@ abstract class SourceImageCommand extends Command
 
     private function imageNamespace(): string
     {
-        $namespace = $this->sourceImageEnv()['SOURCE_IMAGE_NAMESPACE'] ?? 'docker-cli';
+        $namespace = $this->sourceImageEnv()['SOURCE_IMAGE_NAMESPACE'] ?? 'whiskyjs';
 
         return trim((string) $namespace, '/');
+    }
+
+    private function imageName(string $serviceName): string
+    {
+        return 'docker-cli/' . $serviceName;
     }
 
     /** @return array<string, string> */
