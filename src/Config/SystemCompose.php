@@ -62,6 +62,10 @@ final class SystemCompose
             }
         }
 
+        if ($this->ensureHostIdentityEnv()) {
+            $created = true;
+        }
+
         foreach ($this->dataDirectories() as $dataDirectory) {
             if (is_dir($dataDirectory)) {
                 continue;
@@ -108,6 +112,64 @@ final class SystemCompose
             $this->composeFile(),
             $operation,
         ];
+    }
+
+    private function ensureHostIdentityEnv(): bool
+    {
+        $envFile = $this->envFile();
+        if (!is_file($envFile)) {
+            return false;
+        }
+
+        $contents = file_get_contents($envFile);
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $envFile));
+        }
+
+        $replacements = [
+            'HOST_UID' => (string) $this->hostUserId(),
+            'HOST_GID' => (string) $this->hostGroupId(),
+        ];
+        $updated = $contents;
+        foreach ($replacements as $key => $value) {
+            if (preg_match('/^' . $key . '=.*$/m', $updated) === 1) {
+                $updated = preg_replace('/^' . $key . '=.*$/m', $key . '=' . $value, $updated) ?? $updated;
+                continue;
+            }
+
+            $separator = str_ends_with($updated, PHP_EOL) || $updated === '' ? '' : PHP_EOL;
+            $updated .= $separator . $key . '=' . $value . PHP_EOL;
+        }
+
+        if ($updated === $contents) {
+            return false;
+        }
+
+        file_put_contents($envFile, $updated);
+
+        return true;
+    }
+
+    private function hostUserId(): int
+    {
+        if (function_exists('posix_getuid')) {
+            return posix_getuid();
+        }
+
+        $uid = getenv('UID');
+
+        return is_string($uid) && ctype_digit($uid) ? (int) $uid : 1000;
+    }
+
+    private function hostGroupId(): int
+    {
+        if (function_exists('posix_getgid')) {
+            return posix_getgid();
+        }
+
+        $gid = getenv('GID');
+
+        return is_string($gid) && ctype_digit($gid) ? (int) $gid : 1000;
     }
 
     /** @return list<string> */
