@@ -1,4 +1,4 @@
-FROM php:8.2-fpm-alpine
+FROM php:8.2-fpm
 
 COPY scripts/install-extensions.sh /usr/local/bin/docker-cli-install-extensions
 COPY scripts/setup-runtime-user.sh /usr/local/bin/docker-cli-setup-runtime-user

@@ -12,13 +12,21 @@ target_gid="${HOST_GID:-1000}"
 group_name="$(awk -F: -v gid="${target_gid}" '$3 == gid { print $1; exit }' /etc/group)"
 if [ -z "${group_name}" ]; then
     group_name=docker-cli
-    addgroup -g "${target_gid}" "${group_name}"
+    if command -v groupadd >/dev/null 2>&1; then
+        groupadd --gid "${target_gid}" "${group_name}"
+    else
+        addgroup -g "${target_gid}" "${group_name}"
+    fi
 fi
 
 user_name="$(awk -F: -v uid="${target_uid}" '$3 == uid { print $1; exit }' /etc/passwd)"
 if [ -z "${user_name}" ]; then
     user_name=docker-cli
-    adduser -D -H -u "${target_uid}" -G "${group_name}" "${user_name}"
+    if command -v useradd >/dev/null 2>&1; then
+        useradd --uid "${target_uid}" --gid "${group_name}" --no-create-home --shell /usr/sbin/nologin "${user_name}"
+    else
+        adduser -D -H -u "${target_uid}" -G "${group_name}" "${user_name}"
+    fi
 fi
 
 {

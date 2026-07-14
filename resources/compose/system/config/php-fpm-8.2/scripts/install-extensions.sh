@@ -1,30 +1,20 @@
 #!/bin/sh
 set -eux
 
-apk add --no-cache \
-    cyrus-sasl \
-    freetype \
-    gettext \
-    libjpeg-turbo \
-    libmemcached-libs \
-    libpng \
-    libxml2 \
-    libzip \
-    postgresql-libs \
-    zlib
+export DEBIAN_FRONTEND=noninteractive
 
-apk add --no-cache --virtual .docker-cli-build-deps \
-    ${PHPIZE_DEPS} \
-    cyrus-sasl-dev \
-    freetype-dev \
-    gettext-dev \
-    libjpeg-turbo-dev \
+apt-get update
+apt-get install -y --no-install-recommends \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
     libmemcached-dev \
     libpng-dev \
+    libpq-dev \
+    libsasl2-dev \
+    libssl-dev \
     libxml2-dev \
     libzip-dev \
-    postgresql-dev \
-    zlib-dev
+    zlib1g-dev
 
 docker-php-ext-configure gd --with-freetype --with-jpeg
 
@@ -49,5 +39,4 @@ docker-php-ext-enable \
     memcached \
     redis
 
-apk del .docker-cli-build-deps
-rm -rf /tmp/pear ~/.pearrc
+rm -rf /tmp/pear ~/.pearrc /var/lib/apt/lists/*
