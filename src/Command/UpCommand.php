@@ -77,6 +77,8 @@ final class UpCommand extends Command
                 'project' => [
                     'name' => $projectName,
                     'framework' => $description->getCodeName()->value,
+                    'language' => 'php',
+                    ...$this->languageVersionConfig($projectRoot),
                     'root' => $projectRoot,
                     'document_root' => $framework->getDocumentRoot(),
                 ],
@@ -107,6 +109,43 @@ final class UpCommand extends Command
         $output->writeln(sprintf('<info>Проект "%s" зарегистрирован.</info>', $projectName));
 
         return Command::SUCCESS;
+    }
+
+    /** @return array{version?: string} */
+    private function languageVersionConfig(string $projectRoot): array
+    {
+        $version = $this->detectPhpVersion($projectRoot);
+
+        return $version === null ? [] : ['version' => $version];
+    }
+
+    private function detectPhpVersion(string $projectRoot): ?string
+    {
+        $composerJson = join_path($projectRoot, 'composer.json');
+        if (!is_file($composerJson)) {
+            return null;
+        }
+
+        $contents = file_get_contents($composerJson);
+        if ($contents === false) {
+            return null;
+        }
+
+        $composer = json_decode($contents, true);
+        if (!is_array($composer)) {
+            return null;
+        }
+
+        $constraint = $composer['require']['php'] ?? null;
+        if (!is_string($constraint)) {
+            return null;
+        }
+
+        if (preg_match('/(?<!\d)([78]\.\d+)(?!\d)/', $constraint, $matches) !== 1) {
+            return null;
+        }
+
+        return $matches[1];
     }
 
     private function resolveProjectName(InputInterface $input, string $projectRoot): string

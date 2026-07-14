@@ -160,6 +160,26 @@ services:
           - postgres.${BASE_HOST}
     restart: unless-stopped
 
+  php-fpm-8.2:
+    image: php:8.2-fpm-alpine
+    container_name: docker-cli-php-fpm-8.2
+    environment:
+      DNSDOCK_NAME: php-fpm-8.2
+      DNSDOCK_IMAGE: system
+    volumes:
+      - ./config/php-fpm-8.2/php/conf.d:/usr/local/etc/php/conf.d:ro
+      - ./config/php-fpm-8.2/php-fpm.d:/usr/local/etc/php-fpm.d:ro
+      - /home:/home
+      - /:/host
+    expose:
+      - "9000"
+    networks:
+      docker-cli:
+        aliases:
+          - php-fpm-8.2
+          - php-fpm-8.2.${BASE_HOST}
+    restart: unless-stopped
+
   openresty:
     image: openresty/openresty:1.27.1.2-alpine
     container_name: docker-cli-openresty

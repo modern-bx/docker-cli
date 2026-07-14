@@ -43,13 +43,13 @@ final class SystemCompose
                 continue;
             }
 
-            copy($template, $target);
+            $this->copyTemplate($template, $target);
             $created = true;
         }
 
         if ($updateStatic) {
             foreach ($this->staticTemplateMap() as $target => $template) {
-                copy($template, $target);
+                $this->copyTemplate($template, $target, true);
                 $created = true;
             }
         }
@@ -121,6 +121,8 @@ final class SystemCompose
             join_path($data, 'postgres', 'data'),
             join_path($data, 'postgres', 'logs'),
             join_path($this->directory(), 'config', 'openresty', 'hosts'),
+            join_path($this->directory(), 'config', 'php-fpm-8.2', 'php', 'conf.d'),
+            join_path($this->directory(), 'config', 'php-fpm-8.2', 'php-fpm.d'),
         ];
     }
 
@@ -130,6 +132,36 @@ final class SystemCompose
         return $this->editableTemplateMap() + $this->staticTemplateMap();
     }
 
+    private function copyTemplate(string $source, string $target, bool $overwrite = false): void
+    {
+        if (is_dir($source)) {
+            if (!is_dir($target) && !mkdir($target, 0755, true) && !is_dir($target)) {
+                throw new \RuntimeException(sprintf('Unable to create config directory "%s".', $target));
+            }
+
+            foreach (scandir($source) ?: [] as $entry) {
+                if ($entry === '.' || $entry === '..') {
+                    continue;
+                }
+
+                $this->copyTemplate(join_path($source, $entry), join_path($target, $entry), $overwrite);
+            }
+
+            return;
+        }
+
+        if (file_exists($target) && !$overwrite) {
+            return;
+        }
+
+        $targetDirectory = dirname($target);
+        if (!is_dir($targetDirectory) && !mkdir($targetDirectory, 0755, true) && !is_dir($targetDirectory)) {
+            throw new \RuntimeException(sprintf('Unable to create config directory "%s".', $targetDirectory));
+        }
+
+        copy($source, $target);
+    }
+
     /** @return array<string, string> */
     private function staticTemplateMap(): array
     {
@@ -137,6 +169,7 @@ final class SystemCompose
 
         return [
             $this->composeFile() => join_path($resources, self::COMPOSE_FILE),
+            join_path($this->directory(), 'config', 'php-fpm-8.2') => join_path($resources, 'config', 'php-fpm-8.2'),
         ];
     }
 

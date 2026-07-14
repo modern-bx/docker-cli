@@ -12,7 +12,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class ConfigurableServicesRestarter
 {
     /** @var list<string> */
-    private const SERVICES = ['traefik', 'openresty'];
+    private const SERVICES = ['traefik', 'openresty', 'php-fpm-8.2'];
 
     public function restart(OutputInterface $output): int
     {
