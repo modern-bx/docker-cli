@@ -45,6 +45,25 @@ bin/docker-cli stop
 
 `start` выполняет `docker compose up -d` для проекта `docker-cli`, а `stop` выполняет `docker compose down --remove-orphans` и удаляет общую сеть `docker-cli`. Если `.env` или `compose.yaml` отсутствуют, команды завершаются понятной ошибкой и предлагают выполнить `docker-cli init`.
 
+
+## Сборка и публикация кастомных образов
+
+Кастомные образы из исходников собираются командой:
+
+```bash
+docker-cli src:build
+```
+
+Публикация в registry выполняется отдельно:
+
+```bash
+docker-cli src:publish
+```
+
+Сейчас кастомный образ один: `php-fpm-8.2`. По умолчанию команды используют registry `ghcr.io`, namespace `docker-cli` и имя образа `php-fpm-8.2`, то есть публикуемый ref выглядит как `ghcr.io/docker-cli/php-fpm-8.2:<tag>`. Тег берётся из `SOURCE_IMAGE_TAG`, если он задан; иначе используется самый новый semver-тег, достижимый из текущей ветки git-репозитория, без префикса `v`; если подходящий git-тег не найден, используется `default`. Для ручной проверки команд без запуска Docker используйте `--dry-run`, для явного тега — `--tag=1.0.0`.
+
+Настройки сборки и публикации лежат в системном `.env`: `SOURCE_IMAGE_REGISTRY`, `SOURCE_IMAGE_NAMESPACE`, `SOURCE_IMAGE_TAG` и `SOURCE_IMAGE_DOCKER_BUILDKIT`. По умолчанию `SOURCE_IMAGE_DOCKER_BUILDKIT=0`, чтобы обойти сетевые проблемы BuildKit при сборке PHP-FPM.
+
 ## Базовые сервисы
 
 Системный compose-файл запускает:

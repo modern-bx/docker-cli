@@ -7,6 +7,8 @@ use DockerCli\Command\SeedCommand;
 use DockerCli\Command\DownCommand;
 use DockerCli\Command\StartCommand;
 use DockerCli\Command\StopCommand;
+use DockerCli\Command\SourceBuildCommand;
+use DockerCli\Command\SourcePublishCommand;
 use Symfony\Component\Console\Application;
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -18,5 +20,7 @@ $application->add(new SeedCommand());
 $application->add(new StartCommand());
 $application->add(new StopCommand());
 $application->add(new DownCommand());
+$application->add(new SourceBuildCommand());
+$application->add(new SourcePublishCommand());
 $application->setDefaultCommand('list');
 $application->run();

@@ -1,0 +1,190 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DockerCli\Command;
+
+use DockerCli\Config\SystemCompose;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+use function DockerCli\Util\join_path;
+
+abstract class SourceImageCommand extends Command
+{
+    /** @var list<array{name: string, context: string}> */
+    private const IMAGES = [
+        [
+            'name' => 'php-fpm-8.2',
+            'context' => 'resources/compose/system/config/php-fpm-8.2',
+        ],
+    ];
+
+    protected function configureSourceImageOptions(): void
+    {
+        $this->addOption('tag', null, InputOption::VALUE_REQUIRED, 'Тег образа. По умолчанию берется SOURCE_IMAGE_TAG, последний git-тег текущей ветки или default.');
+        $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Показать docker-команды без выполнения.');
+    }
+
+    /** @return list<array{name: string, context: string}> */
+    protected function sourceImages(): array
+    {
+        $root = $this->repositoryRoot();
+
+        return array_map(
+            static fn (array $image): array => [
+                'name' => $image['name'],
+                'context' => join_path($root, $image['context']),
+            ],
+            self::IMAGES
+        );
+    }
+
+    protected function imageTag(InputInterface $input): string
+    {
+        $optionTag = $input->getOption('tag');
+        if (is_string($optionTag) && $optionTag !== '') {
+            return $this->normalizeTag($optionTag);
+        }
+
+        $envTag = $this->sourceImageEnv()['SOURCE_IMAGE_TAG'] ?? null;
+        if (is_string($envTag) && $envTag !== '') {
+            return $this->normalizeTag($envTag);
+        }
+
+        return $this->latestGitTag() ?? 'default';
+    }
+
+    protected function localImageReference(string $name, string $tag): string
+    {
+        return sprintf('%s/%s:%s', $this->imageNamespace(), $name, $tag);
+    }
+
+    protected function remoteImageReference(string $name, string $tag): string
+    {
+        return sprintf('%s/%s/%s:%s', $this->imageRegistry(), $this->imageNamespace(), $name, $tag);
+    }
+
+    /** @param list<string> $command */
+    protected function runDockerCommand(array $command, OutputInterface $output, bool $dryRun): int
+    {
+        $output->writeln('<comment>' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
+        if ($dryRun) {
+            return Command::SUCCESS;
+        }
+
+        $env = getenv();
+        if (!is_array($env)) {
+            $env = [];
+        }
+        $buildKit = $this->sourceImageEnv()['SOURCE_IMAGE_DOCKER_BUILDKIT'] ?? null;
+        if (is_string($buildKit) && $buildKit !== '') {
+            $env['DOCKER_BUILDKIT'] = $buildKit;
+        }
+
+        $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $env);
+        if (!is_resource($process)) {
+            throw new \RuntimeException('Unable to start docker process.');
+        }
+
+        return proc_close($process);
+    }
+
+    private function imageRegistry(): string
+    {
+        $registry = $this->sourceImageEnv()['SOURCE_IMAGE_REGISTRY'] ?? 'ghcr.io';
+
+        return trim((string) $registry, '/');
+    }
+
+    private function imageNamespace(): string
+    {
+        $namespace = $this->sourceImageEnv()['SOURCE_IMAGE_NAMESPACE'] ?? 'docker-cli';
+
+        return trim((string) $namespace, '/');
+    }
+
+    /** @return array<string, string> */
+    private function sourceImageEnv(): array
+    {
+        $env = $this->readEnvFile(join_path($this->repositoryRoot(), 'resources', 'compose', 'system', SystemCompose::ENV_FILE));
+        $composeEnv = (new SystemCompose())->envFile();
+        if (is_file($composeEnv)) {
+            $env = array_replace($env, $this->readEnvFile($composeEnv));
+        }
+
+        return $env;
+    }
+
+    /** @return array<string, string> */
+    private function readEnvFile(string $file): array
+    {
+        if (!is_file($file)) {
+            return [];
+        }
+
+        $values = [];
+        foreach (file($file, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+                continue;
+            }
+
+            [$key, $value] = explode('=', $line, 2);
+            $values[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
+        }
+
+        return $values;
+    }
+
+    private function latestGitTag(): ?string
+    {
+        $command = ['git', 'tag', '--merged', 'HEAD', '--sort=-v:refname'];
+        $descriptors = [
+            0 => ['file', '/dev/null', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $process = proc_open($command, $descriptors, $pipes, $this->repositoryRoot());
+        if (!is_resource($process)) {
+            return null;
+        }
+
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        if (proc_close($process) !== 0 || !is_string($stdout)) {
+            return null;
+        }
+
+        foreach (explode(PHP_EOL, $stdout) as $tag) {
+            $tag = trim($tag);
+            if (preg_match('/^v?(\d+\.\d+\.\d+)$/', $tag, $matches) === 1) {
+                return $matches[1];
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeTag(string $tag): string
+    {
+        $tag = trim($tag);
+        if (preg_match('/^v?(\d+\.\d+\.\d+)$/', $tag, $matches) === 1) {
+            return $matches[1];
+        }
+
+        if ($tag === 'default') {
+            return $tag;
+        }
+
+        throw new \InvalidArgumentException(sprintf('Invalid source image tag "%s". Use a version like 1.0.0 or default.', $tag));
+    }
+
+    private function repositoryRoot(): string
+    {
+        return dirname(__DIR__, 2);
+    }
+}
