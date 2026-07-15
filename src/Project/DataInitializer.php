@@ -16,29 +16,59 @@ final class DataInitializer
     {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
-        $env = $this->readEnvValues($compose->envFile());
-
-        $mysqlRootPassword = $env['MYSQL_ROOT_PASSWORD'] ?? '';
-        if ($mysqlRootPassword === '') {
-            $output->writeln('<error>MYSQL_ROOT_PASSWORD не задан в системном .env.</error>');
-            return Command::FAILURE;
-        }
-
-        $postgresRootUser = $env['POSTGRES_USER'] ?? 'system';
-        $postgresRootPassword = $env['POSTGRES_PASSWORD'] ?? '';
-        if ($postgresRootPassword === '') {
-            $output->writeln('<error>POSTGRES_PASSWORD не задан в системном .env.</error>');
-            return Command::FAILURE;
-        }
-
         $mysqlSql = $this->mysqlSql($projectName, $mysqlPassword, $rebuild);
-        $code = $this->run(array_merge($compose->dockerComposeCommand('exec'), ['-T', 'mysql', 'mysql', '-uroot', '-p' . $mysqlRootPassword, '-e', $mysqlSql]), $compose, $output);
+        $code = $this->run(array_merge($compose->dockerComposeCommand('exec'), [
+            '-T',
+            'mysql',
+            'sh',
+            '-ec',
+            'MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}" mysql -uroot -e "$1"',
+            'sh',
+            $mysqlSql,
+        ]), $compose, $output);
         if ($code !== Command::SUCCESS) {
             return $code;
         }
 
-        [$postgresRoleSql, $postgresDatabaseSql, $postgresGrantSql] = $this->postgresSql($projectName, $postgresPassword, $rebuild);
-        return $this->run(array_merge($compose->dockerComposeCommand('exec'), ['-T', 'postgres', 'psql', '-v', 'ON_ERROR_STOP=1', '-U', $postgresRootUser, '-d', 'postgres', '-c', $postgresRoleSql, '-c', $postgresDatabaseSql, '-c', $postgresGrantSql]), $compose, $output, ['PGPASSWORD' => $postgresRootPassword]);
+        [$postgresRoleSql, $postgresDropRoleSql, $postgresTerminateSql, $postgresDatabaseExistsSql, $postgresGrantSql] = $this->postgresSql($projectName, $postgresPassword);
+        return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
+            '-T',
+            'postgres',
+            'sh',
+            '-ec',
+            <<<'SH'
+set -eu
+export PGPASSWORD="${POSTGRES_PASSWORD:?}"
+root_user="${POSTGRES_USER:-system}"
+database="$1"
+rebuild="$2"
+role_sql="$3"
+drop_role_sql="$4"
+terminate_sql="$5"
+database_exists_sql="$6"
+grant_sql="$7"
+
+if [ "$rebuild" = "1" ]; then
+  psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres -c "$terminate_sql"
+  dropdb -U "$root_user" --if-exists "$database"
+  psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres -c "$drop_role_sql"
+fi
+
+psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres -c "$role_sql"
+if [ "$(psql -v ON_ERROR_STOP=1 -At -U "$root_user" -d postgres -c "$database_exists_sql")" != "1" ]; then
+  createdb -U "$root_user" -O "$database" "$database"
+fi
+psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres -c "$grant_sql"
+SH,
+            'sh',
+            $projectName,
+            $rebuild ? '1' : '0',
+            $postgresRoleSql,
+            $postgresDropRoleSql,
+            $postgresTerminateSql,
+            $postgresDatabaseExistsSql,
+            $postgresGrantSql,
+        ]), $compose, $output);
     }
 
     private function mysqlSql(string $name, string $password, bool $rebuild): string
@@ -51,51 +81,30 @@ final class DataInitializer
         return $drop . " CREATE DATABASE IF NOT EXISTS `{$identifier}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS '{$user}'@'%' IDENTIFIED BY '{$password}'; GRANT ALL PRIVILEGES ON `{$identifier}`.* TO '{$user}'@'%'; FLUSH PRIVILEGES;";
     }
 
-    /** @return array{string, string, string} */
-    private function postgresSql(string $name, string $password, bool $rebuild): array
+    /** @return array{string, string, string, string, string} */
+    private function postgresSql(string $name, string $password): array
     {
         $literalName = str_replace("'", "''", $name);
         $literalPassword = str_replace("'", "''", $password);
-        $rebuildSql = $rebuild ? "PERFORM pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{$literalName}' AND pid <> pg_backend_pid(); EXECUTE format('DROP DATABASE IF EXISTS %I', '{$literalName}'); EXECUTE format('DROP ROLE IF EXISTS %I', '{$literalName}');" : '';
-
         $quotedIdentifier = '"' . str_replace('"', '""', $name) . '"';
 
         return [
-            "DO $$ BEGIN {$rebuildSql} IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{$literalName}') THEN EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', '{$literalName}', '{$literalPassword}'); END IF; END $$;",
-            "SELECT format('CREATE DATABASE %I OWNER %I', '{$literalName}', '{$literalName}') WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = '{$literalName}') \\gexec",
+            "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{$literalName}') THEN EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', '{$literalName}', '{$literalPassword}'); END IF; END $$;",
+            "DROP ROLE IF EXISTS {$quotedIdentifier};",
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{$literalName}' AND pid <> pg_backend_pid();",
+            "SELECT 1 FROM pg_database WHERE datname = '{$literalName}'",
             "GRANT ALL PRIVILEGES ON DATABASE {$quotedIdentifier} TO {$quotedIdentifier};",
         ];
     }
 
-    /** @param array<string, string> $extraEnv */
-    private function run(array $command, SystemCompose $compose, OutputInterface $output, array $extraEnv = []): int
+    private function run(array $command, SystemCompose $compose, OutputInterface $output): int
     {
         $output->writeln('<comment>' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
-        $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $extraEnv + $compose->dockerProcessEnvironment());
+        $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
         if (!is_resource($process)) {
             throw new \RuntimeException('Unable to start docker compose process.');
         }
 
         return proc_close($process);
-    }
-
-    /** @return array<string, string> */
-    private function readEnvValues(string $file): array
-    {
-        $contents = file_get_contents($file);
-        if ($contents === false) {
-            return [];
-        }
-        $values = [];
-        foreach (explode(PHP_EOL, $contents) as $line) {
-            $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
-                continue;
-            }
-            [$key, $value] = explode('=', $line, 2);
-            $values[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
-        }
-
-        return $values;
     }
 }
