@@ -63,7 +63,7 @@ services:
       - -ec
       - |
         if [ -z "$${DOCKGE_ADMIN_PASSWORD}" ]; then
-          echo "DOCKGE_ADMIN_PASSWORD is empty. Run docker-cli seed before start." >&2
+          echo "DOCKGE_ADMIN_PASSWORD is empty. Run docker-cli config:seed before start." >&2
           exit 1
         fi
 

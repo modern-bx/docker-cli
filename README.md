@@ -7,7 +7,7 @@
 Перед первым запуском создайте конфигурацию:
 
 ```bash
-bin/docker-cli init
+bin/docker-cli config:init
 ```
 
 Команда создаёт `~/.config/docker-cli/compose/system`, а также файлы `.env` и `compose.yaml`, если они отсутствуют. Уже существующие файлы не перезаписываются. Опция `--update` после интерактивного подтверждения перезаписывает статические файлы конфигурации из шаблонов; сейчас это `compose.yaml`. Опция `--migrate` добавляет в редактируемые файлы отсутствующие параметры из шаблонов; сейчас это `.env`. Опция `--rebuild` пересобирает значения, зависящие от текущего состава зарегистрированных проектов; сейчас это `PROJECT_WEB_DNSDOCK_ALIAS` в `.env`. Опции `--update`, `--migrate` и `--rebuild` можно указывать одновременно.
@@ -15,23 +15,23 @@ bin/docker-cli init
 После проверки параметров в `.env` заполните генерируемые секреты:
 
 ```bash
-bin/docker-cli seed
+bin/docker-cli config:seed
 ```
 
-Команда спросит подтверждение и заполнит только пустые сидируемые значения в `.env`. Сейчас она заполняет `DOCKGE_ADMIN_USERNAME=admin`, случайный `DOCKGE_ADMIN_PASSWORD`, а также случайные пароли `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` и `POSTGRES_PASSWORD`. Уже заполненные значения не меняются. Имена баз и пользователей MySQL/PostgreSQL предзаполнены в `.env` значением `system`, их можно поменять вручную до первого запуска. Для автоматических сценариев можно использовать `bin/docker-cli seed --yes`.
+Команда спросит подтверждение и заполнит только пустые сидируемые значения в `.env`. Сейчас она заполняет `DOCKGE_ADMIN_USERNAME=admin`, случайный `DOCKGE_ADMIN_PASSWORD`, а также случайные пароли `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` и `POSTGRES_PASSWORD`. Уже заполненные значения не меняются. Имена баз и пользователей MySQL/PostgreSQL предзаполнены в `.env` значением `system`, их можно поменять вручную до первого запуска. Для автоматических сценариев можно использовать `bin/docker-cli config:seed --yes`.
 
 Проект Laravel, Symfony, Bitrix или Bitrix24 можно поднять и зарегистрировать из корня проекта или любой вложенной директории:
 
 ```bash
-bin/docker-cli up [my-project]
+bin/docker-cli project:up [my-project]
 ```
 
-Команда определяет фреймворк, создает запись `~/.config/docker-cli/projects/my-project/project.yaml` с именем проекта, кодовым именем фреймворка, корнем проекта и document root, а также записывает метаданные проекта в `.docker-cli.yaml` в корне найденного проекта. После изменения регистрации пересобираются проектные хосты OpenResty в `~/.config/docker-cli/compose/system/config/openresty/hosts`, обновляется переменная `PROJECT_WEB_DNSDOCK_ALIAS` в системном `.env` для DNS-алиасов проектных доменов на Traefik и пересоздается пул общих проектных сервисов. Если имя проекта не указано, используется название папки проекта. Если имя не соответствует конвенции, проект с таким именем уже зарегистрирован или фреймворк не определен, команда завершается ошибкой. Для пропуска перезапуска используйте `--no-restart`.
+Команда определяет фреймворк, создает запись `~/.config/docker-cli/projects/my-project/project.yaml` с именем проекта, кодовым именем фреймворка, корнем проекта и document root, а также записывает метаданные проекта в `.docker-cli.yaml` в корне найденного проекта. После изменения регистрации пересобираются проектные хосты OpenResty в `~/.config/docker-cli/compose/system/config/openresty/hosts`, обновляется переменная `PROJECT_WEB_DNSDOCK_ALIAS` в системном `.env` для DNS-алиасов проектных доменов на Traefik и пересоздается пул общих проектных сервисов. Если имя проекта не указано, генерируется свободный идентификатор в формате `adjective-animal`, например `precise-pangolin`. Если имя не соответствует конвенции, проект с таким именем уже зарегистрирован или фреймворк не определен, команда завершается ошибкой. Для пропуска перезапуска используйте `--no-restart`.
 
 Чтобы удалить регистрацию текущего проекта, выполните команду из корня проекта или любой вложенной директории:
 
 ```bash
-bin/docker-cli down
+bin/docker-cli project:down
 ```
 
 Команда читает имя проекта из `.docker-cli.yaml`, удаляет соответствующую директорию в `~/.config/docker-cli/projects`, удаляет `.docker-cli.yaml`, пересобирает проектные хосты OpenResty, обновляет `PROJECT_WEB_DNSDOCK_ALIAS` и пересоздает пул общих проектных сервисов. Если фреймворк не определен или файл метаданных отсутствует, команда завершается ошибкой. Для пропуска перезапуска используйте `--no-restart`.
@@ -39,11 +39,11 @@ bin/docker-cli down
 После этого можно запускать и останавливать системное окружение:
 
 ```bash
-bin/docker-cli start
-bin/docker-cli stop
+bin/docker-cli system:start
+bin/docker-cli system:stop
 ```
 
-`start` выполняет `docker compose up -d` для проекта `docker-cli`, а `stop` выполняет `docker compose down --remove-orphans` и удаляет общую сеть `docker-cli`. Если `.env` или `compose.yaml` отсутствуют, команды завершаются понятной ошибкой и предлагают выполнить `docker-cli init`.
+`start` выполняет `docker compose up -d` для проекта `docker-cli`, а `stop` выполняет `docker compose down --remove-orphans` и удаляет общую сеть `docker-cli`. Если `.env` или `compose.yaml` отсутствуют, команды завершаются понятной ошибкой и предлагают выполнить `docker-cli config:init`.
 
 
 ## Сборка и публикация кастомных образов
@@ -51,13 +51,13 @@ bin/docker-cli stop
 Кастомные образы из исходников собираются командой:
 
 ```bash
-docker-cli src:build
+docker-cli image:build
 ```
 
 Публикация в registry выполняется отдельно:
 
 ```bash
-docker-cli src:publish
+docker-cli image:publish
 ```
 
 Сейчас кастомный образ один: `php-fpm-8.2`. По умолчанию команды используют registry `ghcr.io`, namespace `whiskyjs` и составное имя образа `docker-cli/php-fpm-8.2`, то есть публикуемый ref выглядит как `ghcr.io/whiskyjs/docker-cli/php-fpm-8.2:<tag>`. Тег берётся из `SOURCE_IMAGE_TAG`, если он задан; иначе используется самый новый semver-тег, достижимый из текущей ветки git-репозитория, без префикса `v`; если подходящий git-тег не найден, используется `default`. Для ручной проверки команд без запуска Docker используйте `--dry-run`, для явного тега — `--tag=1.0.0`.
@@ -75,11 +75,11 @@ echo "$GITHUB_TOKEN" | docker login ghcr.io -u <github-login> --password-stdin
 После логина соберите и опубликуйте образы:
 
 ```bash
-docker-cli src:build
-docker-cli src:publish
+docker-cli image:build
+docker-cli image:publish
 ```
 
-Если нужно опубликовать образ в другой GitHub namespace или organization, измените `SOURCE_IMAGE_NAMESPACE` в `~/.config/docker-cli/compose/system/.env`. Для проверки без Docker-команд используйте `docker-cli src:build --dry-run` и `docker-cli src:publish --dry-run`.
+Если нужно опубликовать образ в другой GitHub namespace или organization, измените `SOURCE_IMAGE_NAMESPACE` в `~/.config/docker-cli/compose/system/.env`. Для проверки без Docker-команд используйте `docker-cli image:build --dry-run` и `docker-cli image:publish --dry-run`.
 
 ## Базовые сервисы
 

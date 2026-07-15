@@ -12,7 +12,7 @@ final class SourcePublishCommand extends SourceImageCommand
 {
     public function __construct()
     {
-        parent::__construct('src:publish');
+        parent::__construct('image:publish');
         $this->setDescription('Опубликовать кастомные docker-cli образы в registry.');
         $this->configureSourceImageOptions();
     }

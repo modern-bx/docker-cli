@@ -20,7 +20,7 @@ final class StartCommand extends Command
     public function __construct(?TranslatorInterface $translator = null)
     {
         $this->translator = $translator ?? TranslatorFactory::create();
-        parent::__construct('start');
+        parent::__construct('system:start');
         $this->setDescription($this->translator->trans('command.start.description'));
     }
 

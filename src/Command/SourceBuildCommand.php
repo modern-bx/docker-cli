@@ -12,7 +12,7 @@ final class SourceBuildCommand extends SourceImageCommand
 {
     public function __construct()
     {
-        parent::__construct('src:build');
+        parent::__construct('image:build');
         $this->setDescription('Собрать кастомные docker-cli образы из исходников.');
         $this->configureSourceImageOptions();
     }

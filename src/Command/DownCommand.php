@@ -18,7 +18,7 @@ final class DownCommand extends Command
 {
     public function __construct(private readonly ?FrameworkDetectionService $detectionService = null)
     {
-        parent::__construct('down');
+        parent::__construct('project:down');
         $this->setDescription('Удалить регистрацию проекта docker-cli.');
         $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
     }

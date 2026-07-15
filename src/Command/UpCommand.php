@@ -8,6 +8,7 @@ use DockerCli\Framework\Description\FrameworkDescriptionService;
 use DockerCli\Framework\FrameworkDetectionService;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\OpenRestyHostRenderer;
+use DockerCli\Project\ProjectNameGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputOption;
@@ -22,9 +23,9 @@ final class UpCommand extends Command
         private readonly ?FrameworkDetectionService $detectionService = null,
         private readonly ?FrameworkDescriptionService $descriptionService = null,
     ) {
-        parent::__construct('up');
+        parent::__construct('project:up');
         $this->setDescription('Зарегистрировать проект docker-cli.');
-        $this->addArgument('project-name', InputArgument::OPTIONAL, 'Имя проекта. По умолчанию используется имя папки проекта.');
+        $this->addArgument('project-name', InputArgument::OPTIONAL, 'Имя проекта. По умолчанию генерируется случайный идентификатор adjective-animal.');
         $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
     }
 
@@ -37,14 +38,14 @@ final class UpCommand extends Command
             return Command::FAILURE;
         }
 
-        $projectName = $this->resolveProjectName($input, $framework->getProjectRoot());
+        $projectsDirectory = $this->projectsDirectory();
+        $projectName = $this->resolveProjectName($input, $projectsDirectory);
         if (!$this->isValidProjectName($projectName)) {
             $output->writeln(sprintf('<error>Имя проекта "%s" не соответствует конвенции: используйте строчные латинские буквы, цифры и дефисы; имя должно начинаться и заканчиваться буквой или цифрой.</error>', $projectName));
 
             return Command::FAILURE;
         }
 
-        $projectsDirectory = $this->projectsDirectory();
         $projectDirectory = join_path($projectsDirectory, $projectName);
 
         if (is_dir($projectDirectory)) {
@@ -148,14 +149,29 @@ final class UpCommand extends Command
         return $matches[1];
     }
 
-    private function resolveProjectName(InputInterface $input, string $projectRoot): string
+    private function resolveProjectName(InputInterface $input, string $projectsDirectory): string
     {
         $projectName = $input->getArgument('project-name');
         if (is_string($projectName) && $projectName !== '') {
             return $projectName;
         }
 
-        return basename($projectRoot);
+        return (new ProjectNameGenerator())->generate($this->registeredProjectNames($projectsDirectory));
+    }
+
+    /** @return list<string> */
+    private function registeredProjectNames(string $projectsDirectory): array
+    {
+        if (!is_dir($projectsDirectory)) {
+            return [];
+        }
+
+        $names = [];
+        foreach (glob(join_path($projectsDirectory, '*'), GLOB_ONLYDIR) ?: [] as $directory) {
+            $names[] = basename($directory);
+        }
+
+        return $names;
     }
 
     private function isValidProjectName(string $projectName): bool

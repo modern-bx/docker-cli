@@ -20,7 +20,7 @@ final class StopCommand extends Command
     public function __construct(?TranslatorInterface $translator = null)
     {
         $this->translator = $translator ?? TranslatorFactory::create();
-        parent::__construct('stop');
+        parent::__construct('system:stop');
         $this->setDescription($this->translator->trans('command.stop.description'));
     }
 

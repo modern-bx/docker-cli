@@ -21,7 +21,7 @@ final class SeedCommand extends Command
     public function __construct(?TranslatorInterface $translator = null)
     {
         $this->translator = $translator ?? TranslatorFactory::create();
-        parent::__construct('seed');
+        parent::__construct('config:seed');
         $this->setDescription($this->translator->trans('command.seed.description'));
         $this->addOption('yes', 'y', InputOption::VALUE_NONE, $this->translator->trans('command.seed.yes_option'));
     }
