@@ -114,6 +114,28 @@ SH,
         ]), $compose, $output);
     }
 
+    /** @param list<string> $files */
+    public function apply(string $dbms, string $database, array $files, OutputInterface $output): int
+    {
+        $compose = $this->compose ?? new SystemCompose();
+        $compose->assertInitialized();
+
+        foreach ($files as $file) {
+            $output->writeln(sprintf('<info>Применяется SQL-файл "%s".</info>', $file));
+            $code = match ($dbms) {
+                'mysql' => $this->applyMysqlFile($compose, $database, $file, $output),
+                'postgres' => $this->applyPostgresFile($compose, $database, $file, $output),
+                default => Command::FAILURE,
+            };
+
+            if ($code !== Command::SUCCESS) {
+                return $code;
+            }
+        }
+
+        return Command::SUCCESS;
+    }
+
     private function mysqlSql(string $name, string $password, bool $rebuild): string
     {
         $identifier = str_replace('`', '``', $name);
@@ -160,6 +182,32 @@ SH,
         ];
     }
 
+    private function applyMysqlFile(SystemCompose $compose, string $database, string $file, OutputInterface $output): int
+    {
+        return $this->runWithInput(array_merge($compose->dockerComposeCommand('exec'), [
+            '-T',
+            'mysql',
+            'sh',
+            '-ec',
+            'MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}" mysql "$1"',
+            'sh',
+            $database,
+        ]), $compose, $file, $output);
+    }
+
+    private function applyPostgresFile(SystemCompose $compose, string $database, string $file, OutputInterface $output): int
+    {
+        return $this->runWithInput(array_merge($compose->dockerComposeCommand('exec'), [
+            '-T',
+            'postgres',
+            'sh',
+            '-ec',
+            'export PGPASSWORD="${POSTGRES_PASSWORD:?}"; psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:-system}" -d "$1"',
+            'sh',
+            $database,
+        ]), $compose, $file, $output);
+    }
+
     private function run(array $command, SystemCompose $compose, OutputInterface $output): int
     {
         $output->writeln('<comment>' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
@@ -169,5 +217,26 @@ SH,
         }
 
         return proc_close($process);
+    }
+
+    private function runWithInput(array $command, SystemCompose $compose, string $inputFile, OutputInterface $output): int
+    {
+        $input = fopen($inputFile, 'rb');
+        if ($input === false) {
+            $output->writeln(sprintf('<error>Не удалось открыть файл "%s".</error>', $inputFile));
+            return Command::FAILURE;
+        }
+
+        $output->writeln('<comment>' . implode(' ', array_map('escapeshellarg', $command)) . ' < ' . escapeshellarg($inputFile) . '</comment>');
+        $process = proc_open($command, [$input, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
+        if (!is_resource($process)) {
+            fclose($input);
+            throw new \RuntimeException('Unable to start docker compose process.');
+        }
+
+        $code = proc_close($process);
+        fclose($input);
+
+        return $code;
     }
 }

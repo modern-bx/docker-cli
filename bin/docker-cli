@@ -2,6 +2,7 @@
 <?php
 
 use DockerCli\Command\ConfigInitCommand;
+use DockerCli\Command\DataApplyCommand;
 use DockerCli\Command\DataDropCommand;
 use DockerCli\Command\DataInitCommand;
 use DockerCli\Command\ProjectUpCommand;
@@ -22,6 +23,7 @@ $application = new Application('docker-cli', '0.1.0');
 $application->add(new ConfigInitCommand());
 $application->add(new ProjectUpCommand());
 $application->add(new ConfigSeedCommand());
+$application->add(new DataApplyCommand());
 $application->add(new DataDropCommand());
 $application->add(new DataInitCommand());
 $application->add(new SystemStartCommand());
