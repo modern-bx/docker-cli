@@ -21,6 +21,7 @@ final class SystemStopCommand extends Command
     {
         $this->translator = $translator ?? TranslatorFactory::create();
         parent::__construct('system:stop');
+        $this->setAliases(['stop']);
         $this->setDescription($this->translator->trans('command.stop.description'));
     }
 

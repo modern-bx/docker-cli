@@ -46,6 +46,7 @@ final class OpenRestyHostRenderer
                 '{{ host_name }}' => $hostName,
                 '{{ document_root }}' => $this->containerDocumentRoot($project['document_root']),
                 '{{ php_fpm_upstream }}' => $this->phpFpmUpstream($project),
+                '{{ xdebug_client_port }}' => (string) ($project['xdebug_client_port'] ?? 9003),
             ]));
         }
 
@@ -57,7 +58,7 @@ final class OpenRestyHostRenderer
         return join_path($compose->directory(), self::HOSTS_RELATIVE_PATH);
     }
 
-    /** @return list<array{name: string, framework: string, document_root: string, language?: string, version?: string}> */
+    /** @return list<array{name: string, framework: string, document_root: string, xdebug_client_port?: int, language?: string, version?: string}> */
     private function registeredProjects(): array
     {
         $projectsDirectory = $this->projectsDirectory();
@@ -87,6 +88,7 @@ final class OpenRestyHostRenderer
                     'language' => is_string($project['language'] ?? null) ? $project['language'] : null,
                     'version' => is_string($project['version'] ?? null) ? $project['version'] : null,
                     'document_root' => $documentRoot,
+                    'xdebug_client_port' => $this->xdebugClientPort($project),
                 ], static fn (mixed $value): bool => $value !== null);
             }
         }
@@ -94,7 +96,22 @@ final class OpenRestyHostRenderer
         return $projects;
     }
 
-    /** @param array{name: string, framework: string, document_root: string, language?: string, version?: string} $project */
+    /** @param array<string, mixed> $project */
+    private function xdebugClientPort(array $project): int
+    {
+        $port = $project['xdebug']['client_port'] ?? null;
+        if (is_int($port)) {
+            return $port;
+        }
+
+        if (is_string($port) && ctype_digit($port)) {
+            return (int) $port;
+        }
+
+        return 9003;
+    }
+
+    /** @param array{name: string, framework: string, document_root: string, xdebug_client_port?: int, language?: string, version?: string} $project */
     private function phpFpmUpstream(array $project): string
     {
         $language = $project['language'] ?? 'php';
