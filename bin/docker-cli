@@ -1,26 +1,26 @@
 #!/usr/bin/env php
 <?php
 
-use DockerCli\Command\InitCommand;
-use DockerCli\Command\UpCommand;
-use DockerCli\Command\SeedCommand;
-use DockerCli\Command\DownCommand;
-use DockerCli\Command\StartCommand;
-use DockerCli\Command\StopCommand;
-use DockerCli\Command\SourceBuildCommand;
-use DockerCli\Command\SourcePublishCommand;
+use DockerCli\Command\ConfigInitCommand;
+use DockerCli\Command\ProjectUpCommand;
+use DockerCli\Command\ConfigSeedCommand;
+use DockerCli\Command\ProjectDownCommand;
+use DockerCli\Command\SystemStartCommand;
+use DockerCli\Command\SystemStopCommand;
+use DockerCli\Command\ImageBuildCommand;
+use DockerCli\Command\ImagePublishCommand;
 use Symfony\Component\Console\Application;
 
 require __DIR__ . '/../vendor/autoload.php';
 
 $application = new Application('docker-cli', '0.1.0');
-$application->add(new InitCommand());
-$application->add(new UpCommand());
-$application->add(new SeedCommand());
-$application->add(new StartCommand());
-$application->add(new StopCommand());
-$application->add(new DownCommand());
-$application->add(new SourceBuildCommand());
-$application->add(new SourcePublishCommand());
+$application->add(new ConfigInitCommand());
+$application->add(new ProjectUpCommand());
+$application->add(new ConfigSeedCommand());
+$application->add(new SystemStartCommand());
+$application->add(new SystemStopCommand());
+$application->add(new ProjectDownCommand());
+$application->add(new ImageBuildCommand());
+$application->add(new ImagePublishCommand());
 $application->setDefaultCommand('list');
 $application->run();

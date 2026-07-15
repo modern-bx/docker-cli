@@ -14,7 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class InitCommand extends Command
+final class ConfigInitCommand extends Command
 {
     private TranslatorInterface $translator;
 

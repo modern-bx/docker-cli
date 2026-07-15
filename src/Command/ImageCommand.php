@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use function DockerCli\Util\join_path;
 
-abstract class SourceImageCommand extends Command
+abstract class ImageCommand extends Command
 {
     /** @var list<array{name: string, context: string}> */
     private const IMAGES = [
@@ -21,14 +21,14 @@ abstract class SourceImageCommand extends Command
         ],
     ];
 
-    protected function configureSourceImageOptions(): void
+    protected function configureImageOptions(): void
     {
         $this->addOption('tag', null, InputOption::VALUE_REQUIRED, 'Тег образа. По умолчанию берется SOURCE_IMAGE_TAG, последний git-тег текущей ветки или default.');
         $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Показать docker-команды без выполнения.');
     }
 
     /** @return list<array{name: string, context: string}> */
-    protected function sourceImages(): array
+    protected function images(): array
     {
         $root = $this->repositoryRoot();
 
@@ -48,7 +48,7 @@ abstract class SourceImageCommand extends Command
             return $this->normalizeTag($optionTag);
         }
 
-        $envTag = $this->sourceImageEnv()['SOURCE_IMAGE_TAG'] ?? null;
+        $envTag = $this->imageEnv()['SOURCE_IMAGE_TAG'] ?? null;
         if (is_string($envTag) && $envTag !== '') {
             return $this->normalizeTag($envTag);
         }
@@ -78,7 +78,7 @@ abstract class SourceImageCommand extends Command
         if (!is_array($env)) {
             $env = [];
         }
-        $buildKit = $this->sourceImageEnv()['SOURCE_IMAGE_DOCKER_BUILDKIT'] ?? null;
+        $buildKit = $this->imageEnv()['SOURCE_IMAGE_DOCKER_BUILDKIT'] ?? null;
         if (is_string($buildKit) && $buildKit !== '') {
             $env['DOCKER_BUILDKIT'] = $buildKit;
         }
@@ -93,14 +93,14 @@ abstract class SourceImageCommand extends Command
 
     private function imageRegistry(): string
     {
-        $registry = $this->sourceImageEnv()['SOURCE_IMAGE_REGISTRY'] ?? 'ghcr.io';
+        $registry = $this->imageEnv()['SOURCE_IMAGE_REGISTRY'] ?? 'ghcr.io';
 
         return trim((string) $registry, '/');
     }
 
     private function imageNamespace(): string
     {
-        $namespace = $this->sourceImageEnv()['SOURCE_IMAGE_NAMESPACE'] ?? 'whiskyjs';
+        $namespace = $this->imageEnv()['SOURCE_IMAGE_NAMESPACE'] ?? 'whiskyjs';
 
         return trim((string) $namespace, '/');
     }
@@ -111,7 +111,7 @@ abstract class SourceImageCommand extends Command
     }
 
     /** @return array<string, string> */
-    private function sourceImageEnv(): array
+    private function imageEnv(): array
     {
         $env = $this->readEnvFile(join_path($this->repositoryRoot(), 'resources', 'compose', 'system', SystemCompose::ENV_FILE));
         $composeEnv = (new SystemCompose())->envFile();

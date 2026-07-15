@@ -17,7 +17,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 use function DockerCli\Util\join_path;
 
-final class UpCommand extends Command
+final class ProjectUpCommand extends Command
 {
     public function __construct(
         private readonly ?FrameworkDetectionService $detectionService = null,
