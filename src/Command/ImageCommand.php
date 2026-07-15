@@ -13,11 +13,12 @@ use function DockerCli\Util\join_path;
 
 abstract class ImageCommand extends Command
 {
-    /** @var list<array{name: string, context: string}> */
+    /** @var list<array{name: string, context: string, service: string}> */
     private const IMAGES = [
         [
             'name' => 'php-fpm-8.2',
             'context' => 'resources/compose/system/config/php-fpm-8.2',
+            'service' => 'php-fpm-8.2',
         ],
     ];
 
@@ -27,7 +28,7 @@ abstract class ImageCommand extends Command
         $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Показать docker-команды без выполнения.');
     }
 
-    /** @return list<array{name: string, context: string}> */
+    /** @return list<array{name: string, context: string, service: string}> */
     protected function images(): array
     {
         $root = $this->repositoryRoot();
@@ -36,6 +37,7 @@ abstract class ImageCommand extends Command
             static fn (array $image): array => [
                 'name' => $image['name'],
                 'context' => join_path($root, $image['context']),
+                'service' => $image['service'],
             ],
             self::IMAGES
         );
@@ -66,8 +68,11 @@ abstract class ImageCommand extends Command
         return sprintf('%s/%s/%s:%s', $this->imageRegistry(), $this->imageNamespace(), $this->imageName($name), $tag);
     }
 
-    /** @param list<string> $command */
-    protected function runDockerCommand(array $command, OutputInterface $output, bool $dryRun): int
+    /**
+     * @param list<string> $command
+     * @param array<string, string> $extraEnv
+     */
+    protected function runDockerCommand(array $command, OutputInterface $output, bool $dryRun, array $extraEnv = []): int
     {
         $output->writeln('<comment>' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
         if ($dryRun) {
@@ -78,10 +83,13 @@ abstract class ImageCommand extends Command
         if (!is_array($env)) {
             $env = [];
         }
-        $buildKit = $this->imageEnv()['SOURCE_IMAGE_DOCKER_BUILDKIT'] ?? null;
+        $imageEnv = $this->imageEnv();
+        $buildKit = $imageEnv['SOURCE_IMAGE_DOCKER_BUILDKIT'] ?? null;
         if (is_string($buildKit) && $buildKit !== '') {
             $env['DOCKER_BUILDKIT'] = $buildKit;
+            $env['COMPOSE_DOCKER_CLI_BUILD'] = $buildKit;
         }
+        $env = array_replace($env, $extraEnv);
 
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $env);
         if (!is_resource($process)) {
@@ -89,6 +97,36 @@ abstract class ImageCommand extends Command
         }
 
         return proc_close($process);
+    }
+
+    /** @return list<string> */
+    protected function composeBuildCommand(string $service, bool $noCache = false): array
+    {
+        $command = [
+            'docker',
+            'compose',
+            '--env-file',
+            $this->composeEnvFile(),
+            '--file',
+            $this->composeFile(),
+            'build',
+        ];
+        if ($noCache) {
+            $command[] = '--no-cache';
+        }
+        $command[] = $service;
+
+        return $command;
+    }
+
+    /** @return array<string, string> */
+    protected function imageCommandEnvironment(string $tag): array
+    {
+        return [
+            'SOURCE_IMAGE_REGISTRY' => $this->imageRegistry(),
+            'SOURCE_IMAGE_NAMESPACE' => $this->imageNamespace(),
+            'SOURCE_IMAGE_TAG' => $tag,
+        ];
     }
 
     private function imageRegistry(): string
@@ -186,6 +224,21 @@ abstract class ImageCommand extends Command
         }
 
         throw new \InvalidArgumentException(sprintf('Invalid source image tag "%s". Use a version like 1.0.0 or default.', $tag));
+    }
+
+    private function composeFile(): string
+    {
+        return join_path($this->repositoryRoot(), 'resources', 'compose', 'system', SystemCompose::COMPOSE_FILE);
+    }
+
+    private function composeEnvFile(): string
+    {
+        $composeEnv = (new SystemCompose())->envFile();
+        if (is_file($composeEnv)) {
+            return $composeEnv;
+        }
+
+        return join_path($this->repositoryRoot(), 'resources', 'compose', 'system', SystemCompose::ENV_FILE);
     }
 
     private function repositoryRoot(): string
