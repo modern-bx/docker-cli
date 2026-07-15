@@ -10,6 +10,15 @@ if [ -d /docker-cli/php-fpm.d ]; then
     cp /docker-cli/php-fpm.d/*.conf /usr/local/etc/php-fpm.d/
 fi
 
+
+if [ -f /usr/local/bin/docker-cli-setup-xdebug-cli ]; then
+    cp /usr/local/bin/docker-cli-setup-xdebug-cli /etc/profile.d/docker-cli-xdebug.sh
+    chmod 0644 /etc/profile.d/docker-cli-xdebug.sh
+    if ! grep -q /etc/profile.d/docker-cli-xdebug.sh /etc/bash.bashrc 2>/dev/null; then
+        printf '\n[ -f /etc/profile.d/docker-cli-xdebug.sh ] && . /etc/profile.d/docker-cli-xdebug.sh\n' >> /etc/bash.bashrc
+    fi
+fi
+
 target_uid="${HOST_UID:-1000}"
 target_gid="${HOST_GID:-1000}"
 

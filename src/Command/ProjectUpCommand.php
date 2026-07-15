@@ -82,6 +82,9 @@ final class ProjectUpCommand extends Command
                     ...$this->languageVersionConfig($projectRoot),
                     'root' => $projectRoot,
                     'document_root' => $framework->getDocumentRoot(),
+                    'xdebug' => [
+                        'client_port' => $this->nextXdebugClientPort($projectsDirectory),
+                    ],
                 ],
             ],
         ]);
@@ -172,6 +175,46 @@ final class ProjectUpCommand extends Command
         }
 
         return $names;
+    }
+
+    private function nextXdebugClientPort(string $projectsDirectory): int
+    {
+        $port = 9004;
+        $usedPorts = $this->registeredXdebugClientPorts($projectsDirectory);
+
+        while (in_array($port, $usedPorts, true)) {
+            ++$port;
+        }
+
+        return $port;
+    }
+
+    /** @return list<int> */
+    private function registeredXdebugClientPorts(string $projectsDirectory): array
+    {
+        if (!is_dir($projectsDirectory)) {
+            return [];
+        }
+
+        $ports = [];
+        foreach (glob(join_path($projectsDirectory, '*', 'project.yaml')) ?: [] as $projectFile) {
+            $data = Yaml::parseFile($projectFile);
+            if (!is_array($data)) {
+                continue;
+            }
+
+            $port = $data['data']['project']['xdebug']['client_port'] ?? null;
+            if (is_int($port)) {
+                $ports[] = $port;
+                continue;
+            }
+
+            if (is_string($port) && ctype_digit($port)) {
+                $ports[] = (int) $port;
+            }
+        }
+
+        return $ports;
     }
 
     private function isValidProjectName(string $projectName): bool

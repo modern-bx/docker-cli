@@ -178,6 +178,8 @@ services:
       - ./config/php-fpm-8.2/php-fpm.d:/docker-cli/php-fpm.d:ro
       - /home:/home
       - /:/host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     expose:
       - "9000"
     networks:
