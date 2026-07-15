@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Framework\Description\FrameworkDescriptionService;
+use DockerCli\Config\MissingConfigException;
 use DockerCli\Framework\FrameworkDetectionService;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\OpenRestyHostRenderer;
+use DockerCli\Project\DataInitializer;
+use DockerCli\Project\ProjectDatabaseConfig;
 use DockerCli\Project\ProjectNameGenerator;
+use DockerCli\Project\ProjectRegistry;
 use DockerCli\Project\XdebugPortManager;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Command\Command;
@@ -39,7 +43,8 @@ final class ProjectUpCommand extends Command
             return Command::FAILURE;
         }
 
-        $projectsDirectory = $this->projectsDirectory();
+        $registry = new ProjectRegistry();
+        $projectsDirectory = $registry->projectsDirectory();
         $projectName = $this->resolveProjectName($input, $projectsDirectory);
         if (!$this->isValidProjectName($projectName)) {
             $output->writeln(sprintf('<error>Имя проекта "%s" не соответствует конвенции: используйте строчные латинские буквы, цифры и дефисы; имя должно начинаться и заканчиваться буквой или цифрой.</error>', $projectName));
@@ -70,7 +75,7 @@ final class ProjectUpCommand extends Command
         $description = ($this->descriptionService ?? new FrameworkDescriptionService())->describe($framework);
         $projectRoot = $framework->getProjectRoot();
 
-        $this->writeYaml(join_path($projectDirectory, 'project.yaml'), [
+        $projectConfig = (new ProjectDatabaseConfig())->ensure([
             'meta' => [
                 'schema' => 'project',
                 'version' => 0.1,
@@ -89,6 +94,7 @@ final class ProjectUpCommand extends Command
                 ],
             ],
         ]);
+        $this->writeYaml(join_path($projectDirectory, 'project.yaml'), $projectConfig);
 
         $this->writeYaml(join_path($projectRoot, '.docker-cli.yaml'), [
             'meta' => [
@@ -101,6 +107,19 @@ final class ProjectUpCommand extends Command
                 ],
             ],
         ]);
+
+        $mysqlPassword = $projectConfig['data']['databases']['mysql']['password'];
+        $postgresPassword = $projectConfig['data']['databases']['postgres']['password'];
+        try {
+            $dataInitCode = (new DataInitializer())->initialize($projectName, $mysqlPassword, $postgresPassword, false, $output);
+        } catch (MissingConfigException $exception) {
+            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+
+            return Command::FAILURE;
+        }
+        if ($dataInitCode !== Command::SUCCESS) {
+            return $dataInitCode;
+        }
 
         (new OpenRestyHostRenderer())->render();
 
@@ -181,16 +200,6 @@ final class ProjectUpCommand extends Command
     private function isValidProjectName(string $projectName): bool
     {
         return (bool) preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $projectName);
-    }
-
-    private function projectsDirectory(): string
-    {
-        $home = getenv('HOME') ?: null;
-        if ($home === null) {
-            throw new \RuntimeException('Unable to determine HOME directory.');
-        }
-
-        return join_path($home, '.config', 'docker-cli', 'projects');
     }
 
     /** @param array<string, mixed> $data */
