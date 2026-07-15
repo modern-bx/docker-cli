@@ -71,6 +71,49 @@ SH,
         ]), $compose, $output);
     }
 
+    public function drop(string $projectName, OutputInterface $output): int
+    {
+        $compose = $this->compose ?? new SystemCompose();
+        $compose->assertInitialized();
+
+        $code = $this->run(array_merge($compose->dockerComposeCommand('exec'), [
+            '-T',
+            'mysql',
+            'sh',
+            '-ec',
+            'MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}" mysql -uroot -e "$1"',
+            'sh',
+            $this->mysqlDropSql($projectName),
+        ]), $compose, $output);
+        if ($code !== Command::SUCCESS) {
+            return $code;
+        }
+
+        [$postgresDropRoleSql, $postgresTerminateSql] = $this->postgresDropSql($projectName);
+        return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
+            '-T',
+            'postgres',
+            'sh',
+            '-ec',
+            <<<'SH'
+set -eu
+export PGPASSWORD="${POSTGRES_PASSWORD:?}"
+root_user="${POSTGRES_USER:-system}"
+database="$1"
+drop_role_sql="$2"
+terminate_sql="$3"
+
+psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres -c "$terminate_sql"
+dropdb -U "$root_user" --if-exists "$database"
+psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres -c "$drop_role_sql"
+SH,
+            'sh',
+            $projectName,
+            $postgresDropRoleSql,
+            $postgresTerminateSql,
+        ]), $compose, $output);
+    }
+
     private function mysqlSql(string $name, string $password, bool $rebuild): string
     {
         $identifier = str_replace('`', '``', $name);
@@ -79,6 +122,14 @@ SH,
         $drop = $rebuild ? "DROP USER IF EXISTS '{$user}'@'%'; DROP DATABASE IF EXISTS `{$identifier}`;" : '';
 
         return $drop . " CREATE DATABASE IF NOT EXISTS `{$identifier}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS '{$user}'@'%' IDENTIFIED BY '{$password}'; GRANT ALL PRIVILEGES ON `{$identifier}`.* TO '{$user}'@'%'; FLUSH PRIVILEGES;";
+    }
+
+    private function mysqlDropSql(string $name): string
+    {
+        $identifier = str_replace('`', '``', $name);
+        $user = str_replace("'", "''", $name);
+
+        return "DROP USER IF EXISTS '{$user}'@'%'; DROP DATABASE IF EXISTS `{$identifier}`;";
     }
 
     /** @return array{string, string, string, string, string} */
@@ -94,6 +145,18 @@ SH,
             "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{$literalName}' AND pid <> pg_backend_pid();",
             "SELECT 1 FROM pg_database WHERE datname = '{$literalName}'",
             "GRANT ALL PRIVILEGES ON DATABASE {$quotedIdentifier} TO {$quotedIdentifier};",
+        ];
+    }
+
+    /** @return array{string, string} */
+    private function postgresDropSql(string $name): array
+    {
+        $literalName = str_replace("'", "''", $name);
+        $quotedIdentifier = '"' . str_replace('"', '""', $name) . '"';
+
+        return [
+            "DROP ROLE IF EXISTS {$quotedIdentifier};",
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{$literalName}' AND pid <> pg_backend_pid();",
         ];
     }
 
