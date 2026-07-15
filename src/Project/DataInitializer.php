@@ -114,6 +114,24 @@ SH,
         ]), $compose, $output);
     }
 
+    public function dump(string $dbms, string $database, string $outputFile, OutputInterface $output): int
+    {
+        $compose = $this->compose ?? new SystemCompose();
+        $compose->assertInitialized();
+
+        $directory = dirname($outputFile);
+        if ($directory !== '.' && !is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+            $output->writeln(sprintf('<error>Не удалось создать директорию "%s".</error>', $directory));
+            return Command::FAILURE;
+        }
+
+        return match ($dbms) {
+            'mysql' => $this->dumpMysql($compose, $database, $outputFile, $output),
+            'postgres' => $this->dumpPostgres($compose, $database, $outputFile, $output),
+            default => Command::FAILURE,
+        };
+    }
+
     /** @param list<string> $files */
     public function apply(string $dbms, string $database, array $files, OutputInterface $output): int
     {
@@ -182,6 +200,32 @@ SH,
         ];
     }
 
+    private function dumpMysql(SystemCompose $compose, string $database, string $outputFile, OutputInterface $output): int
+    {
+        return $this->runWithOutput(array_merge($compose->dockerComposeCommand('exec'), [
+            '-T',
+            'mysql',
+            'sh',
+            '-ec',
+            'MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}" mysqldump --single-transaction --routines --triggers "$1"',
+            'sh',
+            $database,
+        ]), $compose, $outputFile, $output);
+    }
+
+    private function dumpPostgres(SystemCompose $compose, string $database, string $outputFile, OutputInterface $output): int
+    {
+        return $this->runWithOutput(array_merge($compose->dockerComposeCommand('exec'), [
+            '-T',
+            'postgres',
+            'sh',
+            '-ec',
+            'export PGPASSWORD="${POSTGRES_PASSWORD:?}"; pg_dump -U "${POSTGRES_USER:-system}" -d "$1"',
+            'sh',
+            $database,
+        ]), $compose, $outputFile, $output);
+    }
+
     private function applyMysqlFile(SystemCompose $compose, string $database, string $file, OutputInterface $output): int
     {
         return $this->runWithInput(array_merge($compose->dockerComposeCommand('exec'), [
@@ -239,4 +283,26 @@ SH,
 
         return $code;
     }
+
+    private function runWithOutput(array $command, SystemCompose $compose, string $outputFile, OutputInterface $output): int
+    {
+        $file = fopen($outputFile, 'wb');
+        if ($file === false) {
+            $output->writeln(sprintf('<error>Не удалось открыть файл "%s" для записи.</error>', $outputFile));
+            return Command::FAILURE;
+        }
+
+        $output->writeln('<comment>' . implode(' ', array_map('escapeshellarg', $command)) . ' > ' . escapeshellarg($outputFile) . '</comment>');
+        $process = proc_open($command, [STDIN, $file, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
+        if (!is_resource($process)) {
+            fclose($file);
+            throw new \RuntimeException('Unable to start docker compose process.');
+        }
+
+        $code = proc_close($process);
+        fclose($file);
+
+        return $code;
+    }
+
 }
