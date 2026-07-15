@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 
+if [ -d /docker-cli/php/conf.d ]; then
+    cp /docker-cli/php/conf.d/*.ini /usr/local/etc/php/conf.d/
+fi
+
 if [ -d /docker-cli/php-fpm.d ]; then
     rm -f /usr/local/etc/php-fpm.d/www.conf
     cp /docker-cli/php-fpm.d/*.conf /usr/local/etc/php-fpm.d/
