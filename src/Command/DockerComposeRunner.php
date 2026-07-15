@@ -32,7 +32,7 @@ trait DockerComposeRunner
             '%command%' => implode(' ', array_map('escapeshellarg', $fullCommand)),
         ]) . '</comment>');
 
-        $process = proc_open($fullCommand, [STDIN, STDOUT, STDERR], $pipes);
+        $process = proc_open($fullCommand, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
         if (!is_resource($process)) {
             throw new \RuntimeException('Unable to start docker compose process.');
         }

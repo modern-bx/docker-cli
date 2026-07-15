@@ -45,6 +45,7 @@ final class OpenRestyHostRenderer
                 '{{ project_name }}' => $project['name'],
                 '{{ host_name }}' => $hostName,
                 '{{ document_root }}' => $this->containerDocumentRoot($project['document_root']),
+                '{{ php_fpm_upstream }}' => $this->phpFpmUpstream($project),
             ]));
         }
 
@@ -56,7 +57,7 @@ final class OpenRestyHostRenderer
         return join_path($compose->directory(), self::HOSTS_RELATIVE_PATH);
     }
 
-    /** @return list<array{name: string, framework: string, document_root: string}> */
+    /** @return list<array{name: string, framework: string, document_root: string, language?: string, version?: string}> */
     private function registeredProjects(): array
     {
         $projectsDirectory = $this->projectsDirectory();
@@ -80,15 +81,30 @@ final class OpenRestyHostRenderer
             $framework = $project['framework'] ?? null;
             $documentRoot = $project['document_root'] ?? null;
             if (is_string($name) && is_string($framework) && is_string($documentRoot)) {
-                $projects[] = [
+                $projects[] = array_filter([
                     'name' => $name,
                     'framework' => $framework,
+                    'language' => is_string($project['language'] ?? null) ? $project['language'] : null,
+                    'version' => is_string($project['version'] ?? null) ? $project['version'] : null,
                     'document_root' => $documentRoot,
-                ];
+                ], static fn (mixed $value): bool => $value !== null);
             }
         }
 
         return $projects;
+    }
+
+    /** @param array{name: string, framework: string, document_root: string, language?: string, version?: string} $project */
+    private function phpFpmUpstream(array $project): string
+    {
+        $language = $project['language'] ?? 'php';
+        $version = $project['version'] ?? '8.2';
+
+        if ($language !== 'php') {
+            throw new \RuntimeException(sprintf('Unsupported project language "%s" for PHP-FPM upstream.', $language));
+        }
+
+        return sprintf('php-fpm-%s:9000', $version);
     }
 
     private function projectsDirectory(): string

@@ -63,7 +63,7 @@ services:
       - -ec
       - |
         if [ -z "$${DOCKGE_ADMIN_PASSWORD}" ]; then
-          echo "DOCKGE_ADMIN_PASSWORD is empty. Run docker-cli seed before start." >&2
+          echo "DOCKGE_ADMIN_PASSWORD is empty. Run docker-cli config:seed before start." >&2
           exit 1
         fi
 
@@ -158,6 +158,33 @@ services:
         aliases:
           - postgres
           - postgres.${BASE_HOST}
+    restart: unless-stopped
+
+  php-fpm-8.2:
+    build:
+      context: ./config/php-fpm-8.2
+      dockerfile: Dockerfile
+      network: host
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:-whiskyjs}/docker-cli/php-fpm-8.2:${SOURCE_IMAGE_TAG:-default}
+    container_name: docker-cli-php-fpm-8.2
+    environment:
+      DNSDOCK_NAME: php-fpm-8.2
+      DNSDOCK_IMAGE: system
+      HOST_UID: ${HOST_UID:-1000}
+      HOST_GID: ${HOST_GID:-1000}
+    command: ["docker-cli-setup-runtime-user"]
+    volumes:
+      - ./config/php-fpm-8.2/php/conf.d:/docker-cli/php/conf.d:ro
+      - ./config/php-fpm-8.2/php-fpm.d:/docker-cli/php-fpm.d:ro
+      - /home:/home
+      - /:/host
+    expose:
+      - "9000"
+    networks:
+      docker-cli:
+        aliases:
+          - php-fpm-8.2
+          - php-fpm-8.2.${BASE_HOST}
     restart: unless-stopped
 
   openresty:

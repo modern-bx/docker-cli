@@ -14,14 +14,14 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class InitCommand extends Command
+final class ConfigInitCommand extends Command
 {
     private TranslatorInterface $translator;
 
     public function __construct(?TranslatorInterface $translator = null)
     {
         $this->translator = $translator ?? TranslatorFactory::create();
-        parent::__construct('init');
+        parent::__construct('config:init');
         $this->setDescription($this->translator->trans('command.init.description'));
         $this->addOption('update', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.update_option'));
         $this->addOption('migrate', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.migrate_option'));

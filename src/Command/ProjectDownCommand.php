@@ -14,11 +14,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 use function DockerCli\Util\join_path;
 
-final class DownCommand extends Command
+final class ProjectDownCommand extends Command
 {
     public function __construct(private readonly ?FrameworkDetectionService $detectionService = null)
     {
-        parent::__construct('down');
+        parent::__construct('project:down');
         $this->setDescription('Удалить регистрацию проекта docker-cli.');
         $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
     }

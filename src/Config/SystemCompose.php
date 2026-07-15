@@ -39,17 +39,20 @@ final class SystemCompose
 
         $created = false;
         foreach ($this->templateMap() as $target => $template) {
-            if (file_exists($target)) {
+            if (file_exists($target) && !is_dir($template)) {
                 continue;
             }
 
-            copy($template, $target);
-            $created = true;
+            $before = $this->snapshotFiles($target);
+            $this->copyTemplate($template, $target);
+            if ($before !== $this->snapshotFiles($target)) {
+                $created = true;
+            }
         }
 
         if ($updateStatic) {
             foreach ($this->staticTemplateMap() as $target => $template) {
-                copy($template, $target);
+                $this->copyTemplate($template, $target, true);
                 $created = true;
             }
         }
@@ -60,6 +63,10 @@ final class SystemCompose
                     $created = true;
                 }
             }
+        }
+
+        if ($this->ensureHostIdentityEnv()) {
+            $created = true;
         }
 
         foreach ($this->dataDirectories() as $dataDirectory) {
@@ -94,6 +101,33 @@ final class SystemCompose
         ));
     }
 
+    /** @return array<string, string> */
+    public function dockerProcessEnvironment(): array
+    {
+        $environment = getenv();
+        if (!is_array($environment)) {
+            $environment = [];
+        }
+
+        if (!is_file($this->envFile())) {
+            return $environment;
+        }
+
+        $contents = file_get_contents($this->envFile());
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $this->envFile()));
+        }
+
+        $values = $this->readEnvValues($contents);
+        $buildKit = $values['SOURCE_IMAGE_DOCKER_BUILDKIT'] ?? '';
+        if ($buildKit !== '') {
+            $environment['DOCKER_BUILDKIT'] = $buildKit;
+            $environment['COMPOSE_DOCKER_CLI_BUILD'] = $buildKit;
+        }
+
+        return $environment;
+    }
+
     /** @return list<string> */
     public function dockerComposeCommand(string $operation): array
     {
@@ -111,6 +145,95 @@ final class SystemCompose
     }
 
     /** @return list<string> */
+    private function snapshotFiles(string $path): array
+    {
+        if (!file_exists($path)) {
+            return [];
+        }
+
+        if (is_file($path)) {
+            return [$path];
+        }
+
+        $files = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($iterator as $file) {
+            if ($file instanceof \SplFileInfo && $file->isFile()) {
+                $files[] = $file->getPathname();
+            }
+        }
+
+        sort($files);
+
+        return $files;
+    }
+
+    private function ensureHostIdentityEnv(): bool
+    {
+        $envFile = $this->envFile();
+        if (!is_file($envFile)) {
+            return false;
+        }
+
+        $contents = file_get_contents($envFile);
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $envFile));
+        }
+
+        $replacements = [
+            'HOST_UID' => (string) $this->hostUserId(),
+            'HOST_GID' => (string) $this->hostGroupId(),
+        ];
+        $currentValues = $this->readEnvValues($contents);
+        $updated = $contents;
+        foreach ($replacements as $key => $value) {
+            if (($currentValues[$key] ?? '') !== '') {
+                continue;
+            }
+
+            if (preg_match('/^' . $key . '=.*$/m', $updated) === 1) {
+                $updated = preg_replace('/^' . $key . '=.*$/m', $key . '=' . $value, $updated) ?? $updated;
+                continue;
+            }
+
+            $separator = str_ends_with($updated, PHP_EOL) || $updated === '' ? '' : PHP_EOL;
+            $updated .= $separator . $key . '=' . $value . PHP_EOL;
+        }
+
+        if ($updated === $contents) {
+            return false;
+        }
+
+        file_put_contents($envFile, $updated);
+
+        return true;
+    }
+
+    private function hostUserId(): int
+    {
+        if (function_exists('posix_getuid')) {
+            return posix_getuid();
+        }
+
+        $uid = getenv('UID');
+
+        return is_string($uid) && ctype_digit($uid) ? (int) $uid : 1000;
+    }
+
+    private function hostGroupId(): int
+    {
+        if (function_exists('posix_getgid')) {
+            return posix_getgid();
+        }
+
+        $gid = getenv('GID');
+
+        return is_string($gid) && ctype_digit($gid) ? (int) $gid : 1000;
+    }
+
+    /** @return list<string> */
     private function dataDirectories(): array
     {
         $data = join_path($this->directory(), 'data');
@@ -121,6 +244,8 @@ final class SystemCompose
             join_path($data, 'postgres', 'data'),
             join_path($data, 'postgres', 'logs'),
             join_path($this->directory(), 'config', 'openresty', 'hosts'),
+            join_path($this->directory(), 'config', 'php-fpm-8.2', 'php', 'conf.d'),
+            join_path($this->directory(), 'config', 'php-fpm-8.2', 'php-fpm.d'),
         ];
     }
 
@@ -130,6 +255,36 @@ final class SystemCompose
         return $this->editableTemplateMap() + $this->staticTemplateMap();
     }
 
+    private function copyTemplate(string $source, string $target, bool $overwrite = false): void
+    {
+        if (is_dir($source)) {
+            if (!is_dir($target) && !mkdir($target, 0755, true) && !is_dir($target)) {
+                throw new \RuntimeException(sprintf('Unable to create config directory "%s".', $target));
+            }
+
+            foreach (scandir($source) ?: [] as $entry) {
+                if ($entry === '.' || $entry === '..') {
+                    continue;
+                }
+
+                $this->copyTemplate(join_path($source, $entry), join_path($target, $entry), $overwrite);
+            }
+
+            return;
+        }
+
+        if (file_exists($target) && !$overwrite) {
+            return;
+        }
+
+        $targetDirectory = dirname($target);
+        if (!is_dir($targetDirectory) && !mkdir($targetDirectory, 0755, true) && !is_dir($targetDirectory)) {
+            throw new \RuntimeException(sprintf('Unable to create config directory "%s".', $targetDirectory));
+        }
+
+        copy($source, $target);
+    }
+
     /** @return array<string, string> */
     private function staticTemplateMap(): array
     {
@@ -137,6 +292,7 @@ final class SystemCompose
 
         return [
             $this->composeFile() => join_path($resources, self::COMPOSE_FILE),
+            join_path($this->directory(), 'config', 'php-fpm-8.2') => join_path($resources, 'config', 'php-fpm-8.2'),
         ];
     }
 

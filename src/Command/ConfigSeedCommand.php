@@ -14,14 +14,14 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class SeedCommand extends Command
+final class ConfigSeedCommand extends Command
 {
     private TranslatorInterface $translator;
 
     public function __construct(?TranslatorInterface $translator = null)
     {
         $this->translator = $translator ?? TranslatorFactory::create();
-        parent::__construct('seed');
+        parent::__construct('config:seed');
         $this->setDescription($this->translator->trans('command.seed.description'));
         $this->addOption('yes', 'y', InputOption::VALUE_NONE, $this->translator->trans('command.seed.yes_option'));
     }
@@ -86,9 +86,53 @@ final class SeedCommand extends Command
     /** @param array<string, string> $values */
     private function writeEnvFile(string $file, array $values): void
     {
+        $lines = file($file, FILE_IGNORE_NEW_LINES);
+        if ($lines === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $file));
+        }
+
+        $writtenKeys = [];
+        foreach ($lines as $index => $line) {
+            $trimmed = trim($line);
+            if ($trimmed === '' || str_starts_with($trimmed, '#') || !str_contains($trimmed, '=')) {
+                continue;
+            }
+
+            [$key] = explode('=', $trimmed, 2);
+            $key = trim($key);
+            if (!array_key_exists($key, $values)) {
+                continue;
+            }
+
+            $lines[$index] = $key . '=' . $values[$key];
+            $writtenKeys[$key] = true;
+        }
+
+        foreach ($this->envKeyOrder($values) as $key) {
+            if (!isset($writtenKeys[$key])) {
+                $lines[] = $key . '=' . $values[$key];
+            }
+        }
+
+        file_put_contents($file, implode(PHP_EOL, $lines) . PHP_EOL);
+    }
+
+    /**
+     * @param array<string, string> $values
+     * @return list<string>
+     */
+    private function envKeyOrder(array $values): array
+    {
         $orderedKeys = [
             'APP_LOCALE',
             'BASE_HOST',
+            'PROJECT_WEB_DNSDOCK_ALIAS',
+            'HOST_UID',
+            'HOST_GID',
+            'SOURCE_IMAGE_REGISTRY',
+            'SOURCE_IMAGE_NAMESPACE',
+            'SOURCE_IMAGE_TAG',
+            'SOURCE_IMAGE_DOCKER_BUILDKIT',
             'CLOUDFLARE_DNS_API_TOKEN',
             'ACME_EMAIL',
             'DOCKGE_ADMIN_USERNAME',
@@ -102,19 +146,10 @@ final class SeedCommand extends Command
             'POSTGRES_PASSWORD',
         ];
 
-        $lines = [];
-        foreach ($orderedKeys as $key) {
-            if (array_key_exists($key, $values)) {
-                $lines[] = $key . '=' . $values[$key];
-                unset($values[$key]);
-            }
-        }
-
-        foreach ($values as $key => $value) {
-            $lines[] = $key . '=' . $value;
-        }
-
-        file_put_contents($file, implode(PHP_EOL, $lines) . PHP_EOL);
+        return array_values(array_unique(array_merge(
+            array_values(array_filter($orderedKeys, static fn (string $key): bool => array_key_exists($key, $values))),
+            array_keys($values)
+        )));
     }
 
     /** @param array<string, string> $values */
