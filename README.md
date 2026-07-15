@@ -10,7 +10,7 @@
 bin/docker-cli config:init
 ```
 
-Команда создаёт `~/.config/docker-cli/compose/system`, а также файлы `.env` и `compose.yaml`, если они отсутствуют. Уже существующие файлы не перезаписываются. Опция `--update` после интерактивного подтверждения перезаписывает статические файлы конфигурации из шаблонов; сейчас это `compose.yaml`. Опция `--migrate` добавляет в редактируемые файлы отсутствующие параметры из шаблонов; сейчас это `.env`. Опция `--rebuild` пересобирает значения, зависящие от текущего состава зарегистрированных проектов; сейчас это `PROJECT_WEB_DNSDOCK_ALIAS` в `.env`. Опции `--update`, `--migrate` и `--rebuild` можно указывать одновременно.
+Команда создаёт `~/.config/docker-cli/compose/system`, а также файлы `.env` и `compose.yaml`, если они отсутствуют. Уже существующие файлы не перезаписываются. Опция `--update` после интерактивного подтверждения перезаписывает статические файлы конфигурации из шаблонов; сейчас это `compose.yaml`. Опция `--migrate` добавляет в редактируемые файлы отсутствующие параметры из шаблонов; сейчас это `.env`. Опция `--rebuild` пересобирает значения, зависящие от текущего состава зарегистрированных проектов; сейчас это `PROJECT_WEB_DNSDOCK_ALIAS` в `.env` и `data.project.xdebug.client_port` в конфигах проектов. Опции `--update`, `--migrate` и `--rebuild` можно указывать одновременно.
 
 После проверки параметров в `.env` заполните генерируемые секреты:
 
@@ -36,14 +36,15 @@ bin/docker-cli project:down
 
 Команда читает имя проекта из `.docker-cli.yaml`, удаляет соответствующую директорию в `~/.config/docker-cli/projects`, удаляет `.docker-cli.yaml`, пересобирает проектные хосты OpenResty, обновляет `PROJECT_WEB_DNSDOCK_ALIAS` и пересоздает пул общих проектных сервисов. Если фреймворк не определен или файл метаданных отсутствует, команда завершается ошибкой. Для пропуска перезапуска используйте `--no-restart`.
 
-После этого можно запускать и останавливать системное окружение:
+После этого можно запускать, останавливать и перезапускать системное окружение:
 
 ```bash
-bin/docker-cli system:start
-bin/docker-cli system:stop
+bin/docker-cli system:start   # или коротко: bin/docker-cli start
+bin/docker-cli system:stop    # или коротко: bin/docker-cli stop
+bin/docker-cli system:restart # или коротко: bin/docker-cli restart
 ```
 
-`start` выполняет `docker compose up -d` для проекта `docker-cli`, а `stop` выполняет `docker compose down --remove-orphans` и удаляет общую сеть `docker-cli`. Если `.env` или `compose.yaml` отсутствуют, команды завершаются понятной ошибкой и предлагают выполнить `docker-cli config:init`.
+`start` выполняет `docker compose up -d` для проекта `docker-cli`, `stop` выполняет `docker compose down --remove-orphans` и удаляет общую сеть `docker-cli`, а `restart` последовательно выполняет `stop` и `start`. Если `.env` или `compose.yaml` отсутствуют, команды завершаются понятной ошибкой и предлагают выполнить `docker-cli config:init`.
 
 
 ## Сборка и публикация кастомных образов
@@ -207,3 +208,87 @@ php -d phar.readonly=0 scripts/build-phar.php
 ```
 
 Команда создаёт `build/docker-cli.phar`.
+
+## Xdebug
+
+Образ `php-fpm-8.2` устанавливает расширение Xdebug и включает только режим пошаговой отладки. Профайлинг, трассировка, coverage и остальные режимы не включаются.
+
+### Порты проектов
+
+Для браузера используется единый trigger cookie `XDEBUG_TRIGGER=docker-cli`, но каждый зарегистрированный проект получает отдельный порт IDE. Это позволяет держать несколько проектов открытыми в PhpStorm одновременно: cookie одна и та же, а входящие debug-соединения приходят на разные порты.
+
+При `docker-cli project:up` в `~/.config/docker-cli/projects/<project>/project.yaml` сохраняется вычисленная настройка:
+
+```yaml
+data:
+  project:
+    xdebug:
+      client_port: 9004
+```
+
+Алгоритм не использует стандартный порт Xdebug `9003`: первый кандидат — `9004`. Если такой порт уже записан у любого зарегистрированного проекта, кандидат увеличивается на `1`, после чего список проектов проверяется заново. Первый порт, которого нет ни в одном `project.yaml`, сохраняется за новым проектом. Команда `docker-cli config:init --rebuild` пересобирает эти порты для всех зарегистрированных проектов в детерминированном порядке и затем заново генерирует OpenResty-конфиги. OpenResty при генерации vhost-а подставляет этот порт в FastCGI-параметр `PHP_VALUE`, поэтому browser-request конкретного проекта подключается именно к своему порту IDE.
+
+### Активация из браузера
+
+Xdebug стартует только по trigger-у. Для browser-сценариев установите cookie:
+
+```text
+XDEBUG_TRIGGER=docker-cli
+```
+
+Удобнее всего сделать это расширением браузера для Xdebug. Значение cookie одинаковое для всех проектов. Разделение проектов выполняется не cookie, а портом `xdebug.client_port`, который docker-cli хранит в конфиге проекта и передаёт в PHP-FPM через OpenResty.
+
+### Активация из консоли внутри контейнера
+
+При входе в PHP-FPM контейнер через интерактивный shell docker-cli подключает `/etc/profile.d/docker-cli-xdebug.sh`. Скрипт ищет вверх от текущей директории файл `.docker-cli.yaml`, по имени проекта читает `~/.config/docker-cli/projects/<project>/project.yaml` и выставляет:
+
+```bash
+XDEBUG_CONFIG="client_host=host.docker.internal client_port=<порт проекта> idekey=PHPSTORM"
+```
+
+Поэтому типовой сценарий выглядит так:
+
+```bash
+docker exec -it docker-cli-php-fpm-8.2 bash
+cd /home/user/projects/my-project
+export XDEBUG_TRIGGER=docker-cli
+php bin/console app:command
+```
+
+Если после входа в контейнер вы меняете директорию командой `cd`, wrapper обновляет `XDEBUG_CONFIG` под новый проект. Для запуска без интерактивного shell можно задать переменные явно:
+
+```bash
+docker exec -e XDEBUG_TRIGGER=docker-cli \
+  -e 'XDEBUG_CONFIG=client_host=host.docker.internal client_port=9004 idekey=PHPSTORM' \
+  docker-cli-php-fpm-8.2 php /home/user/projects/my-project/bin/console app:command
+```
+
+### Параметры `zz-xdebug.ini`
+
+Файл `config/php-fpm-8.2/php/conf.d/zz-xdebug.ini` содержит только настройки, необходимые для пошаговой отладки:
+
+- `xdebug.mode=debug` — включает только step debugger. В принципе Xdebug умеет несколько режимов (`debug`, `develop`, `coverage`, `profile`, `trace`, `gcstats`), но каждый дополнительный режим добавляет накладные расходы или генерирует артефакты. В docker-cli оставлен только `debug`, потому что профайлинг и трассировка не требуются.
+- `xdebug.start_with_request=trigger` — Xdebug не пытается подключаться к IDE на каждый HTTP/CLI запуск, а стартует только при наличии trigger-а. Для браузера trigger — cookie/request-параметр/header `XDEBUG_TRIGGER`; для CLI — переменная окружения `XDEBUG_TRIGGER`. Это снижает шум и не замедляет обычные запросы.
+- `xdebug.trigger_value=docker-cli` — ограничивает допустимое значение trigger-а. В нашем окружении browser-cookie должна быть `XDEBUG_TRIGGER=docker-cli`; случайная cookie или переменная с другим значением отладку не включит.
+- `xdebug.client_host=host.docker.internal` — адрес IDE с точки зрения контейнера. В compose для PHP-FPM добавлен `extra_hosts: host.docker.internal:host-gateway`, поэтому контейнер стабильно обращается к Docker host, где запущен PhpStorm.
+- `xdebug.client_port=9003` — базовый fallback Xdebug. Для проектов docker-cli этот стандартный порт намеренно не используется: browser-запросы получают проектный порт из OpenResty, а CLI-запуски получают его через `XDEBUG_CONFIG`. Значение `9003` остаётся только безопасным дефолтом, если PHP запущен вне зарегистрированного проекта.
+- `xdebug.idekey=PHPSTORM` — IDE key, который PhpStorm умеет принимать по умолчанию. В большинстве конфигураций PhpStorm достаточно слушать порт и правильно настроить path mappings; отдельная фильтрация по IDE key не нужна.
+- `xdebug.log_level=0` — отключает подробный лог Xdebug. Это сохраняет контейнеры чистыми при обычной работе. Для диагностики можно временно добавить `xdebug.log=/tmp/xdebug.log` и поднять `xdebug.log_level`, но в шаблоне docker-cli это не включено.
+
+Само расширение подключается стандартным ini-файлом, который создаёт `docker-php-ext-enable xdebug` при сборке образа. `zz-xdebug.ini` не содержит `zend_extension`, чтобы не загрузить Xdebug дважды.
+
+### Настройка PhpStorm
+
+1. Откройте `Settings/Preferences → PHP → Debug`.
+2. В блоке Xdebug добавьте порты всех нужных проектов в поле `Debug port`, например `9004,9005,9006`. Порт конкретного проекта смотрите в `~/.config/docker-cli/projects/<project>/project.yaml` в `data.project.xdebug.client_port`.
+3. Включите `Can accept external connections` / нажмите `Start Listening for PHP Debug Connections` на панели PhpStorm.
+4. Откройте `Settings/Preferences → PHP → Servers` и создайте server для каждого web-домена проекта:
+   - `Name`: удобно указать домен проекта, например `web-my-project.local.kubehut.top`;
+   - `Host`: тот же домен, например `web-my-project.local.kubehut.top`;
+   - `Port`: `80` — даже если в браузере проект открывается по HTTPS через Traefik;
+   - `Debugger`: `Xdebug`;
+   - почему `80`, а не `443`: PhpStorm сопоставляет server не с внешним TLS-входом Traefik, а с тем HTTP-запросом, который после терминации TLS приходит от Traefik в OpenResty. Внутри compose OpenResty слушает обычный HTTP на `80`, а PHP получает FastCGI-параметры уже после проксирования; поэтому для корректного server mapping указываем внутренний web-порт `80`.
+   - включите `Use path mappings`;
+   - локальный корень проекта сопоставьте с тем же абсолютным путём внутри контейнера, если проект лежит в `/home`, например `/home/user/projects/my-project`; для проектов вне `/home` путь внутри контейнера будет `/host/<абсолютный-путь-на-хосте>`.
+5. Для браузера установите cookie `XDEBUG_TRIGGER=docker-cli` на домен проекта и обновите страницу. PhpStorm должен принять соединение на порту проекта.
+6. Для CLI войдите в контейнер, перейдите в директорию проекта, выполните `export XDEBUG_TRIGGER=docker-cli` и запустите PHP-скрипт. Если breakpoint не сработал, проверьте, что PhpStorm слушает порт проекта, а `echo "$XDEBUG_CONFIG"` внутри контейнера содержит тот же `client_port`.

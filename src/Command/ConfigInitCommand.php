@@ -6,6 +6,7 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\SystemCompose;
 use DockerCli\Project\OpenRestyHostRenderer;
+use DockerCli\Project\XdebugPortManager;
 use DockerCli\Service\TranslatorFactory;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -52,10 +53,18 @@ final class ConfigInitCommand extends Command
         ]) . '</info>');
 
         if ($rebuild) {
+            (new XdebugPortManager())->rebuildProjectPorts($this->projectsDirectory());
             (new OpenRestyHostRenderer())->render();
             $output->writeln('<info>' . $this->translator->trans('config.rebuilt') . '</info>');
         }
 
         return Command::SUCCESS;
+    }
+
+    private function projectsDirectory(): string
+    {
+        $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
+
+        return $home . DIRECTORY_SEPARATOR . '.config' . DIRECTORY_SEPARATOR . 'docker-cli' . DIRECTORY_SEPARATOR . 'projects';
     }
 }

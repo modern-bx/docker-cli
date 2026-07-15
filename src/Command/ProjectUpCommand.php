@@ -9,6 +9,7 @@ use DockerCli\Framework\FrameworkDetectionService;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectNameGenerator;
+use DockerCli\Project\XdebugPortManager;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputOption;
@@ -82,6 +83,9 @@ final class ProjectUpCommand extends Command
                     ...$this->languageVersionConfig($projectRoot),
                     'root' => $projectRoot,
                     'document_root' => $framework->getDocumentRoot(),
+                    'xdebug' => [
+                        'client_port' => (new XdebugPortManager())->nextPort($projectsDirectory),
+                    ],
                 ],
             ],
         ]);

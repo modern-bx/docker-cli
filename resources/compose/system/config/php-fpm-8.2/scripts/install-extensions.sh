@@ -33,10 +33,12 @@ docker-php-ext-install -j"$(nproc)" \
 
 pecl install \
     memcached \
-    redis
+    redis \
+    xdebug
 
 docker-php-ext-enable \
     memcached \
-    redis
+    redis \
+    xdebug
 
 rm -rf /tmp/pear ~/.pearrc /var/lib/apt/lists/*
