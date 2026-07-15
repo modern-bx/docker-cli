@@ -28,7 +28,7 @@ final class ConfigurableServicesRestarter
         $command = array_merge($compose->dockerComposeCommand('up'), ['--detach', '--force-recreate'], self::SERVICES);
         $output->writeln('<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
 
-        $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes);
+        $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
         if (!is_resource($process)) {
             throw new \RuntimeException('Unable to start docker compose process.');
         }

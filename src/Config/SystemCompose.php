@@ -101,6 +101,33 @@ final class SystemCompose
         ));
     }
 
+    /** @return array<string, string> */
+    public function dockerProcessEnvironment(): array
+    {
+        $environment = getenv();
+        if (!is_array($environment)) {
+            $environment = [];
+        }
+
+        if (!is_file($this->envFile())) {
+            return $environment;
+        }
+
+        $contents = file_get_contents($this->envFile());
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $this->envFile()));
+        }
+
+        $values = $this->readEnvValues($contents);
+        $buildKit = $values['SOURCE_IMAGE_DOCKER_BUILDKIT'] ?? '';
+        if ($buildKit !== '') {
+            $environment['DOCKER_BUILDKIT'] = $buildKit;
+            $environment['COMPOSE_DOCKER_CLI_BUILD'] = $buildKit;
+        }
+
+        return $environment;
+    }
+
     /** @return list<string> */
     public function dockerComposeCommand(string $operation): array
     {
