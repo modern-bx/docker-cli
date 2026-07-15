@@ -36,14 +36,15 @@ bin/docker-cli project:down
 
 Команда читает имя проекта из `.docker-cli.yaml`, удаляет соответствующую директорию в `~/.config/docker-cli/projects`, удаляет `.docker-cli.yaml`, пересобирает проектные хосты OpenResty, обновляет `PROJECT_WEB_DNSDOCK_ALIAS` и пересоздает пул общих проектных сервисов. Если фреймворк не определен или файл метаданных отсутствует, команда завершается ошибкой. Для пропуска перезапуска используйте `--no-restart`.
 
-После этого можно запускать и останавливать системное окружение:
+После этого можно запускать, останавливать и перезапускать системное окружение:
 
 ```bash
-bin/docker-cli system:start
-bin/docker-cli system:stop
+bin/docker-cli system:start   # или коротко: bin/docker-cli start
+bin/docker-cli system:stop    # или коротко: bin/docker-cli stop
+bin/docker-cli system:restart # или коротко: bin/docker-cli restart
 ```
 
-`start` выполняет `docker compose up -d` для проекта `docker-cli`, а `stop` выполняет `docker compose down --remove-orphans` и удаляет общую сеть `docker-cli`. Если `.env` или `compose.yaml` отсутствуют, команды завершаются понятной ошибкой и предлагают выполнить `docker-cli config:init`.
+`start` выполняет `docker compose up -d` для проекта `docker-cli`, `stop` выполняет `docker compose down --remove-orphans` и удаляет общую сеть `docker-cli`, а `restart` последовательно выполняет `stop` и `start`. Если `.env` или `compose.yaml` отсутствуют, команды завершаются понятной ошибкой и предлагают выполнить `docker-cli config:init`.
 
 
 ## Сборка и публикация кастомных образов
@@ -284,8 +285,9 @@ docker exec -e XDEBUG_TRIGGER=docker-cli \
 4. Откройте `Settings/Preferences → PHP → Servers` и создайте server для каждого web-домена проекта:
    - `Name`: удобно указать домен проекта, например `web-my-project.local.kubehut.top`;
    - `Host`: тот же домен, например `web-my-project.local.kubehut.top`;
-   - `Port`: `443`;
+   - `Port`: `80` — даже если в браузере проект открывается по HTTPS через Traefik;
    - `Debugger`: `Xdebug`;
+   - почему `80`, а не `443`: PhpStorm сопоставляет server не с внешним TLS-входом Traefik, а с тем HTTP-запросом, который после терминации TLS приходит от Traefik в OpenResty. Внутри compose OpenResty слушает обычный HTTP на `80`, а PHP получает FastCGI-параметры уже после проксирования; поэтому для корректного server mapping указываем внутренний web-порт `80`.
    - включите `Use path mappings`;
    - локальный корень проекта сопоставьте с тем же абсолютным путём внутри контейнера, если проект лежит в `/home`, например `/home/user/projects/my-project`; для проектов вне `/home` путь внутри контейнера будет `/host/<абсолютный-путь-на-хосте>`.
 5. Для браузера установите cookie `XDEBUG_TRIGGER=docker-cli` на домен проекта и обновите страницу. PhpStorm должен принять соединение на порту проекта.

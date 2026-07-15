@@ -6,6 +6,7 @@ command.init.update_confirm: 'Статические файлы конфигур
 command.init.cancelled: 'Операция отменена.'
 command.start.description: 'Запустить общую сеть docker-cli и системные сервисы.'
 command.stop.description: 'Остановить системные сервисы и удалить общую сеть docker-cli.'
+command.restart.description: 'Перезапустить системные сервисы docker-cli.'
 command.seed.description: 'Записать случайные пароли и токены в .env.'
 command.seed.yes_option: 'Не задавать вопрос подтверждения.'
 command.seed.confirm: 'Команда заполнит пустые значения сидируемых секретов в .env. Продолжить? [y/N]'

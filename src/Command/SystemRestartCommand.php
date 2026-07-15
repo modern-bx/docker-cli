@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class SystemStartCommand extends Command
+final class SystemRestartCommand extends Command
 {
     use DockerComposeRunner;
 
@@ -20,13 +20,19 @@ final class SystemStartCommand extends Command
     public function __construct(?TranslatorInterface $translator = null)
     {
         $this->translator = $translator ?? TranslatorFactory::create();
-        parent::__construct('system:start');
-        $this->setAliases(['start']);
-        $this->setDescription($this->translator->trans('command.start.description'));
+        parent::__construct('system:restart');
+        $this->setAliases(['restart']);
+        $this->setDescription($this->translator->trans('command.restart.description'));
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        return $this->runOperation(new SystemCompose(), 'up', ['-d'], $output, $this->translator);
+        $compose = new SystemCompose();
+        $stopCode = $this->runOperation($compose, 'down', ['--remove-orphans'], $output, $this->translator);
+        if ($stopCode !== Command::SUCCESS) {
+            return $stopCode;
+        }
+
+        return $this->runOperation($compose, 'up', ['-d'], $output, $this->translator);
     }
 }
