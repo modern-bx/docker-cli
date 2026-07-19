@@ -22,6 +22,30 @@ export default defineConfig({
     docFooter: { prev: 'Назад', next: 'Далее' },
     darkModeSwitchLabel: 'Тема',
     sidebarMenuLabel: 'Меню',
-    returnToTopLabel: 'Наверх'
+    returnToTopLabel: 'Наверх',
+    nav: [
+      { text: 'Руководство', link: '/guide/getting-started' },
+      { text: 'Команды', link: '/reference/commands' }
+    ],
+    sidebar: [
+      {
+        text: 'Руководство',
+        items: [
+          { text: 'Быстрый старт', link: '/guide/getting-started' },
+          { text: 'Базовые сервисы', link: '/guide/services' },
+          { text: 'Домен в Cloudflare', link: '/guide/cloudflare' },
+          { text: 'DNS и браузеры', link: '/guide/dns' },
+          { text: 'Xdebug', link: '/guide/xdebug' },
+          { text: 'Образы', link: '/guide/images' },
+          { text: 'PHAR', link: '/guide/phar' }
+        ]
+      },
+      {
+        text: 'Справочник',
+        items: [
+          { text: 'Команды', link: '/reference/commands' }
+        ]
+      }
+    ]
   }
 })

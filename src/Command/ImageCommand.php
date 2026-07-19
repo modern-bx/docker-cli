@@ -24,7 +24,7 @@ abstract class ImageCommand extends Command
 
     protected function configureImageOptions(): void
     {
-        $this->addOption('tag', null, InputOption::VALUE_REQUIRED, 'Тег образа. По умолчанию берется SOURCE_IMAGE_TAG, последний git-тег текущей ветки или default.');
+        $this->addOption('tag', null, InputOption::VALUE_REQUIRED, 'Тег образа. По умолчанию берется SOURCE_IMAGE_TAG, последний git-тег текущей ветки или default. Для имени vendor/namespace задайте SOURCE_IMAGE_NAMESPACE.');
         $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Показать docker-команды без выполнения.');
     }
 
@@ -138,9 +138,12 @@ abstract class ImageCommand extends Command
 
     private function imageNamespace(): string
     {
-        $namespace = $this->imageEnv()['SOURCE_IMAGE_NAMESPACE'] ?? 'whiskyjs';
+        $namespace = trim((string) ($this->imageEnv()['SOURCE_IMAGE_NAMESPACE'] ?? ''), '/');
+        if ($namespace === '') {
+            throw new \RuntimeException('SOURCE_IMAGE_NAMESPACE is not set. Set the image vendor/namespace before building or publishing custom images.');
+        }
 
-        return trim((string) $namespace, '/');
+        return $namespace;
     }
 
     private function imageName(string $serviceName): string
