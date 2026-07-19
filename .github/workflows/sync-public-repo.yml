@@ -3,14 +3,14 @@ name: Sync master to public repository
 on:
   push:
     branches:
-      - master
+      - main
 
 permissions:
   contents: read
 
 jobs:
   sync:
-    name: Push master to PUBLIC_REPO
+    name: Push main to PUBLIC_REPO
     runs-on: ubuntu-latest
     if: ${{ vars.PUBLIC_REPO != '' }}
 
@@ -52,7 +52,7 @@ jobs:
             exit 1
           fi
 
-      - name: Push master to public repository
+      - name: Push main to public repository
         if: ${{ steps.target.outputs.sync == 'true' }}
         env:
           PUBLIC_REPO: ${{ vars.PUBLIC_REPO }}
@@ -61,4 +61,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add public "https://x-access-token:${PUBLIC_REPO_TOKEN}@github.com/${PUBLIC_REPO}.git"
-          git push --force public "HEAD:refs/heads/master"
+          git push --force public "HEAD:refs/heads/main"
