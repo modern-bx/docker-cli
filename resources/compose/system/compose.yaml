@@ -165,7 +165,7 @@ services:
       context: ./config/php-fpm-8.2
       dockerfile: Dockerfile
       network: host
-    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:-whiskyjs}/docker-cli/php-fpm-8.2:${SOURCE_IMAGE_TAG:-default}
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/docker-cli/php-fpm-8.2:${SOURCE_IMAGE_TAG:-default}
     container_name: docker-cli-php-fpm-8.2
     environment:
       DNSDOCK_NAME: php-fpm-8.2

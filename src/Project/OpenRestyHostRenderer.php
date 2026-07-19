@@ -148,7 +148,7 @@ final class OpenRestyHostRenderer
     private function readBaseHost(string $envFile): string
     {
         if (!is_file($envFile)) {
-            return 'local.kubehut.top';
+            throw new \RuntimeException(sprintf('Env file "%s" not found. Run docker-cli config:init and set BASE_HOST before rendering OpenResty hosts.', $envFile));
         }
 
         foreach (file($envFile, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
@@ -159,11 +159,16 @@ final class OpenRestyHostRenderer
 
             [$key, $value] = explode('=', $line, 2);
             if (trim($key) === 'BASE_HOST') {
-                return trim($value, " \t\n\r\0\x0B\"'");
+                $baseHost = trim($value, " \t\n\r\0\x0B\"'");
+                if ($baseHost === '') {
+                    throw new \RuntimeException(sprintf('BASE_HOST is empty in env file "%s". Set your own domain before rendering OpenResty hosts.', $envFile));
+                }
+
+                return $baseHost;
             }
         }
 
-        return 'local.kubehut.top';
+        throw new \RuntimeException(sprintf('BASE_HOST is not defined in env file "%s". Set your own domain before rendering OpenResty hosts.', $envFile));
     }
 
     /** @param list<string> $hostNames */
