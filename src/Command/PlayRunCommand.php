@@ -77,7 +77,7 @@ final class PlayRunCommand extends Command
             'playwright',
             'sh',
             '-lc',
-            'mkdir -p /docker-cli/playwright/runtime && cd /docker-cli/playwright/runtime && if [ ! -d node_modules/playwright ]; then npm --silent --no-update-notifier --no-fund install playwright@${PLAYWRIGHT_VERSION:-1.61.0}; fi && node "$1"',
+            'mkdir -p /docker-cli/playwright/runtime && cd /docker-cli/playwright/runtime && if [ ! -d node_modules/playwright ]; then npm --silent --no-update-notifier --no-fund install playwright@${PLAYWRIGHT_VERSION:-1.61.0}; fi && NODE_PATH=/docker-cli/playwright/runtime/node_modules node "$1"',
             'docker-cli-playwright',
             join_path('/docker-cli/playwright/scripts', $script),
         ]);
