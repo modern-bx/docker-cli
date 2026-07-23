@@ -32,13 +32,15 @@ final class ProjectUpCommand extends Command
         $this->setDescription('Зарегистрировать проект docker-cli.');
         $this->addArgument('project-name', InputArgument::OPTIONAL, 'Имя проекта. По умолчанию генерируется случайный идентификатор adjective-animal.');
         $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
+        $this->addOption('force', null, InputOption::VALUE_NONE, 'Зарегистрировать проект, даже если фреймворк не удалось определить.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $framework = ($this->detectionService ?? FrameworkDetectionService::createDefault())->detect();
-        if ($framework === null) {
-            $output->writeln('<error>Не удалось определить фреймворк проекта.</error>');
+        $force = (bool) $input->getOption('force');
+        if ($framework === null && !$force) {
+            $output->writeln('<error>Не удалось определить фреймворк проекта. Используйте --force, чтобы зарегистрировать проект без определения фреймворка.</error>');
 
             return Command::FAILURE;
         }
@@ -72,8 +74,13 @@ final class ProjectUpCommand extends Command
             return Command::FAILURE;
         }
 
-        $description = ($this->descriptionService ?? new FrameworkDescriptionService())->describe($framework);
-        $projectRoot = $framework->getProjectRoot();
+        $description = $framework === null ? null : ($this->descriptionService ?? new FrameworkDescriptionService())->describe($framework);
+        $projectRoot = $framework === null ? (string) getcwd() : $framework->getProjectRoot();
+        $documentRoot = $framework === null ? $projectRoot : $framework->getDocumentRoot();
+
+        if ($framework === null) {
+            $output->writeln('<comment>Фреймворк проекта не определен; проект будет зарегистрирован без веб-конфигурации фреймворка.</comment>');
+        }
 
         $projectConfig = (new ProjectDatabaseConfig())->ensure([
             'meta' => [
@@ -83,11 +90,11 @@ final class ProjectUpCommand extends Command
             'data' => [
                 'project' => [
                     'name' => $projectName,
-                    'framework' => $description->getCodeName()->value,
+                    'framework' => $description?->getCodeName()->value ?? false,
                     'language' => 'php',
                     ...$this->languageVersionConfig($projectRoot),
                     'root' => $projectRoot,
-                    'document_root' => $framework->getDocumentRoot(),
+                    'document_root' => $documentRoot,
                     'xdebug' => [
                         'client_port' => (new XdebugPortManager())->nextPort($projectsDirectory),
                     ],

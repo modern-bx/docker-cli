@@ -7,6 +7,7 @@ namespace DockerCli\Command;
 use DockerCli\Framework\FrameworkDetectionService;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\OpenRestyHostRenderer;
+use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -26,13 +27,14 @@ final class ProjectDownCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $framework = ($this->detectionService ?? FrameworkDetectionService::createDefault())->detect();
-        if ($framework === null) {
-            $output->writeln('<error>Не удалось определить фреймворк проекта.</error>');
+        $registry = new ProjectRegistry();
+        $projectRoot = $framework?->getProjectRoot() ?? $this->projectRootFromContext($registry);
+        if ($projectRoot === null || $projectRoot === '') {
+            $output->writeln('<error>Не удалось определить директорию проекта.</error>');
 
             return Command::FAILURE;
         }
 
-        $projectRoot = $framework->getProjectRoot();
         $metaFile = join_path($projectRoot, '.docker-cli.yaml');
         if (!is_file($metaFile)) {
             $output->writeln(sprintf('<error>Файл "%s" не найден.</error>', $metaFile));
@@ -65,6 +67,19 @@ final class ProjectDownCommand extends Command
         $output->writeln(sprintf('<info>Регистрация проекта "%s" удалена.</info>', $projectName));
 
         return Command::SUCCESS;
+    }
+
+    private function projectRootFromContext(ProjectRegistry $registry): ?string
+    {
+        $projectName = $registry->projectNameFromContext();
+        if ($projectName === null || !$registry->hasProject($projectName)) {
+            return null;
+        }
+
+        $projectConfig = $registry->readProjectConfig($projectName);
+        $projectRoot = $projectConfig['data']['project']['root'] ?? null;
+
+        return is_string($projectRoot) && $projectRoot !== '' ? $projectRoot : null;
     }
 
     private function projectsDirectory(): string
