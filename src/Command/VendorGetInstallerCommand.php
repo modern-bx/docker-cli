@@ -127,6 +127,20 @@ final class VendorGetInstallerCommand extends Command
         }
     }
 
+    /** @param list<string> $command */
+    private function runProcess(array $command): void
+    {
+        $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes);
+        if (!is_resource($process)) {
+            throw new \RuntimeException(sprintf('Не удалось запустить команду: %s', implode(' ', $command)));
+        }
+
+        $exitCode = proc_close($process);
+        if ($exitCode !== 0) {
+            throw new \RuntimeException(sprintf('Команда завершилась с кодом %d: %s', $exitCode, implode(' ', $command)));
+        }
+    }
+
     private function extract(string $archive, string $directory): void
     {
         if (str_ends_with($archive, '.zip')) {
@@ -140,13 +154,7 @@ final class VendorGetInstallerCommand extends Command
         }
 
         if (str_ends_with($archive, '.tar.gz')) {
-            $phar = new \PharData($archive);
-            $tarPath = substr($archive, 0, -3);
-            if (!file_exists($tarPath)) {
-                $phar->decompress();
-            }
-            (new \PharData($tarPath))->extractTo($directory, null, true);
-            @unlink($tarPath);
+            $this->runProcess(['tar', '-xzf', $archive, '-C', $directory]);
             return;
         }
 
