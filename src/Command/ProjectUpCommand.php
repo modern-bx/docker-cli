@@ -79,7 +79,7 @@ final class ProjectUpCommand extends Command
         $documentRoot = $framework === null ? $projectRoot : $framework->getDocumentRoot();
 
         if ($framework === null) {
-            $output->writeln('<comment>Фреймворк проекта не определен; проект будет зарегистрирован без веб-конфигурации фреймворка.</comment>');
+            $output->writeln('<comment>Фреймворк проекта не определен; проект будет зарегистрирован с базовой веб-конфигурацией.</comment>');
         }
 
         $projectConfig = (new ProjectDatabaseConfig())->ensure([
