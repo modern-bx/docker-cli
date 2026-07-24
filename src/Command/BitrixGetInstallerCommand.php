@@ -9,7 +9,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class VendorGetInstallerCommand extends Command
+final class BitrixGetInstallerCommand extends Command
 {
     private const BASE_URL = 'https://www.1c-bitrix.ru/download/';
 
@@ -31,7 +31,7 @@ final class VendorGetInstallerCommand extends Command
 
     public function __construct()
     {
-        parent::__construct('vendor:get-installer');
+        parent::__construct('bitrix:get-installer');
         $this->setDescription('Скачать дистрибутив 1С-Битрикс или 1С-Битрикс24.');
         $this->addOption('product', null, InputOption::VALUE_REQUIRED, 'Продукт: bitrix или bitrix24.', 'bitrix');
         $this->addOption('edition', null, InputOption::VALUE_REQUIRED, 'Редакция продукта.', 'start');

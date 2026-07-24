@@ -129,9 +129,9 @@ docker-cli image:publish --dry-run
 docker-cli image:publish --tag=1.0.0
 ```
 
-## Вендорные дистрибутивы
+## Дистрибутивы Битрикс
 
-### `bin/docker-cli vendor:get-installer`
+### `bin/docker-cli bitrix:get-installer`
 
 Скачивает архив дистрибутива 1С-Битрикс или 1С-Битрикс24. По умолчанию выбирается продукт `bitrix`, редакция `start` и текущая директория. Если целевой файл уже существует, команда завершается с ошибкой.
 
@@ -145,8 +145,8 @@ docker-cli image:publish --tag=1.0.0
 Примеры:
 
 ```bash
-bin/docker-cli vendor:get-installer
-bin/docker-cli vendor:get-installer --product=bitrix24 --edition=enterprise --path=./dist --extract
+bin/docker-cli bitrix:get-installer
+bin/docker-cli bitrix:get-installer --product=bitrix24 --edition=enterprise --path=./dist --extract
 ```
 
 ## Упаковка PHAR
