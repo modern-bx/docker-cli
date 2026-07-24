@@ -81,6 +81,8 @@ final class PlayRunCommand extends Command
             'PROJECT_URL=' . $projectUrl,
             '-e',
             'PLAYWRIGHT_LOG_DIR=' . $containerLogDirectory,
+            '-e',
+            'PLAYWRIGHT_SCRIPT_ID=' . $script,
             'playwright',
             'sh',
             '-lc',

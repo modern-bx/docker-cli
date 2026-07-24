@@ -12,9 +12,13 @@ const path = require('path');
  *   dockerCli.logging.log(message)
  */
 class PlaywrightLoggingHelper {
-  constructor(logDirectory = process.env.PLAYWRIGHT_LOG_DIR || path.join(process.cwd(), '.docker-cli', 'playwright', 'logs')) {
+  constructor(
+    logDirectory = process.env.PLAYWRIGHT_LOG_DIR || path.join(process.cwd(), '.docker-cli', 'playwright', 'logs'),
+    scriptId = process.env.PLAYWRIGHT_SCRIPT_ID || 'playwright',
+  ) {
     this.logDirectory = logDirectory;
-    this.logFile = path.join(this.logDirectory, `playwright-${this.timestamp().replace(/[:.]/g, '-')}.log`);
+    this.scriptName = this.normalizeScriptName(scriptId);
+    this.logFile = path.join(this.logDirectory, `${this.scriptName}-${this.timestamp().replace(/[:.]/g, '-')}.log`);
   }
 
   /**
@@ -30,6 +34,14 @@ class PlaywrightLoggingHelper {
 
   timestamp() {
     return new Date().toISOString();
+  }
+
+  normalizeScriptName(scriptId) {
+    return String(scriptId)
+      .replace(/\.js$/i, '')
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase() || 'playwright';
   }
 
   writeTextFile(line) {

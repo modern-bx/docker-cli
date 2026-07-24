@@ -19,7 +19,7 @@ docker-cli play:run bitrix/setup
 
 Команда передает в контейнер переменные `PROJECT_NAME`, `PROJECT_ROOT`, `PROJECT_DOCUMENT_ROOT` и `PROJECT_URL`. Встроенный сценарий `bitrix/setup.js` открывает адрес из `PLAYWRIGHT_URL` или `PROJECT_URL`, ждет загрузку страницы, через 3 секунды выводит заголовок, ждет еще 10 секунд и завершается.
 
-Во время выполнения `bitrix/setup.js` пишет диагностические сообщения в stdout команды и дублирует их в файл внутри проекта: `~/.config/docker-cli/projects/<project>/logs/playwright/playwright-<timestamp>.log`; после завершения `play:run` дополнительно печатает директорию логов на хосте. В лог попадают путь к лог-файлу, открываемый URL, заголовок страницы, сообщения `console` из браузера и ошибки страницы.
+Во время выполнения `bitrix/setup.js` пишет диагностические сообщения в stdout команды и дублирует их в файл внутри проекта: `~/.config/docker-cli/projects/<project>/logs/playwright/<script-path>-<timestamp>.log` (например, `bitrix-setup-<timestamp>.log` для `bitrix/setup.js`); после завершения `play:run` дополнительно печатает директорию логов на хосте. В лог попадают путь к лог-файлу, открываемый URL, заголовок страницы, сообщения `console` из браузера и ошибки страницы.
 
 
 Все файлы `~/.config/docker-cli/playwright/scripts/mixins/*.js` автоматически подключаются перед запуском сценария через Node.js `--require`. Встроенный `mixins/logging.js` публикует объектный helper `dockerCli.logging` с методом `log(message)`, который одновременно пишет сообщение в stdout и в текстовый файл.
