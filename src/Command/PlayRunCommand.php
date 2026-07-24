@@ -61,9 +61,10 @@ final class PlayRunCommand extends Command
         $documentRoot = $projectConfig['data']['project']['document_root'] ?? '';
         $baseHost = $this->readEnvValue($compose->envFile(), 'BASE_HOST');
         $projectUrl = $baseHost === '' ? '' : sprintf('https://web-%s.%s', $projectName, $baseHost);
-        $hostLogDirectory = join_path($projectRoot, '.docker-cli', 'playwright', 'logs');
+        $hostLogDirectory = join_path($registry->projectDirectory($projectName), 'logs', 'playwright');
         $this->ensureDirectory($hostLogDirectory);
         $containerLogDirectory = $this->containerPath($hostLogDirectory);
+        $mixinRequireArguments = $this->mixinRequireArguments($compose);
 
         $command = array_merge($compose->dockerComposeCommand('run'), [
             '--rm',
@@ -83,8 +84,9 @@ final class PlayRunCommand extends Command
             'playwright',
             'sh',
             '-lc',
-            'mkdir -p /docker-cli/playwright/runtime && cd /docker-cli/playwright/runtime && if [ ! -d node_modules/playwright ]; then npm --silent --no-update-notifier --no-fund install playwright@${PLAYWRIGHT_VERSION:-1.61.0}; fi && NODE_PATH=/docker-cli/playwright/runtime/node_modules node "$1"',
+            'mkdir -p /docker-cli/playwright/runtime && cd /docker-cli/playwright/runtime && if [ ! -d node_modules/playwright ]; then npm --silent --no-update-notifier --no-fund install playwright@${PLAYWRIGHT_VERSION:-1.61.0}; fi && NODE_PATH=/docker-cli/playwright/runtime/node_modules node "$@"',
             'docker-cli-playwright',
+            ...$mixinRequireArguments,
             join_path('/docker-cli/playwright/scripts', $script),
         ]);
 
@@ -114,6 +116,26 @@ final class PlayRunCommand extends Command
         }
 
         return $script;
+    }
+
+    /** @return list<string> */
+    private function mixinRequireArguments(SystemCompose $compose): array
+    {
+        $mixinsDirectory = join_path($compose->playwrightScriptsDirectory(), 'mixins');
+        if (!is_dir($mixinsDirectory)) {
+            return [];
+        }
+
+        $files = glob(join_path($mixinsDirectory, '*.js')) ?: [];
+        sort($files, SORT_STRING);
+
+        $arguments = [];
+        foreach ($files as $file) {
+            $arguments[] = '--require';
+            $arguments[] = join_path('/docker-cli/playwright/scripts/mixins', basename($file));
+        }
+
+        return $arguments;
     }
 
     private function ensureDirectory(string $directory): void
