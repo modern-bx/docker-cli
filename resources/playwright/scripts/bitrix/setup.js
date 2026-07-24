@@ -9,27 +9,27 @@ const logging = globalThis.dockerCli.logging;
     throw new Error('Set PLAYWRIGHT_URL or PROJECT_URL to the page that should be opened.');
   }
 
-  logging.log(`Opening ${url}`);
+  logging.info(`Opening ${url}`);
 
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
-  page.on('console', (message) => logging.log(`browser console ${message.type()}: ${message.text()}`));
-  page.on('pageerror', (error) => logging.log(`browser page error: ${error.message}`));
+  page.on('console', (message) => logging.debug(`browser console ${message.type()}: ${message.text()}`));
+  page.on('pageerror', (error) => logging.error(`browser page error: ${error.message}`));
 
   try {
     await page.goto(url, { waitUntil: 'load' });
-    logging.log('Page load event has fired; waiting 3 seconds before reading title.');
+    logging.info('Page load event has fired; waiting 3 seconds before reading title.');
     await delay(3000);
 
     const title = await page.title();
-    logging.log(`Page title: ${title}`);
+    logging.info(`Page title: ${title}`);
 
-    logging.log('Waiting 10 seconds before finishing.');
+    logging.info('Waiting 10 seconds before finishing.');
     await delay(10000);
-    logging.log('Scenario finished successfully.');
+    logging.info('Scenario finished successfully.');
   } finally {
     await browser.close();
-    logging.log('Browser closed.');
+    logging.info('Browser closed.');
   }
 })();

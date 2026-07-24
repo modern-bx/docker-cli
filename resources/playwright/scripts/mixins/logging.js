@@ -4,12 +4,16 @@ const path = require('path');
 /**
  * Writes Playwright scenario diagnostics to every supported channel.
  *
- * The helper always writes a timestamped line to stdout and also mirrors the
- * same line into a per-run text file. docker-cli passes PLAYWRIGHT_LOG_DIR to
- * point at ~/.config/docker-cli/projects/<project>/logs/playwright on the host.
+ * The helper always writes a timestamped line with a severity level to stdout
+ * and mirrors the same plain-text line into a per-run log file. docker-cli
+ * passes PLAYWRIGHT_LOG_DIR to point at
+ * ~/.config/docker-cli/projects/<project>/logs/playwright on the host.
  *
  * Public API:
- *   dockerCli.logging.log(message)
+ *   dockerCli.logging.info(message)
+ *   dockerCli.logging.warn(message)
+ *   dockerCli.logging.error(message)
+ *   dockerCli.logging.debug(message)
  */
 class PlaywrightLoggingHelper {
   constructor(
@@ -19,17 +23,47 @@ class PlaywrightLoggingHelper {
     this.logDirectory = logDirectory;
     this.scriptName = this.normalizeScriptName(scriptId);
     this.logFile = path.join(this.logDirectory, `${this.scriptName}-${this.timestamp().replace(/[:.]/g, '-')}.log`);
+    this.colors = {
+      INFO: '\x1b[32m',
+      WARN: '\x1b[33m',
+      ERROR: '\x1b[31m',
+      DEBUG: '\x1b[36m',
+    };
+    this.resetColor = '\x1b[0m';
   }
 
-  /**
-   * Write one message to stdout and to the text log file.
-   *
-   * @param {string} message Human-readable diagnostic message.
-   */
-  log(message) {
-    const line = `[${this.timestamp()}] ${message}`;
-    console.log(line);
+  /** @param {string} message Human-readable informational message. */
+  info(message) {
+    this.write('INFO', message);
+  }
+
+  /** @param {string} message Human-readable warning message. */
+  warn(message) {
+    this.write('WARN', message);
+  }
+
+  /** @param {string} message Human-readable error message. */
+  error(message) {
+    this.write('ERROR', message);
+  }
+
+  /** @param {string} message Human-readable debug message. */
+  debug(message) {
+    this.write('DEBUG', message);
+  }
+
+  write(level, message) {
+    const line = `[${this.timestamp()}] [${level}] ${message}`;
+    console.log(this.colorize(level, line));
     this.writeTextFile(line);
+  }
+
+  colorize(level, line) {
+    if (!process.stdout.isTTY || !this.colors[level]) {
+      return line;
+    }
+
+    return `${this.colors[level]}${line}${this.resetColor}`;
   }
 
   timestamp() {
@@ -49,11 +83,11 @@ class PlaywrightLoggingHelper {
       fs.mkdirSync(this.logDirectory, { recursive: true });
       fs.appendFileSync(this.logFile, `${line}\n`);
     } catch (error) {
-      console.warn(`[${this.timestamp()}] Unable to write log file ${this.logFile}: ${error.message}`);
+      console.warn(this.colorize('WARN', `[${this.timestamp()}] [WARN] Unable to write log file ${this.logFile}: ${error.message}`));
     }
   }
 }
 
 globalThis.dockerCli = globalThis.dockerCli || {};
 globalThis.dockerCli.logging = globalThis.dockerCli.logging || new PlaywrightLoggingHelper();
-globalThis.dockerCli.logging.log(`Log file: ${globalThis.dockerCli.logging.logFile}`);
+globalThis.dockerCli.logging.info(`Log file: ${globalThis.dockerCli.logging.logFile}`);
