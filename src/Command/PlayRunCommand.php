@@ -57,15 +57,19 @@ final class PlayRunCommand extends Command
 
         $projectConfig = $registry->readProjectConfig($projectName);
         $projectRoot = $projectConfig['data']['project']['root'] ?? getcwd();
+        $projectRoot = is_string($projectRoot) ? $projectRoot : (string) getcwd();
         $documentRoot = $projectConfig['data']['project']['document_root'] ?? '';
         $baseHost = $this->readEnvValue($compose->envFile(), 'BASE_HOST');
         $projectUrl = $baseHost === '' ? '' : sprintf('https://web-%s.%s', $projectName, $baseHost);
+        $hostLogDirectory = join_path($projectRoot, '.docker-cli', 'playwright', 'logs');
+        $this->ensureDirectory($hostLogDirectory);
+        $containerLogDirectory = $this->containerPath($hostLogDirectory);
 
         $command = array_merge($compose->dockerComposeCommand('run'), [
             '--rm',
             '--no-deps',
             '--workdir',
-            $this->containerPath(is_string($projectRoot) ? $projectRoot : (string) getcwd()),
+            $this->containerPath($projectRoot),
             '-e',
             'PROJECT_NAME=' . $projectName,
             '-e',
@@ -74,6 +78,8 @@ final class PlayRunCommand extends Command
             'PROJECT_DOCUMENT_ROOT=' . (is_string($documentRoot) ? $documentRoot : ''),
             '-e',
             'PROJECT_URL=' . $projectUrl,
+            '-e',
+            'PLAYWRIGHT_LOG_DIR=' . $containerLogDirectory,
             'playwright',
             'sh',
             '-lc',
@@ -91,6 +97,7 @@ final class PlayRunCommand extends Command
         }
 
         $exitCode = proc_close($process);
+        $output->writeln(sprintf('<info>Playwright logs directory: %s</info>', $hostLogDirectory));
 
         return is_int($exitCode) ? $exitCode : Command::FAILURE;
     }
@@ -107,6 +114,13 @@ final class PlayRunCommand extends Command
         }
 
         return $script;
+    }
+
+    private function ensureDirectory(string $directory): void
+    {
+        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+            throw new \RuntimeException(sprintf('Unable to create directory "%s".', $directory));
+        }
     }
 
     private function containerPath(string $hostPath): string

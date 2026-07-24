@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const timestamp = () => new Date().toISOString();
-const logDirectory = path.join(process.cwd(), '.docker-cli', 'playwright', 'logs');
+const logDirectory = process.env.PLAYWRIGHT_LOG_DIR || path.join(process.cwd(), '.docker-cli', 'playwright', 'logs');
 const logFile = path.join(logDirectory, `bitrix-setup-${timestamp().replace(/[:.]/g, '-')}.log`);
 
 const writeLogFile = (message) => {
