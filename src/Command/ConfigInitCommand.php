@@ -27,6 +27,7 @@ final class ConfigInitCommand extends Command
         $this->addOption('update', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.update_option'));
         $this->addOption('migrate', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.migrate_option'));
         $this->addOption('rebuild', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.rebuild_option'));
+        $this->addOption('force', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.force_option'));
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -34,8 +35,9 @@ final class ConfigInitCommand extends Command
         $update = (bool) $input->getOption('update');
         $migrate = (bool) $input->getOption('migrate');
         $rebuild = (bool) $input->getOption('rebuild');
+        $force = (bool) $input->getOption('force');
 
-        if ($update) {
+        if ($update && !$force) {
             $question = new ConfirmationQuestion($this->translator->trans('command.init.update_confirm') . ' ', false);
             if (!$this->getHelper('question')->ask($input, $output, $question)) {
                 $output->writeln('<comment>' . $this->translator->trans('command.init.cancelled') . '</comment>');

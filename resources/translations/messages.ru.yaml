@@ -2,6 +2,7 @@ command.init.description: 'Создать файлы настроек docker-cli
 command.init.update_option: 'Перезаписать статические файлы конфигурации из шаблонов.'
 command.init.migrate_option: 'Добавить в редактируемые файлы конфигурации отсутствующие параметры из шаблонов.'
 command.init.rebuild_option: 'Пересобрать значения конфигурации, зависящие от зарегистрированных проектов.'
+command.init.force_option: 'Не запрашивать подтверждение для опасных операций, например --update.'
 command.init.update_confirm: 'Статические файлы конфигурации будут перезаписаны из шаблонов. Продолжить? [y/N]'
 command.init.cancelled: 'Операция отменена.'
 command.start.description: 'Запустить общую сеть docker-cli и системные сервисы.'

@@ -9,13 +9,14 @@
 Опции:
 
 - `--update` — перезаписывает статические файлы конфигурации из шаблонов после подтверждения.
+- `--force` — отключает интерактивное подтверждение для `--update`.
 - `--migrate` — добавляет отсутствующие параметры в редактируемые файлы.
 - `--rebuild` — пересобирает значения, зависящие от зарегистрированных проектов.
 
 Пример:
 
 ```bash
-bin/docker-cli config:init --update --migrate --rebuild
+bin/docker-cli config:init --update --force --migrate --rebuild
 ```
 
 ### `bin/docker-cli config:seed`
@@ -42,7 +43,7 @@ bin/docker-cli config:seed --yes
 bin/docker-cli project:up my-project
 ```
 
-Если `name` не указан, CLI генерирует свободный идентификатор в формате `adjective-animal`.
+Если `name` не указан, CLI генерирует свободный идентификатор в формате `adjective-animal`. Перед созданием проектных баз команда выполняет `system:start`, чтобы системные сервисы были запущены.
 
 Опция:
 

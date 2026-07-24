@@ -6,6 +6,7 @@ namespace DockerCli\Command;
 
 use DockerCli\Framework\Description\FrameworkDescriptionService;
 use DockerCli\Config\MissingConfigException;
+use DockerCli\Config\SystemCompose;
 use DockerCli\Framework\FrameworkDetectionService;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\OpenRestyHostRenderer;
@@ -14,6 +15,7 @@ use DockerCli\Project\ProjectDatabaseConfig;
 use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Project\ProjectRegistry;
 use DockerCli\Project\XdebugPortManager;
+use DockerCli\Service\TranslatorFactory;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputOption;
@@ -24,6 +26,8 @@ use function DockerCli\Util\join_path;
 
 final class ProjectUpCommand extends Command
 {
+    use DockerComposeRunner;
+
     public function __construct(
         private readonly ?FrameworkDetectionService $detectionService = null,
         private readonly ?FrameworkDescriptionService $descriptionService = null,
@@ -114,6 +118,11 @@ final class ProjectUpCommand extends Command
                 ],
             ],
         ]);
+
+        $startCode = $this->runOperation(new SystemCompose(), 'up', ['-d'], $output, TranslatorFactory::create());
+        if ($startCode !== Command::SUCCESS) {
+            return $startCode;
+        }
 
         $mysqlPassword = $projectConfig['data']['databases']['mysql']['password'];
         $postgresPassword = $projectConfig['data']['databases']['postgres']['password'];
