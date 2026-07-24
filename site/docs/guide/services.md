@@ -38,6 +38,70 @@ OpenResty отдаёт статику зарегистрированных пр�
 
 Для проектов в `/home` путь монтируется в контейнер без префикса, чтобы абсолютные пути и symlink-и внутри проекта резолвились так же, как на хосте. Остальные пути доступны через fallback-mount `/host`.
 
+
+### Порт OpenResty
+
+Порт, на котором OpenResty слушает проектные virtual host-и внутри compose-сети, задаётся переменной `OPENRESTY_PORT` в системном `.env`:
+
+```dotenv
+OPENRESTY_PORT=80
+```
+
+Значение по умолчанию — `80`. Если порт меняется в уже инициализированном окружении, выполните:
+
+```bash
+docker-cli config:init --migrate --rebuild
+docker-cli system:restart
+```
+
+`--rebuild` пересобирает конфиги `config/openresty/hosts/*.web.conf` с новым `listen`-портом, а `system:restart` перезапускает OpenResty и прокси-слой.
+
+### Внешний OpenResty на хост-машине
+
+Если порты `80` и `443` на хост-машине занимает внешний OpenResty вне контейнеров, он должен только маршрутизировать нужный wildcard-хост на внутренний прокси без терминации TLS. В этом режиме сертификаты остаются внутри docker-cli окружения, а внешний OpenResty передаёт TCP-трафик «как есть».
+
+1. В системном `.env` docker-cli укажите свободные published-порты внутреннего прокси, например:
+
+   ```dotenv
+   # пример: внутренний прокси опубликован на localhost и не конфликтует с внешним OpenResty
+   TRAEFIK_HTTP_PORT=127.0.0.1:8080
+   TRAEFIK_HTTPS_PORT=127.0.0.1:8443
+   ```
+
+2. Во внешнем OpenResty используйте обычный `http`-proxy для порта `80` и `stream` с `ssl_preread` для порта `443`, чтобы TLS передавался внутрь без терминации:
+
+   ```nginx
+   http {
+       server {
+           listen 80;
+           server_name example.test *.example.test;
+
+           location / {
+               proxy_pass http://127.0.0.1:8080;
+               proxy_set_header Host $host;
+               proxy_set_header X-Real-IP $remote_addr;
+               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+               proxy_set_header X-Forwarded-Proto $scheme;
+           }
+       }
+   }
+
+   stream {
+       map $ssl_preread_server_name $docker_cli_https_upstream {
+           ~^(.+\.)?example\.test$ 127.0.0.1:8443;
+           default 127.0.0.1:8443;
+       }
+
+       server {
+           listen 443;
+           ssl_preread on;
+           proxy_pass $docker_cli_https_upstream;
+       }
+   }
+   ```
+
+   Замените `example.test` на значение `BASE_HOST`. Для wildcard-домена `*.example.test` регулярное выражение `~^(.+\.)?example\.test$` пропускает и сам базовый домен, и любые поддомены. Внешний OpenResty не должен содержать директивы `ssl_certificate` для этого wildcard-хоста: TLS-сессия должна завершаться внутри docker-cli окружения.
+
 ## Traefik, DNS-алиасы и TLS
 
 `BASE_HOST` не должен оставаться пустым: укажите собственный домен перед запуском окружения. Подготовка зоны Cloudflare описана в разделе [Настройка домена в Cloudflare](./cloudflare.md).

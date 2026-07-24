@@ -12,6 +12,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class BitrixGetInstallerCommand extends Command
 {
     private const BASE_URL = 'https://www.1c-bitrix.ru/download/';
+    private const CACHE_RELATIVE_PATH = '.config/docker-cli/cache/bitrix-get-installer/distro';
 
     /** @var array<string, array<string, string>> */
     private const EDITIONS = [
@@ -70,8 +71,17 @@ final class BitrixGetInstallerCommand extends Command
             return Command::FAILURE;
         }
 
-        $output->writeln(sprintf('<info>Скачиваю %s/%s: %s</info>', $product, $edition, $url));
-        $this->download($url, $target);
+        $cache = $this->cachePath($remotePath);
+        $contentLength = $this->remoteContentLength($url);
+        if ($contentLength !== null && is_file($cache) && filesize($cache) === $contentLength) {
+            $output->writeln(sprintf('<info>Использую кешированный дистрибутив: %s</info>', $cache));
+        } else {
+            $output->writeln(sprintf('<info>Скачиваю %s/%s: %s</info>', $product, $edition, $url));
+            $this->download($url, $cache);
+            $output->writeln(sprintf('<info>Кеш обновлен: %s</info>', $cache));
+        }
+
+        $this->copyFromCache($cache, $target);
         $output->writeln(sprintf('<info>Архив сохранен: %s</info>', $target));
 
         if ((bool) $input->getOption('extract')) {
@@ -98,17 +108,59 @@ final class BitrixGetInstallerCommand extends Command
         return $path;
     }
 
+    private function cachePath(string $remotePath): string
+    {
+        $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
+
+        return $home . DIRECTORY_SEPARATOR . self::CACHE_RELATIVE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $remotePath);
+    }
+
+    private function remoteContentLength(string $url): ?int
+    {
+        $read = @fopen($url, 'rb', false, stream_context_create(['http' => [
+            'method' => 'HEAD',
+            'ignore_errors' => true,
+            'user_agent' => 'BitrixSiteLoader',
+        ]]));
+        if (!is_resource($read)) {
+            return null;
+        }
+
+        fclose($read);
+        $this->assertSuccessfulResponse($http_response_header ?? [], $url);
+
+        foreach ($http_response_header ?? [] as $header) {
+            if (preg_match('/^Content-Length:\s*(\d+)\s*$/i', $header, $matches) === 1) {
+                return (int) $matches[1];
+            }
+        }
+
+        return null;
+    }
+
     private function download(string $url, string $target): void
     {
-        $read = @fopen($url, 'rb', false, stream_context_create(['http' => ['user_agent' => 'BitrixSiteLoader']]));
+        $directory = dirname($target);
+        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+            throw new \RuntimeException(sprintf('Не удалось создать директорию кеша: %s', $directory));
+        }
+
+        $temporary = tempnam($directory, '.download-');
+        if ($temporary === false) {
+            throw new \RuntimeException(sprintf('Не удалось создать временный файл в директории: %s', $directory));
+        }
+
+        $read = @fopen($url, 'rb', false, stream_context_create(['http' => ['user_agent' => 'BitrixSiteLoader', 'ignore_errors' => true]]));
         if (!is_resource($read)) {
+            @unlink($temporary);
             throw new \RuntimeException(sprintf('Не удалось открыть URL: %s', $url));
         }
 
-        $write = @fopen($target, 'xb');
+        $write = @fopen($temporary, 'wb');
         if (!is_resource($write)) {
             fclose($read);
-            throw new \RuntimeException(sprintf('Не удалось создать файл: %s', $target));
+            @unlink($temporary);
+            throw new \RuntimeException(sprintf('Не удалось создать файл: %s', $temporary));
         }
 
         try {
@@ -120,9 +172,35 @@ final class BitrixGetInstallerCommand extends Command
             fclose($write);
         }
 
-        $statusLine = $http_response_header[0] ?? '';
+        try {
+            $this->assertSuccessfulResponse($http_response_header ?? [], $url);
+        } catch (\Throwable $exception) {
+            @unlink($temporary);
+            throw $exception;
+        }
+
+        if (!rename($temporary, $target)) {
+            @unlink($temporary);
+            throw new \RuntimeException(sprintf('Не удалось обновить кеш: %s', $target));
+        }
+    }
+
+    private function copyFromCache(string $cache, string $target): void
+    {
+        if (!is_file($cache)) {
+            throw new \RuntimeException(sprintf('Кешированный файл не найден: %s', $cache));
+        }
+
+        if (!copy($cache, $target)) {
+            throw new \RuntimeException(sprintf('Не удалось скопировать файл из кеша: %s -> %s', $cache, $target));
+        }
+    }
+
+    /** @param list<string> $headers */
+    private function assertSuccessfulResponse(array $headers, string $url): void
+    {
+        $statusLine = $headers[0] ?? '';
         if (preg_match('/^HTTP\/\S+\s+(\d+)/', $statusLine, $matches) === 1 && (int) $matches[1] >= 400) {
-            @unlink($target);
             throw new \RuntimeException(sprintf('Сервер вернул ошибку %s для %s', $matches[1], $url));
         }
     }

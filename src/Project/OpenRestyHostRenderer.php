@@ -25,7 +25,9 @@ final class OpenRestyHostRenderer
             unlink($hostFile);
         }
 
-        $baseHost = $this->readBaseHost($compose->envFile());
+        $envValues = $this->readEnvValues($compose->envFile());
+        $baseHost = $this->requiredEnvValue($envValues, 'BASE_HOST', $compose->envFile());
+        $openRestyPort = $this->openRestyPort($envValues, $compose->envFile());
         $hostNames = [];
         foreach ($this->registeredProjects() as $project) {
             $template = $this->templateFile($project['framework']);
@@ -47,6 +49,7 @@ final class OpenRestyHostRenderer
                 '{{ document_root }}' => $this->containerDocumentRoot($project['document_root']),
                 '{{ php_fpm_upstream }}' => $this->phpFpmUpstream($project),
                 '{{ xdebug_client_port }}' => (string) ($project['xdebug_client_port'] ?? 9003),
+                '{{ openresty_port }}' => (string) $openRestyPort,
             ]));
         }
 
@@ -149,12 +152,14 @@ final class OpenRestyHostRenderer
         return join_path('/host', $documentRoot);
     }
 
-    private function readBaseHost(string $envFile): string
+    /** @return array<string, string> */
+    private function readEnvValues(string $envFile): array
     {
         if (!is_file($envFile)) {
             throw new \RuntimeException(sprintf('Env file "%s" not found. Run docker-cli config:init and set BASE_HOST before rendering OpenResty hosts.', $envFile));
         }
 
+        $values = [];
         foreach (file($envFile, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
             $line = trim($line);
             if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
@@ -162,17 +167,40 @@ final class OpenRestyHostRenderer
             }
 
             [$key, $value] = explode('=', $line, 2);
-            if (trim($key) === 'BASE_HOST') {
-                $baseHost = trim($value, " \t\n\r\0\x0B\"'");
-                if ($baseHost === '') {
-                    throw new \RuntimeException(sprintf('BASE_HOST is empty in env file "%s". Set your own domain before rendering OpenResty hosts.', $envFile));
-                }
-
-                return $baseHost;
-            }
+            $values[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
         }
 
-        throw new \RuntimeException(sprintf('BASE_HOST is not defined in env file "%s". Set your own domain before rendering OpenResty hosts.', $envFile));
+        return $values;
+    }
+
+    /** @param array<string, string> $envValues */
+    private function requiredEnvValue(array $envValues, string $key, string $envFile): string
+    {
+        if (!array_key_exists($key, $envValues)) {
+            throw new \RuntimeException(sprintf('%s is not defined in env file "%s". Set your own domain before rendering OpenResty hosts.', $key, $envFile));
+        }
+
+        if ($envValues[$key] === '') {
+            throw new \RuntimeException(sprintf('%s is empty in env file "%s". Set your own domain before rendering OpenResty hosts.', $key, $envFile));
+        }
+
+        return $envValues[$key];
+    }
+
+    /** @param array<string, string> $envValues */
+    private function openRestyPort(array $envValues, string $envFile): int
+    {
+        $port = $envValues['OPENRESTY_PORT'] ?? '80';
+        if (!ctype_digit($port)) {
+            throw new \RuntimeException(sprintf('OPENRESTY_PORT must be a number from 1 to 65535 in env file "%s".', $envFile));
+        }
+
+        $portNumber = (int) $port;
+        if ($portNumber < 1 || $portNumber > 65535) {
+            throw new \RuntimeException(sprintf('OPENRESTY_PORT must be a number from 1 to 65535 in env file "%s".', $envFile));
+        }
+
+        return $portNumber;
     }
 
     /** @param list<string> $hostNames */
