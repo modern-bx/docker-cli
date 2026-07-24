@@ -262,6 +262,28 @@ services:
       docker-cli:
     restart: unless-stopped
 
+  playwright:
+    image: ${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright:v1.61.0-noble}
+    container_name: docker-cli-playwright
+    environment:
+      HOME: /root
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      NODE_PATH: /docker-cli/playwright/runtime/node_modules
+      PLAYWRIGHT_VERSION: ${PLAYWRIGHT_VERSION:-1.61.0}
+    volumes:
+      - ../../playwright/scripts:/docker-cli/playwright/scripts:ro
+      - playwright-node-modules:/docker-cli/playwright/runtime
+      - /home:/home
+      - /:/host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      docker-cli:
+    ipc: host
+    profiles:
+      - tools
+    restart: "no"
+
 networks:
   docker-cli:
     name: docker-cli
@@ -270,3 +292,4 @@ networks:
 volumes:
   dockge-data:
   traefik-letsencrypt:
+  playwright-node-modules:

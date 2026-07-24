@@ -30,6 +30,13 @@ final class SystemCompose
         return join_path($this->directory(), self::ENV_FILE);
     }
 
+    public function playwrightScriptsDirectory(): string
+    {
+        $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
+
+        return join_path($home, '.config', 'docker-cli', 'playwright', 'scripts');
+    }
+
     public function init(bool $updateStatic = false, bool $migrateEditable = false): bool
     {
         $directory = $this->directory();
@@ -246,6 +253,7 @@ final class SystemCompose
             join_path($this->directory(), 'config', 'openresty', 'hosts'),
             join_path($this->directory(), 'config', 'php-fpm-8.2', 'php', 'conf.d'),
             join_path($this->directory(), 'config', 'php-fpm-8.2', 'php-fpm.d'),
+            $this->playwrightScriptsDirectory(),
         ];
     }
 
@@ -288,11 +296,13 @@ final class SystemCompose
     /** @return array<string, string> */
     private function staticTemplateMap(): array
     {
-        $resources = join_path(dirname(__DIR__, 2), 'resources', 'compose', 'system');
+        $resources = join_path(dirname(__DIR__, 2), 'resources');
+        $composeResources = join_path($resources, 'compose', 'system');
 
         return [
-            $this->composeFile() => join_path($resources, self::COMPOSE_FILE),
-            join_path($this->directory(), 'config', 'php-fpm-8.2') => join_path($resources, 'config', 'php-fpm-8.2'),
+            $this->composeFile() => join_path($composeResources, self::COMPOSE_FILE),
+            join_path($this->directory(), 'config', 'php-fpm-8.2') => join_path($composeResources, 'config', 'php-fpm-8.2'),
+            $this->playwrightScriptsDirectory() => join_path($resources, 'playwright', 'scripts'),
         ];
     }
 

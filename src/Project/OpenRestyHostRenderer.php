@@ -81,6 +81,10 @@ final class OpenRestyHostRenderer
             $name = $project['name'] ?? null;
             $framework = $project['framework'] ?? null;
             $documentRoot = $project['document_root'] ?? null;
+            if (is_string($name) && $framework === false && is_string($documentRoot)) {
+                $framework = 'generic';
+            }
+
             if (is_string($name) && is_string($framework) && is_string($documentRoot)) {
                 $projects[] = array_filter([
                     'name' => $name,

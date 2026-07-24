@@ -18,6 +18,7 @@ use DockerCli\Command\SystemRestartCommand;
 use DockerCli\Command\VendorGetInstallerCommand;
 use DockerCli\Command\ImageBuildCommand;
 use DockerCli\Command\ImagePublishCommand;
+use DockerCli\Command\PlayRunCommand;
 use Symfony\Component\Console\Application;
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -39,6 +40,7 @@ $application->add(new ProjectDownCommand());
 $application->add(new ProjectListCommand());
 $application->add(new ImageBuildCommand());
 $application->add(new ImagePublishCommand());
+$application->add(new PlayRunCommand());
 $application->add(new VendorGetInstallerCommand());
 $application->setDefaultCommand('list');
 $application->run();
