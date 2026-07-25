@@ -16,13 +16,13 @@ const installationError = (page) => page.locator('.inst-note-block.inst-note-blo
 const stopOnInstallationError = async (page) => {
   const errorBlock = installationError(page);
   if (!await errorBlock.isVisible()) {
-    return;
+    return false;
   }
 
   const errorText = (await errorBlock.textContent() || '').trim();
   const message = errorText || 'Неизвестная ошибка установки.';
   logging.error(`Ошибка установки: ${message}`);
-  throw new Error(message);
+  return true;
 };
 
 const pauseAfterAction = async () => {
@@ -45,10 +45,14 @@ const clickAndWaitForPage = async (page, selector, description) => {
   const result = await Promise.race([navigation, errorAppeared]);
   if (result === 'error') {
     await stopOnInstallationError(page);
+    return false;
   }
-  await stopOnInstallationError(page);
+  if (await stopOnInstallationError(page)) {
+    return false;
+  }
   logging.info(`${description}: следующая страница загружена.`);
   await pauseAfterAction();
+  return true;
 };
 
 const fill = async (page, selector, value, description, logValue = true) => {
@@ -62,12 +66,20 @@ const fill = async (page, selector, value, description, logValue = true) => {
 const installStartEdition = async (page) => {
   logging.info('Запуск сценария установки редакции «Старт».');
 
-  await clickAndWaitForPage(page, 'input[name=StepNext]', 'Переход к лицензионному соглашению');
+  if (!await clickAndWaitForPage(page, 'input[name=StepNext]', 'Переход к лицензионному соглашению')) {
+    return false;
+  }
   await click(page, 'label[for=agree_license_id]', 'Принятие лицензионного соглашения');
-  await clickAndWaitForPage(page, 'input[name=StepNext]', 'Переход к выбору лицензионного ключа');
+  if (!await clickAndWaitForPage(page, 'input[name=StepNext]', 'Переход к выбору лицензионного ключа')) {
+    return false;
+  }
   await click(page, 'label[for=lic_key_variant]', 'Выбор варианта лицензионного ключа');
-  await clickAndWaitForPage(page, 'input[name=StepNext]', 'Переход к следующему шагу установки');
-  await clickAndWaitForPage(page, 'input[name=StepNext]', 'Переход к настройкам базы данных');
+  if (!await clickAndWaitForPage(page, 'input[name=StepNext]', 'Переход к следующему шагу установки')) {
+    return false;
+  }
+  if (!await clickAndWaitForPage(page, 'input[name=StepNext]', 'Переход к настройкам базы данных')) {
+    return false;
+  }
 
   const databaseHost = globalThis.wizard.db.host;
   if (!['mysql', 'postgres'].includes(databaseHost)) {
@@ -95,8 +107,11 @@ const installStartEdition = async (page) => {
   const installationResult = await Promise.race([administratorPage, installationFailed]);
   if (installationResult === 'error') {
     await stopOnInstallationError(page);
+    return false;
   }
-  await stopOnInstallationError(page);
+  if (await stopOnInstallationError(page)) {
+    return false;
+  }
   logging.info('Страница создания администратора загружена.');
 
   const admin = globalThis.wizard.admin;
@@ -112,7 +127,7 @@ const installStartEdition = async (page) => {
   console.log(`Пароль администратора Bitrix: ${admin.password}`);
   logging.info('Поля администратора заполнены; учетные данные выведены только в stdout.');
 
-  await clickAndWaitForPage(page, 'input[name=StepNext]', 'Отправка данных администратора');
+  return clickAndWaitForPage(page, 'input[name=StepNext]', 'Отправка данных администратора');
 };
 
 (async () => {
@@ -135,7 +150,10 @@ const installStartEdition = async (page) => {
     logging.info(`Заголовок страницы установки: ${title}.`);
 
     if (normalizeTitle(title) === START_EDITION_TITLE) {
-      await installStartEdition(page);
+      const installed = await installStartEdition(page);
+      if (!installed) {
+        process.exitCode = 1;
+      }
     } else {
       logging.warn(`Для страницы с заголовком «${title}» сценарий установки не найден.`);
     }
