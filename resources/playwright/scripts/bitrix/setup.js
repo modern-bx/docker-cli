@@ -68,10 +68,11 @@ const installStartEdition = async (page) => {
   logging.info('Administrator creation page loaded.');
 
   const admin = globalThis.wizard.admin;
+  const adminEmail = admin.email.replace('<project-host>', new URL(page.url()).hostname);
   await fill(page, 'input[name=__wiz_login]', admin.login, 'Setting the administrator login', false);
   await fill(page, 'input[name=__wiz_admin_password]', admin.password, 'Setting the administrator password', false);
   await fill(page, 'input[name=__wiz_admin_password_confirm]', admin.password, 'Confirming the administrator password', false);
-  await fill(page, 'input[name=__wiz_email]', admin.email, 'Setting the administrator email');
+  await fill(page, 'input[name=__wiz_email]', adminEmail, 'Setting the administrator email');
   await fill(page, 'input[name=__wiz_user_name]', admin.name, 'Setting the administrator first name');
   await fill(page, 'input[name=__wiz_user_surname]', admin.last_name, 'Setting the administrator surname');
 

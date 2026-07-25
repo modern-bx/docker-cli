@@ -3,6 +3,6 @@ db:
 admin:
   login: admin
   password: ''
-  email: admin@localhost
-  name: Bitrix24
-  last_name: Admin
+  email: admin@<project-host>
+  name: Bitrix
+  last_name: Bitrix
