@@ -12,6 +12,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Yaml\Yaml;
 use function DockerCli\Util\join_path;
 
 final class PlayRunCommand extends Command
@@ -76,6 +77,15 @@ final class PlayRunCommand extends Command
 
             return Command::INVALID;
         }
+
+        try {
+            $contextFile = $this->writeContextFile($hostLogDirectory, $projectRoot, $projectConfig);
+        } catch (\JsonException|\RuntimeException $exception) {
+            $output->writeln(sprintf('<error>Не удалось подготовить данные Playwright: %s</error>', $exception->getMessage()));
+
+            return Command::FAILURE;
+        }
+
         $viewerPort = 7900;
 
         $runArguments = [
@@ -109,6 +119,8 @@ final class PlayRunCommand extends Command
             'PLAYWRIGHT_LOG_DIR=' . $containerLogDirectory,
             '-e',
             'PLAYWRIGHT_SCRIPT_ID=' . $script,
+            '-e',
+            'PLAYWRIGHT_CONTEXT_FILE=' . $this->containerPath($contextFile),
             'playwright',
             'sh',
             '-lc',
@@ -121,6 +133,7 @@ final class PlayRunCommand extends Command
         $output->writeln('<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
         if (!is_resource($process)) {
+            unlink($contextFile);
             $output->writeln('<error>Не удалось запустить Docker Compose.</error>');
 
             return Command::FAILURE;
@@ -133,9 +146,65 @@ final class PlayRunCommand extends Command
         }
 
         $exitCode = proc_close($process);
+        unlink($contextFile);
         $output->writeln(sprintf('<info>Playwright logs directory: %s</info>', $hostLogDirectory));
 
         return is_int($exitCode) ? $exitCode : Command::FAILURE;
+    }
+
+    /**
+     * @param array<string, mixed> $projectConfig
+     */
+    private function writeContextFile(string $directory, string $projectRoot, array $projectConfig): string
+    {
+        $dataDirectory = join_path($projectRoot, '.docker-cli', 'data');
+        $context = ['project' => $projectConfig];
+
+        if (is_dir($dataDirectory)) {
+            $files = glob(join_path($dataDirectory, '*.{json,yaml,yml}'), GLOB_BRACE) ?: [];
+            sort($files, SORT_STRING);
+
+            foreach ($files as $file) {
+                if (!is_file($file)) {
+                    continue;
+                }
+
+                $name = pathinfo($file, PATHINFO_FILENAME);
+                if (preg_match('/^[A-Za-z_$][A-Za-z0-9_$]*$/', $name) !== 1) {
+                    throw new \RuntimeException(sprintf('Имя файла "%s" не является допустимым JavaScript-идентификатором.', basename($file)));
+                }
+                if (array_key_exists($name, $context)) {
+                    throw new \RuntimeException(sprintf('Имя объекта "%s" используется более одного раза или зарезервировано.', $name));
+                }
+
+                if (strtolower(pathinfo($file, PATHINFO_EXTENSION)) === 'json') {
+                    $contents = file_get_contents($file);
+                    if ($contents === false) {
+                        throw new \RuntimeException(sprintf('Не удалось прочитать файл "%s".', $file));
+                    }
+                    $context[$name] = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+                } else {
+                    $context[$name] = Yaml::parseFile($file);
+                }
+            }
+        }
+
+        $contextFile = tempnam($directory, '.context-');
+        if ($contextFile === false) {
+            throw new \RuntimeException(sprintf('Не удалось создать временный файл в "%s".', $directory));
+        }
+
+        try {
+            $json = json_encode($context, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if (file_put_contents($contextFile, $json) === false) {
+                throw new \RuntimeException(sprintf('Не удалось записать временный файл "%s".', $contextFile));
+            }
+        } catch (\Throwable $exception) {
+            unlink($contextFile);
+            throw $exception;
+        }
+
+        return $contextFile;
     }
 
     private function openViewerWhenReady(string $url, int $port): void
