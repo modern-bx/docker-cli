@@ -4,7 +4,7 @@
 docker_cli_xdebug_refresh() {
     search_dir="$PWD"
     while [ "$search_dir" != / ]; do
-        project_meta="$search_dir/.docker-cli.yaml"
+        project_meta="$search_dir/.docker-cli/project.yaml"
         if [ -f "$project_meta" ]; then
             project_name="$(sed -n 's/^[[:space:]]*name:[[:space:]]*//p' "$project_meta" | head -n 1 | sed 's/["'"'"']//g')"
             project_file="$HOME/.config/docker-cli/projects/$project_name/project.yaml"

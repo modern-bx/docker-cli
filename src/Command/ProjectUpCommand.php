@@ -107,7 +107,14 @@ final class ProjectUpCommand extends Command
         ]);
         $this->writeYaml(join_path($projectDirectory, 'project.yaml'), $projectConfig);
 
-        $this->writeYaml(join_path($projectRoot, '.docker-cli.yaml'), [
+        $projectMetadataDirectory = join_path($projectRoot, '.docker-cli');
+        if (!is_dir($projectMetadataDirectory) && !mkdir($projectMetadataDirectory, 0775, true) && !is_dir($projectMetadataDirectory)) {
+            $output->writeln(sprintf('<error>Не удалось создать директорию "%s".</error>', $projectMetadataDirectory));
+
+            return Command::FAILURE;
+        }
+
+        $this->writeYaml(join_path($projectMetadataDirectory, 'project.yaml'), [
             'meta' => [
                 'schema' => 'project-meta',
                 'version' => 0.1,
