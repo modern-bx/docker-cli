@@ -129,8 +129,7 @@ const installBitrixSiteManager = async (page) => {
   await fill(page, 'input[name=__wiz_user_name]', admin.name, 'Указание имени администратора');
   await fill(page, 'input[name=__wiz_user_surname]', admin.last_name, 'Указание фамилии администратора');
 
-  console.log(`Логин администратора Bitrix: ${admin.login}`);
-  logging.info('Поля администратора заполнены; логин выведен только в stdout.');
+  logging.info('Поля администратора заполнены.');
 
   return clickAndWaitForPage(page, 'input[name=StepNext]', 'Отправка данных администратора');
 };
