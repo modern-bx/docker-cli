@@ -1,4 +1,6 @@
 const { chromium } = require('playwright');
+const { unlink } = require('node:fs/promises');
+const path = require('node:path');
 
 const IS_VISUAL_MODE = process.env.PLAYWRIGHT_SHOW === '1';
 const ACTION_DELAY_MS = Number(globalThis.wizard.action_delay[IS_VISUAL_MODE ? 'visual' : 'headless']);
@@ -140,6 +142,19 @@ const installBitrixSiteManager = async (page) => {
   return installBitrixProduct(page, '«1С-Битрикс: Управление сайтом»');
 };
 
+const removeSiteManagerIndex = async () => {
+  const documentRoot = process.env.PROJECT_DOCUMENT_ROOT;
+  if (!documentRoot) {
+    throw new Error('Не задан PROJECT_DOCUMENT_ROOT для удаления index.php.');
+  }
+
+  // Удаление index.php необходимо, т.к. мастер установки с недавних пор не позволяет завершить установку без выбора решения, что нам не нужно. Мы де-факто останавливаем установку на полпути, хотя всё, что необходимо, мастер уже сделал
+  const indexPath = path.join(documentRoot, 'index.php');
+  logging.info(`Удаление ${indexPath}.`);
+  await unlink(indexPath);
+  logging.info(`${indexPath} удалён.`);
+};
+
 const installBitrix24 = async (page) => {
   logging.info('Запуск сценария установки «1С-Битрикс24: Корпоративный портал».');
   if (!await installBitrixProduct(page, '«1С-Битрикс24: Корпоративный портал»')) {
@@ -202,6 +217,8 @@ const installBitrix24 = async (page) => {
       const installed = await installBitrixSiteManager(page);
       if (!installed) {
         process.exitCode = 1;
+      } else {
+        await removeSiteManagerIndex();
       }
     } else if (normalizeTitle(title) === BITRIX24_TITLE) {
       const installed = await installBitrix24(page);
