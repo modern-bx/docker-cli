@@ -2,7 +2,13 @@ const { chromium } = require('playwright');
 
 const IS_VISUAL_MODE = process.env.PLAYWRIGHT_SHOW === '1';
 const ACTION_DELAY_MS = Number(globalThis.wizard.action_delay[IS_VISUAL_MODE ? 'visual' : 'headless']);
-const START_EDITION_TITLE = 'Установка «1С-Битрикс: Управление сайтом: Старт»';
+const SITE_MANAGER_EDITION_TITLES = new Set([
+  'Установка «1С-Битрикс: Управление сайтом: Старт»',
+  'Установка «1С-Битрикс: Управление сайтом: Стандарт»',
+  'Установка «1С-Битрикс: Управление сайтом: Малый бизнес»',
+  'Установка «1С-Битрикс: Управление сайтом: Бизнес»',
+  'Установка «1С-Битрикс: Управление сайтом: Энтерпрайз»',
+]);
 const logging = globalThis.dockerCli.logging;
 
 if (!Number.isFinite(ACTION_DELAY_MS) || ACTION_DELAY_MS < 0) {
@@ -63,8 +69,8 @@ const fill = async (page, selector, value, description, logValue = true) => {
   await pauseAfterAction();
 };
 
-const installStartEdition = async (page) => {
-  logging.info('Запуск сценария установки редакции «Старт».');
+const installBitrixSiteManager = async (page) => {
+  logging.info('Запуск сценария установки «1С-Битрикс: Управление сайтом».');
 
   if (!await clickAndWaitForPage(page, 'input[name=StepNext]', 'Переход к лицензионному соглашению')) {
     return false;
@@ -92,7 +98,7 @@ const installStartEdition = async (page) => {
   await fill(page, 'input[name=__wiz_password]', database.password, `Указание пароля ${databaseHost}`, false);
   await fill(page, 'input[name=__wiz_database]', database.database, `Указание базы данных ${databaseHost}`);
 
-  logging.info('Настройки базы данных для редакции «Старт» успешно заполнены.');
+  logging.info('Настройки базы данных для «1С-Битрикс: Управление сайтом» успешно заполнены.');
 
   logging.info('Запуск установки базы данных: клик по input[name=StepNext].');
   const administratorPage = page.locator('.inst-cont-title', { hasText: 'Создание администратора' }).waitFor({
@@ -124,8 +130,7 @@ const installStartEdition = async (page) => {
   await fill(page, 'input[name=__wiz_user_surname]', admin.last_name, 'Указание фамилии администратора');
 
   console.log(`Логин администратора Bitrix: ${admin.login}`);
-  console.log(`Пароль администратора Bitrix: ${admin.password}`);
-  logging.info('Поля администратора заполнены; учетные данные выведены только в stdout.');
+  logging.info('Поля администратора заполнены; логин выведен только в stdout.');
 
   return clickAndWaitForPage(page, 'input[name=StepNext]', 'Отправка данных администратора');
 };
@@ -149,8 +154,8 @@ const installStartEdition = async (page) => {
     const title = await page.title();
     logging.info(`Заголовок страницы установки: ${title}.`);
 
-    if (normalizeTitle(title) === START_EDITION_TITLE) {
-      const installed = await installStartEdition(page);
+    if (SITE_MANAGER_EDITION_TITLES.has(normalizeTitle(title))) {
+      const installed = await installBitrixSiteManager(page);
       if (!installed) {
         process.exitCode = 1;
       }
