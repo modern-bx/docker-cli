@@ -79,7 +79,12 @@ final class PlayRunCommand extends Command
         }
 
         try {
-            $contextFile = $this->writeContextFile($hostLogDirectory, $projectRoot, $projectConfig);
+            $contextFile = $this->writeContextFile(
+                $hostLogDirectory,
+                $projectRoot,
+                $projectConfig,
+                join_path($compose->playwrightDataDirectory(), substr($script, 0, -3)),
+            );
         } catch (\JsonException|\RuntimeException $exception) {
             $output->writeln(sprintf('<error>Не удалось подготовить данные Playwright: %s</error>', $exception->getMessage()));
 
@@ -155,38 +160,22 @@ final class PlayRunCommand extends Command
     /**
      * @param array<string, mixed> $projectConfig
      */
-    private function writeContextFile(string $directory, string $projectRoot, array $projectConfig): string
+    private function writeContextFile(string $directory, string $projectRoot, array $projectConfig, string $defaultDataDirectory): string
     {
-        $dataDirectory = join_path($projectRoot, '.docker-cli', 'data');
         $context = ['project' => $projectConfig];
 
-        if (is_dir($dataDirectory)) {
-            $files = glob(join_path($dataDirectory, '*.{json,yaml,yml}'), GLOB_BRACE) ?: [];
-            sort($files, SORT_STRING);
-
-            foreach ($files as $file) {
-                if (!is_file($file)) {
-                    continue;
-                }
-
-                $name = pathinfo($file, PATHINFO_FILENAME);
-                if (preg_match('/^[A-Za-z_$][A-Za-z0-9_$]*$/', $name) !== 1) {
-                    throw new \RuntimeException(sprintf('Имя файла "%s" не является допустимым JavaScript-идентификатором.', basename($file)));
-                }
-                if (array_key_exists($name, $context)) {
-                    throw new \RuntimeException(sprintf('Имя объекта "%s" используется более одного раза или зарезервировано.', $name));
-                }
-
-                if (strtolower(pathinfo($file, PATHINFO_EXTENSION)) === 'json') {
-                    $contents = file_get_contents($file);
-                    if ($contents === false) {
-                        throw new \RuntimeException(sprintf('Не удалось прочитать файл "%s".', $file));
-                    }
-                    $context[$name] = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
-                } else {
-                    $context[$name] = Yaml::parseFile($file);
-                }
+        foreach ($this->readDataDirectory($defaultDataDirectory) as $name => $value) {
+            if ($name === 'project') {
+                throw new \RuntimeException('Имя объекта "project" зарезервировано.');
             }
+            $context[$name] = $value;
+        }
+
+        foreach ($this->readDataDirectory(join_path($projectRoot, '.docker-cli', 'data')) as $name => $value) {
+            if ($name === 'project') {
+                throw new \RuntimeException('Имя объекта "project" зарезервировано.');
+            }
+            $context[$name] = $value;
         }
 
         $contextFile = tempnam($directory, '.context-');
@@ -205,6 +194,44 @@ final class PlayRunCommand extends Command
         }
 
         return $contextFile;
+    }
+
+    /** @return array<string, mixed> */
+    private function readDataDirectory(string $directory): array
+    {
+        if (!is_dir($directory)) {
+            return [];
+        }
+
+        $data = [];
+        $files = glob(join_path($directory, '*.{json,yaml,yml}'), GLOB_BRACE) ?: [];
+        sort($files, SORT_STRING);
+
+        foreach ($files as $file) {
+            if (!is_file($file)) {
+                continue;
+            }
+
+            $name = pathinfo($file, PATHINFO_FILENAME);
+            if (preg_match('/^[A-Za-z_$][A-Za-z0-9_$]*$/', $name) !== 1) {
+                throw new \RuntimeException(sprintf('Имя файла "%s" не является допустимым JavaScript-идентификатором.', basename($file)));
+            }
+            if (array_key_exists($name, $data)) {
+                throw new \RuntimeException(sprintf('Имя объекта "%s" используется более одного раза.', $name));
+            }
+
+            if (strtolower(pathinfo($file, PATHINFO_EXTENSION)) === 'json') {
+                $contents = file_get_contents($file);
+                if ($contents === false) {
+                    throw new \RuntimeException(sprintf('Не удалось прочитать файл "%s".', $file));
+                }
+                $data[$name] = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+            } else {
+                $data[$name] = Yaml::parseFile($file);
+            }
+        }
+
+        return $data;
     }
 
     private function openViewerWhenReady(string $url, int $port): void

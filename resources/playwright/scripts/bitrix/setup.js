@@ -1,34 +1,10 @@
 const { chromium } = require('playwright');
-const { randomInt } = require('node:crypto');
 
 const ACTION_DELAY_MS = 2000;
 const START_EDITION_TITLE = 'Установка «1С-Битрикс: Управление сайтом: Старт»';
 const logging = globalThis.dockerCli.logging;
 
 const normalizeTitle = (title) => title.trim().replace(/\s+/g, ' ');
-
-const generatePassword = () => {
-  const lowerCaseLetters = 'abcdefghijklmnopqrstuvwxyz';
-  const upperCaseLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const digits = '0123456789';
-  const alphabet = lowerCaseLetters + upperCaseLetters + digits;
-  const characters = [
-    lowerCaseLetters[randomInt(lowerCaseLetters.length)],
-    upperCaseLetters[randomInt(upperCaseLetters.length)],
-    digits[randomInt(digits.length)],
-  ];
-
-  while (characters.length < 24) {
-    characters.push(alphabet[randomInt(alphabet.length)]);
-  }
-
-  for (let index = characters.length - 1; index > 0; index -= 1) {
-    const swapIndex = randomInt(index + 1);
-    [characters[index], characters[swapIndex]] = [characters[swapIndex], characters[index]];
-  }
-
-  return characters.join('');
-};
 
 const pauseAfterAction = async () => {
   logging.debug(`Waiting ${ACTION_DELAY_MS} ms before the next action.`);
@@ -70,11 +46,16 @@ const installStartEdition = async (page) => {
   await clickAndWaitForPage(page, 'input[name=StepNext]', 'Opening the next installation step');
   await clickAndWaitForPage(page, 'input[name=StepNext]', 'Opening the database settings step');
 
-  const mysql = globalThis.project.data.databases.mysql;
-  await fill(page, 'input[name=__wiz_host]', 'mysql', 'Setting the MySQL host');
-  await fill(page, 'input[name=__wiz_user]', mysql.username, 'Setting the MySQL username');
-  await fill(page, 'input[name=__wiz_password]', mysql.password, 'Setting the MySQL password', false);
-  await fill(page, 'input[name=__wiz_database]', mysql.database, 'Setting the MySQL database');
+  const databaseHost = globalThis.wizard.db.host;
+  if (!['mysql', 'postgres'].includes(databaseHost)) {
+    throw new Error(`Unsupported database host in wizard.db.host: ${databaseHost}. Expected mysql or postgres.`);
+  }
+
+  const database = globalThis.project.data.databases[databaseHost];
+  await fill(page, 'input[name=__wiz_host]', databaseHost, `Setting the ${databaseHost} host`);
+  await fill(page, 'input[name=__wiz_user]', database.username, `Setting the ${databaseHost} username`);
+  await fill(page, 'input[name=__wiz_password]', database.password, `Setting the ${databaseHost} password`, false);
+  await fill(page, 'input[name=__wiz_database]', database.database, `Setting the ${databaseHost} database`);
 
   logging.info('Database settings for the Start edition have been filled successfully.');
 
@@ -86,17 +67,16 @@ const installStartEdition = async (page) => {
   });
   logging.info('Administrator creation page loaded.');
 
-  const adminLogin = 'admin';
-  const adminPassword = generatePassword();
-  await fill(page, 'input[name=__wiz_login]', adminLogin, 'Setting the administrator login', false);
-  await fill(page, 'input[name=__wiz_admin_password]', adminPassword, 'Setting the administrator password', false);
-  await fill(page, 'input[name=__wiz_admin_password_confirm]', adminPassword, 'Confirming the administrator password', false);
-  await fill(page, 'input[name=__wiz_email]', 'test@test.test', 'Setting the administrator email');
-  await fill(page, 'input[name=__wiz_user_name]', 'Иван', 'Setting the administrator first name');
-  await fill(page, 'input[name=__wiz_user_surname]', 'Иванов', 'Setting the administrator surname');
+  const admin = globalThis.wizard.admin;
+  await fill(page, 'input[name=__wiz_login]', admin.login, 'Setting the administrator login', false);
+  await fill(page, 'input[name=__wiz_admin_password]', admin.password, 'Setting the administrator password', false);
+  await fill(page, 'input[name=__wiz_admin_password_confirm]', admin.password, 'Confirming the administrator password', false);
+  await fill(page, 'input[name=__wiz_email]', admin.email, 'Setting the administrator email');
+  await fill(page, 'input[name=__wiz_user_name]', admin.name, 'Setting the administrator first name');
+  await fill(page, 'input[name=__wiz_user_surname]', admin.last_name, 'Setting the administrator surname');
 
-  console.log(`Bitrix administrator login: ${adminLogin}`);
-  console.log(`Bitrix administrator password: ${adminPassword}`);
+  console.log(`Bitrix administrator login: ${admin.login}`);
+  console.log(`Bitrix administrator password: ${admin.password}`);
   logging.info('Administrator fields have been filled; credentials were printed to stdout only.');
 
   await clickAndWaitForPage(page, 'input[name=StepNext]', 'Submitting the administrator details');

@@ -37,6 +37,13 @@ final class SystemCompose
         return join_path($home, '.config', 'docker-cli', 'playwright', 'scripts');
     }
 
+    public function playwrightDataDirectory(): string
+    {
+        $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
+
+        return join_path($home, '.config', 'docker-cli', 'playwright', 'data');
+    }
+
     public function init(bool $updateStatic = false, bool $migrateEditable = false): bool
     {
         $directory = $this->directory();
@@ -260,7 +267,7 @@ final class SystemCompose
     /** @return array<string, string> */
     private function templateMap(): array
     {
-        return $this->editableTemplateMap() + $this->staticTemplateMap();
+        return $this->editableTemplateMap() + $this->staticTemplateMap() + $this->playwrightDataTemplateMap();
     }
 
     private function copyTemplate(string $source, string $target, bool $overwrite = false): void
@@ -304,6 +311,16 @@ final class SystemCompose
             join_path($this->directory(), 'config', 'playwright') => join_path($composeResources, 'config', 'playwright'),
             join_path($this->directory(), 'config', 'php-fpm-8.2') => join_path($composeResources, 'config', 'php-fpm-8.2'),
             $this->playwrightScriptsDirectory() => join_path($resources, 'playwright', 'scripts'),
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function playwrightDataTemplateMap(): array
+    {
+        $resources = join_path(dirname(__DIR__, 2), 'resources');
+
+        return [
+            $this->playwrightDataDirectory() => join_path($resources, 'playwright', 'data'),
         ];
     }
 

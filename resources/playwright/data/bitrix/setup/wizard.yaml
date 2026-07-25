@@ -1,0 +1,8 @@
+db:
+  host: mysql
+admin:
+  login: admin
+  password: ''
+  email: admin@localhost
+  name: Bitrix24
+  last_name: Admin
