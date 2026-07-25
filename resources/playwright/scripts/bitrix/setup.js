@@ -9,6 +9,7 @@ const SITE_MANAGER_EDITION_TITLES = new Set([
   'Установка «1С-Битрикс: Управление сайтом: Бизнес»',
   'Установка «1С-Битрикс: Управление сайтом: Энтерпрайз»',
 ]);
+const BITRIX24_TITLE = 'Установка «1С-Битрикс24: Корпоративный портал»';
 const logging = globalThis.dockerCli.logging;
 
 if (!Number.isFinite(ACTION_DELAY_MS) || ACTION_DELAY_MS < 0) {
@@ -69,8 +70,8 @@ const fill = async (page, selector, value, description, logValue = true) => {
   await pauseAfterAction();
 };
 
-const installBitrixSiteManager = async (page) => {
-  logging.info('Запуск сценария установки «1С-Битрикс: Управление сайтом».');
+const installBitrixProduct = async (page, productName) => {
+  logging.info(`Запуск общих шагов установки ${productName}.`);
 
   if (!await clickAndWaitForPage(page, 'input[name=StepNext]', 'Переход к лицензионному соглашению')) {
     return false;
@@ -98,7 +99,7 @@ const installBitrixSiteManager = async (page) => {
   await fill(page, 'input[name=__wiz_password]', database.password, `Указание пароля ${databaseHost}`, false);
   await fill(page, 'input[name=__wiz_database]', database.database, `Указание базы данных ${databaseHost}`);
 
-  logging.info('Настройки базы данных для «1С-Битрикс: Управление сайтом» успешно заполнены.');
+  logging.info(`Настройки базы данных для ${productName} успешно заполнены.`);
 
   logging.info('Запуск установки базы данных: клик по input[name=StepNext].');
   const administratorPage = page.locator('.inst-cont-title', { hasText: 'Создание администратора' }).waitFor({
@@ -134,6 +135,50 @@ const installBitrixSiteManager = async (page) => {
   return clickAndWaitForPage(page, 'input[name=StepNext]', 'Отправка данных администратора');
 };
 
+const installBitrixSiteManager = async (page) => {
+  logging.info('Запуск сценария установки «1С-Битрикс: Управление сайтом».');
+  return installBitrixProduct(page, '«1С-Битрикс: Управление сайтом»');
+};
+
+const installBitrix24 = async (page) => {
+  logging.info('Запуск сценария установки «1С-Битрикс24: Корпоративный портал».');
+  if (!await installBitrixProduct(page, '«1С-Битрикс24: Корпоративный портал»')) {
+    return false;
+  }
+
+  if (!await clickAndWaitForPage(page, 'input[name=StepNext]', 'Первый переход к следующим настройкам Битрикс24')) {
+    return false;
+  }
+  if (!await clickAndWaitForPage(page, 'input[name=StepNext]', 'Второй переход к следующим настройкам Битрикс24')) {
+    return false;
+  }
+
+  await click(page, 'label[for=allow_social]', 'Включение социальных сервисов');
+  if (!await clickAndWaitForPage(page, 'input[name=StepNext]', 'Отправка настроек социальных сервисов')) {
+    return false;
+  }
+
+  const openBitrix24Selector = '.instal-btn-wrap input.wizard-next-button[name=StepNext][value="Перейти в Битрикс24"]';
+  logging.info(`Ожидание кнопки перехода в Битрикс24: ${openBitrix24Selector}.`);
+  const openBitrix24Button = page.locator(openBitrix24Selector).waitFor({
+    state: 'visible',
+    timeout: 0,
+  }).then(() => 'button');
+  const installationFailed = installationError(page).waitFor({ state: 'visible', timeout: 0 }).then(() => 'error');
+  const buttonResult = await Promise.race([openBitrix24Button, installationFailed]);
+  if (buttonResult === 'error') {
+    await stopOnInstallationError(page);
+    return false;
+  }
+  logging.info('Кнопка перехода в Битрикс24 появилась.');
+
+  if (!await clickAndWaitForPage(page, openBitrix24Selector, 'Переход в Битрикс24')) {
+    return false;
+  }
+  logging.info('Установка Битрикс24 успешно завершена.');
+  return true;
+};
+
 (async () => {
   const url = process.env.PLAYWRIGHT_URL || process.env.PROJECT_URL;
   if (!url) {
@@ -155,6 +200,11 @@ const installBitrixSiteManager = async (page) => {
 
     if (SITE_MANAGER_EDITION_TITLES.has(normalizeTitle(title))) {
       const installed = await installBitrixSiteManager(page);
+      if (!installed) {
+        process.exitCode = 1;
+      }
+    } else if (normalizeTitle(title) === BITRIX24_TITLE) {
+      const installed = await installBitrix24(page);
       if (!installed) {
         process.exitCode = 1;
       }
