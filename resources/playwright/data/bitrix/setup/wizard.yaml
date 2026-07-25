@@ -1,5 +1,8 @@
 db:
   host: mysql
+action_delay:
+  headless: 500
+  visual: 2000
 admin:
   login: admin
   password: ''

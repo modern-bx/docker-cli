@@ -83,11 +83,11 @@ class PlaywrightLoggingHelper {
       fs.mkdirSync(this.logDirectory, { recursive: true });
       fs.appendFileSync(this.logFile, `${line}\n`);
     } catch (error) {
-      console.warn(this.colorize('WARN', `[${this.timestamp()}] [WARN] Unable to write log file ${this.logFile}: ${error.message}`));
+      console.warn(this.colorize('WARN', `[${this.timestamp()}] [WARN] Не удалось записать файл лога ${this.logFile}: ${error.message}`));
     }
   }
 }
 
 globalThis.dockerCli = globalThis.dockerCli || {};
 globalThis.dockerCli.logging = globalThis.dockerCli.logging || new PlaywrightLoggingHelper();
-globalThis.dockerCli.logging.info(`Log file: ${globalThis.dockerCli.logging.logFile}`);
+globalThis.dockerCli.logging.info(`Файл лога: ${globalThis.dockerCli.logging.logFile}`);
