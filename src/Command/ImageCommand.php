@@ -20,6 +20,11 @@ abstract class ImageCommand extends Command
             'context' => 'resources/compose/system/config/php-fpm-8.2',
             'service' => 'php-fpm-8.2',
         ],
+        [
+            'name' => 'playwright',
+            'context' => 'resources/compose/system/config/playwright',
+            'service' => 'playwright',
+        ],
     ];
 
     protected function configureImageOptions(): void
