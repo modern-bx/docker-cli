@@ -212,12 +212,18 @@ services:
       - /:/host:ro
     labels:
       traefik.enable: "true"
+      traefik.http.routers.openresty-http.rule: HostRegexp(`^web-.+\.${BASE_HOST}$`)
+      traefik.http.routers.openresty-http.entrypoints: web
+      traefik.http.routers.openresty-http.middlewares: openresty-https-redirect
+      traefik.http.routers.openresty-http.service: openresty
       traefik.http.routers.openresty.rule: HostRegexp(`^web-.+\.${BASE_HOST}$`)
       traefik.http.routers.openresty.entrypoints: websecure
       traefik.http.routers.openresty.tls: "true"
       traefik.http.routers.openresty.tls.certresolver: cloudflare
       traefik.http.routers.openresty.tls.domains[0].main: ${BASE_HOST}
       traefik.http.routers.openresty.tls.domains[0].sans: '*.${BASE_HOST}'
+      traefik.http.middlewares.openresty-https-redirect.redirectscheme.scheme: https
+      traefik.http.middlewares.openresty-https-redirect.redirectscheme.permanent: "true"
       traefik.http.services.openresty.loadbalancer.server.port: "${OPENRESTY_PORT:-80}"
     networks:
       docker-cli:
