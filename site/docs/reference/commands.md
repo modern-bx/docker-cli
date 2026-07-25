@@ -134,21 +134,22 @@ docker-cli image:publish --tag=1.0.0
 
 ### `bin/docker-cli bitrix:get-installer`
 
-Скачивает архив дистрибутива 1С-Битрикс или 1С-Битрикс24. По умолчанию выбирается продукт `bitrix`, редакция `start` и текущая директория. Если целевой файл уже существует, команда завершается с ошибкой.
+Скачивает архив дистрибутива 1С-Битрикс или 1С-Битрикс24. По умолчанию выбирается продукт `bitrix`; редакция по умолчанию зависит от продукта: `start` для `bitrix` и `business` для `bitrix24`. Архив сохраняется в текущую директорию. Если целевой файл уже существует, команда завершается с ошибкой.
 
 Перед скачиванием команда выполняет `HEAD`-запрос к URL дистрибутива. Если `Content-Length` совпадает с размером файла в кеше `~/.config/docker-cli/cache/bitrix-get-installer/distro`, архив берётся из кеша без повторной загрузки. Если размер изменился или кеша нет, команда скачивает свежий архив и обновляет кеш без отдельного версионирования.
 
 Опции:
 
 - `--product` — продукт: `bitrix` или `bitrix24`.
-- `--edition` — редакция. Для `bitrix`: `start`, `standard`, `small_business`, `expert`, `business`; для `bitrix24`: `business`, `enterprise`, `enterprise_postgresql`.
-- `--path` — файл для сохранения или директория, куда архив будет помещен с серверным именем файла.
+- `--edition` — редакция. Для `bitrix`: `start` (по умолчанию), `standard`, `small_business`, `expert`, `business`; для `bitrix24`: `business` (по умолчанию), `enterprise`, `enterprise_postgresql`.
+- `--path` — файл для сохранения или директория, куда архив будет помещен с серверным именем файла; по умолчанию используется текущая директория.
 - `--extract` — распаковать архив в директорию, где он лежит, и удалить архив после распаковки.
 
 Примеры:
 
 ```bash
 bin/docker-cli bitrix:get-installer
+bin/docker-cli bitrix:get-installer --product=bitrix24 --extract
 bin/docker-cli bitrix:get-installer --product=bitrix24 --edition=enterprise --path=./dist --extract
 ```
 
