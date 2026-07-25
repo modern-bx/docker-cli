@@ -13,6 +13,10 @@ final class BitrixGetInstallerCommand extends Command
 {
     private const BASE_URL = 'https://www.1c-bitrix.ru/download/';
     private const CACHE_RELATIVE_PATH = '.config/docker-cli/cache/bitrix-get-installer/distro';
+    private const DEFAULT_EDITIONS = [
+        'bitrix' => 'start',
+        'bitrix24' => 'business',
+    ];
 
     /** @var array<string, array<string, string>> */
     private const EDITIONS = [
@@ -35,8 +39,8 @@ final class BitrixGetInstallerCommand extends Command
         parent::__construct('bitrix:get-installer');
         $this->setDescription('Скачать дистрибутив 1С-Битрикс или 1С-Битрикс24.');
         $this->addOption('product', null, InputOption::VALUE_REQUIRED, 'Продукт: bitrix или bitrix24.', 'bitrix');
-        $this->addOption('edition', null, InputOption::VALUE_REQUIRED, 'Редакция продукта.', 'start');
-        $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Файл или директория для сохранения архива.', getcwd() ?: '.');
+        $this->addOption('edition', null, InputOption::VALUE_REQUIRED, 'Редакция продукта (по умолчанию: start для bitrix, business для bitrix24).');
+        $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Файл или директория для сохранения архива.', '.');
         $this->addOption('extract', null, InputOption::VALUE_NONE, 'Распаковать архив рядом с ним и удалить архив.');
     }
 
@@ -49,6 +53,10 @@ final class BitrixGetInstallerCommand extends Command
         if (!isset(self::EDITIONS[$product])) {
             $output->writeln(sprintf('<error>Неизвестный продукт "%s". Доступно: %s.</error>', $product, implode(', ', array_keys(self::EDITIONS))));
             return Command::INVALID;
+        }
+
+        if ($edition === '') {
+            $edition = self::DEFAULT_EDITIONS[$product];
         }
 
         if (!isset(self::EDITIONS[$product][$edition])) {
