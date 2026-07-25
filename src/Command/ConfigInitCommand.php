@@ -13,6 +13,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
+use Symfony\Component\Yaml\Yaml;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class ConfigInitCommand extends Command
@@ -48,6 +49,9 @@ final class ConfigInitCommand extends Command
 
         $compose = new SystemCompose();
         $created = $compose->init($update, $migrate);
+        if ($this->ensureBitrixWizardPassword($compose)) {
+            $created = true;
+        }
         $message = $created ? 'config.created' : 'config.exists';
 
         $output->writeln('<info>' . $this->translator->trans($message, [
@@ -68,5 +72,47 @@ final class ConfigInitCommand extends Command
         $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
 
         return $home . DIRECTORY_SEPARATOR . '.config' . DIRECTORY_SEPARATOR . 'docker-cli' . DIRECTORY_SEPARATOR . 'projects';
+    }
+
+    private function ensureBitrixWizardPassword(SystemCompose $compose): bool
+    {
+        $file = $compose->playwrightDataDirectory() . DIRECTORY_SEPARATOR . 'bitrix' . DIRECTORY_SEPARATOR . 'setup' . DIRECTORY_SEPARATOR . 'wizard.yaml';
+        if (!is_file($file)) {
+            return false;
+        }
+
+        $data = Yaml::parseFile($file);
+        if (!is_array($data) || !is_array($data['admin'] ?? null) || ($data['admin']['password'] ?? '') !== '') {
+            return false;
+        }
+
+        $data['admin']['password'] = $this->randomPassword();
+        file_put_contents($file, Yaml::dump($data, 4, 2));
+
+        return true;
+    }
+
+    private function randomPassword(): string
+    {
+        $lowercase = 'abcdefghijklmnopqrstuvwxyz';
+        $uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $digits = '0123456789';
+        $alphabet = $lowercase . $uppercase . $digits;
+        $characters = [
+            $lowercase[random_int(0, strlen($lowercase) - 1)],
+            $uppercase[random_int(0, strlen($uppercase) - 1)],
+            $digits[random_int(0, strlen($digits) - 1)],
+        ];
+
+        while (count($characters) < 24) {
+            $characters[] = $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+
+        for ($index = count($characters) - 1; $index > 0; --$index) {
+            $swapIndex = random_int(0, $index);
+            [$characters[$index], $characters[$swapIndex]] = [$characters[$swapIndex], $characters[$index]];
+        }
+
+        return implode('', $characters);
     }
 }

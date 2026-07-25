@@ -6,24 +6,21 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Project\DataInitializer;
-use DockerCli\Project\ProjectDatabaseConfig;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DataInitCommand extends Command
+final class DataWipeCommand extends Command
 {
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?DataInitializer $initializer = null,
     ) {
-        parent::__construct('data:init');
-        $this->setDescription('Создать БД и пользователя проекта во всех доступных СУБД.');
+        parent::__construct('data:wipe');
+        $this->setDescription('Очистить все таблицы в БД проекта, не удаляя БД и пользователей.');
         $this->addArgument('project', InputArgument::OPTIONAL, 'Кодовое имя зарегистрированного проекта.');
-        $this->addOption('rebuild', null, InputOption::VALUE_NONE, 'Удалить существующие БД и пользователей перед созданием.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -40,24 +37,23 @@ final class DataInitCommand extends Command
             return Command::FAILURE;
         }
 
-        $config = (new ProjectDatabaseConfig())->ensure($registry->readProjectConfig($projectName));
-        $registry->writeProjectConfig($projectName, $config);
-
-        $mysqlPassword = $config['data']['databases']['mysql']['password'] ?? null;
-        $postgresPassword = $config['data']['databases']['postgres']['password'] ?? null;
-        if (!is_string($mysqlPassword) || !is_string($postgresPassword)) {
-            throw new \RuntimeException('Database passwords are missing from project config.');
+        $config = $registry->readProjectConfig($projectName);
+        $mysqlDatabase = $config['data']['databases']['mysql']['database'] ?? $projectName;
+        $postgresDatabase = $config['data']['databases']['postgres']['database'] ?? $projectName;
+        if (!is_string($mysqlDatabase) || $mysqlDatabase === '' || !is_string($postgresDatabase) || $postgresDatabase === '') {
+            $output->writeln(sprintf('<error>В конфигурации проекта "%s" не заданы БД MySQL или PostgreSQL.</error>', $projectName));
+            return Command::FAILURE;
         }
 
         try {
-            $code = ($this->initializer ?? new DataInitializer())->initialize($projectName, $mysqlPassword, $postgresPassword, (bool) $input->getOption('rebuild'), $output);
+            $code = ($this->initializer ?? new DataInitializer())->wipe($mysqlDatabase, $postgresDatabase, $output);
         } catch (MissingConfigException $exception) {
             $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
             return Command::FAILURE;
         }
 
         if ($code === Command::SUCCESS) {
-            $output->writeln(sprintf('<info>Данные проекта "%s" инициализированы.</info>', $projectName));
+            $output->writeln(sprintf('<info>Все таблицы в БД проекта "%s" удалены.</info>', $projectName));
         }
 
         return $code;
