@@ -1,6 +1,6 @@
 const { chromium } = require('playwright');
 
-const ACTION_DELAY_MS = 250;
+const ACTION_DELAY_MS = 2000;
 const START_EDITION_TITLE = 'Установка «1С-Битрикс: Управление сайтом: Старт»';
 const logging = globalThis.dockerCli.logging;
 
@@ -46,7 +46,7 @@ const installStartEdition = async (page) => {
   await clickAndWaitForPage(page, 'input[name=StepNext]', 'Opening the next installation step');
   await clickAndWaitForPage(page, 'input[name=StepNext]', 'Opening the database settings step');
 
-  const mysql = globalThis.project.databases.mysql;
+  const mysql = globalThis.project.data.databases.mysql;
   await fill(page, 'input[name=__wiz_host]', 'mysql', 'Setting the MySQL host');
   await fill(page, 'input[name=__wiz_user]', mysql.username, 'Setting the MySQL username');
   await fill(page, 'input[name=__wiz_password]', mysql.password, 'Setting the MySQL password', false);

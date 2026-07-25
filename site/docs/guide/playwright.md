@@ -32,7 +32,7 @@ docker-cli play:run --browser=firefox --show bitrix/setup
 docker-cli play:run --browser=webkit bitrix/setup
 ```
 
-Команда передает в контейнер переменные `PROJECT_NAME`, `PROJECT_ROOT`, `PROJECT_DOCUMENT_ROOT` и `PROJECT_URL`. Встроенный сценарий `bitrix/setup.js` открывает адрес из `PLAYWRIGHT_URL` или `PROJECT_URL`. Для страницы установки редакции «Старт» он принимает лицензионное соглашение, выбирает вариант лицензионного ключа, переходит к настройкам базы данных и заполняет их значениями `project.databases.mysql`.
+Команда передает в контейнер переменные `PROJECT_NAME`, `PROJECT_ROOT`, `PROJECT_DOCUMENT_ROOT` и `PROJECT_URL`. Встроенный сценарий `bitrix/setup.js` открывает адрес из `PLAYWRIGHT_URL` или `PROJECT_URL`. Для страницы установки редакции «Старт» он принимает лицензионное соглашение, выбирает вариант лицензионного ключа, переходит к настройкам базы данных и заполняет их значениями `project.data.databases.mysql`.
 
 При регистрации проекта рядом с `.docker-cli/project.yaml` создается директория `.docker-cli/data`. JSON- и YAML-файлы (`.json`, `.yaml`, `.yml`) из нее автоматически читаются перед каждым запуском Playwright. Содержимое каждого файла доступно сценарию как глобальный объект с именем файла без расширения: например, `.docker-cli/data/customer.yaml` становится объектом `customer`. Имена файлов должны быть допустимыми JavaScript-идентификаторами и не могут называться `project`; одинаковые базовые имена у файлов с разными расширениями также не допускаются.
 
