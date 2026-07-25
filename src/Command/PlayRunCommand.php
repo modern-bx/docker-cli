@@ -10,6 +10,7 @@ use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use function DockerCli\Util\join_path;
 
@@ -20,6 +21,7 @@ final class PlayRunCommand extends Command
         parent::__construct('play:run');
         $this->setDescription('Запустить Playwright-сценарий в контексте текущего проекта.');
         $this->addArgument('script', InputArgument::REQUIRED, 'Путь к js-сценарию относительно ~/.config/docker-cli/playwright/scripts; расширение .js можно опустить.');
+        $this->addOption('show', null, InputOption::VALUE_NONE, 'Показывать управляемый браузер в окне через локальный noVNC viewer.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -66,9 +68,23 @@ final class PlayRunCommand extends Command
         $containerLogDirectory = $this->containerPath($hostLogDirectory);
         $mixinRequireArguments = $this->mixinRequireArguments($compose);
 
-        $command = array_merge($compose->dockerComposeCommand('run'), [
+        $show = (bool) $input->getOption('show');
+        $viewerPort = 7900;
+
+        $runArguments = [
             '--rm',
             '--no-deps',
+        ];
+        if ($show) {
+            $runArguments = array_merge($runArguments, [
+                '--publish',
+                sprintf('127.0.0.1:%d:7900', $viewerPort),
+                '-e',
+                'PLAYWRIGHT_SHOW=1',
+            ]);
+        }
+
+        $command = array_merge($compose->dockerComposeCommand('run'), $runArguments, [
             '--workdir',
             $this->containerPath($projectRoot),
             '-e',
@@ -100,10 +116,38 @@ final class PlayRunCommand extends Command
             return Command::FAILURE;
         }
 
+        if ($show) {
+            $viewerUrl = sprintf('http://127.0.0.1:%d/vnc.html?autoconnect=true&resize=scale', $viewerPort);
+            $output->writeln(sprintf('<info>Окно браузера доступно по адресу: %s</info>', $viewerUrl));
+            $this->openViewerWhenReady($viewerUrl, $viewerPort);
+        }
+
         $exitCode = proc_close($process);
         $output->writeln(sprintf('<info>Playwright logs directory: %s</info>', $hostLogDirectory));
 
         return is_int($exitCode) ? $exitCode : Command::FAILURE;
+    }
+
+    private function openViewerWhenReady(string $url, int $port): void
+    {
+        if (PHP_OS_FAMILY === 'Darwin') {
+            $opener = 'open';
+        } elseif (PHP_OS_FAMILY === 'Windows') {
+            return;
+        } else {
+            $opener = 'xdg-open';
+        }
+
+        $script = sprintf(
+            'command -v %1$s >/dev/null 2>&1 || exit 0; while ! (echo >/dev/tcp/127.0.0.1/%2$d) >/dev/null 2>&1; do sleep 1; done; %1$s %3$s >/dev/null 2>&1',
+            escapeshellarg($opener),
+            $port,
+            escapeshellarg($url),
+        );
+        $viewerProcess = proc_open(['bash', '-c', $script . ' &'], [], $pipes);
+        if (is_resource($viewerProcess)) {
+            proc_close($viewerProcess);
+        }
     }
 
     private function normalizeScriptName(string $script): ?string
