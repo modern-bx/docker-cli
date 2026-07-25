@@ -301,7 +301,7 @@ final class SystemCompose
 
         return [
             $this->composeFile() => join_path($composeResources, self::COMPOSE_FILE),
-            join_path($this->directory(), 'playwright') => join_path($composeResources, 'playwright'),
+            join_path($this->directory(), 'config', 'playwright') => join_path($composeResources, 'config', 'playwright'),
             join_path($this->directory(), 'config', 'php-fpm-8.2') => join_path($composeResources, 'config', 'php-fpm-8.2'),
             $this->playwrightScriptsDirectory() => join_path($resources, 'playwright', 'scripts'),
         ];

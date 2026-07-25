@@ -25,6 +25,13 @@ docker-cli play:run --show bitrix/setup
 
 Команда запускает графический браузер внутри Playwright-контейнера и открывает локальный noVNC viewer по адресу `http://127.0.0.1:7900`. Устанавливать браузер, X-сервер или VNC-клиент в хост-систему не требуется. Если системная команда открытия URL недоступна, адрес viewer также печатается в терминале и его можно открыть вручную. Порт доступен только через loopback-интерфейс и только пока выполняется сценарий.
 
+Официальный Playwright-образ уже содержит Chromium, Firefox и WebKit. Нужный движок можно выбрать опцией `--browser`; она работает как вместе с `--show`, так и в headless-режиме:
+
+```bash
+docker-cli play:run --browser=firefox --show bitrix/setup
+docker-cli play:run --browser=webkit bitrix/setup
+```
+
 Команда передает в контейнер переменные `PROJECT_NAME`, `PROJECT_ROOT`, `PROJECT_DOCUMENT_ROOT` и `PROJECT_URL`. Встроенный сценарий `bitrix/setup.js` открывает адрес из `PLAYWRIGHT_URL` или `PROJECT_URL`, ждет загрузку страницы, через 3 секунды выводит заголовок, ждет еще 10 секунд и завершается.
 
 Во время выполнения `bitrix/setup.js` пишет диагностические сообщения в stdout команды и дублирует их в файл внутри проекта: `~/.config/docker-cli/projects/<project>/logs/playwright/<script-path>-<timestamp>.log` (например, `bitrix-setup-<timestamp>.log` для `bitrix/setup.js`); после завершения `play:run` дополнительно печатает директорию логов на хосте. В лог попадают путь к лог-файлу, открываемый URL, заголовок страницы, сообщения `console` из браузера и ошибки страницы.

@@ -22,6 +22,7 @@ final class PlayRunCommand extends Command
         $this->setDescription('Запустить Playwright-сценарий в контексте текущего проекта.');
         $this->addArgument('script', InputArgument::REQUIRED, 'Путь к js-сценарию относительно ~/.config/docker-cli/playwright/scripts; расширение .js можно опустить.');
         $this->addOption('show', null, InputOption::VALUE_NONE, 'Показывать управляемый браузер в окне через локальный noVNC viewer.');
+        $this->addOption('browser', null, InputOption::VALUE_REQUIRED, 'Браузер для выполнения сценария: chromium, firefox или webkit.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -69,12 +70,21 @@ final class PlayRunCommand extends Command
         $mixinRequireArguments = $this->mixinRequireArguments($compose);
 
         $show = (bool) $input->getOption('show');
+        $browser = $input->getOption('browser');
+        if ($browser !== null && !in_array($browser, ['chromium', 'firefox', 'webkit'], true)) {
+            $output->writeln('<error>Некорректный браузер. Допустимые значения: chromium, firefox, webkit.</error>');
+
+            return Command::INVALID;
+        }
         $viewerPort = 7900;
 
         $runArguments = [
             '--rm',
             '--no-deps',
         ];
+        if ($browser !== null) {
+            $runArguments = array_merge($runArguments, ['-e', 'PLAYWRIGHT_BROWSER=' . $browser]);
+        }
         if ($show) {
             $runArguments = array_merge($runArguments, [
                 '--publish',
