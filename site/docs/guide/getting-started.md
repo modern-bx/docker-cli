@@ -89,6 +89,20 @@ bin/docker-cli project:down
 bin/docker-cli project:down --no-restart
 ```
 
+## Очистка баз данных проекта
+
+Чтобы удалить все таблицы из MySQL- и PostgreSQL-баз текущего проекта, не удаляя сами базы и их пользователей, выполните команду из директории проекта:
+
+```bash
+bin/docker-cli data:wipe
+```
+
+При необходимости проект можно указать явно:
+
+```bash
+bin/docker-cli data:wipe my-project
+```
+
 ## Остановка и перезапуск
 
 ```bash

@@ -114,6 +114,69 @@ SH,
         ]), $compose, $output);
     }
 
+    public function wipe(string $mysqlDatabase, string $postgresDatabase, OutputInterface $output): int
+    {
+        $compose = $this->compose ?? new SystemCompose();
+        $compose->assertInitialized();
+
+        $code = $this->run(array_merge($compose->dockerComposeCommand('exec'), [
+            '-T',
+            'mysql',
+            'sh',
+            '-ec',
+            <<<'SH'
+set -eu
+export MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}"
+database="$1"
+drop_tables_query=$(cat <<'SQL'
+SELECT CONCAT('DROP TABLE IF EXISTS `', REPLACE(TABLE_NAME, '`', '``'), '`;')
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE';
+SQL
+)
+
+{
+  echo 'SET FOREIGN_KEY_CHECKS=0;'
+  mysql -uroot -N -B "$database" -e "$drop_tables_query"
+  echo 'SET FOREIGN_KEY_CHECKS=1;'
+} | mysql -uroot "$database"
+SH,
+            'sh',
+            $mysqlDatabase,
+        ]), $compose, $output);
+        if ($code !== Command::SUCCESS) {
+            return $code;
+        }
+
+        return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
+            '-T',
+            'postgres',
+            'sh',
+            '-ec',
+            <<<'SH'
+set -eu
+export PGPASSWORD="${POSTGRES_PASSWORD:?}"
+psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:-system}" -d "$1" <<'SQL'
+DO $$
+DECLARE
+  current_table record;
+BEGIN
+  FOR current_table IN
+    SELECT schemaname, tablename
+    FROM pg_tables
+    WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+  LOOP
+    EXECUTE format('DROP TABLE IF EXISTS %I.%I CASCADE', current_table.schemaname, current_table.tablename);
+  END LOOP;
+END
+$$;
+SQL
+SH,
+            'sh',
+            $postgresDatabase,
+        ]), $compose, $output);
+    }
+
     public function dump(string $dbms, string $database, string $outputFile, OutputInterface $output): int
     {
         $compose = $this->compose ?? new SystemCompose();
