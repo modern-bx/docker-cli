@@ -35,7 +35,8 @@ final class ProjectDownCommand extends Command
             return Command::FAILURE;
         }
 
-        $metaFile = join_path($projectRoot, '.docker-cli.yaml');
+        $metadataDirectory = join_path($projectRoot, '.docker-cli');
+        $metaFile = join_path($metadataDirectory, 'project.yaml');
         if (!is_file($metaFile)) {
             $output->writeln(sprintf('<error>Файл "%s" не найден.</error>', $metaFile));
 
@@ -55,6 +56,10 @@ final class ProjectDownCommand extends Command
         }
 
         unlink($metaFile);
+        $metadataFiles = scandir($metadataDirectory);
+        if ($metadataFiles !== false && array_diff($metadataFiles, ['.', '..']) === []) {
+            rmdir($metadataDirectory);
+        }
         (new OpenRestyHostRenderer())->render();
 
         if (!$input->getOption('no-restart')) {

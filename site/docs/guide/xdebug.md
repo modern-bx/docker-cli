@@ -43,7 +43,7 @@ XDEBUG_TRIGGER=docker-cli
 
 ## Активация из консоли внутри контейнера
 
-При входе в PHP-FPM контейнер через интерактивный shell docker-cli подключает `/etc/profile.d/docker-cli-xdebug.sh`. Скрипт ищет вверх от текущей директории файл `.docker-cli.yaml`, по имени проекта читает `~/.config/docker-cli/projects/<project>/project.yaml` и выставляет:
+При входе в PHP-FPM контейнер через интерактивный shell docker-cli подключает `/etc/profile.d/docker-cli-xdebug.sh`. Скрипт ищет вверх от текущей директории файл `.docker-cli/project.yaml`, по имени проекта читает `~/.config/docker-cli/projects/<project>/project.yaml` и выставляет:
 
 ```bash
 XDEBUG_CONFIG="client_host=host.docker.internal client_port=<порт проекта> idekey=PHPSTORM"

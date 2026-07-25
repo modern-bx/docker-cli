@@ -76,7 +76,7 @@ final class ProjectRegistry
 
         $directory = realpath($directory) ?: $directory;
         while (true) {
-            $metaFile = join_path($directory, '.docker-cli.yaml');
+            $metaFile = join_path($directory, '.docker-cli', 'project.yaml');
             if (is_file($metaFile)) {
                 $data = Yaml::parseFile($metaFile);
                 $name = is_array($data) ? ($data['data']['project']['name'] ?? null) : null;
