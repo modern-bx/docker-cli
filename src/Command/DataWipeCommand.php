@@ -20,7 +20,7 @@ final class DataWipeCommand extends Command
     ) {
         parent::__construct('data:wipe');
         $this->setDescription('Очистить все таблицы в БД проекта, не удаляя БД и пользователей.');
-        $this->addArgument('project-name', InputArgument::OPTIONAL, 'Кодовое имя зарегистрированного проекта.');
+        $this->addArgument('project', InputArgument::OPTIONAL, 'Кодовое имя зарегистрированного проекта.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -61,7 +61,7 @@ final class DataWipeCommand extends Command
 
     private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string
     {
-        $projectName = $input->getArgument('project-name');
+        $projectName = $input->getArgument('project');
         if (is_string($projectName) && $projectName !== '') {
             return $projectName;
         }

@@ -20,18 +20,18 @@ final class DataDropCommand extends Command
     ) {
         parent::__construct('data:drop');
         $this->setDescription('Удалить БД и пользователя проекта во всех доступных СУБД.');
-        $this->addArgument('project-name', InputArgument::REQUIRED, 'Кодовое имя зарегистрированного проекта.');
+        $this->addArgument('project', InputArgument::OPTIONAL, 'Кодовое имя зарегистрированного проекта.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $projectName = $input->getArgument('project-name');
-        if (!is_string($projectName) || $projectName === '') {
-            $output->writeln('<error>Укажите код зарегистрированного проекта.</error>');
+        $registry = $this->registry ?? new ProjectRegistry();
+        $projectName = $this->resolveProjectName($input, $registry);
+        if ($projectName === null) {
+            $output->writeln('<error>Укажите код зарегистрированного проекта или запустите команду в директории зарегистрированного проекта.</error>');
             return Command::FAILURE;
         }
 
-        $registry = $this->registry ?? new ProjectRegistry();
         if (!$registry->hasProject($projectName)) {
             $output->writeln(sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
             return Command::FAILURE;
@@ -49,5 +49,15 @@ final class DataDropCommand extends Command
         }
 
         return $code;
+    }
+
+    private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string
+    {
+        $projectName = $input->getArgument('project');
+        if (is_string($projectName) && $projectName !== '') {
+            return $projectName;
+        }
+
+        return $registry->projectNameFromContext();
     }
 }

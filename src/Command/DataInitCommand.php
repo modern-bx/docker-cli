@@ -22,7 +22,7 @@ final class DataInitCommand extends Command
     ) {
         parent::__construct('data:init');
         $this->setDescription('Создать БД и пользователя проекта во всех доступных СУБД.');
-        $this->addArgument('project-name', InputArgument::OPTIONAL, 'Кодовое имя зарегистрированного проекта.');
+        $this->addArgument('project', InputArgument::OPTIONAL, 'Кодовое имя зарегистрированного проекта.');
         $this->addOption('rebuild', null, InputOption::VALUE_NONE, 'Удалить существующие БД и пользователей перед созданием.');
     }
 
@@ -65,7 +65,7 @@ final class DataInitCommand extends Command
 
     private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string
     {
-        $projectName = $input->getArgument('project-name');
+        $projectName = $input->getArgument('project');
         if (is_string($projectName) && $projectName !== '') {
             return $projectName;
         }
