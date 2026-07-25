@@ -103,6 +103,20 @@ bin/docker-cli data:wipe
 bin/docker-cli data:wipe my-project
 ```
 
+## Очистка файлов проекта
+
+Команда `project:wipe` рекурсивно удаляет из корня проекта все файлы и директории, включая скрытые, но сохраняет директорию `.docker-cli` со служебными данными проекта:
+
+```bash
+bin/docker-cli project:wipe
+```
+
+Проект определяется по текущей директории. Для очистки другого зарегистрированного проекта укажите его имя:
+
+```bash
+bin/docker-cli project:wipe --project my-project
+```
+
 ## Остановка и перезапуск
 
 ```bash
