@@ -263,7 +263,11 @@ services:
     restart: unless-stopped
 
   playwright:
-    image: ${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright:v1.61.0-noble}
+    build:
+      context: ./config/playwright
+      args:
+        PLAYWRIGHT_IMAGE: ${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright:v1.61.0-noble}
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/docker-cli/playwright:${SOURCE_IMAGE_TAG:-default}
     container_name: docker-cli-playwright
     environment:
       HOME: /root

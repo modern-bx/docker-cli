@@ -12,7 +12,7 @@ docker-cli image:build
 docker-cli image:publish
 ```
 
-Сейчас кастомный образ один: `php-fpm-8.2`.
+Команды собирают и публикуют два кастомных образа: `php-fpm-8.2` и `playwright`.
 
 ## Registry, vendor/namespace и тег
 
@@ -29,6 +29,7 @@ SOURCE_IMAGE_NAMESPACE=<ваш-vendor-or-namespace>
 
 ```text
 <SOURCE_IMAGE_REGISTRY>/<SOURCE_IMAGE_NAMESPACE>/docker-cli/php-fpm-8.2:<tag>
+<SOURCE_IMAGE_REGISTRY>/<SOURCE_IMAGE_NAMESPACE>/docker-cli/playwright:<tag>
 ```
 
 Тег выбирается так:

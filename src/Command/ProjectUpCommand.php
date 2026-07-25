@@ -114,6 +114,13 @@ final class ProjectUpCommand extends Command
             return Command::FAILURE;
         }
 
+        $projectDataDirectory = join_path($projectMetadataDirectory, 'data');
+        if (!is_dir($projectDataDirectory) && !mkdir($projectDataDirectory, 0775, true) && !is_dir($projectDataDirectory)) {
+            $output->writeln(sprintf('<error>Не удалось создать директорию "%s".</error>', $projectDataDirectory));
+
+            return Command::FAILURE;
+        }
+
         $this->writeYaml(join_path($projectMetadataDirectory, 'project.yaml'), [
             'meta' => [
                 'schema' => 'project-meta',
