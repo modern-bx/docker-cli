@@ -1,10 +1,34 @@
 const { chromium } = require('playwright');
+const { randomInt } = require('node:crypto');
 
 const ACTION_DELAY_MS = 2000;
 const START_EDITION_TITLE = 'Установка «1С-Битрикс: Управление сайтом: Старт»';
 const logging = globalThis.dockerCli.logging;
 
 const normalizeTitle = (title) => title.trim().replace(/\s+/g, ' ');
+
+const generatePassword = () => {
+  const lowerCaseLetters = 'abcdefghijklmnopqrstuvwxyz';
+  const upperCaseLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const digits = '0123456789';
+  const alphabet = lowerCaseLetters + upperCaseLetters + digits;
+  const characters = [
+    lowerCaseLetters[randomInt(lowerCaseLetters.length)],
+    upperCaseLetters[randomInt(upperCaseLetters.length)],
+    digits[randomInt(digits.length)],
+  ];
+
+  while (characters.length < 24) {
+    characters.push(alphabet[randomInt(alphabet.length)]);
+  }
+
+  for (let index = characters.length - 1; index > 0; index -= 1) {
+    const swapIndex = randomInt(index + 1);
+    [characters[index], characters[swapIndex]] = [characters[swapIndex], characters[index]];
+  }
+
+  return characters.join('');
+};
 
 const pauseAfterAction = async () => {
   logging.debug(`Waiting ${ACTION_DELAY_MS} ms before the next action.`);
@@ -53,6 +77,29 @@ const installStartEdition = async (page) => {
   await fill(page, 'input[name=__wiz_database]', mysql.database, 'Setting the MySQL database');
 
   logging.info('Database settings for the Start edition have been filled successfully.');
+
+  await click(page, 'input[name=StepNext]', 'Starting the database installation');
+  logging.info('Waiting for database installation and the administrator creation page.');
+  await page.locator('.inst-cont-title', { hasText: 'Создание администратора' }).waitFor({
+    state: 'visible',
+    timeout: 0,
+  });
+  logging.info('Administrator creation page loaded.');
+
+  const adminLogin = 'admin';
+  const adminPassword = generatePassword();
+  await fill(page, 'input[name=__wiz_login]', adminLogin, 'Setting the administrator login', false);
+  await fill(page, 'input[name=__wiz_admin_password]', adminPassword, 'Setting the administrator password', false);
+  await fill(page, 'input[name=__wiz_admin_password_confirm]', adminPassword, 'Confirming the administrator password', false);
+  await fill(page, 'input[name=__wiz_email]', 'test@test.test', 'Setting the administrator email');
+  await fill(page, 'input[name=__wiz_user_name]', 'Иван', 'Setting the administrator first name');
+  await fill(page, 'input[name=__wiz_user_surname]', 'Иванов', 'Setting the administrator surname');
+
+  console.log(`Bitrix administrator login: ${adminLogin}`);
+  console.log(`Bitrix administrator password: ${adminPassword}`);
+  logging.info('Administrator fields have been filled; credentials were printed to stdout only.');
+
+  await clickAndWaitForPage(page, 'input[name=StepNext]', 'Submitting the administrator details');
 };
 
 (async () => {
