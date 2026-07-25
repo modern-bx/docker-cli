@@ -11,6 +11,20 @@ if (!Number.isFinite(ACTION_DELAY_MS) || ACTION_DELAY_MS < 0) {
 
 const normalizeTitle = (title) => title.trim().replace(/\s+/g, ' ');
 
+const installationError = (page) => page.locator('.inst-note-block.inst-note-block-red').first();
+
+const stopOnInstallationError = async (page) => {
+  const errorBlock = installationError(page);
+  if (!await errorBlock.isVisible()) {
+    return;
+  }
+
+  const errorText = (await errorBlock.textContent() || '').trim();
+  const message = errorText || 'Неизвестная ошибка установки.';
+  logging.error(`Ошибка установки: ${message}`);
+  throw new Error(message);
+};
+
 const pauseAfterAction = async () => {
   logging.debug(`Ожидание ${ACTION_DELAY_MS} мс перед следующим действием.`);
   await new Promise((resolve) => setTimeout(resolve, ACTION_DELAY_MS));
@@ -25,10 +39,14 @@ const click = async (page, selector, description) => {
 
 const clickAndWaitForPage = async (page, selector, description) => {
   logging.info(`${description}: клик по ${selector} и ожидание следующей страницы.`);
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'load' }),
-    page.locator(selector).click(),
-  ]);
+  const navigation = page.waitForNavigation({ waitUntil: 'load' }).then(() => 'navigation');
+  const errorAppeared = installationError(page).waitFor({ state: 'visible', timeout: 0 }).then(() => 'error');
+  await page.locator(selector).click();
+  const result = await Promise.race([navigation, errorAppeared]);
+  if (result === 'error') {
+    await stopOnInstallationError(page);
+  }
+  await stopOnInstallationError(page);
   logging.info(`${description}: следующая страница загружена.`);
   await pauseAfterAction();
 };
@@ -64,12 +82,21 @@ const installStartEdition = async (page) => {
 
   logging.info('Настройки базы данных для редакции «Старт» успешно заполнены.');
 
-  await click(page, 'input[name=StepNext]', 'Запуск установки базы данных');
-  logging.info('Ожидание завершения установки базы данных и страницы создания администратора.');
-  await page.locator('.inst-cont-title', { hasText: 'Создание администратора' }).waitFor({
+  logging.info('Запуск установки базы данных: клик по input[name=StepNext].');
+  const administratorPage = page.locator('.inst-cont-title', { hasText: 'Создание администратора' }).waitFor({
     state: 'visible',
     timeout: 0,
-  });
+  }).then(() => 'administrator');
+  const installationFailed = installationError(page).waitFor({ state: 'visible', timeout: 0 }).then(() => 'error');
+  await page.locator('input[name=StepNext]').click();
+  logging.info('Запуск установки базы данных: клик выполнен.');
+  await pauseAfterAction();
+  logging.info('Ожидание завершения установки базы данных и страницы создания администратора.');
+  const installationResult = await Promise.race([administratorPage, installationFailed]);
+  if (installationResult === 'error') {
+    await stopOnInstallationError(page);
+  }
+  await stopOnInstallationError(page);
   logging.info('Страница создания администратора загружена.');
 
   const admin = globalThis.wizard.admin;
