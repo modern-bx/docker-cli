@@ -1,8 +1,10 @@
 const { chromium } = require('playwright');
 
 const ACTION_DELAY_MS = 250;
-const START_EDITION_TITLE = 'Установка  «1С-Битрикс: Управление сайтом: Старт»';
+const START_EDITION_TITLE = 'Установка «1С-Битрикс: Управление сайтом: Старт»';
 const logging = globalThis.dockerCli.logging;
+
+const normalizeTitle = (title) => title.trim().replace(/\s+/g, ' ');
 
 const pauseAfterAction = async () => {
   logging.debug(`Waiting ${ACTION_DELAY_MS} ms before the next action.`);
@@ -71,7 +73,7 @@ const installStartEdition = async (page) => {
     const title = await page.title();
     logging.info(`Installation page title: ${title}.`);
 
-    if (title === START_EDITION_TITLE) {
+    if (normalizeTitle(title) === START_EDITION_TITLE) {
       await installStartEdition(page);
     } else {
       logging.warn(`No installation scenario is available for page title: ${title}.`);
