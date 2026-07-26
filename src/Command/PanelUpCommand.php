@@ -7,6 +7,8 @@ namespace DockerCli\Command;
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\HttpResponse;
+use DockerCli\Panel\JwtTokenService;
+use DockerCli\Panel\UserRepository;
 use React\EventLoop\Loop;
 use React\Http\HttpServer;
 use React\Socket\SocketServer;
@@ -41,6 +43,13 @@ final class PanelUpCommand extends Command
         }
         $port = (int) $rawPort;
 
+        $salt = $compose->envValue('PANEL_PASSWORD_SALT');
+        $jwtSecret = $compose->envValue('PANEL_JWT_SECRET');
+        if ($salt === '' || $jwtSecret === '') {
+            $output->writeln('<error>Секреты панели не настроены. Выполните `docker-cli config:init`.</error>');
+            return Command::FAILURE;
+        }
+
         $lockPath = dirname($compose->directory()) . DIRECTORY_SEPARATOR . 'panel.lock';
         $lock = fopen($lockPath, 'c+');
         if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
@@ -56,7 +65,8 @@ final class PanelUpCommand extends Command
             return Command::FAILURE;
         }
 
-        $server = new HttpServer(HttpResponse::forRequest(...));
+        $assets = dirname(__DIR__, 2) . '/resources/panel/dist';
+        $server = new HttpServer(new HttpResponse(new UserRepository($salt), new JwtTokenService($jwtSecret), $assets));
         $server->listen($socket);
         $output->writeln(sprintf('<info>Панель запущена на https://panel.%s</info>', $compose->envValue('BASE_HOST', '')));
         Loop::run();
@@ -70,7 +80,14 @@ final class PanelUpCommand extends Command
         if (!is_dir(dirname($file)) && !mkdir(dirname($file), 0755, true) && !is_dir(dirname($file))) {
             throw new \RuntimeException(sprintf('Unable to create panel config directory "%s".', dirname($file)));
         }
-        $contents = sprintf("set \$panel_upstream http://host.docker.internal:%d;\n", $port);
+        // A hostname in a variable proxy_pass is resolved by nginx's configured
+        // DNS resolver, which does not consult Docker's extra_hosts entries.
+        // Keep the hostname in an upstream instead: nginx then resolves it via
+        // libc on start/reload and honours host.docker.internal from /etc/hosts.
+        $contents = sprintf(
+            "upstream panel_backend {\n    server host.docker.internal:%d;\n}\n",
+            $port
+        );
         if (file_put_contents($file, $contents, LOCK_EX) === false) {
             throw new \RuntimeException(sprintf('Unable to write panel gateway config "%s".', $file));
         }

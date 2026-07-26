@@ -34,7 +34,7 @@ $files = new RecursiveIteratorIterator(
         static function (SplFileInfo $file): bool {
             $name = $file->getFilename();
 
-            return !in_array($name, ['.git', 'build'], true) && !($file->isDir() && $name === 'bin' && str_contains($file->getPath(), '/vendor'));
+            return !in_array($name, ['.git', 'build', 'node_modules'], true) && !($file->isDir() && $name === 'bin' && str_contains($file->getPath(), '/vendor'));
         }
     )
 );

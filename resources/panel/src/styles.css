@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+@import '@skeletonlabs/skeleton';
+@import '@skeletonlabs/skeleton/themes/vox';
+@custom-variant dark (&:where(.dark, .dark *));
+@source '../index.html';
+@source './**/*.{svelte,js}';
+
+html, body, #app { min-height: 100%; }
+body { margin: 0; }
+button { cursor: pointer; }

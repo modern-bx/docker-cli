@@ -82,6 +82,9 @@ final class SystemCompose
         if ($this->ensureHostIdentityEnv()) {
             $created = true;
         }
+        if ($this->ensurePanelSecrets()) {
+            $created = true;
+        }
 
         foreach ($this->dataDirectories() as $dataDirectory) {
             if (is_dir($dataDirectory)) {
@@ -235,6 +238,41 @@ final class SystemCompose
         }
 
         file_put_contents($envFile, $updated);
+
+        return true;
+    }
+
+    private function ensurePanelSecrets(): bool
+    {
+        $envFile = $this->envFile();
+        if (!is_file($envFile)) {
+            return false;
+        }
+
+        $contents = file_get_contents($envFile);
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $envFile));
+        }
+        $updated = $contents;
+        $values = $this->readEnvValues($contents);
+        foreach (['PANEL_PASSWORD_SALT', 'PANEL_JWT_SECRET'] as $key) {
+            if (($values[$key] ?? '') !== '') {
+                continue;
+            }
+            $line = $key . '=' . bin2hex(random_bytes(32));
+            if (preg_match('/^' . $key . '=.*$/m', $updated) === 1) {
+                $updated = preg_replace('/^' . $key . '=.*$/m', $line, $updated) ?? $updated;
+            } else {
+                $separator = str_ends_with($updated, PHP_EOL) || $updated === '' ? '' : PHP_EOL;
+                $updated .= $separator . $line . PHP_EOL;
+            }
+        }
+        if ($updated === $contents) {
+            return false;
+        }
+        if (!is_string($updated) || file_put_contents($envFile, $updated, LOCK_EX) === false) {
+            throw new \RuntimeException(sprintf('Unable to write env file "%s".', $envFile));
+        }
 
         return true;
     }

@@ -1,0 +1,21 @@
+{
+  "name": "docker-cli-panel",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "svelte-check --tsconfig ./jsconfig.json"
+  },
+  "devDependencies": {
+    "@skeletonlabs/skeleton": "^5.0.0",
+    "@skeletonlabs/skeleton-svelte": "^5.0.0",
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "@tailwindcss/vite": "^4.1.18",
+    "svelte": "^5.56.8",
+    "svelte-check": "^4.3.6",
+    "tailwindcss": "^4.1.18",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  }
+}

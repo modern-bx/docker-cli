@@ -3,3 +3,4 @@
 /.phpunit.cache/
 
 /.idea
+/resources/panel/node_modules/

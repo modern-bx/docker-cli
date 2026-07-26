@@ -24,6 +24,14 @@
         "bin/docker-cli"
     ],
     "scripts": {
-        "build-phar": "php -d phar.readonly=0 scripts/build-phar.php"
+        "build-panel": [
+            "npm --prefix resources/panel ci",
+            "npm --prefix resources/panel run build"
+        ],
+        "build-phar": "php -d phar.readonly=0 scripts/build-phar.php",
+        "build": [
+            "@build-panel",
+            "@build-phar"
+        ]
     }
 }
