@@ -1,5 +1,7 @@
 <script>
   import { onMount } from 'svelte';
+  import { Collapsible } from '@skeletonlabs/skeleton-svelte';
+  import { getProjects } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -29,6 +31,12 @@
   let theme = 'vox';
   let mode = 'system';
   let systemDark = false;
+  let projects = [];
+  let selectedProjectName = '';
+  let projectsLoading = false;
+  let projectsError = '';
+
+  $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
 
   function applyAppearance() {
     document.documentElement.dataset.theme = theme;
@@ -91,6 +99,23 @@
     }
   }
 
+  async function refreshProjects() {
+    if (!token) return;
+    if (projects.length === 0) projectsLoading = true;
+    try {
+      const data = await getProjects(api);
+      projects = data.projects;
+      projectsError = '';
+      if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) {
+        selectedProjectName = '';
+      }
+    } catch (cause) {
+      projectsError = cause instanceof Error ? cause.message : 'Не удалось получить список проектов.';
+    } finally {
+      projectsLoading = false;
+    }
+  }
+
   async function submit() {
     error = '';
     submitting = true;
@@ -125,8 +150,11 @@
     if (!token) window.location.hash = '#/login';
     checkSession().finally(() => { loading = false; });
     const interval = setInterval(checkSession, 60_000);
+    refreshProjects();
+    const projectsInterval = setInterval(refreshProjects, 1_000);
     return () => {
       clearInterval(interval);
+      clearInterval(projectsInterval);
       media.removeEventListener('change', updateSystemMode);
     };
   });
@@ -186,7 +214,7 @@
     </div>
   </header>
 
-  <main class="flex-1 flex items-center justify-center p-5">
+  <main class:workspace={token && !loading} class="flex-1 flex items-center justify-center p-5">
     {#if loading}
       <div class="animate-pulse text-surface-500">Проверка сессии…</div>
     {:else if !token}
@@ -206,6 +234,64 @@
             {submitting ? 'Входим…' : 'Войти'}
           </button>
         </form>
+      </section>
+    {:else}
+      <section class="projects-view" aria-label="Рабочая область">
+        <nav class="tabs" aria-label="Разделы панели">
+          <button class="tab active" type="button" aria-current="page">Проекты</button>
+        </nav>
+        <div class="projects-layout">
+          <aside class="project-sidebar" aria-label="Список проектов">
+            <div class="project-sidebar-title">
+              <h1>Проекты</h1>
+              <span>{projects.length}</span>
+            </div>
+            {#if projectsLoading}
+              <p class="project-message animate-pulse">Загрузка проектов…</p>
+            {:else if projects.length === 0}
+              <p class="project-message">Проекты не найдены</p>
+            {:else}
+              <div class="project-list">
+                {#each projects as project (project.name)}
+                  <button
+                    type="button"
+                    class="project-item"
+                    class:selected={selectedProjectName === project.name}
+                    aria-pressed={selectedProjectName === project.name}
+                    onclick={() => { selectedProjectName = project.name; }}
+                  >
+                    <span class:enabled={project.enabled} class="status-dot" title={project.enabled ? 'Включен' : 'Выключен'}></span>
+                    <span class="project-summary">
+                      <strong>{project.name}</strong>
+                      <small>{project.language || 'Язык не указан'} · {project.framework || 'Без фреймворка'}</small>
+                    </span>
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </aside>
+          <div class="project-details">
+            {#if selectedProject}
+              <Collapsible defaultOpen={true} class="collapsible card preset-filled-surface-100-900">
+                <Collapsible.Trigger class="collapsible-trigger">
+                  <span>Общее</span>
+                  <Collapsible.Indicator class="collapsible-indicator">⌄</Collapsible.Indicator>
+                </Collapsible.Trigger>
+                <Collapsible.Content class="collapsible-content">
+                  <dl class="project-fields">
+                    <div><dt>Название</dt><dd>{selectedProject.name}</dd></div>
+                    <div><dt>Язык</dt><dd>{selectedProject.language || 'Не указан'}</dd></div>
+                    <div><dt>Фреймворк</dt><dd>{selectedProject.framework || 'Не указан'}</dd></div>
+                    <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
+                  </dl>
+                </Collapsible.Content>
+              </Collapsible>
+            {:else}
+              <div class="select-project">Выберите проект</div>
+            {/if}
+          </div>
+        </div>
+        {#if projectsError}<p class="projects-error" role="status">{projectsError}</p>{/if}
       </section>
     {/if}
   </main>

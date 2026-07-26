@@ -31,6 +31,48 @@ html, body, #app { min-height: 100%; }
 body { margin: 0; }
 button { cursor: pointer; }
 
+main.workspace { min-height: 0; align-items: stretch; justify-content: stretch; padding: 0; }
+.projects-view { position: relative; display: flex; min-width: 0; width: 100%; flex-direction: column; }
+.tabs { height: 3.25rem; display: flex; align-items: end; padding: 0 1.5rem; border-bottom: 1px solid var(--color-surface-200); background: var(--color-surface-100); }
+.dark .tabs { border-color: var(--color-surface-800); background: var(--color-surface-900); }
+.tab { height: 100%; padding: 0 1rem; border-bottom: 2px solid transparent; font-weight: 600; }
+.tab.active { border-color: var(--color-primary-500); color: var(--color-primary-700); }
+.dark .tab.active { color: var(--color-primary-300); }
+.projects-layout { display: grid; grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr); min-height: 0; flex: 1; }
+.project-sidebar { min-height: 0; overflow-y: auto; border-right: 1px solid var(--color-surface-200); background: var(--color-surface-50); }
+.dark .project-sidebar { border-color: var(--color-surface-800); background: var(--color-surface-950); }
+.project-sidebar-title { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem 0.75rem; }
+.project-sidebar-title h1 { font-size: 1.1rem; font-weight: 700; }
+.project-sidebar-title span { min-width: 1.6rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: var(--color-surface-200); font-size: 0.75rem; text-align: center; }
+.dark .project-sidebar-title span { background: var(--color-surface-800); }
+.project-list { padding: 0.35rem 0.75rem 1rem; }
+.project-item { display: flex; width: 100%; align-items: center; gap: 0.8rem; padding: 0.85rem 0.75rem; border: 1px solid transparent; border-radius: var(--radius-container); text-align: left; }
+.project-item:hover { background: var(--color-surface-100); }
+.dark .project-item:hover { background: var(--color-surface-900); }
+.project-item.selected { border-color: color-mix(in oklab, var(--color-primary-500) 45%, transparent); background: color-mix(in oklab, var(--color-primary-500) 12%, transparent); }
+.status-dot, .status-value i { flex: 0 0 auto; width: 0.65rem; height: 0.65rem; border-radius: 999px; background: var(--color-error-500); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-error-500) 16%, transparent); }
+.status-dot.enabled, .status-value.enabled i { background: var(--color-success-500); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-success-500) 16%, transparent); }
+.project-summary { display: flex; min-width: 0; flex-direction: column; }
+.project-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-summary small { overflow: hidden; color: var(--color-surface-500); text-overflow: ellipsis; white-space: nowrap; }
+.project-message { padding: 2rem 1.5rem; color: var(--color-surface-500); text-align: center; }
+.project-details { min-width: 0; overflow-y: auto; padding: clamp(1.25rem, 3vw, 2.5rem); background: var(--color-surface-100); }
+.dark .project-details { background: var(--color-surface-900); }
+.select-project { display: grid; min-height: 100%; place-items: center; color: var(--color-surface-500); font-size: 1.1rem; }
+.collapsible { overflow: hidden; border: 1px solid var(--color-surface-200); }
+.dark .collapsible { border-color: var(--color-surface-800); }
+.collapsible-trigger { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; font-size: 1.05rem; font-weight: 700; text-align: left; }
+.collapsible-indicator { transition: transform 150ms ease; }
+.collapsible-indicator[data-state='open'] { transform: rotate(180deg); }
+.collapsible-content { border-top: 1px solid var(--color-surface-200); padding: 1.25rem; }
+.dark .collapsible-content { border-color: var(--color-surface-800); }
+.project-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem 2rem; }
+.project-fields div { min-width: 0; }
+.project-fields dt { margin-bottom: 0.3rem; color: var(--color-surface-500); font-size: 0.78rem; }
+.project-fields dd { overflow-wrap: anywhere; font-weight: 600; }
+.status-value { display: flex; align-items: center; gap: 0.55rem; }
+.projects-error { position: absolute; right: 1rem; bottom: 1rem; max-width: min(28rem, calc(100% - 2rem)); padding: 0.65rem 0.9rem; border-radius: var(--radius-container); background: var(--color-error-500); color: white; box-shadow: 0 4px 16px rgb(0 0 0 / 0.2); font-size: 0.8rem; }
+
 .theme-trigger { width: auto; gap: 0.35rem; padding-inline: 0.65rem; }
 .theme-trigger svg { width: 0.9rem; fill: none; stroke: currentColor; stroke-width: 2; }
 .theme-dot { width: 1.15rem; height: 1.15rem; border-radius: 999px; background: var(--color-primary-500); box-shadow: inset 0 0 0 2px color-mix(in oklab, white 70%, transparent); }
@@ -53,4 +95,11 @@ button { cursor: pointer; }
 
 @media (max-width: 420px) {
   .theme-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .projects-layout { grid-template-columns: 1fr; grid-template-rows: minmax(12rem, 42vh) minmax(16rem, 1fr); }
+  .project-sidebar { border-right: 0; border-bottom: 1px solid var(--color-surface-200); }
+  .dark .project-sidebar { border-color: var(--color-surface-800); }
+  .project-fields { grid-template-columns: 1fr; }
 }

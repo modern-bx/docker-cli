@@ -14,6 +14,7 @@ final class HttpResponse
         private readonly UserRepository $users,
         private readonly JwtTokenService $tokens,
         private readonly string $assetsDirectory,
+        private readonly ?ProjectController $projects = null,
     ) {
     }
 
@@ -25,6 +26,13 @@ final class HttpResponse
         }
         if ($request->getMethod() === 'GET' && $path === '/api/auth/session') {
             return $this->session($request);
+        }
+        if ($request->getMethod() === 'GET' && $path === '/api/projects') {
+            if ($this->authenticatedLogin($request) === null) {
+                return $this->json(401, ['error' => 'Сессия истекла.']);
+            }
+
+            return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->index());
         }
         if ($request->getMethod() === 'GET' && ($path === '/' || str_starts_with($path, '/assets/'))) {
             return $this->asset($path === '/' ? 'index.html' : ltrim($path, '/'));
@@ -57,13 +65,19 @@ final class HttpResponse
 
     private function session(ServerRequestInterface $request): ResponseInterface
     {
-        $header = $request->getHeaderLine('Authorization');
-        $login = str_starts_with($header, 'Bearer ') ? $this->tokens->login(substr($header, 7)) : null;
+        $login = $this->authenticatedLogin($request);
         if ($login === null) {
             return $this->json(401, ['error' => 'Сессия истекла.']);
         }
 
         return $this->authorized($login);
+    }
+
+    private function authenticatedLogin(ServerRequestInterface $request): ?string
+    {
+        $header = $request->getHeaderLine('Authorization');
+
+        return str_starts_with($header, 'Bearer ') ? $this->tokens->login(substr($header, 7)) : null;
     }
 
     private function authorized(string $login): ResponseInterface
@@ -96,8 +110,8 @@ final class HttpResponse
         return new Response(200, ['Content-Type' => $contentType, 'Cache-Control' => $extension === 'html' ? 'no-store' : 'public, max-age=31536000, immutable'], $contents);
     }
 
-    /** @param array<string, int|string> $body */
-    private function json(int $status, array $body): ResponseInterface
+    /** @param array<string, mixed>|\JsonSerializable $body */
+    private function json(int $status, array|\JsonSerializable $body): ResponseInterface
     {
         return new Response($status, ['Content-Type' => 'application/json; charset=UTF-8', 'Cache-Control' => 'no-store'], json_encode($body, JSON_THROW_ON_ERROR));
     }

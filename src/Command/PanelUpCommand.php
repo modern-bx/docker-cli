@@ -8,7 +8,9 @@ use DockerCli\Config\MissingConfigException;
 use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\HttpResponse;
 use DockerCli\Panel\JwtTokenService;
+use DockerCli\Panel\ProjectController;
 use DockerCli\Panel\UserRepository;
+use DockerCli\Project\ProjectRegistry;
 use React\EventLoop\Loop;
 use React\Http\HttpServer;
 use React\Socket\SocketServer;
@@ -66,7 +68,12 @@ final class PanelUpCommand extends Command
         }
 
         $assets = dirname(__DIR__, 2) . '/resources/panel/dist';
-        $server = new HttpServer(new HttpResponse(new UserRepository($salt), new JwtTokenService($jwtSecret), $assets));
+        $server = new HttpServer(new HttpResponse(
+            new UserRepository($salt),
+            new JwtTokenService($jwtSecret),
+            $assets,
+            new ProjectController(new ProjectRegistry()),
+        ));
         $server->listen($socket);
         $output->writeln(sprintf('<info>Панель запущена на https://panel.%s</info>', $compose->envValue('BASE_HOST', '')));
         Loop::run();
