@@ -2,7 +2,21 @@
   import { onMount } from 'svelte';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
-  const THEME_KEY = 'docker-cli-panel-theme';
+  const THEME_KEY = 'docker-cli-panel-color-theme';
+  const MODE_KEY = 'docker-cli-panel-theme';
+  const themes = [
+    ['vox', 'Vox'], ['cerberus', 'Cerberus'], ['concord', 'Concord'],
+    ['crimson', 'Crimson'], ['dracula', 'Dracula'], ['fennec', 'Fennec'],
+    ['hamlindigo', 'Hamlindigo'], ['legacy', 'Legacy'], ['mint', 'Mint'],
+    ['modern', 'Modern'], ['mona', 'Mona'], ['nosh', 'Nosh'],
+    ['nouveau', 'Nouveau'], ['pine', 'Pine'], ['reign', 'Reign'],
+    ['rocket', 'Rocket'], ['rose', 'Rose'], ['rosepine', 'Rosé Pine'],
+    ['sahara', 'Sahara'], ['seafoam', 'Seafoam'], ['terminus', 'Terminus'],
+    ['vintage', 'Vintage'], ['wintry', 'Wintry'],
+  ];
+  const modes = [
+    ['light', 'Светлая'], ['dark', 'Тёмная'], ['system', 'Системная'],
+  ];
   let login = '';
   let password = '';
   let currentLogin = '';
@@ -11,12 +25,32 @@
   let loading = true;
   let submitting = false;
   let profileOpen = false;
-  let dark = false;
+  let themeOpen = false;
+  let theme = 'vox';
+  let mode = 'system';
+  let systemDark = false;
+
+  function applyAppearance() {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.classList.toggle('dark', mode === 'dark' || (mode === 'system' && systemDark));
+  }
 
   function setTheme(value) {
-    dark = value;
-    document.documentElement.classList.toggle('dark', dark);
-    localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light');
+    theme = value;
+    localStorage.setItem(THEME_KEY, theme);
+    applyAppearance();
+  }
+
+  function setMode(value) {
+    mode = value;
+    localStorage.setItem(MODE_KEY, mode);
+    applyAppearance();
+  }
+
+  function closeMenus(event) {
+    if (event.target instanceof Element && event.target.closest('.header-menu')) return;
+    themeOpen = false;
+    profileOpen = false;
   }
 
   async function api(path, options = {}) {
@@ -75,15 +109,33 @@
   }
 
   onMount(() => {
+    const media = matchMedia('(prefers-color-scheme: dark)');
+    systemDark = media.matches;
     const savedTheme = localStorage.getItem(THEME_KEY);
-    setTheme(savedTheme ? savedTheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
+    theme = themes.some(([value]) => value === savedTheme) ? savedTheme : 'vox';
+    const savedMode = localStorage.getItem(MODE_KEY);
+    mode = modes.some(([value]) => value === savedMode) ? savedMode : 'system';
+    applyAppearance();
+    const updateSystemMode = (event) => {
+      systemDark = event.matches;
+      if (mode === 'system') applyAppearance();
+    };
+    media.addEventListener('change', updateSystemMode);
     token = localStorage.getItem(TOKEN_KEY) || '';
     if (!token) window.location.hash = '#/login';
     checkSession().finally(() => { loading = false; });
     const interval = setInterval(checkSession, 60_000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      media.removeEventListener('change', updateSystemMode);
+    };
   });
 </script>
+
+<svelte:window
+  onclick={closeMenus}
+  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; profileOpen = false; } }}
+/>
 
 <svelte:head><title>{token ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
 
@@ -91,12 +143,39 @@
   <header class="h-16 border-b border-surface-200-800 bg-surface-100-900 flex items-center px-5 md:px-8 shadow-sm">
     {#if token}<a href="#/" class="font-bold text-xl no-underline">docker-cli</a>{/if}
     <div class="ml-auto flex items-center gap-3">
-      <button class="btn-icon preset-tonal" type="button" aria-label={dark ? 'Включить светлую тему' : 'Включить тёмную тему'} onclick={() => setTheme(!dark)}>
-        <span aria-hidden="true">{dark ? '☀️' : '🌙'}</span>
-      </button>
+      <div class="relative header-menu">
+        <button class="btn-icon preset-tonal theme-trigger" type="button" aria-label="Настроить оформление" aria-haspopup="dialog" aria-expanded={themeOpen} onclick={() => { themeOpen = !themeOpen; profileOpen = false; }}>
+          <span class="theme-dot" aria-hidden="true"></span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+        </button>
+        {#if themeOpen}
+          <div class="theme-menu card preset-filled-surface-100-900 absolute right-0 mt-2 p-4 shadow-2xl z-20" role="dialog" aria-label="Настройки оформления">
+            <div class="flex items-center justify-between mb-3">
+              <strong>Тема</strong>
+              <span class="text-sm text-surface-500">{themes.find(([value]) => value === theme)?.[1]}</span>
+            </div>
+            <div class="theme-grid" role="list" aria-label="Цветовая тема">
+              {#each themes as [value, label]}
+                <button class:active={theme === value} class="theme-option" type="button" data-theme={value} aria-label={label} aria-pressed={theme === value} title={label} onclick={() => setTheme(value)}>
+                  <span class="swatch"><i></i><i></i><i></i></span>
+                  <span>{label}</span>
+                </button>
+              {/each}
+            </div>
+            <div class="mode-switch mt-4" aria-label="Цветовой режим">
+              {#each modes as [value, label]}
+                <button class:active={mode === value} type="button" aria-pressed={mode === value} onclick={() => setMode(value)}>
+                  <span aria-hidden="true">{value === 'light' ? '☀' : value === 'dark' ? '☾' : '◐'}</span>
+                  {label}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
+      </div>
       {#if token}
-        <div class="relative">
-          <button class="btn preset-tonal" type="button" aria-expanded={profileOpen} onclick={() => profileOpen = !profileOpen}>{currentLogin}</button>
+        <div class="relative header-menu">
+          <button class="btn preset-tonal" type="button" aria-expanded={profileOpen} onclick={() => { profileOpen = !profileOpen; themeOpen = false; }}>{currentLogin}</button>
           {#if profileOpen}
             <div class="card preset-filled-surface-100-900 absolute right-0 mt-2 min-w-44 p-2 shadow-xl z-10">
               <button class="btn w-full justify-start hover:preset-tonal-error" type="button" onclick={logout}>Выйти</button>
