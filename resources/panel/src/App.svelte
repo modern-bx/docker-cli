@@ -1,8 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import { Collapsible, Dialog } from '@skeletonlabs/skeleton-svelte';
-  import { ExternalLink, Play, Power, RotateCw, Square, Trash2 } from '@lucide/svelte';
-  import { getProjects, getSystemStatus, runProjectAction, runSystemAction } from './api.js';
+  import { ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -48,15 +48,26 @@
   let systemConfirmation = null;
   let projectConfirmation = null;
   let projectContextMenu = null;
+  let notesProjectName = '';
+  let noteTags = [];
+  let noteTagInput = '';
+  let noteDescription = '';
+  let notesSaving = false;
   const panelServices = ['dnsdock', 'panel-gateway', 'traefik'];
 
   $: hasRunningServices = systemServices.some((service) => service.running);
   $: hasStoppedServices = systemServices.some((service) => !service.running);
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
+  $: if (selectedProject && selectedProject.name !== notesProjectName) {
+    notesProjectName = selectedProject.name;
+    noteTags = [...selectedProject.tags];
+    noteTagInput = '';
+    noteDescription = selectedProject.description;
+  }
   $: filteredProjects = projects.filter((project) => {
     const matchesName = project.name.toLocaleLowerCase().includes(projectQuery.trim().toLocaleLowerCase());
-    const tags = [project.language || 'no-language', project.framework || 'no-framework'];
+    const tags = [project.language || 'no-language', project.framework || 'no-framework', ...project.tags];
     return matchesName && projectTags.every((tag) => tags.includes(tag));
   });
 
@@ -66,6 +77,36 @@
 
   function removeProjectTag(tag) {
     projectTags = projectTags.filter((item) => item !== tag);
+  }
+
+  function addNoteTag() {
+    const tag = noteTagInput.trim();
+    if (!tag || !/^[\p{L}\p{N} -]+$/u.test(tag)) return;
+    if (!noteTags.includes(tag)) noteTags = [...noteTags, tag];
+    noteTagInput = '';
+  }
+
+  function removeNoteTag(tag) {
+    noteTags = noteTags.filter((item) => item !== tag);
+  }
+
+  function validateNoteTagInput(event) {
+    const nextValue = event.currentTarget.value;
+    noteTagInput = [...nextValue].filter((character) => /^[\p{L}\p{N} -]$/u.test(character)).join('');
+  }
+
+  async function saveNotes() {
+    if (!selectedProject || notesSaving) return;
+    notesSaving = true;
+    projectsError = '';
+    try {
+      const data = await saveProjectNotes(api, selectedProject.name, noteTags, noteDescription);
+      projects = data.projects;
+    } catch (cause) {
+      projectsError = cause instanceof Error ? cause.message : 'Не удалось сохранить заметки.';
+    } finally {
+      notesSaving = false;
+    }
   }
 
   function applyAppearance() {
@@ -103,7 +144,7 @@
     projectContextMenu = {
       project,
       x: Math.max(8, Math.min(x, window.innerWidth - 184)),
-      y: Math.max(8, Math.min(y, window.innerHeight - 104)),
+      y: Math.max(8, Math.min(y, window.innerHeight - 152)),
     };
   }
 
@@ -524,7 +565,7 @@
                     <span class="project-summary">
                       <strong>{project.name}</strong>
                       <span class="project-tags">
-                        {#each [project.language || 'no-language', project.framework || 'no-framework'] as tag}
+                        {#each [project.language || 'no-language', project.framework || 'no-framework', ...project.tags] as tag}
                           <button type="button" onclick={(event) => { event.stopPropagation(); addProjectTag(tag); }}>{tag}</button>
                         {/each}
                       </span>
@@ -536,6 +577,11 @@
           </aside>
           <div class="project-details">
             {#if selectedProject}
+              <div class="project-toolbar">
+                <button class="btn preset-filled-primary-500" type="button" disabled={notesSaving} onclick={saveNotes}>
+                  <Save size={16} aria-hidden="true" />{notesSaving ? 'Сохраняем…' : 'Сохранить'}
+                </button>
+              </div>
               <Collapsible defaultOpen={true} class="collapsible card preset-filled-surface-100-900">
                 <Collapsible.Trigger class="collapsible-trigger">
                   <span>Общее</span>
@@ -559,6 +605,27 @@
                   </div>
                 </Collapsible.Content>
               </Collapsible>
+              <Collapsible defaultOpen={true} class="collapsible card preset-filled-surface-100-900 project-notes">
+                <Collapsible.Trigger class="collapsible-trigger">
+                  <span>Заметки</span>
+                  <Collapsible.Indicator class="collapsible-indicator">⌄</Collapsible.Indicator>
+                </Collapsible.Trigger>
+                <Collapsible.Content class="collapsible-content notes-content">
+                  <label class="label">
+                    <span class="label-text">Теги</span>
+                    <span class="notes-tags-input input">
+                      {#each noteTags as tag (tag)}
+                        <span class="search-tag">{tag}<button type="button" aria-label={`Удалить тег ${tag}`} onclick={() => removeNoteTag(tag)}>×</button></span>
+                      {/each}
+                      <input value={noteTagInput} oninput={validateNoteTagInput} onkeydown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addNoteTag(); } }} placeholder={noteTags.length ? 'Добавить тег…' : 'Введите тег и нажмите Enter'} />
+                    </span>
+                  </label>
+                  <label class="label">
+                    <span class="label-text">Заметки</span>
+                    <textarea class="textarea notes-textarea" bind:value={noteDescription} rows="8" placeholder="Произвольные заметки о проекте"></textarea>
+                  </label>
+                </Collapsible.Content>
+              </Collapsible>
             {:else}
               <div class="select-project">Выберите проект</div>
             {/if}
@@ -577,6 +644,14 @@
     aria-label={`Действия с проектом ${projectContextMenu.project.name}`}
     style={`left: ${projectContextMenu.x}px; top: ${projectContextMenu.y}px;`}
   >
+    {#if projectContextMenu.project.url}
+      <a href={projectContextMenu.project.url} target="_blank" rel="noreferrer" role="menuitem" onclick={() => { projectContextMenu = null; }}>
+        <ExternalLink size={16} aria-hidden="true" />Открыть
+      </a>
+    {:else}
+      <button type="button" role="menuitem" disabled><ExternalLink size={16} aria-hidden="true" />Открыть</button>
+    {/if}
+    <hr />
     <button type="button" role="menuitem" onclick={() => runContextProjectAction(projectContextMenu.project.enabled ? 'disable' : 'enable')}>
       <Power size={16} aria-hidden="true" />{projectContextMenu.project.enabled ? 'Отключить' : 'Включить'}
     </button>

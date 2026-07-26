@@ -5,6 +5,8 @@
  * @property {string|null} framework Project framework, when configured.
  * @property {boolean} enabled Whether the project is enabled.
  * @property {string|null} url HTTPS URL of the project's primary host.
+ * @property {string[]} tags User-defined project tags.
+ * @property {string} description Project notes.
  */
 
 /**
@@ -28,6 +30,14 @@ export async function getProjects(request) {
 /** @returns {Promise<ProjectListDto>} */
 export async function runProjectAction(request, project, action) {
   return /** @type {Promise<ProjectListDto>} */ (request(`/api/projects/${encodeURIComponent(project)}/${action}`, { method: 'POST' }));
+}
+
+/** @returns {Promise<ProjectListDto>} */
+export async function saveProjectNotes(request, project, tags, description) {
+  return /** @type {Promise<ProjectListDto>} */ (request(`/api/projects/${encodeURIComponent(project)}/notes`, {
+    method: 'POST',
+    body: JSON.stringify({ tags, description }),
+  }));
 }
 
 /**

@@ -94,9 +94,13 @@ main.workspace { min-height: 0; align-items: stretch; justify-content: stretch; 
 .dark .project-tags button:hover { color: var(--color-surface-950); }
 .project-context-menu { position: fixed; z-index: 50; width: 11rem; overflow: hidden; border: 1px solid var(--color-surface-200); padding: 0.3rem; }
 .dark .project-context-menu { border-color: var(--color-surface-800); }
-.project-context-menu button { display: flex; width: 100%; align-items: center; gap: 0.55rem; padding: 0.55rem 0.65rem; border-radius: var(--radius-base); font-size: 0.82rem; text-align: left; }
-.project-context-menu button:hover { background: var(--color-surface-200); }
+.project-context-menu button, .project-context-menu > a { display: flex; width: 100%; align-items: center; gap: 0.55rem; padding: 0.55rem 0.65rem; border-radius: var(--radius-base); font-size: 0.82rem; text-align: left; }
+.project-context-menu button:hover, .project-context-menu > a:hover { background: var(--color-surface-200); }
 .dark .project-context-menu button:hover { background: var(--color-surface-800); }
+.dark .project-context-menu > a:hover { background: var(--color-surface-800); }
+.project-context-menu button:disabled { cursor: not-allowed; opacity: 0.5; }
+.project-context-menu hr { margin: 0.3rem 0.25rem; border: 0; border-top: 1px solid var(--color-surface-200); }
+.dark .project-context-menu hr { border-color: var(--color-surface-800); }
 .project-context-menu button.danger { color: var(--color-error-600); }
 .dark .project-context-menu button.danger { color: var(--color-error-400); }
 .project-message { padding: 2rem 1.5rem; color: var(--color-surface-500); text-align: center; }
@@ -104,6 +108,12 @@ main.workspace { min-height: 0; align-items: stretch; justify-content: stretch; 
 .dark .project-details { background: var(--color-surface-900); }
 .select-project { display: grid; min-height: 100%; place-items: center; color: var(--color-surface-500); font-size: 1.1rem; }
 .collapsible { overflow: hidden; border: 1px solid var(--color-surface-200); }
+.project-toolbar { display: flex; justify-content: flex-end; margin-bottom: 0.75rem; }
+.project-notes { margin-top: 1rem; }
+.notes-content { display: grid; gap: 1rem; }
+.notes-tags-input { display: flex; min-height: 2.65rem; height: auto; align-items: center; gap: 0.4rem; padding-block: 0.35rem; flex-wrap: wrap; }
+.notes-tags-input input { min-width: 10rem; flex: 1; border: 0; outline: 0; background: transparent; }
+.notes-textarea { min-height: 9rem; resize: vertical; }
 .dark .collapsible { border-color: var(--color-surface-800); }
 .collapsible-trigger { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; font-size: 1.05rem; font-weight: 700; text-align: left; }
 .collapsible-indicator { transition: transform 150ms ease; }
