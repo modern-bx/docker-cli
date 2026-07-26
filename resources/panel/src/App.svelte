@@ -236,7 +236,7 @@
 <svelte:head><title>{token ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
 
 <div class="min-h-screen bg-surface-50-950 text-surface-950-50 flex flex-col">
-  <header class="h-16 border-b border-surface-200-800 bg-surface-100-900 flex items-center px-5 md:px-8 shadow-sm">
+  <header class="app-header h-16 border-b border-surface-200-800 bg-surface-100-900 flex items-center px-5 md:px-8 shadow-sm">
     {#if token}<a href="#/" class="font-bold text-xl no-underline">docker-cli</a>{/if}
     {#if token}
       <div class="system-header header-menu">

@@ -31,7 +31,8 @@ html, body, #app { min-height: 100%; }
 body { margin: 0; }
 button { cursor: pointer; }
 
-.system-header { position: absolute; left: 50%; display: flex; align-items: center; gap: 0.5rem; transform: translateX(-50%); }
+.app-header { position: relative; z-index: 40; overflow: visible; }
+.system-header { position: absolute; left: 50%; z-index: 1; display: flex; align-items: center; gap: 0.5rem; transform: translateX(-50%); }
 .system-main-control { position: relative; }
 .system-trigger { gap: 0.5rem; white-space: nowrap; }
 .system-trigger svg { width: 0.9rem; fill: none; stroke: currentColor; stroke-width: 2; }
