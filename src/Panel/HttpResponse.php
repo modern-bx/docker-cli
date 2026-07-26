@@ -4,19 +4,23 @@ declare(strict_types=1);
 
 namespace DockerCli\Panel;
 
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use React\Http\Message\Response;
+
 final class HttpResponse
 {
-    public static function send(string $method, string $path): void
+    public static function forRequest(ServerRequestInterface $request): ResponseInterface
     {
-        header('Content-Type: text/html; charset=UTF-8');
-
-        if ($method !== 'GET' || $path !== '/') {
-            http_response_code(404);
-            echo '<!doctype html><html lang="en"><meta charset="utf-8"><title>Not found</title><body><h1>404</h1></body></html>';
-            return;
+        if ($request->getMethod() !== 'GET' || $request->getUri()->getPath() !== '/') {
+            return new Response(
+                404,
+                ['Content-Type' => 'text/html; charset=UTF-8'],
+                '<!doctype html><html lang="en"><meta charset="utf-8"><title>Not found</title><body><h1>404</h1></body></html>'
+            );
         }
 
-        echo <<<'HTML'
+        $body = <<<'HTML'
 <!doctype html>
 <html lang="en">
 <meta charset="utf-8">
@@ -26,5 +30,7 @@ final class HttpResponse
 <main><h1>Hello World</h1><p>docker-cli administrative panel</p></main>
 </html>
 HTML;
+
+        return new Response(200, ['Content-Type' => 'text/html; charset=UTF-8'], $body);
     }
 }

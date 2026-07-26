@@ -6,6 +6,10 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Config\SystemCompose;
+use DockerCli\Panel\HttpResponse;
+use React\EventLoop\Loop;
+use React\Http\HttpServer;
+use React\Socket\SocketServer;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -45,21 +49,19 @@ final class PanelUpCommand extends Command
         }
 
         $this->configureGateway($compose, $port);
-        $router = $_SERVER['argv'][0] ?? '';
-        if ($router === '' || !is_file($router)) {
-            $output->writeln('<error>Не удалось определить путь к исполняемому файлу.</error>');
+        try {
+            $socket = new SocketServer('0.0.0.0:' . $port);
+        } catch (\RuntimeException $exception) {
+            $output->writeln('<error>Не удалось запустить HTTP-сервер: ' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
 
+        $server = new HttpServer(HttpResponse::forRequest(...));
+        $server->listen($socket);
         $output->writeln(sprintf('<info>Панель запущена на http://0.0.0.0:%d (HTTPS: panel.%s).</info>', $port, $compose->envValue('BASE_HOST', '')));
-        $process = proc_open([PHP_BINARY, '-S', '0.0.0.0:' . $port, $router], [STDIN, STDOUT, STDERR], $pipes);
-        if (!is_resource($process)) {
-            $output->writeln('<error>Не удалось запустить HTTP-сервер.</error>');
-            return Command::FAILURE;
-        }
+        Loop::run();
 
-        $exitCode = proc_close($process);
-        return $exitCode === 0 ? Command::SUCCESS : Command::FAILURE;
+        return Command::SUCCESS;
     }
 
     private function configureGateway(SystemCompose $compose, int $port): void

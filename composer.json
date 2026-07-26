@@ -9,7 +9,8 @@
         "symfony/console": "^7.3",
         "symfony/yaml": "^7.3",
         "symfony/translation": "^7.3",
-        "nubs/random-name-generator": "^2.2"
+        "nubs/random-name-generator": "^2.2",
+        "react/http": "^1.11"
     },
     "autoload": {
         "psr-4": {
