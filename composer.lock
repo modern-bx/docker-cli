@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6f60dfbaaff5255eaae8f2ecab859e5a",
+    "content-hash": "1b64ac4c143a6ea1a2ff8bea79ca20e8",
     "packages": [
         {
             "name": "nubs/random-name-generator",
@@ -1059,7 +1059,8 @@
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
-        "php": ">=8.2"
+        "php": ">=8.2",
+        "ext-zip": "*"
     },
     "platform-dev": {},
     "plugin-api-version": "2.9.0"

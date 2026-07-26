@@ -5,6 +5,7 @@
     "type": "project",
     "require": {
         "php": ">=8.2",
+        "ext-zip": "*",
         "symfony/console": "^7.3",
         "symfony/yaml": "^7.3",
         "symfony/translation": "^7.3",

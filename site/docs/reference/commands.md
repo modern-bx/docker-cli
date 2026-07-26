@@ -37,7 +37,7 @@ bin/docker-cli config:seed --yes
 
 ### `bin/docker-cli project:up [name]`
 
-Регистрирует Laravel, Symfony, Bitrix или Bitrix24 проект из текущей директории или вложенного пути.
+Регистрирует Laravel, Symfony, Bitrix или Bitrix24 проект из текущей директории или вложенного пути. Опция `--force` разрешает регистрацию, даже если определить фреймворк не удалось.
 
 ```bash
 bin/docker-cli project:up my-project
@@ -52,6 +52,14 @@ bin/docker-cli project:up my-project --no-restart
 ```
 
 `--no-restart` пропускает перезапуск общего пула проектных сервисов.
+
+### `bin/docker-cli project:list`
+
+Выводит кодовые имена всех зарегистрированных проектов, по одному на строку:
+
+```bash
+bin/docker-cli project:list
+```
 
 ### `bin/docker-cli project:down`
 
@@ -76,6 +84,94 @@ bin/docker-cli project:down --no-restart
 ```bash
 bin/docker-cli project:show
 bin/docker-cli project:show my-project
+```
+
+### `bin/docker-cli project:config-get <path>`
+
+Читает значение из секции `data` конфигурации текущего проекта. Путь задаётся через точку:
+
+```bash
+bin/docker-cli project:config-get databases.mysql.password
+```
+
+### `bin/docker-cli project:config-set <path> <value>`
+
+Записывает значение в секцию `data` конфигурации текущего проекта и создаёт отсутствующие части пути:
+
+```bash
+bin/docker-cli project:config-set databases.mysql.database app_database
+```
+
+### `bin/docker-cli project:wipe`
+
+Удаляет из корня проекта все файлы и директории, включая скрытые, но сохраняет служебную директорию `.docker-cli`. Проект определяется по текущей директории либо через `--project`:
+
+```bash
+bin/docker-cli project:wipe
+bin/docker-cli project:wipe --project=my-project
+```
+
+## Данные проекта
+
+Команды без явного аргумента или опции проекта определяют его по текущей директории.
+
+### `bin/docker-cli data:init [project]`
+
+Создаёт базы и пользователей MySQL и PostgreSQL зарегистрированного проекта. `--rebuild` предварительно удаляет существующие базы и пользователей:
+
+```bash
+bin/docker-cli data:init
+bin/docker-cli data:init my-project --rebuild
+```
+
+### `bin/docker-cli data:drop [project]`
+
+Удаляет базы и пользователей MySQL и PostgreSQL проекта:
+
+```bash
+bin/docker-cli data:drop
+bin/docker-cli data:drop my-project
+```
+
+### `bin/docker-cli data:wipe [project]`
+
+Удаляет таблицы из баз MySQL и PostgreSQL, не удаляя сами базы и пользователей:
+
+```bash
+bin/docker-cli data:wipe
+bin/docker-cli data:wipe my-project
+```
+
+### `bin/docker-cli data:dump <path>`
+
+Создаёт дамп выбранной базы. Обязательная опция `--dbms` принимает `mysql` или `postgres`; проект задаётся через `--project` или определяется по текущей директории.
+
+```bash
+bin/docker-cli data:dump --dbms=mysql ./backup.sql
+bin/docker-cli data:dump --dbms=postgres --project=my-project ./backup.sql
+```
+
+Опция `--compress=zip` после создания дампа записывает архив `<path>.zip` с SQL-файлом в корне и удаляет исходный дамп:
+
+```bash
+bin/docker-cli data:dump --dbms=mysql --compress=zip ./backup.sql
+# Результат: ./backup.sql.zip
+```
+
+### `bin/docker-cli data:apply <path>...`
+
+Последовательно применяет к выбранной базе SQL-файлы. Обязательная опция `--dbms` принимает `mysql` или `postgres`; проект задаётся через `--project` или определяется по текущей директории. Можно передать несколько файлов, директорий и glob-выражений:
+
+```bash
+bin/docker-cli data:apply --dbms=mysql ./schema.sql ./fixtures/
+bin/docker-cli data:apply --dbms=postgres --project=my-project './migrations/*.sql'
+```
+
+Поддерживаются SQL-файлы и ZIP-архивы. При поиске в директории рассматриваются только находящиеся непосредственно в ней файлы с расширением `.sql` и `.zip`. Из каждого архива временно извлекаются только SQL-файлы верхнего уровня: содержимое вложенных директорий игнорируется, а файлы применяются в порядке возрастания имени. ZIP-файлы также можно передавать напрямую или находить glob-выражением:
+
+```bash
+bin/docker-cli data:apply --dbms=mysql ./backup.sql.zip
+bin/docker-cli data:apply --dbms=mysql './backups/*'
 ```
 
 ## Системное окружение
@@ -122,6 +218,7 @@ docker-cli image:build
 ```bash
 docker-cli image:build --dry-run
 docker-cli image:build --tag=1.0.0
+docker-cli image:build --no-cache
 ```
 
 ### `docker-cli image:publish`
@@ -138,6 +235,19 @@ docker-cli image:publish
 docker-cli image:publish --dry-run
 docker-cli image:publish --tag=1.0.0
 ```
+
+## Сценарии Playwright
+
+### `docker-cli play:run <script>`
+
+Запускает JavaScript-сценарий из `~/.config/docker-cli/playwright/scripts`; расширение `.js` можно опустить. `--browser` выбирает `chromium`, `firefox` или `webkit`, а `--show` открывает управляемый браузер через локальный noVNC viewer:
+
+```bash
+docker-cli play:run bitrix/setup
+docker-cli play:run --browser=firefox --show bitrix/setup
+```
+
+Подробное описание сценариев и их данных приведено в разделе [Playwright](../guide/playwright.md).
 
 ## Дистрибутивы Битрикс
 
