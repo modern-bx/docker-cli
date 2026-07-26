@@ -142,6 +142,20 @@ final class SystemCompose
         return $environment;
     }
 
+    public function envValue(string $key, string $default = ''): string
+    {
+        if (!is_file($this->envFile())) {
+            return $default;
+        }
+
+        $contents = file_get_contents($this->envFile());
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $this->envFile()));
+        }
+
+        return $this->readEnvValues($contents)[$key] ?? $default;
+    }
+
     /** @return list<string> */
     public function dockerComposeCommand(string $operation): array
     {
@@ -258,6 +272,7 @@ final class SystemCompose
             join_path($data, 'postgres', 'data'),
             join_path($data, 'postgres', 'logs'),
             join_path($this->directory(), 'config', 'openresty', 'hosts'),
+            join_path($this->directory(), 'config', 'panel'),
             join_path($this->directory(), 'config', 'php-fpm-8.2', 'php', 'conf.d'),
             join_path($this->directory(), 'config', 'php-fpm-8.2', 'php-fpm.d'),
             $this->playwrightScriptsDirectory(),
@@ -310,6 +325,7 @@ final class SystemCompose
             $this->composeFile() => join_path($composeResources, self::COMPOSE_FILE),
             join_path($this->directory(), 'config', 'playwright') => join_path($composeResources, 'config', 'playwright'),
             join_path($this->directory(), 'config', 'php-fpm-8.2') => join_path($composeResources, 'config', 'php-fpm-8.2'),
+            join_path($this->directory(), 'config', 'panel') => join_path($composeResources, 'config', 'panel'),
             $this->playwrightScriptsDirectory() => join_path($resources, 'playwright', 'scripts'),
         ];
     }

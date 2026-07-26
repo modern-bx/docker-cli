@@ -22,6 +22,9 @@ use DockerCli\Command\BitrixGetInstallerCommand;
 use DockerCli\Command\ImageBuildCommand;
 use DockerCli\Command\ImagePublishCommand;
 use DockerCli\Command\PlayRunCommand;
+use DockerCli\Command\PanelUpCommand;
+use DockerCli\Command\ProjectDisableCommand;
+use DockerCli\Command\ProjectEnableCommand;
 use Symfony\Component\Console\Application;
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -48,5 +51,8 @@ $application->add(new ImageBuildCommand());
 $application->add(new ImagePublishCommand());
 $application->add(new PlayRunCommand());
 $application->add(new BitrixGetInstallerCommand());
+$application->add(new PanelUpCommand());
+$application->add(new ProjectEnableCommand());
+$application->add(new ProjectDisableCommand());
 $application->setDefaultCommand('list');
 $application->run();
