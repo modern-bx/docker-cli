@@ -69,6 +69,15 @@ bin/docker-cli project:down --no-restart
 
 `--no-restart` пропускает перезапуск общего пула проектных сервисов.
 
+### `bin/docker-cli project:show [project]`
+
+Выводит содержимое `project.yaml` текущего проекта без преобразований. Кодовое имя проекта можно указать явно, чтобы вызвать команду из любой директории.
+
+```bash
+bin/docker-cli project:show
+bin/docker-cli project:show my-project
+```
+
 ## Системное окружение
 
 ### `bin/docker-cli system:start` / `bin/docker-cli start`
