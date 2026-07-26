@@ -4,9 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
+    <script>
+      (() => {
+        const mode = localStorage.getItem('docker-cli-panel-theme') || 'system';
+        const theme = localStorage.getItem('docker-cli-panel-color-theme') || 'vox';
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.classList.toggle('dark', mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches));
+      })();
+    </script>
     <title>docker-cli</title>
-    <script type="module" crossorigin src="/assets/index-DLX3HYvO.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BUVZd3eZ.css">
+    <script type="module" crossorigin src="/assets/index-Cgk8htlp.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-3H2Lj9Bz.css">
   </head>
   <body>
     <div id="app"></div>
