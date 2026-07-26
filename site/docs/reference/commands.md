@@ -198,10 +198,10 @@ bin/docker-cli panel:user-delete admin@example.com
 Интерфейс панели реализован как Svelte SPA на Skeleton. Сборка находится в `resources/panel/dist`, а исходный код — в `resources/panel/src`. Для пересборки интерфейса выполните:
 
 ```bash
-cd resources/panel
-npm install
-npm run build
+composer build-panel
 ```
+
+Команда `composer build` последовательно собирает панель и PHAR. Важно: сборка не заменяет ранее установленный глобальный исполняемый файл `docker-cli`. После сборки запускайте `build/docker-cli.phar` либо установите этот файл вместо старой версии.
 
 ## Системное окружение
 
