@@ -174,6 +174,26 @@ bin/docker-cli data:apply --dbms=mysql ./backup.sql.zip
 bin/docker-cli data:apply --dbms=mysql './backups/*'
 ```
 
+## Административная панель
+
+### `bin/docker-cli panel:user-add`
+
+Интерактивно запрашивает логин в формате email и пароль, затем добавляет пользователя панели. Пароль сохраняется в виде солёного хеша в `~/.config/docker-cli/panel/users.yaml`.
+
+```bash
+bin/docker-cli panel:user-add
+```
+
+### `bin/docker-cli panel:user-delete <логин>`
+
+Удаляет пользователя панели, если пользователь с таким email существует.
+
+```bash
+bin/docker-cli panel:user-delete admin@example.com
+```
+
+Случайная соль `PANEL_PASSWORD_SALT` создаётся в системном `.env` командой `config:init`.
+
 ## Системное окружение
 
 ### `bin/docker-cli system:start` / `bin/docker-cli start`
