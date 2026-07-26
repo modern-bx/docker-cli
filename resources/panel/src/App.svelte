@@ -43,6 +43,9 @@
   let systemStatus = 'stopped';
   let systemServices = [];
   let systemPending = false;
+  let systemPendingMessage = '';
+  let systemConfirmation = null;
+  const panelServices = ['dnsdock', 'panel-gateway', 'traefik'];
 
   $: hasRunningServices = systemServices.some((service) => service.running);
   $: hasStoppedServices = systemServices.some((service) => !service.running);
@@ -134,7 +137,7 @@
   }
 
   async function refreshProjects() {
-    if (!token) return;
+    if (!token || systemPending) return;
     if (projects.length === 0) projectsLoading = true;
     try {
       const data = await getProjects(api);
@@ -144,7 +147,11 @@
         selectedProjectName = '';
       }
     } catch (cause) {
-      projectsError = cause instanceof Error ? cause.message : 'Не удалось получить список проектов.';
+      // A service can accept Docker's "running" state before its HTTP
+      // endpoint is ready. Do not turn these short transport gaps into toasts.
+      if (cause instanceof Error && 'status' in cause && typeof cause.status === 'number' && cause.status < 500) {
+        projectsError = cause.message;
+      }
     } finally {
       projectsLoading = false;
     }
@@ -164,16 +171,29 @@
   async function systemAction(action, service = '') {
     systemOpen = false;
     systemPending = true;
+    projectsError = '';
+    systemPendingMessage = action === 'restart'
+      ? 'Система перезапускается. Ждём восстановления необходимых компонентов…'
+      : 'Ждём выполнения запроса. Пожалуйста, не закрывайте страницу.';
+    const affectsPanel = !service || panelServices.includes(service);
     try {
       const data = await runSystemAction(api, action, service);
       systemStatus = data.status;
       systemServices = data.services;
+      if (action === 'restart' && affectsPanel && !(await waitForPanelServices())) {
+        throw Object.assign(new Error('Не удалось дождаться восстановления компонентов панели.'), { status: 504 });
+      }
     } catch (cause) {
       // The proxy connection can be interrupted while Docker has already
       // completed the operation. Reconcile transport errors with fresh state
       // before telling the user that the action failed.
       let reconciled = false;
-      if (!(cause instanceof Error && 'status' in cause)) {
+      if (action === 'restart' && affectsPanel && !(cause instanceof Error && 'status' in cause)) {
+        reconciled = await waitForPanelServices();
+      } else if (action === 'stop' && affectsPanel && !(cause instanceof Error && 'status' in cause)) {
+        // Losing the control-plane connection is the expected result here.
+        reconciled = true;
+      } else if (!(cause instanceof Error && 'status' in cause)) {
         try {
           const data = await getSystemStatus(api);
           systemStatus = data.status;
@@ -195,6 +215,31 @@
       systemPending = false;
       refreshSystem();
     }
+  }
+
+  function requestSystemAction(action, service = '') {
+    const affectsPanel = !service || panelServices.includes(service);
+    if (affectsPanel && (action === 'stop' || action === 'restart')) {
+      systemOpen = false;
+      systemConfirmation = { action, service };
+      return;
+    }
+    systemAction(action, service);
+  }
+
+  async function waitForPanelServices() {
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      try {
+        const data = await getSystemStatus(api);
+        systemStatus = data.status;
+        systemServices = data.services;
+        if (panelServices.every((name) => data.services.find((service) => service.name === name)?.running)) return true;
+      } catch {
+        // The gateway is expected to be unreachable for part of a restart.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+    }
+    return false;
   }
 
   async function submit() {
@@ -272,8 +317,8 @@
                   <span class={`system-dot ${service.running ? 'running' : 'stopped'}`} aria-hidden="true"></span>
                   <span class="system-service-name" title={service.image}>{service.name}</span>
                   <div class="system-actions">
-                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => systemAction(service.running ? 'stop' : 'start', service.name)}>{service.running ? 'Остановить' : 'Запустить'}</button>
-                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => systemAction('restart', service.name)}>Перезапустить</button>
+                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction(service.running ? 'stop' : 'start', service.name)}>{service.running ? 'Остановить' : 'Запустить'}</button>
+                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart', service.name)}>Перезапустить</button>
                   </div>
                 </div>
               {/each}
@@ -281,9 +326,9 @@
           {/if}
         </div>
         <div class="system-actions system-global-actions">
-          {#if hasStoppedServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => systemAction('start')}>Запустить</button>{/if}
-          {#if hasRunningServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => systemAction('stop')}>Остановить</button>{/if}
-          <button class="btn btn-sm preset-tonal" type="button" onclick={() => systemAction('restart')}>Перезапустить</button>
+          {#if hasStoppedServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('start')}>Запустить</button>{/if}
+          {#if hasRunningServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('stop')}>Остановить</button>{/if}
+          <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart')}>Перезапустить</button>
         </div>
       </div>
     {/if}
@@ -430,13 +475,35 @@
   </main>
 </div>
 
+<Dialog open={Boolean(systemConfirmation)} onOpenChange={({ open }) => { if (!open) systemConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">
+        {systemConfirmation?.action === 'stop' ? 'Остановить панель?' : 'Перезапустить панель?'}
+      </Dialog.Title>
+      <Dialog.Description class="login-error-description">
+        {#if systemConfirmation?.action === 'stop'}
+          Вы останавливаете компонент, необходимый для работы админки. После подтверждения админка прекратит работу, пока система не будет снова запущена.
+        {:else}
+          Админка сейчас уйдёт на перезапуск и автоматически восстановит работу через несколько секунд.
+        {/if}
+      </Dialog.Description>
+      <div class="login-error-actions system-confirm-actions">
+        <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
+        <button class="btn preset-filled-primary-500" type="button" onclick={() => { const action = systemConfirmation; systemConfirmation = null; if (action) systemAction(action.action, action.service); }}>Продолжить</button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
 <Dialog open={systemPending} role="alertdialog" closeOnEscape={false} closeOnInteractOutside={false}>
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
     <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl system-wait-dialog">
       <div class="system-spinner" aria-hidden="true"></div>
       <Dialog.Title class="login-error-title">Выполняется операция</Dialog.Title>
-      <Dialog.Description class="login-error-description">Ждём выполнения запроса. Пожалуйста, не закрывайте страницу.</Dialog.Description>
+      <Dialog.Description class="login-error-description">{systemPendingMessage}</Dialog.Description>
     </Dialog.Content>
   </Dialog.Positioner>
 </Dialog>
