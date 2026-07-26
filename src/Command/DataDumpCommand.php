@@ -7,6 +7,8 @@ namespace DockerCli\Command;
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Project\DataInitializer;
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Project\ZipArchiveManager;
+use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -25,6 +27,7 @@ final class DataDumpCommand extends Command
         $this->setDescription('Снять дамп БД проекта.');
         $this->addOption('dbms', null, InputOption::VALUE_REQUIRED, 'СУБД проекта: mysql или postgres.');
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
+        $this->addOption('compress', null, InputOption::VALUE_REQUIRED, 'Формат архива: zip.');
         $this->addArgument('path', InputArgument::REQUIRED, 'Путь к файлу дампа.');
     }
 
@@ -54,6 +57,12 @@ final class DataDumpCommand extends Command
             return Command::FAILURE;
         }
 
+        $compress = $input->getOption('compress');
+        if ($compress !== null && $compress !== 'zip') {
+            $output->writeln('<error>Поддерживаемый формат сжатия: zip.</error>');
+            return Command::FAILURE;
+        }
+
         $config = $registry->readProjectConfig($projectName);
         $database = $config['data']['databases'][$dbms]['database'] ?? $projectName;
         if (!is_string($database) || $database === '') {
@@ -66,6 +75,15 @@ final class DataDumpCommand extends Command
         } catch (MissingConfigException $exception) {
             $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
             return Command::FAILURE;
+        }
+
+        if ($code === Command::SUCCESS && $compress === 'zip') {
+            try {
+                $path = (new ZipArchiveManager())->compress($path);
+            } catch (RuntimeException $exception) {
+                $output->writeln(sprintf('<error>%s</error>', $exception->getMessage()));
+                return Command::FAILURE;
+            }
         }
 
         if ($code === Command::SUCCESS) {

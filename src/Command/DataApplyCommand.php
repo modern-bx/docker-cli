@@ -7,6 +7,8 @@ namespace DockerCli\Command;
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Project\DataInitializer;
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Project\ZipArchiveManager;
+use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -53,30 +55,40 @@ final class DataApplyCommand extends Command
             $paths = [];
         }
 
-        $files = $this->resolveSqlFiles($paths, $output);
-        if ($files === []) {
-            return Command::FAILURE;
-        }
-
-        $config = $registry->readProjectConfig($projectName);
-        $database = $config['data']['databases'][$dbms]['database'] ?? $projectName;
-        if (!is_string($database) || $database === '') {
-            $output->writeln(sprintf('<error>В конфигурации проекта "%s" не задана БД для %s.</error>', $projectName, $dbms));
-            return Command::FAILURE;
-        }
-
+        $temporaryDirectories = [];
         try {
-            $code = ($this->initializer ?? new DataInitializer())->apply($dbms, $database, $files, $output);
-        } catch (MissingConfigException $exception) {
-            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            $files = $this->resolveSqlFiles($paths, $output, $temporaryDirectories);
+            if ($files === []) {
+                return Command::FAILURE;
+            }
+
+            $config = $registry->readProjectConfig($projectName);
+            $database = $config['data']['databases'][$dbms]['database'] ?? $projectName;
+            if (!is_string($database) || $database === '') {
+                $output->writeln(sprintf('<error>В конфигурации проекта "%s" не задана БД для %s.</error>', $projectName, $dbms));
+                return Command::FAILURE;
+            }
+
+            try {
+                $code = ($this->initializer ?? new DataInitializer())->apply($dbms, $database, $files, $output);
+            } catch (MissingConfigException $exception) {
+                $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+                return Command::FAILURE;
+            }
+
+            if ($code === Command::SUCCESS) {
+                $output->writeln(sprintf('<info>SQL-файлы применены к БД "%s" проекта "%s".</info>', $database, $projectName));
+            }
+
+            return $code;
+        } catch (RuntimeException $exception) {
+            $output->writeln(sprintf('<error>%s</error>', $exception->getMessage()));
             return Command::FAILURE;
+        } finally {
+            foreach ($temporaryDirectories as $directory) {
+                $this->removeDirectory($directory);
+            }
         }
-
-        if ($code === Command::SUCCESS) {
-            $output->writeln(sprintf('<info>SQL-файлы применены к БД "%s" проекта "%s".</info>', $database, $projectName));
-        }
-
-        return $code;
     }
 
     private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string
@@ -93,7 +105,7 @@ final class DataApplyCommand extends Command
      * @param list<string> $paths
      * @return list<string>
      */
-    private function resolveSqlFiles(array $paths, OutputInterface $output): array
+    private function resolveSqlFiles(array $paths, OutputInterface $output, array &$temporaryDirectories): array
     {
         $files = [];
         foreach ($paths as $path) {
@@ -102,20 +114,24 @@ final class DataApplyCommand extends Command
             }
 
             if (is_file($path)) {
-                if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) !== 'sql') {
-                    $output->writeln(sprintf('<error>Файл "%s" не является sql-файлом.</error>', $path));
+                if (!$this->addFile($path, $files, $temporaryDirectories, $output)) {
                     return [];
                 }
-                $files[] = $this->normalizePath($path);
                 continue;
             }
 
             if (is_dir($path)) {
-                $matches = glob(rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '*.sql') ?: [];
+                $matches = [];
+                foreach (scandir($path) ?: [] as $name) {
+                    $file = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $name;
+                    if (is_file($file) && in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['sql', 'zip'], true)) {
+                        $matches[] = $file;
+                    }
+                }
                 sort($matches, SORT_STRING);
                 foreach ($matches as $file) {
-                    if (is_file($file)) {
-                        $files[] = $this->normalizePath($file);
+                    if (is_file($file) && !$this->addFile($file, $files, $temporaryDirectories, $output)) {
+                        return [];
                     }
                 }
                 continue;
@@ -129,11 +145,47 @@ final class DataApplyCommand extends Command
 
             sort($matches, SORT_STRING);
             foreach ($matches as $file) {
-                $files[] = $this->normalizePath($file);
+                if (!$this->addFile($file, $files, $temporaryDirectories, $output)) {
+                    return [];
+                }
             }
         }
 
         return array_values(array_unique($files));
+    }
+
+    /**
+     * @param list<string> $files
+     * @param list<string> $temporaryDirectories
+     */
+    private function addFile(string $file, array &$files, array &$temporaryDirectories, OutputInterface $output): bool
+    {
+        $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+        if ($extension === 'sql') {
+            $files[] = $this->normalizePath($file);
+            return true;
+        }
+        if ($extension !== 'zip') {
+            $output->writeln(sprintf('<error>Файл "%s" не является sql-файлом или zip-архивом.</error>', $file));
+            return false;
+        }
+
+        $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'docker-cli-' . bin2hex(random_bytes(8));
+        $temporaryDirectories[] = $directory;
+        $extracted = (new ZipArchiveManager())->extractSqlFiles($file, $directory);
+        foreach ($extracted as $sqlFile) {
+            $files[] = $sqlFile;
+        }
+
+        return true;
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+            @unlink($file);
+        }
+        @rmdir($directory);
     }
 
     private function normalizePath(string $path): string
