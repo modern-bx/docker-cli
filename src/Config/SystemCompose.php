@@ -82,7 +82,7 @@ final class SystemCompose
         if ($this->ensureHostIdentityEnv()) {
             $created = true;
         }
-        if ($this->ensurePanelPasswordSalt()) {
+        if ($this->ensurePanelSecrets()) {
             $created = true;
         }
 
@@ -242,7 +242,7 @@ final class SystemCompose
         return true;
     }
 
-    private function ensurePanelPasswordSalt(): bool
+    private function ensurePanelSecrets(): bool
     {
         $envFile = $this->envFile();
         if (!is_file($envFile)) {
@@ -253,16 +253,22 @@ final class SystemCompose
         if ($contents === false) {
             throw new \RuntimeException(sprintf('Unable to read env file "%s".', $envFile));
         }
-        if (($this->readEnvValues($contents)['PANEL_PASSWORD_SALT'] ?? '') !== '') {
-            return false;
+        $updated = $contents;
+        $values = $this->readEnvValues($contents);
+        foreach (['PANEL_PASSWORD_SALT', 'PANEL_JWT_SECRET'] as $key) {
+            if (($values[$key] ?? '') !== '') {
+                continue;
+            }
+            $line = $key . '=' . bin2hex(random_bytes(32));
+            if (preg_match('/^' . $key . '=.*$/m', $updated) === 1) {
+                $updated = preg_replace('/^' . $key . '=.*$/m', $line, $updated) ?? $updated;
+            } else {
+                $separator = str_ends_with($updated, PHP_EOL) || $updated === '' ? '' : PHP_EOL;
+                $updated .= $separator . $line . PHP_EOL;
+            }
         }
-
-        $line = 'PANEL_PASSWORD_SALT=' . bin2hex(random_bytes(32));
-        if (preg_match('/^PANEL_PASSWORD_SALT=.*$/m', $contents) === 1) {
-            $updated = preg_replace('/^PANEL_PASSWORD_SALT=.*$/m', $line, $contents);
-        } else {
-            $separator = str_ends_with($contents, PHP_EOL) || $contents === '' ? '' : PHP_EOL;
-            $updated = $contents . $separator . $line . PHP_EOL;
+        if ($updated === $contents) {
+            return false;
         }
         if (!is_string($updated) || file_put_contents($envFile, $updated, LOCK_EX) === false) {
             throw new \RuntimeException(sprintf('Unable to write env file "%s".', $envFile));

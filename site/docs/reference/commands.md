@@ -193,6 +193,15 @@ bin/docker-cli panel:user-delete admin@example.com
 ```
 
 Случайная соль `PANEL_PASSWORD_SALT` создаётся в системном `.env` командой `config:init`.
+Там же создаётся отдельный секрет `PANEL_JWT_SECRET`, которым подписываются токены авторизации панели. JWT действует 10 минут и обновляется при каждом успешном запросе проверки сессии.
+
+Интерфейс панели реализован как Svelte SPA на Skeleton. Сборка находится в `resources/panel/dist`, а исходный код — в `resources/panel/src`. Для пересборки интерфейса выполните:
+
+```bash
+cd resources/panel
+npm install
+npm run build
+```
 
 ## Системное окружение
 

@@ -7,6 +7,8 @@ namespace DockerCli\Command;
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\HttpResponse;
+use DockerCli\Panel\JwtTokenService;
+use DockerCli\Panel\UserRepository;
 use React\EventLoop\Loop;
 use React\Http\HttpServer;
 use React\Socket\SocketServer;
@@ -41,6 +43,13 @@ final class PanelUpCommand extends Command
         }
         $port = (int) $rawPort;
 
+        $salt = $compose->envValue('PANEL_PASSWORD_SALT');
+        $jwtSecret = $compose->envValue('PANEL_JWT_SECRET');
+        if ($salt === '' || $jwtSecret === '') {
+            $output->writeln('<error>Секреты панели не настроены. Выполните `docker-cli config:init`.</error>');
+            return Command::FAILURE;
+        }
+
         $lockPath = dirname($compose->directory()) . DIRECTORY_SEPARATOR . 'panel.lock';
         $lock = fopen($lockPath, 'c+');
         if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
@@ -56,7 +65,8 @@ final class PanelUpCommand extends Command
             return Command::FAILURE;
         }
 
-        $server = new HttpServer(HttpResponse::forRequest(...));
+        $assets = dirname(__DIR__, 2) . '/resources/panel/dist';
+        $server = new HttpServer(new HttpResponse(new UserRepository($salt), new JwtTokenService($jwtSecret), $assets));
         $server->listen($socket);
         $output->writeln(sprintf('<info>Панель запущена на https://panel.%s</info>', $compose->envValue('BASE_HOST', '')));
         Loop::run();

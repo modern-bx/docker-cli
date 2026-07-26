@@ -1,0 +1,9 @@
+@import 'tailwindcss';
+@import '@skeletonlabs/skeleton';
+@import '@skeletonlabs/skeleton/themes/cerberus';
+@source '../index.html';
+@source './**/*.{svelte,js}';
+
+html, body, #app { min-height: 100%; }
+body { margin: 0; }
+button { cursor: pointer; }
