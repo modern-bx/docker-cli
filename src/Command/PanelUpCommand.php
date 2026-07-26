@@ -10,6 +10,7 @@ use DockerCli\Panel\HttpResponse;
 use DockerCli\Panel\JwtTokenService;
 use DockerCli\Panel\ProjectController;
 use DockerCli\Panel\SystemController;
+use DockerCli\Panel\SystemdService;
 use DockerCli\Panel\UserRepository;
 use DockerCli\Project\ProjectRegistry;
 use React\EventLoop\Loop;
@@ -22,11 +23,12 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class PanelUpCommand extends Command
 {
-    public function __construct()
+    public function __construct(private readonly SystemdService $systemdService = new SystemdService())
     {
         parent::__construct('panel:up');
         $this->setDescription('Запустить HTTP-сервер административной панели.');
         $this->addOption('port', null, InputOption::VALUE_REQUIRED, 'Порт HTTP-сервера (переопределяет PANEL_PORT из .env).');
+        $this->addOption('daemon', 'd', InputOption::VALUE_NONE, 'Создать и запустить systemd-сервис панели.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -45,6 +47,10 @@ final class PanelUpCommand extends Command
             return Command::INVALID;
         }
         $port = (int) $rawPort;
+
+        if ($input->getOption('daemon')) {
+            return $this->installSystemdService($input, $output, $port);
+        }
 
         $salt = $compose->envValue('PANEL_PASSWORD_SALT');
         $jwtSecret = $compose->envValue('PANEL_JWT_SECRET');
@@ -81,6 +87,39 @@ final class PanelUpCommand extends Command
         Loop::run();
 
         return Command::SUCCESS;
+    }
+
+    private function installSystemdService(InputInterface $input, OutputInterface $output, int $port): int
+    {
+        $binary = $this->resolveBinary((string) ($_SERVER['argv'][0] ?? 'docker-cli'));
+        try {
+            $this->systemdService->install($binary, $input->getOption('port') === null ? null : $port);
+        } catch (\RuntimeException $exception) {
+            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            return Command::FAILURE;
+        }
+
+        $output->writeln(sprintf('<info>Создан systemd-сервис %s.</info>', SystemdService::NAME));
+        $output->writeln(sprintf('<info>Конфигурация записана в %s.</info>', SystemdService::UNIT_PATH));
+        $output->writeln(sprintf('<info>Сервис запускает: %s panel:up</info>', $binary));
+        $output->writeln(sprintf('<info>Сервис включён и запущен. Управление: systemctl {status|restart|stop} %s</info>', SystemdService::NAME));
+
+        return Command::SUCCESS;
+    }
+
+    private function resolveBinary(string $binary): string
+    {
+        if (str_contains($binary, DIRECTORY_SEPARATOR)) {
+            return realpath($binary) ?: $binary;
+        }
+        foreach (explode(PATH_SEPARATOR, (string) getenv('PATH')) as $directory) {
+            $candidate = $directory . DIRECTORY_SEPARATOR . $binary;
+            if (is_file($candidate) && is_executable($candidate)) {
+                return realpath($candidate) ?: $candidate;
+            }
+        }
+
+        return $binary;
     }
 
     private function configureGateway(SystemCompose $compose, int $port): void

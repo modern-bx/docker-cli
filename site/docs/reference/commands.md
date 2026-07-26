@@ -176,6 +176,25 @@ bin/docker-cli data:apply --dbms=mysql './backups/*'
 
 ## Административная панель
 
+### `bin/docker-cli panel:up [-d]`
+
+Запускает HTTP-сервер панели в текущем процессе. Опция `--port` переопределяет порт из системного `.env`.
+
+С опцией `-d` (или `--daemon`) команда создаёт системный сервис `docker-cli.panel`, записывает unit-файл в `/etc/systemd/system/docker-cli.panel.service`, включает его и сразу запускает. Сервис использует тот исполняемый файл `docker-cli`, которым была вызвана команда регистрации:
+
+```bash
+sudo bin/docker-cli panel:up -d
+systemctl status docker-cli.panel
+```
+
+### `bin/docker-cli panel:down`
+
+Останавливает и отключает сервис `docker-cli.panel`, удаляет его unit-файл и обновляет конфигурацию systemd. Если сервис не установлен, команда завершается с ошибкой.
+
+```bash
+sudo bin/docker-cli panel:down
+```
+
 ### `bin/docker-cli panel:user-add`
 
 Интерактивно запрашивает логин в формате email и пароль, затем добавляет пользователя панели. Пароль сохраняется в виде солёного хеша в `~/.config/docker-cli/panel/users.yaml`.
