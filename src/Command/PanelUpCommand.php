@@ -35,6 +35,20 @@ final class PanelUpCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        if ($input->getOption('daemon')) {
+            $rawPort = $input->getOption('port');
+            if ($rawPort !== null && !$this->isValidPort($rawPort)) {
+                $output->writeln('<error>Порт должен быть целым числом от 1 до 65535.</error>');
+                return Command::INVALID;
+            }
+
+            return $this->installSystemdService($input, $output, $rawPort === null ? null : (int) $rawPort);
+        }
+        if ($input->getOption('user') !== null || $input->getOption('path') !== null) {
+            $output->writeln('<error>Опции --user и --path можно использовать только вместе с -d.</error>');
+            return Command::INVALID;
+        }
+
         $compose = new SystemCompose();
         try {
             $compose->assertInitialized();
@@ -44,19 +58,11 @@ final class PanelUpCommand extends Command
         }
 
         $rawPort = $input->getOption('port') ?? $compose->envValue('PANEL_PORT', '8181');
-        if (!is_string($rawPort) || !ctype_digit($rawPort) || (int) $rawPort < 1 || (int) $rawPort > 65535) {
+        if (!$this->isValidPort($rawPort)) {
             $output->writeln('<error>Порт должен быть целым числом от 1 до 65535.</error>');
             return Command::INVALID;
         }
         $port = (int) $rawPort;
-
-        if ($input->getOption('daemon')) {
-            return $this->installSystemdService($input, $output, $port);
-        }
-        if ($input->getOption('user') !== null || $input->getOption('path') !== null) {
-            $output->writeln('<error>Опции --user и --path можно использовать только вместе с -d.</error>');
-            return Command::INVALID;
-        }
 
         $salt = $compose->envValue('PANEL_PASSWORD_SALT');
         $jwtSecret = $compose->envValue('PANEL_JWT_SECRET');
@@ -95,7 +101,7 @@ final class PanelUpCommand extends Command
         return Command::SUCCESS;
     }
 
-    private function installSystemdService(InputInterface $input, OutputInterface $output, int $port): int
+    private function installSystemdService(InputInterface $input, OutputInterface $output, ?int $port): int
     {
         $rawUser = $input->getOption('user');
         if ($rawUser !== null && (!is_string($rawUser) || preg_match('/^[a-zA-Z0-9_.@-]+$/D', $rawUser) !== 1)) {
@@ -110,7 +116,7 @@ final class PanelUpCommand extends Command
             return Command::INVALID;
         }
         try {
-            $this->systemdService->install($binary, $input->getOption('port') === null ? null : $port, is_string($rawUser) ? $rawUser : null);
+            $this->systemdService->install($binary, $port, is_string($rawUser) ? $rawUser : null);
         } catch (\RuntimeException $exception) {
             $output->writeln('<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
@@ -125,6 +131,11 @@ final class PanelUpCommand extends Command
         $output->writeln(sprintf('<info>Сервис включён и запущен. Управление: systemctl {status|restart|stop} %s</info>', SystemdService::NAME));
 
         return Command::SUCCESS;
+    }
+
+    private function isValidPort(mixed $port): bool
+    {
+        return is_string($port) && ctype_digit($port) && (int) $port >= 1 && (int) $port <= 65535;
     }
 
     private function resolveBinary(string $binary): string
