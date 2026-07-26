@@ -27,7 +27,7 @@ final class DataApplyCommand extends Command
         $this->setDescription('Выполнить SQL-файлы в БД проекта.');
         $this->addOption('dbms', null, InputOption::VALUE_REQUIRED, 'СУБД проекта: mysql или postgres.');
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
-        $this->addArgument('path', InputArgument::IS_ARRAY | InputArgument::REQUIRED, 'SQL-файл, директория или glob-выражение. Можно указать несколько путей.');
+        $this->addArgument('path', InputArgument::IS_ARRAY | InputArgument::REQUIRED, 'SQL-файл, ZIP-архив, директория или glob-выражение. Можно указать несколько путей.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
