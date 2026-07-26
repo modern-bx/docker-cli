@@ -79,6 +79,18 @@
     projectTags = projectTags.filter((item) => item !== tag);
   }
 
+  function addProjectTagFromInput() {
+    const tag = projectQuery.trim();
+    if (!tag || !/^[\p{L}\p{N} -]+$/u.test(tag)) return;
+    addProjectTag(tag);
+    projectQuery = '';
+  }
+
+  function validateProjectQuery(event) {
+    const nextValue = event.currentTarget.value;
+    projectQuery = [...nextValue].filter((character) => /^[\p{L}\p{N} -]$/u.test(character)).join('');
+  }
+
   function addNoteTag() {
     const tag = noteTagInput.trim();
     if (!tag || !/^[\p{L}\p{N} -]+$/u.test(tag)) return;
@@ -542,7 +554,13 @@
                   <button type="button" aria-label={`Удалить тег ${tag}`} onclick={() => removeProjectTag(tag)}>×</button>
                 </span>
               {/each}
-              <input type="search" bind:value={projectQuery} placeholder={projectTags.length ? 'Название…' : 'Поиск по названию…'} />
+              <input
+                type="search"
+                value={projectQuery}
+                oninput={validateProjectQuery}
+                onkeydown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addProjectTagFromInput(); } }}
+                placeholder={projectTags.length ? 'Название или новый тег…' : 'Название или тег…'}
+              />
             </label>
             <div class="project-list-scroll">
               {#if projectsLoading}
