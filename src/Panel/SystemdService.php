@@ -9,7 +9,7 @@ final class SystemdService
     public const NAME = 'docker-cli.panel';
     public const UNIT_PATH = '/etc/systemd/system/' . self::NAME . '.service';
 
-    public function install(string $binary, ?int $port = null): void
+    public function install(string $binary, ?int $port = null, ?string $user = null): void
     {
         $previousUnit = is_file(self::UNIT_PATH) ? file_get_contents(self::UNIT_PATH) : false;
         $arguments = [$binary, 'panel:up'];
@@ -17,15 +17,22 @@ final class SystemdService
             $arguments[] = '--port=' . $port;
         }
 
+        $service = [
+            '[Service]',
+            'Type=simple',
+        ];
+        if ($user !== null) {
+            $service[] = 'User=' . $user;
+        }
+        $service[] = 'ExecStart=' . implode(' ', array_map($this->escapeArgument(...), $arguments));
+        $service[] = 'Restart=on-failure';
+
         $unit = implode("\n", [
             '[Unit]',
             'Description=Docker CLI administrative panel',
             'After=network.target docker.service',
             '',
-            '[Service]',
-            'Type=simple',
-            'ExecStart=' . implode(' ', array_map($this->escapeArgument(...), $arguments)),
-            'Restart=on-failure',
+            ...$service,
             '',
             '[Install]',
             'WantedBy=multi-user.target',

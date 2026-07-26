@@ -180,10 +180,11 @@ bin/docker-cli data:apply --dbms=mysql './backups/*'
 
 Запускает HTTP-сервер панели в текущем процессе. Опция `--port` переопределяет порт из системного `.env`.
 
-С опцией `-d` (или `--daemon`) команда создаёт системный сервис `docker-cli.panel`, записывает unit-файл в `/etc/systemd/system/docker-cli.panel.service`, включает его и сразу запускает. Сервис использует тот исполняемый файл `docker-cli`, которым была вызвана команда регистрации:
+С опцией `-d` (или `--daemon`) команда создаёт системный сервис `docker-cli.panel`, записывает unit-файл в `/etc/systemd/system/docker-cli.panel.service`, включает его и сразу запускает. Сервис использует тот исполняемый файл `docker-cli`, которым была вызвана команда регистрации. Опция `--user` задаёт пользователя сервиса, а `--path` позволяет явно указать исполняемый файл:
 
 ```bash
 sudo bin/docker-cli panel:up -d
+sudo bin/docker-cli panel:up -d --user=www-data --path=/usr/local/bin/docker-cli
 systemctl status docker-cli.panel
 ```
 

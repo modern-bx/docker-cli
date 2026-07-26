@@ -29,6 +29,8 @@ final class PanelUpCommand extends Command
         $this->setDescription('Запустить HTTP-сервер административной панели.');
         $this->addOption('port', null, InputOption::VALUE_REQUIRED, 'Порт HTTP-сервера (переопределяет PANEL_PORT из .env).');
         $this->addOption('daemon', 'd', InputOption::VALUE_NONE, 'Создать и запустить systemd-сервис панели.');
+        $this->addOption('user', null, InputOption::VALUE_REQUIRED, 'Пользователь, от имени которого будет работать systemd-сервис.');
+        $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Явный путь к бинарнику для systemd-сервиса.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -50,6 +52,10 @@ final class PanelUpCommand extends Command
 
         if ($input->getOption('daemon')) {
             return $this->installSystemdService($input, $output, $port);
+        }
+        if ($input->getOption('user') !== null || $input->getOption('path') !== null) {
+            $output->writeln('<error>Опции --user и --path можно использовать только вместе с -d.</error>');
+            return Command::INVALID;
         }
 
         $salt = $compose->envValue('PANEL_PASSWORD_SALT');
@@ -91,9 +97,20 @@ final class PanelUpCommand extends Command
 
     private function installSystemdService(InputInterface $input, OutputInterface $output, int $port): int
     {
-        $binary = $this->resolveBinary((string) ($_SERVER['argv'][0] ?? 'docker-cli'));
+        $rawUser = $input->getOption('user');
+        if ($rawUser !== null && (!is_string($rawUser) || preg_match('/^[a-zA-Z0-9_.@-]+$/D', $rawUser) !== 1)) {
+            $output->writeln('<error>Некорректное имя пользователя для systemd-сервиса.</error>');
+            return Command::INVALID;
+        }
+
+        $rawPath = $input->getOption('path');
+        $binary = $this->resolveBinary(is_string($rawPath) ? $rawPath : (string) ($_SERVER['argv'][0] ?? 'docker-cli'));
+        if ($rawPath !== null && (!str_starts_with($binary, DIRECTORY_SEPARATOR) || !is_file($binary) || !is_executable($binary))) {
+            $output->writeln('<error>Опция --path должна указывать на существующий исполняемый файл.</error>');
+            return Command::INVALID;
+        }
         try {
-            $this->systemdService->install($binary, $input->getOption('port') === null ? null : $port);
+            $this->systemdService->install($binary, $input->getOption('port') === null ? null : $port, is_string($rawUser) ? $rawUser : null);
         } catch (\RuntimeException $exception) {
             $output->writeln('<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
@@ -102,6 +119,9 @@ final class PanelUpCommand extends Command
         $output->writeln(sprintf('<info>Создан systemd-сервис %s.</info>', SystemdService::NAME));
         $output->writeln(sprintf('<info>Конфигурация записана в %s.</info>', SystemdService::UNIT_PATH));
         $output->writeln(sprintf('<info>Сервис запускает: %s panel:up</info>', $binary));
+        if (is_string($rawUser)) {
+            $output->writeln(sprintf('<info>Сервис работает от пользователя: %s</info>', $rawUser));
+        }
         $output->writeln(sprintf('<info>Сервис включён и запущен. Управление: systemctl {status|restart|stop} %s</info>', SystemdService::NAME));
 
         return Command::SUCCESS;
