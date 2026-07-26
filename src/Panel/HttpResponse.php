@@ -14,6 +14,8 @@ final class HttpResponse
         private readonly UserRepository $users,
         private readonly JwtTokenService $tokens,
         private readonly string $assetsDirectory,
+        private readonly ?ProjectController $projects = null,
+        private readonly ?SystemController $system = null,
     ) {
     }
 
@@ -25,6 +27,42 @@ final class HttpResponse
         }
         if ($request->getMethod() === 'GET' && $path === '/api/auth/session') {
             return $this->session($request);
+        }
+        if ($request->getMethod() === 'GET' && $path === '/api/projects') {
+            if ($this->authenticatedLogin($request) === null) {
+                return $this->json(401, ['error' => 'Сессия истекла.']);
+            }
+
+            return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->index());
+        }
+        if ($request->getMethod() === 'POST' && preg_match('#^/api/projects/([^/]+)/(enable|disable|wipe)$#', $path, $matches) === 1) {
+            if ($this->authenticatedLogin($request) === null) {
+                return $this->json(401, ['error' => 'Сессия истекла.']);
+            }
+            try {
+                return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->act(rawurldecode($matches[1]), $matches[2]));
+            } catch (ProjectActionException $exception) {
+                return $this->json($exception->httpStatus, ['error' => $exception->getMessage()]);
+            }
+        }
+        if (str_starts_with($path, '/api/system')) {
+            if ($this->authenticatedLogin($request) === null) {
+                return $this->json(401, ['error' => 'Сессия истекла.']);
+            }
+            $system = $this->system ?? new SystemController(new \DockerCli\Config\SystemCompose());
+            try {
+                if ($request->getMethod() === 'GET' && $path === '/api/system') {
+                    return $this->json(200, $system->status());
+                }
+                if ($request->getMethod() === 'POST' && preg_match('#^/api/system/(start|stop|restart)$#', $path, $matches) === 1) {
+                    return $this->json(200, $system->act($matches[1]));
+                }
+                if ($request->getMethod() === 'POST' && preg_match('#^/api/system/services/([^/]+)/(start|stop|restart)$#', $path, $matches) === 1) {
+                    return $this->json(200, $system->act($matches[2], rawurldecode($matches[1])));
+                }
+            } catch (SystemActionException $exception) {
+                return $this->json($exception->httpStatus, ['error' => $exception->getMessage()]);
+            }
         }
         if ($request->getMethod() === 'GET' && ($path === '/' || str_starts_with($path, '/assets/'))) {
             return $this->asset($path === '/' ? 'index.html' : ltrim($path, '/'));
@@ -57,13 +95,19 @@ final class HttpResponse
 
     private function session(ServerRequestInterface $request): ResponseInterface
     {
-        $header = $request->getHeaderLine('Authorization');
-        $login = str_starts_with($header, 'Bearer ') ? $this->tokens->login(substr($header, 7)) : null;
+        $login = $this->authenticatedLogin($request);
         if ($login === null) {
             return $this->json(401, ['error' => 'Сессия истекла.']);
         }
 
         return $this->authorized($login);
+    }
+
+    private function authenticatedLogin(ServerRequestInterface $request): ?string
+    {
+        $header = $request->getHeaderLine('Authorization');
+
+        return str_starts_with($header, 'Bearer ') ? $this->tokens->login(substr($header, 7)) : null;
     }
 
     private function authorized(string $login): ResponseInterface
@@ -96,8 +140,8 @@ final class HttpResponse
         return new Response(200, ['Content-Type' => $contentType, 'Cache-Control' => $extension === 'html' ? 'no-store' : 'public, max-age=31536000, immutable'], $contents);
     }
 
-    /** @param array<string, int|string> $body */
-    private function json(int $status, array $body): ResponseInterface
+    /** @param array<string, mixed>|\JsonSerializable $body */
+    private function json(int $status, array|\JsonSerializable $body): ResponseInterface
     {
         return new Response($status, ['Content-Type' => 'application/json; charset=UTF-8', 'Cache-Control' => 'no-store'], json_encode($body, JSON_THROW_ON_ERROR));
     }
