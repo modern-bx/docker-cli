@@ -80,7 +80,14 @@ final class PanelUpCommand extends Command
         if (!is_dir(dirname($file)) && !mkdir(dirname($file), 0755, true) && !is_dir(dirname($file))) {
             throw new \RuntimeException(sprintf('Unable to create panel config directory "%s".', dirname($file)));
         }
-        $contents = sprintf("set \$panel_upstream http://host.docker.internal:%d;\n", $port);
+        // A hostname in a variable proxy_pass is resolved by nginx's configured
+        // DNS resolver, which does not consult Docker's extra_hosts entries.
+        // Keep the hostname in an upstream instead: nginx then resolves it via
+        // libc on start/reload and honours host.docker.internal from /etc/hosts.
+        $contents = sprintf(
+            "upstream panel_backend {\n    server host.docker.internal:%d;\n}\n",
+            $port
+        );
         if (file_put_contents($file, $contents, LOCK_EX) === false) {
             throw new \RuntimeException(sprintf('Unable to write panel gateway config "%s".', $file));
         }
