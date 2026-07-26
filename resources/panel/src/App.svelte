@@ -1,8 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import { Collapsible, Dialog } from '@skeletonlabs/skeleton-svelte';
-  import { Play, RotateCw, Square } from '@lucide/svelte';
-  import { getProjects, getSystemStatus, runSystemAction } from './api.js';
+  import { Play, Power, RotateCw, Square, Trash2 } from '@lucide/svelte';
+  import { getProjects, getSystemStatus, runProjectAction, runSystemAction } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -46,6 +46,7 @@
   let systemPending = false;
   let systemPendingMessage = '';
   let systemConfirmation = null;
+  let projectConfirmation = null;
   const panelServices = ['dnsdock', 'panel-gateway', 'traefik'];
 
   $: hasRunningServices = systemServices.some((service) => service.running);
@@ -167,6 +168,55 @@
     } catch {
       systemStatus = 'stopped';
     }
+  }
+
+  async function projectAction(action, name) {
+    systemPending = true;
+    projectsError = '';
+    systemPendingMessage = action === 'wipe'
+      ? `Удаляем файлы проекта «${name}»…`
+      : `${action === 'enable' ? 'Включаем' : 'Отключаем'} проект «${name}»…`;
+    try {
+      const data = await runProjectAction(api, name, action);
+      projects = data.projects;
+    } catch (cause) {
+      let reconciled = false;
+      if (action !== 'wipe' && !(cause instanceof Error && 'status' in cause)) {
+        reconciled = await waitForProjectAction(action, name);
+      }
+      if (!reconciled) {
+        errorTitle = 'Не удалось выполнить действие';
+        error = cause instanceof Error ? cause.message : 'Не удалось выполнить действие.';
+        errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+      }
+    } finally {
+      systemPending = false;
+      refreshProjects();
+      refreshSystem();
+    }
+  }
+
+  async function waitForProjectAction(action, name) {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      try {
+        const data = await getProjects(api);
+        projects = data.projects;
+        const project = data.projects.find((item) => item.name === name);
+        if (action === 'enable' ? project?.enabled === true : project?.enabled === false) return true;
+      } catch {
+        // Traefik can be briefly unavailable while project routing is rebuilt.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+    }
+    return false;
+  }
+
+  function requestProjectAction(action, project) {
+    if (action === 'disable' || action === 'wipe') {
+      projectConfirmation = { action, project };
+      return;
+    }
+    projectAction(action, project.name);
   }
 
   async function systemAction(action, service = '') {
@@ -466,6 +516,14 @@
                     <div><dt>Фреймворк</dt><dd>{selectedProject.framework || 'Не указан'}</dd></div>
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
                   </dl>
+                  <div class="project-general-actions">
+                    <button class="btn preset-tonal" type="button" onclick={() => requestProjectAction(selectedProject.enabled ? 'disable' : 'enable', selectedProject)}>
+                      <Power size={16} aria-hidden="true" />{selectedProject.enabled ? 'Отключить' : 'Включить'}
+                    </button>
+                    <button class="btn preset-filled-error-500" type="button" onclick={() => requestProjectAction('wipe', selectedProject)}>
+                      <Trash2 size={16} aria-hidden="true" />Стереть
+                    </button>
+                  </div>
                 </Collapsible.Content>
               </Collapsible>
             {:else}
@@ -478,6 +536,28 @@
     {/if}
   </main>
 </div>
+
+<Dialog open={Boolean(projectConfirmation)} onOpenChange={({ open }) => { if (!open) projectConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class={`login-error-dialog card preset-filled-surface-100-900 shadow-2xl${projectConfirmation?.action === 'wipe' ? ' error-alert' : ''}`}>
+      <Dialog.Title class="login-error-title">{projectConfirmation?.action === 'wipe' ? 'Стереть проект?' : 'Отключить проект?'}</Dialog.Title>
+      <Dialog.Description class="login-error-description">
+        {#if projectConfirmation?.action === 'wipe'}
+          Все файлы из директории проекта «{projectConfirmation?.project.name}», кроме служебной директории .docker-cli, будут безвозвратно удалены.
+        {:else}
+          Проект «{projectConfirmation?.project.name}» станет недоступен через веб-сервер. Его можно будет включить снова.
+        {/if}
+      </Dialog.Description>
+      <div class="login-error-actions system-confirm-actions">
+        <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
+        <button class={`btn ${projectConfirmation?.action === 'wipe' ? 'preset-filled-error-500' : 'preset-filled-primary-500'}`} type="button" onclick={() => { const confirmation = projectConfirmation; projectConfirmation = null; if (confirmation) projectAction(confirmation.action, confirmation.project.name); }}>
+          {projectConfirmation?.action === 'wipe' ? 'Стереть' : 'Отключить'}
+        </button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
 
 <Dialog open={Boolean(systemConfirmation)} onOpenChange={({ open }) => { if (!open) systemConfirmation = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />

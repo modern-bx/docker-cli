@@ -73,7 +73,7 @@ final class PanelUpCommand extends Command
             new UserRepository($salt),
             new JwtTokenService($jwtSecret),
             $assets,
-            new ProjectController(new ProjectRegistry()),
+            new ProjectController(new ProjectRegistry(), $compose),
             new SystemController($compose),
         ));
         $server->listen($socket);

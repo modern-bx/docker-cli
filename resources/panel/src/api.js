@@ -24,6 +24,11 @@ export async function getProjects(request) {
   return /** @type {ProjectListDto} */ (data);
 }
 
+/** @returns {Promise<ProjectListDto>} */
+export async function runProjectAction(request, project, action) {
+  return /** @type {Promise<ProjectListDto>} */ (request(`/api/projects/${encodeURIComponent(project)}/${action}`, { method: 'POST' }));
+}
+
 /**
  * @typedef {object} SystemServiceDto
  * @property {string} name Docker Compose service name.

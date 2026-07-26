@@ -35,6 +35,16 @@ final class HttpResponse
 
             return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->index());
         }
+        if ($request->getMethod() === 'POST' && preg_match('#^/api/projects/([^/]+)/(enable|disable|wipe)$#', $path, $matches) === 1) {
+            if ($this->authenticatedLogin($request) === null) {
+                return $this->json(401, ['error' => 'Сессия истекла.']);
+            }
+            try {
+                return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->act(rawurldecode($matches[1]), $matches[2]));
+            } catch (ProjectActionException $exception) {
+                return $this->json($exception->httpStatus, ['error' => $exception->getMessage()]);
+            }
+        }
         if (str_starts_with($path, '/api/system')) {
             if ($this->authenticatedLogin($request) === null) {
                 return $this->json(401, ['error' => 'Сессия истекла.']);
