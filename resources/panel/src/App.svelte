@@ -130,11 +130,13 @@
   }
 
   async function checkSession() {
-    if (!token) return;
+    if (!token || systemPending) return;
     try {
       acceptSession(await api('/api/auth/session'));
-    } catch {
-      logout();
+    } catch (cause) {
+      // A temporary proxy or network failure does not invalidate the JWT.
+      // Only the backend can explicitly tell us that the session has expired.
+      if (cause instanceof Error && 'status' in cause && cause.status === 401) logout();
     }
   }
 
@@ -179,6 +181,9 @@
     try {
       const data = await runProjectAction(api, name, action);
       projects = data.projects;
+      if (action !== 'wipe' && !projectHasState(data.projects, action, name) && !(await waitForProjectAction(action, name))) {
+        throw Object.assign(new Error('Не удалось дождаться подтверждения статуса проекта.'), { status: 504 });
+      }
     } catch (cause) {
       let reconciled = false;
       if (action !== 'wipe' && !(cause instanceof Error && 'status' in cause)) {
@@ -201,14 +206,18 @@
       try {
         const data = await getProjects(api);
         projects = data.projects;
-        const project = data.projects.find((item) => item.name === name);
-        if (action === 'enable' ? project?.enabled === true : project?.enabled === false) return true;
+        if (projectHasState(data.projects, action, name)) return true;
       } catch {
-        // Traefik can be briefly unavailable while project routing is rebuilt.
+        // Keep the blocking dialog open during a short-lived API outage.
       }
       await new Promise((resolve) => setTimeout(resolve, 1_000));
     }
     return false;
+  }
+
+  function projectHasState(items, action, name) {
+    const project = items.find((item) => item.name === name);
+    return action === 'enable' ? project?.enabled === true : project?.enabled === false;
   }
 
   function requestProjectAction(action, project) {
