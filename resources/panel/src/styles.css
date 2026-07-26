@@ -92,6 +92,13 @@ main.workspace { min-height: 0; align-items: stretch; justify-content: stretch; 
 .dark .project-tags button { background: var(--color-surface-800); color: var(--color-surface-300); }
 .project-tags button:hover { background: color-mix(in oklab, var(--color-primary-500) 22%, var(--color-surface-100)); color: var(--color-primary-700); }
 .dark .project-tags button:hover { color: var(--color-surface-950); }
+.project-context-menu { position: fixed; z-index: 50; width: 11rem; overflow: hidden; border: 1px solid var(--color-surface-200); padding: 0.3rem; }
+.dark .project-context-menu { border-color: var(--color-surface-800); }
+.project-context-menu button { display: flex; width: 100%; align-items: center; gap: 0.55rem; padding: 0.55rem 0.65rem; border-radius: var(--radius-base); font-size: 0.82rem; text-align: left; }
+.project-context-menu button:hover { background: var(--color-surface-200); }
+.dark .project-context-menu button:hover { background: var(--color-surface-800); }
+.project-context-menu button.danger { color: var(--color-error-600); }
+.dark .project-context-menu button.danger { color: var(--color-error-400); }
 .project-message { padding: 2rem 1.5rem; color: var(--color-surface-500); text-align: center; }
 .project-details { min-width: 0; overflow-y: auto; padding: clamp(1.25rem, 3vw, 2.5rem); background: var(--color-surface-100); }
 .dark .project-details { background: var(--color-surface-900); }
@@ -107,6 +114,8 @@ main.workspace { min-height: 0; align-items: stretch; justify-content: stretch; 
 .project-fields div { min-width: 0; }
 .project-fields dt { margin-bottom: 0.3rem; color: var(--color-surface-500); font-size: 0.78rem; }
 .project-fields dd { overflow-wrap: anywhere; font-weight: 600; }
+.project-host { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--color-primary-700); text-decoration: underline; text-underline-offset: 0.18rem; }
+.dark .project-host { color: var(--color-primary-300); }
 .project-general-actions { display: flex; align-items: center; gap: 0.5rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--color-surface-200); }
 .dark .project-general-actions { border-color: var(--color-surface-800); }
 .status-value { display: flex; align-items: center; gap: 0.55rem; }

@@ -4,6 +4,7 @@
  * @property {string|null} language Project programming language, when configured.
  * @property {string|null} framework Project framework, when configured.
  * @property {boolean} enabled Whether the project is enabled.
+ * @property {string|null} url HTTPS URL of the project's primary host.
  */
 
 /**

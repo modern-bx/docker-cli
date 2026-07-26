@@ -47,16 +47,19 @@ final class ProjectController
     public function index(): ProjectListDto
     {
         $projects = [];
+        $baseHost = ($this->compose ?? new SystemCompose())->envValue('BASE_HOST', '');
         foreach ($this->projects->registeredProjectNames() as $name) {
             $config = $this->projects->readProjectConfig($name);
             $project = is_array($config['data']['project'] ?? null) ? $config['data']['project'] : [];
+            $projectName = is_string($project['name'] ?? null) && $project['name'] !== '' ? $project['name'] : $name;
             $projects[] = new ProjectDto(
-                name: is_string($project['name'] ?? null) && $project['name'] !== '' ? $project['name'] : $name,
+                name: $projectName,
                 language: $this->nullableString($project['language'] ?? null),
                 framework: $this->nullableString($project['framework'] ?? null),
                 // Older project configs predate this flag and are enabled by default,
                 // just like OpenRestyHostRenderer treats them.
                 enabled: ($project['enabled'] ?? true) !== false,
+                url: $baseHost !== '' ? sprintf('https://web-%s.%s', $projectName, $baseHost) : null,
             );
         }
 

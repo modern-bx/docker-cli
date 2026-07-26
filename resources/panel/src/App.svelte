@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { Collapsible, Dialog } from '@skeletonlabs/skeleton-svelte';
-  import { Play, Power, RotateCw, Square, Trash2 } from '@lucide/svelte';
+  import { ExternalLink, Play, Power, RotateCw, Square, Trash2 } from '@lucide/svelte';
   import { getProjects, getSystemStatus, runProjectAction, runSystemAction } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
@@ -47,6 +47,7 @@
   let systemPendingMessage = '';
   let systemConfirmation = null;
   let projectConfirmation = null;
+  let projectContextMenu = null;
   const panelServices = ['dnsdock', 'panel-gateway', 'traefik'];
 
   $: hasRunningServices = systemServices.some((service) => service.running);
@@ -85,10 +86,31 @@
   }
 
   function closeMenus(event) {
+    if (event.target instanceof Element && event.target.closest('.project-context-menu')) return;
+    projectContextMenu = null;
     if (event.target instanceof Element && event.target.closest('.header-menu')) return;
     themeOpen = false;
     profileOpen = false;
     systemOpen = false;
+  }
+
+  function openProjectContextMenu(event, project) {
+    event.preventDefault();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
+    const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.top;
+    selectedProjectName = project.name;
+    projectContextMenu = {
+      project,
+      x: Math.max(8, Math.min(x, window.innerWidth - 184)),
+      y: Math.max(8, Math.min(y, window.innerHeight - 104)),
+    };
+  }
+
+  function runContextProjectAction(action) {
+    const project = projectContextMenu?.project;
+    projectContextMenu = null;
+    if (project) requestProjectAction(action, project);
   }
 
   async function api(path, options = {}) {
@@ -495,7 +517,8 @@
                     class:selected={selectedProjectName === project.name}
                     aria-pressed={selectedProjectName === project.name}
                     onclick={() => { selectedProjectName = project.name; }}
-                    onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectedProjectName = project.name; } }}
+                    oncontextmenu={(event) => openProjectContextMenu(event, project)}
+                    onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectedProjectName = project.name; } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { openProjectContextMenu(event, project); } }}
                   >
                     <span class:enabled={project.enabled} class="status-dot" title={project.enabled ? 'Включен' : 'Выключен'}></span>
                     <span class="project-summary">
@@ -524,6 +547,7 @@
                     <div><dt>Язык</dt><dd>{selectedProject.language || 'Не указан'}</dd></div>
                     <div><dt>Фреймворк</dt><dd>{selectedProject.framework || 'Не указан'}</dd></div>
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
+                    <div><dt>Основной хост</dt><dd>{#if selectedProject.url}<a class="project-host" href={selectedProject.url} target="_blank" rel="noreferrer">{selectedProject.url}<ExternalLink size={14} aria-hidden="true" /></a>{:else}Не указан{/if}</dd></div>
                   </dl>
                   <div class="project-general-actions">
                     <button class="btn preset-tonal" type="button" onclick={() => requestProjectAction(selectedProject.enabled ? 'disable' : 'enable', selectedProject)}>
@@ -545,6 +569,22 @@
     {/if}
   </main>
 </div>
+
+{#if projectContextMenu}
+  <div
+    class="project-context-menu card preset-filled-surface-100-900 shadow-2xl"
+    role="menu"
+    aria-label={`Действия с проектом ${projectContextMenu.project.name}`}
+    style={`left: ${projectContextMenu.x}px; top: ${projectContextMenu.y}px;`}
+  >
+    <button type="button" role="menuitem" onclick={() => runContextProjectAction(projectContextMenu.project.enabled ? 'disable' : 'enable')}>
+      <Power size={16} aria-hidden="true" />{projectContextMenu.project.enabled ? 'Отключить' : 'Включить'}
+    </button>
+    <button class="danger" type="button" role="menuitem" onclick={() => runContextProjectAction('wipe')}>
+      <Trash2 size={16} aria-hidden="true" />Стереть
+    </button>
+  </div>
+{/if}
 
 <Dialog open={Boolean(projectConfirmation)} onOpenChange={({ open }) => { if (!open) projectConfirmation = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
