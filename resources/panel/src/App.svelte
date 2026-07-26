@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { Collapsible, Dialog } from '@skeletonlabs/skeleton-svelte';
-  import { getProjects } from './api.js';
+  import { getProjects, getSystemStatus, runSystemAction } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -25,6 +25,7 @@
   let token = '';
   let error = '';
   let errorStatus = 0;
+  let errorTitle = 'Ошибка';
   let loading = true;
   let submitting = false;
   let profileOpen = false;
@@ -38,6 +39,13 @@
   let projectsError = '';
   let projectQuery = '';
   let projectTags = [];
+  let systemOpen = false;
+  let systemStatus = 'stopped';
+  let systemServices = [];
+  let systemPending = false;
+
+  $: hasRunningServices = systemServices.some((service) => service.running);
+  $: hasStoppedServices = systemServices.some((service) => !service.running);
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
   $: filteredProjects = projects.filter((project) => {
@@ -75,6 +83,7 @@
     if (event.target instanceof Element && event.target.closest('.header-menu')) return;
     themeOpen = false;
     profileOpen = false;
+    systemOpen = false;
   }
 
   async function api(path, options = {}) {
@@ -141,9 +150,38 @@
     }
   }
 
+  async function refreshSystem() {
+    if (!token || systemPending) return;
+    try {
+      const data = await getSystemStatus(api);
+      systemStatus = data.status;
+      systemServices = data.services;
+    } catch {
+      systemStatus = 'stopped';
+    }
+  }
+
+  async function systemAction(action, service = '') {
+    systemOpen = false;
+    systemPending = true;
+    try {
+      const data = await runSystemAction(api, action, service);
+      systemStatus = data.status;
+      systemServices = data.services;
+    } catch (cause) {
+      errorTitle = 'Не удалось выполнить действие';
+      error = cause instanceof Error ? cause.message : 'Не удалось выполнить действие.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      systemPending = false;
+      refreshSystem();
+    }
+  }
+
   async function submit() {
     error = '';
     errorStatus = 0;
+    errorTitle = 'Не удалось войти';
     submitting = true;
     try {
       const data = await api('/api/auth/login', {
@@ -179,9 +217,12 @@
     const interval = setInterval(checkSession, 60_000);
     refreshProjects();
     const projectsInterval = setInterval(refreshProjects, 1_000);
+    refreshSystem();
+    const systemInterval = setInterval(refreshSystem, 1_000);
     return () => {
       clearInterval(interval);
       clearInterval(projectsInterval);
+      clearInterval(systemInterval);
       media.removeEventListener('change', updateSystemMode);
     };
   });
@@ -189,7 +230,7 @@
 
 <svelte:window
   onclick={closeMenus}
-  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; profileOpen = false; } }}
+  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; profileOpen = false; systemOpen = false; } }}
 />
 
 <svelte:head><title>{token ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
@@ -197,6 +238,36 @@
 <div class="min-h-screen bg-surface-50-950 text-surface-950-50 flex flex-col">
   <header class="h-16 border-b border-surface-200-800 bg-surface-100-900 flex items-center px-5 md:px-8 shadow-sm">
     {#if token}<a href="#/" class="font-bold text-xl no-underline">docker-cli</a>{/if}
+    {#if token}
+      <div class="system-header header-menu">
+        <div class="system-main-control">
+          <button class="btn preset-tonal system-trigger" type="button" aria-expanded={systemOpen} onclick={() => { systemOpen = !systemOpen; themeOpen = false; profileOpen = false; }}>
+            <span class={`system-dot ${systemStatus}`} aria-hidden="true"></span><span>Система</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+          </button>
+          {#if systemOpen}
+            <div class="system-menu card preset-filled-surface-100-900 shadow-2xl">
+              {#if systemServices.length === 0}<p class="system-empty">Сервисы не найдены</p>{/if}
+              {#each systemServices as service (service.name)}
+                <div class="system-service">
+                  <span class={`system-dot ${service.running ? 'running' : 'stopped'}`} aria-hidden="true"></span>
+                  <span class="system-service-name" title={service.image}>{service.name}</span>
+                  <div class="system-actions">
+                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => systemAction(service.running ? 'stop' : 'start', service.name)}>{service.running ? 'Остановить' : 'Запустить'}</button>
+                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => systemAction('restart', service.name)}>Перезапустить</button>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+        <div class="system-actions system-global-actions">
+          {#if hasStoppedServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => systemAction('start')}>Запустить</button>{/if}
+          {#if hasRunningServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => systemAction('stop')}>Остановить</button>{/if}
+          <button class="btn btn-sm preset-tonal" type="button" onclick={() => systemAction('restart')}>Перезапустить</button>
+        </div>
+      </div>
+    {/if}
     <div class="ml-auto flex items-center gap-3">
       <div class="relative header-menu">
         <button class="btn-icon preset-tonal theme-trigger" type="button" aria-label="Настроить оформление" aria-haspopup="dialog" aria-expanded={themeOpen} onclick={() => { themeOpen = !themeOpen; profileOpen = false; }}>
@@ -340,6 +411,17 @@
   </main>
 </div>
 
+<Dialog open={systemPending} role="alertdialog" closeOnEscape={false} closeOnInteractOutside={false}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl system-wait-dialog">
+      <div class="system-spinner" aria-hidden="true"></div>
+      <Dialog.Title class="login-error-title">Выполняется операция</Dialog.Title>
+      <Dialog.Description class="login-error-description">Ждём выполнения запроса. Пожалуйста, не закрывайте страницу.</Dialog.Description>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
 <Dialog
   open={Boolean(error)}
   role={errorStatus >= 500 ? 'alertdialog' : 'dialog'}
@@ -348,7 +430,7 @@
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
     <Dialog.Content class={`login-error-dialog card preset-filled-surface-100-900 shadow-2xl${errorStatus >= 500 ? ' error-alert' : ''}`}>
-      <Dialog.Title class="login-error-title">{errorStatus >= 500 ? 'Ошибка сервера' : 'Не удалось войти'}</Dialog.Title>
+      <Dialog.Title class="login-error-title">{errorStatus >= 500 ? 'Ошибка сервера' : errorTitle}</Dialog.Title>
       <Dialog.Description class="login-error-description">{error}</Dialog.Description>
       <div class="login-error-actions">
         <Dialog.CloseTrigger class={`btn preset-filled-primary-500${errorStatus >= 500 ? ' error-alert-button' : ''}`} type="button">Закрыть</Dialog.CloseTrigger>

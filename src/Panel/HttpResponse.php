@@ -15,6 +15,7 @@ final class HttpResponse
         private readonly JwtTokenService $tokens,
         private readonly string $assetsDirectory,
         private readonly ?ProjectController $projects = null,
+        private readonly ?SystemController $system = null,
     ) {
     }
 
@@ -33,6 +34,25 @@ final class HttpResponse
             }
 
             return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->index());
+        }
+        if (str_starts_with($path, '/api/system')) {
+            if ($this->authenticatedLogin($request) === null) {
+                return $this->json(401, ['error' => 'Сессия истекла.']);
+            }
+            $system = $this->system ?? new SystemController(new \DockerCli\Config\SystemCompose());
+            try {
+                if ($request->getMethod() === 'GET' && $path === '/api/system') {
+                    return $this->json(200, $system->status());
+                }
+                if ($request->getMethod() === 'POST' && preg_match('#^/api/system/(start|stop|restart)$#', $path, $matches) === 1) {
+                    return $this->json(200, $system->act($matches[1]));
+                }
+                if ($request->getMethod() === 'POST' && preg_match('#^/api/system/services/([^/]+)/(start|stop|restart)$#', $path, $matches) === 1) {
+                    return $this->json(200, $system->act($matches[2], rawurldecode($matches[1])));
+                }
+            } catch (SystemActionException $exception) {
+                return $this->json($exception->httpStatus, ['error' => $exception->getMessage()]);
+            }
         }
         if ($request->getMethod() === 'GET' && ($path === '/' || str_starts_with($path, '/assets/'))) {
             return $this->asset($path === '/' ? 'index.html' : ltrim($path, '/'));

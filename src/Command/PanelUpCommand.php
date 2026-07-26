@@ -9,6 +9,7 @@ use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\HttpResponse;
 use DockerCli\Panel\JwtTokenService;
 use DockerCli\Panel\ProjectController;
+use DockerCli\Panel\SystemController;
 use DockerCli\Panel\UserRepository;
 use DockerCli\Project\ProjectRegistry;
 use React\EventLoop\Loop;
@@ -73,6 +74,7 @@ final class PanelUpCommand extends Command
             new JwtTokenService($jwtSecret),
             $assets,
             new ProjectController(new ProjectRegistry()),
+            new SystemController($compose),
         ));
         $server->listen($socket);
         $output->writeln(sprintf('<info>Панель запущена на https://panel.%s</info>', $compose->envValue('BASE_HOST', '')));

@@ -23,3 +23,27 @@ export async function getProjects(request) {
   }
   return /** @type {ProjectListDto} */ (data);
 }
+
+/**
+ * @typedef {object} SystemServiceDto
+ * @property {string} name Docker Compose service name.
+ * @property {string} image Configured image reference.
+ * @property {boolean} running Whether the service container is running.
+ */
+
+/**
+ * @typedef {object} SystemStatusDto
+ * @property {'running'|'partial'|'stopped'} status Aggregated system state.
+ * @property {SystemServiceDto[]} services Services ordered by name.
+ */
+
+/** @returns {Promise<SystemStatusDto>} */
+export async function getSystemStatus(request) {
+  return /** @type {Promise<SystemStatusDto>} */ (request('/api/system'));
+}
+
+/** @returns {Promise<SystemStatusDto>} */
+export async function runSystemAction(request, action, service = '') {
+  const target = service ? `/api/system/services/${encodeURIComponent(service)}/${action}` : `/api/system/${action}`;
+  return /** @type {Promise<SystemStatusDto>} */ (request(target, { method: 'POST' }));
+}
