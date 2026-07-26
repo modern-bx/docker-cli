@@ -7,6 +7,7 @@ namespace DockerCli\Panel;
 use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\Dto\ProjectDto;
 use DockerCli\Panel\Dto\ProjectListDto;
+use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
 
 final class ProjectController
@@ -32,7 +33,8 @@ final class ProjectController
         if ($action === 'enable' || $action === 'disable') {
             $config['data']['project']['enabled'] = $action === 'enable';
             $this->projects->writeProjectConfig($name, $config);
-            $this->restartProjectServices();
+            (new OpenRestyHostRenderer())->render();
+            $this->reloadOpenResty();
         } elseif ($action === 'wipe') {
             $this->wipe($name, $project);
         } else {
@@ -92,15 +94,15 @@ final class ProjectController
         if (!rmdir($path)) throw new ProjectActionException(sprintf('Не удалось удалить директорию "%s".', $path));
     }
 
-    private function restartProjectServices(): void
+    private function reloadOpenResty(): void
     {
         $compose = $this->compose ?? new SystemCompose();
-        $command = [...$compose->dockerComposeCommand('up'), '--detach', '--force-recreate', 'traefik', 'openresty', 'php-fpm-8.2'];
+        $command = [...$compose->dockerComposeCommand('exec'), '--no-TTY', 'openresty', 'openresty', '-s', 'reload'];
         $process = proc_open($command, [['file', '/dev/null', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes, $compose->directory(), $compose->dockerProcessEnvironment());
-        if (!is_resource($process)) throw new ProjectActionException('Не удалось перезапустить сервисы проекта.');
+        if (!is_resource($process)) throw new ProjectActionException('Не удалось перезагрузить конфигурацию OpenResty.');
         $stdout = stream_get_contents($pipes[1]); $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[1]); fclose($pipes[2]);
         $code = proc_close($process);
-        if ($code !== 0) throw new ProjectActionException(trim($stdout . "\n" . $stderr) ?: 'Не удалось перезапустить сервисы проекта.');
+        if ($code !== 0) throw new ProjectActionException(trim($stdout . "\n" . $stderr) ?: 'Не удалось перезагрузить конфигурацию OpenResty.');
     }
 }
