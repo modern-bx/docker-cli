@@ -7,7 +7,6 @@ namespace DockerCli\Panel;
 use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\Dto\SystemServiceDto;
 use DockerCli\Panel\Dto\SystemStatusDto;
-use Symfony\Component\Yaml\Yaml;
 
 final class SystemController
 {
@@ -53,7 +52,13 @@ final class SystemController
     /** @return array<string, string> */
     private function configuredServices(): array
     {
-        $config = Yaml::parseFile($this->compose->composeFile());
+        [$code, $output] = $this->run(['config', '--format', 'json'], false);
+        $config = json_decode($output, true);
+        if ($code !== 0 || !is_array($config)) {
+            throw new SystemActionException($output !== '' ? $output : 'Не удалось прочитать конфигурацию Docker Compose.');
+        }
+        // `docker compose config` performs the same .env interpolation that is
+        // used to start containers, so image tooltips never expose raw ${...}.
         $definitions = is_array($config['services'] ?? null) ? $config['services'] : [];
         $services = [];
         foreach ($definitions as $name => $definition) {
@@ -106,9 +111,13 @@ final class SystemController
         $command = [...array_slice($this->compose->dockerComposeCommand(''), 0, -1), ...$arguments];
         $process = proc_open($command, [['file', '/dev/null', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes, $this->compose->directory(), $this->compose->dockerProcessEnvironment());
         if (!is_resource($process)) throw new SystemActionException('Не удалось запустить Docker Compose.');
-        $output = trim(stream_get_contents($pipes[1]) . "\n" . stream_get_contents($pipes[2]));
+        $stdout = trim(stream_get_contents($pipes[1]));
+        $stderr = trim(stream_get_contents($pipes[2]));
         fclose($pipes[1]); fclose($pipes[2]);
         $code = proc_close($process);
+        // Compose warnings go to stderr even on success and must not corrupt
+        // machine-readable JSON requested on stdout.
+        $output = $code === 0 ? $stdout : trim($stdout . "\n" . $stderr);
         if ($fail && $code !== 0) throw new SystemActionException($output !== '' ? $output : 'Docker Compose завершился с ошибкой.');
 
         return [$code, $output];

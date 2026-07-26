@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { Collapsible, Dialog } from '@skeletonlabs/skeleton-svelte';
+  import { Play, RotateCw, Square } from '@lucide/svelte';
   import { getProjects, getSystemStatus, runSystemAction } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
@@ -317,8 +318,11 @@
                   <span class={`system-dot ${service.running ? 'running' : 'stopped'}`} aria-hidden="true"></span>
                   <span class="system-service-name" title={service.image}>{service.name}</span>
                   <div class="system-actions">
-                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction(service.running ? 'stop' : 'start', service.name)}>{service.running ? 'Остановить' : 'Запустить'}</button>
-                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart', service.name)}>Перезапустить</button>
+                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction(service.running ? 'stop' : 'start', service.name)}>
+                      {#if service.running}<Square size={14} aria-hidden="true" />{:else}<Play size={14} aria-hidden="true" />{/if}
+                      {service.running ? 'Остановить' : 'Запустить'}
+                    </button>
+                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart', service.name)}><RotateCw size={14} aria-hidden="true" />Перезапустить</button>
                   </div>
                 </div>
               {/each}
@@ -326,9 +330,9 @@
           {/if}
         </div>
         <div class="system-actions system-global-actions">
-          {#if hasStoppedServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('start')}>Запустить</button>{/if}
-          {#if hasRunningServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('stop')}>Остановить</button>{/if}
-          <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart')}>Перезапустить</button>
+          {#if hasStoppedServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('start')}><Play size={14} aria-hidden="true" />Запустить</button>{/if}
+          {#if hasRunningServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('stop')}><Square size={14} aria-hidden="true" />Остановить</button>{/if}
+          <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart')}><RotateCw size={14} aria-hidden="true" />Перезапустить</button>
         </div>
       </div>
     {/if}
