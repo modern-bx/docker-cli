@@ -169,9 +169,28 @@
       systemStatus = data.status;
       systemServices = data.services;
     } catch (cause) {
-      errorTitle = 'Не удалось выполнить действие';
-      error = cause instanceof Error ? cause.message : 'Не удалось выполнить действие.';
-      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+      // The proxy connection can be interrupted while Docker has already
+      // completed the operation. Reconcile transport errors with fresh state
+      // before telling the user that the action failed.
+      let reconciled = false;
+      if (!(cause instanceof Error && 'status' in cause)) {
+        try {
+          const data = await getSystemStatus(api);
+          systemStatus = data.status;
+          systemServices = data.services;
+          const target = service ? data.services.find((item) => item.name === service) : null;
+          reconciled = action === 'restart'
+            || (action === 'start' && (service ? target?.running === true : data.services.every((item) => item.running)))
+            || (action === 'stop' && (service ? target?.running === false : data.services.every((item) => !item.running)));
+        } catch {
+          // Keep the original transport error when status cannot be refreshed.
+        }
+      }
+      if (!reconciled) {
+        errorTitle = 'Не удалось выполнить действие';
+        error = cause instanceof Error ? cause.message : 'Не удалось выполнить действие.';
+        errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+      }
     } finally {
       systemPending = false;
       refreshSystem();
