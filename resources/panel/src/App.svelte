@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Collapsible } from '@skeletonlabs/skeleton-svelte';
+  import { Collapsible, Dialog } from '@skeletonlabs/skeleton-svelte';
   import { getProjects } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
@@ -24,6 +24,7 @@
   let currentLogin = '';
   let token = '';
   let error = '';
+  let errorStatus = 0;
   let loading = true;
   let submitting = false;
   let profileOpen = false;
@@ -85,8 +86,17 @@
         ...(options.headers || {}),
       },
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Не удалось выполнить запрос.');
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      const cause = Object.assign(new Error('Сервер вернул некорректный ответ.'), { status: response.status });
+      throw cause;
+    }
+    if (!response.ok) {
+      const cause = Object.assign(new Error(data.error || 'Не удалось выполнить запрос.'), { status: response.status });
+      throw cause;
+    }
     return data;
   }
 
@@ -133,6 +143,7 @@
 
   async function submit() {
     error = '';
+    errorStatus = 0;
     submitting = true;
     try {
       const data = await api('/api/auth/login', {
@@ -143,6 +154,7 @@
       acceptSession(data);
     } catch (cause) {
       error = cause instanceof Error ? cause.message : 'Не удалось выполнить вход.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
     } finally {
       submitting = false;
     }
@@ -311,8 +323,8 @@
                 <Collapsible.Content class="collapsible-content">
                   <dl class="project-fields">
                     <div><dt>Название</dt><dd>{selectedProject.name}</dd></div>
-                    <div><dt>Язык</dt><dd>{selectedProject.language || 'no-language'}</dd></div>
-                    <div><dt>Фреймворк</dt><dd>{selectedProject.framework || 'no-framework'}</dd></div>
+                    <div><dt>Язык</dt><dd>{selectedProject.language || 'Не указан'}</dd></div>
+                    <div><dt>Фреймворк</dt><dd>{selectedProject.framework || 'Не указан'}</dd></div>
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
                   </dl>
                 </Collapsible.Content>
@@ -328,11 +340,19 @@
   </main>
 </div>
 
-{#if error}
-  <div class="fixed inset-x-4 bottom-5 flex justify-center z-20" role="alert">
-    <div class="card preset-filled-error-500 max-w-md p-4 shadow-2xl flex items-center gap-4">
-      <span>{error}</span>
-      <button class="btn-icon preset-tonal ml-auto" type="button" aria-label="Закрыть" onclick={() => error = ''}>×</button>
-    </div>
-  </div>
-{/if}
+<Dialog
+  open={Boolean(error)}
+  role={errorStatus >= 500 ? 'alertdialog' : 'dialog'}
+  onOpenChange={({ open }) => { if (!open) error = ''; }}
+>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class={`login-error-dialog card preset-filled-surface-100-900 shadow-2xl${errorStatus >= 500 ? ' error-alert' : ''}`}>
+      <Dialog.Title class="login-error-title">{errorStatus >= 500 ? 'Ошибка сервера' : 'Не удалось войти'}</Dialog.Title>
+      <Dialog.Description class="login-error-description">{error}</Dialog.Description>
+      <div class="login-error-actions">
+        <Dialog.CloseTrigger class={`btn preset-filled-primary-500${errorStatus >= 500 ? ' error-alert-button' : ''}`} type="button">Закрыть</Dialog.CloseTrigger>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
