@@ -22,9 +22,16 @@ use DockerCli\Command\BitrixGetInstallerCommand;
 use DockerCli\Command\ImageBuildCommand;
 use DockerCli\Command\ImagePublishCommand;
 use DockerCli\Command\PlayRunCommand;
+use DockerCli\Command\PanelUpCommand;
+use DockerCli\Panel\HttpResponse;
 use Symfony\Component\Console\Application;
 
 require __DIR__ . '/../vendor/autoload.php';
+
+if (PHP_SAPI === 'cli-server') {
+    HttpResponse::send($_SERVER['REQUEST_METHOD'] ?? 'GET', parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/');
+    return;
+}
 
 $application = new Application('docker-cli', '0.1.0');
 $application->add(new ConfigInitCommand());
@@ -48,5 +55,6 @@ $application->add(new ImageBuildCommand());
 $application->add(new ImagePublishCommand());
 $application->add(new PlayRunCommand());
 $application->add(new BitrixGetInstallerCommand());
+$application->add(new PanelUpCommand());
 $application->setDefaultCommand('list');
 $application->run();
