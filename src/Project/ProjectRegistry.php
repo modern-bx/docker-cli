@@ -64,7 +64,7 @@ final class ProjectRegistry
     /** @param array<string, mixed> $config */
     public function writeProjectConfig(string $projectName, array $config): void
     {
-        file_put_contents($this->projectConfigFile($projectName), Yaml::dump($config, 6, 2));
+        file_put_contents($this->projectConfigFile($projectName), Yaml::dump($config, 6, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
     }
 
     public function projectNameFromContext(?string $startDirectory = null): ?string

@@ -45,6 +45,26 @@ final class HttpResponse
                 return $this->json($exception->httpStatus, ['error' => $exception->getMessage()]);
             }
         }
+        if ($request->getMethod() === 'POST' && preg_match('#^/api/projects/([^/]+)/notes$#', $path, $matches) === 1) {
+            if ($this->authenticatedLogin($request) === null) {
+                return $this->json(401, ['error' => 'Сессия истекла.']);
+            }
+            try {
+                $body = json_decode((string) $request->getBody(), true, 8, JSON_THROW_ON_ERROR);
+                if (!is_array($body) || !is_array($body['tags'] ?? null) || !is_string($body['description'] ?? null)) {
+                    throw new ProjectActionException('Некорректные данные заметок.', 400);
+                }
+                return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->saveNotes(
+                    rawurldecode($matches[1]),
+                    array_values($body['tags']),
+                    $body['description'],
+                ));
+            } catch (\JsonException) {
+                return $this->json(400, ['error' => 'Некорректный запрос.']);
+            } catch (ProjectActionException $exception) {
+                return $this->json($exception->httpStatus, ['error' => $exception->getMessage()]);
+            }
+        }
         if (str_starts_with($path, '/api/system')) {
             if ($this->authenticatedLogin($request) === null) {
                 return $this->json(401, ['error' => 'Сессия истекла.']);

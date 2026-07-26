@@ -47,20 +47,60 @@ final class ProjectController
     public function index(): ProjectListDto
     {
         $projects = [];
+        $baseHost = ($this->compose ?? new SystemCompose())->envValue('BASE_HOST', '');
         foreach ($this->projects->registeredProjectNames() as $name) {
             $config = $this->projects->readProjectConfig($name);
             $project = is_array($config['data']['project'] ?? null) ? $config['data']['project'] : [];
+            $projectName = is_string($project['name'] ?? null) && $project['name'] !== '' ? $project['name'] : $name;
             $projects[] = new ProjectDto(
-                name: is_string($project['name'] ?? null) && $project['name'] !== '' ? $project['name'] : $name,
+                name: $projectName,
                 language: $this->nullableString($project['language'] ?? null),
                 framework: $this->nullableString($project['framework'] ?? null),
                 // Older project configs predate this flag and are enabled by default,
                 // just like OpenRestyHostRenderer treats them.
                 enabled: ($project['enabled'] ?? true) !== false,
+                url: $baseHost !== '' ? sprintf('https://web-%s.%s', $projectName, $baseHost) : null,
+                tags: $this->tags($project['tags'] ?? []),
+                description: is_string($project['description'] ?? null) ? $project['description'] : '',
             );
         }
 
         return new ProjectListDto($projects);
+    }
+
+    /** @param list<mixed> $tags */
+    public function saveNotes(string $name, array $tags, string $description): ProjectListDto
+    {
+        if (!$this->projects->hasProject($name)) {
+            throw new ProjectActionException('Проект не найден.', 404);
+        }
+        $normalizedTags = [];
+        foreach ($tags as $tag) {
+            if (!is_string($tag) || preg_match('/^[\p{L}\p{N} -]+$/u', $tag) !== 1) {
+                throw new ProjectActionException('Теги могут содержать только буквы, цифры, дефис и пробел.', 422);
+            }
+            $tag = trim($tag);
+            if ($tag !== '' && !in_array($tag, $normalizedTags, true)) {
+                $normalizedTags[] = $tag;
+            }
+        }
+        $config = $this->projects->readProjectConfig($name);
+        if (!is_array($config['data']['project'] ?? null)) {
+            throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
+        }
+        $config['data']['project']['tags'] = $normalizedTags;
+        $config['data']['project']['description'] = $description;
+        $this->projects->writeProjectConfig($name, $config);
+
+        return $this->index();
+    }
+
+    /** @return list<string> */
+    private function tags(mixed $tags): array
+    {
+        if (!is_array($tags)) return [];
+
+        return array_values(array_filter($tags, static fn (mixed $tag): bool => is_string($tag) && $tag !== ''));
     }
 
     private function nullableString(mixed $value): ?string

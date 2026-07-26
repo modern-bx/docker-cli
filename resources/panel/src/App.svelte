@@ -1,8 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import { Collapsible, Dialog } from '@skeletonlabs/skeleton-svelte';
-  import { Play, Power, RotateCw, Square, Trash2 } from '@lucide/svelte';
-  import { getProjects, getSystemStatus, runProjectAction, runSystemAction } from './api.js';
+  import { ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -47,15 +47,27 @@
   let systemPendingMessage = '';
   let systemConfirmation = null;
   let projectConfirmation = null;
+  let projectContextMenu = null;
+  let notesProjectName = '';
+  let noteTags = [];
+  let noteTagInput = '';
+  let noteDescription = '';
+  let notesSaving = false;
   const panelServices = ['dnsdock', 'panel-gateway', 'traefik'];
 
   $: hasRunningServices = systemServices.some((service) => service.running);
   $: hasStoppedServices = systemServices.some((service) => !service.running);
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
+  $: if (selectedProject && selectedProject.name !== notesProjectName) {
+    notesProjectName = selectedProject.name;
+    noteTags = [...selectedProject.tags];
+    noteTagInput = '';
+    noteDescription = selectedProject.description;
+  }
   $: filteredProjects = projects.filter((project) => {
     const matchesName = project.name.toLocaleLowerCase().includes(projectQuery.trim().toLocaleLowerCase());
-    const tags = [project.language || 'no-language', project.framework || 'no-framework'];
+    const tags = [project.language || 'no-language', project.framework || 'no-framework', ...project.tags];
     return matchesName && projectTags.every((tag) => tags.includes(tag));
   });
 
@@ -65,6 +77,48 @@
 
   function removeProjectTag(tag) {
     projectTags = projectTags.filter((item) => item !== tag);
+  }
+
+  function addProjectTagFromInput() {
+    const tag = projectQuery.trim();
+    if (!tag || !/^[\p{L}\p{N} -]+$/u.test(tag)) return;
+    addProjectTag(tag);
+    projectQuery = '';
+  }
+
+  function validateProjectQuery(event) {
+    const nextValue = event.currentTarget.value;
+    projectQuery = [...nextValue].filter((character) => /^[\p{L}\p{N} -]$/u.test(character)).join('');
+  }
+
+  function addNoteTag() {
+    const tag = noteTagInput.trim();
+    if (!tag || !/^[\p{L}\p{N} -]+$/u.test(tag)) return;
+    if (!noteTags.includes(tag)) noteTags = [...noteTags, tag];
+    noteTagInput = '';
+  }
+
+  function removeNoteTag(tag) {
+    noteTags = noteTags.filter((item) => item !== tag);
+  }
+
+  function validateNoteTagInput(event) {
+    const nextValue = event.currentTarget.value;
+    noteTagInput = [...nextValue].filter((character) => /^[\p{L}\p{N} -]$/u.test(character)).join('');
+  }
+
+  async function saveNotes() {
+    if (!selectedProject || notesSaving) return;
+    notesSaving = true;
+    projectsError = '';
+    try {
+      const data = await saveProjectNotes(api, selectedProject.name, noteTags, noteDescription);
+      projects = data.projects;
+    } catch (cause) {
+      projectsError = cause instanceof Error ? cause.message : 'Не удалось сохранить заметки.';
+    } finally {
+      notesSaving = false;
+    }
   }
 
   function applyAppearance() {
@@ -85,10 +139,31 @@
   }
 
   function closeMenus(event) {
+    if (event.target instanceof Element && event.target.closest('.project-context-menu')) return;
+    projectContextMenu = null;
     if (event.target instanceof Element && event.target.closest('.header-menu')) return;
     themeOpen = false;
     profileOpen = false;
     systemOpen = false;
+  }
+
+  function openProjectContextMenu(event, project) {
+    event.preventDefault();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
+    const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.top;
+    selectedProjectName = project.name;
+    projectContextMenu = {
+      project,
+      x: Math.max(8, Math.min(x, window.innerWidth - 184)),
+      y: Math.max(8, Math.min(y, window.innerHeight - 152)),
+    };
+  }
+
+  function runContextProjectAction(action) {
+    const project = projectContextMenu?.project;
+    projectContextMenu = null;
+    if (project) requestProjectAction(action, project);
   }
 
   async function api(path, options = {}) {
@@ -359,7 +434,7 @@
 
 <svelte:head><title>{token ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
 
-<div class="min-h-screen bg-surface-50-950 text-surface-950-50 flex flex-col">
+<div class:panel-shell={token && !loading} class="min-h-screen bg-surface-50-950 text-surface-950-50 flex flex-col">
   <header class="app-header h-16 border-b border-surface-200-800 bg-surface-100-900 flex items-center px-5 md:px-8 shadow-sm">
     {#if token}<a href="#/" class="font-bold text-xl no-underline">docker-cli</a>{/if}
     {#if token}
@@ -479,41 +554,56 @@
                   <button type="button" aria-label={`Удалить тег ${tag}`} onclick={() => removeProjectTag(tag)}>×</button>
                 </span>
               {/each}
-              <input type="search" bind:value={projectQuery} placeholder={projectTags.length ? 'Название…' : 'Поиск по названию…'} />
+              <input
+                type="search"
+                value={projectQuery}
+                oninput={validateProjectQuery}
+                onkeydown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addProjectTagFromInput(); } }}
+                placeholder={projectTags.length ? 'Название или новый тег…' : 'Название или тег…'}
+              />
             </label>
-            {#if projectsLoading}
-              <p class="project-message animate-pulse">Загрузка проектов…</p>
-            {:else if filteredProjects.length === 0}
-              <p class="project-message">{projects.length ? 'Ничего не найдено' : 'Проекты не найдены'}</p>
-            {:else}
-              <div class="project-list">
-                {#each filteredProjects as project (project.name)}
-                  <div
-                    role="button"
-                    tabindex="0"
-                    class="project-item"
-                    class:selected={selectedProjectName === project.name}
-                    aria-pressed={selectedProjectName === project.name}
-                    onclick={() => { selectedProjectName = project.name; }}
-                    onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectedProjectName = project.name; } }}
-                  >
-                    <span class:enabled={project.enabled} class="status-dot" title={project.enabled ? 'Включен' : 'Выключен'}></span>
-                    <span class="project-summary">
-                      <strong>{project.name}</strong>
-                      <span class="project-tags">
-                        {#each [project.language || 'no-language', project.framework || 'no-framework'] as tag}
-                          <button type="button" onclick={(event) => { event.stopPropagation(); addProjectTag(tag); }}>{tag}</button>
-                        {/each}
+            <div class="project-list-scroll">
+              {#if projectsLoading}
+                <p class="project-message animate-pulse">Загрузка проектов…</p>
+              {:else if filteredProjects.length === 0}
+                <p class="project-message">{projects.length ? 'Ничего не найдено' : 'Проекты не найдены'}</p>
+              {:else}
+                <div class="project-list">
+                  {#each filteredProjects as project (project.name)}
+                    <div
+                      role="button"
+                      tabindex="0"
+                      class="project-item"
+                      class:selected={selectedProjectName === project.name}
+                      aria-pressed={selectedProjectName === project.name}
+                      onclick={() => { selectedProjectName = project.name; }}
+                      oncontextmenu={(event) => openProjectContextMenu(event, project)}
+                      onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectedProjectName = project.name; } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { openProjectContextMenu(event, project); } }}
+                    >
+                      <span class:enabled={project.enabled} class="status-dot" title={project.enabled ? 'Включен' : 'Выключен'}></span>
+                      <span class="project-summary">
+                        <strong>{project.name}</strong>
+                        <span class="project-tags">
+                          {#each [project.language || 'no-language', project.framework || 'no-framework', ...project.tags] as tag}
+                            <button type="button" onclick={(event) => { event.stopPropagation(); addProjectTag(tag); }}>{tag}</button>
+                          {/each}
+                        </span>
                       </span>
-                    </span>
-                  </div>
-                {/each}
-              </div>
-            {/if}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
           </aside>
           <div class="project-details">
             {#if selectedProject}
-              <Collapsible defaultOpen={true} class="collapsible card preset-filled-surface-100-900">
+              <div class="project-toolbar">
+                <button class="btn preset-filled-primary-500" type="button" disabled={notesSaving} onclick={saveNotes}>
+                  <Save size={16} aria-hidden="true" />{notesSaving ? 'Сохраняем…' : 'Сохранить'}
+                </button>
+              </div>
+              <div class="project-details-scroll">
+                <Collapsible defaultOpen={true} class="collapsible card preset-filled-surface-100-900">
                 <Collapsible.Trigger class="collapsible-trigger">
                   <span>Общее</span>
                   <Collapsible.Indicator class="collapsible-indicator">⌄</Collapsible.Indicator>
@@ -524,6 +614,7 @@
                     <div><dt>Язык</dt><dd>{selectedProject.language || 'Не указан'}</dd></div>
                     <div><dt>Фреймворк</dt><dd>{selectedProject.framework || 'Не указан'}</dd></div>
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
+                    <div><dt>Основной хост</dt><dd>{#if selectedProject.url}<a class="project-host" href={selectedProject.url} target="_blank" rel="noreferrer">{selectedProject.url}<ExternalLink size={14} aria-hidden="true" /></a>{:else}Не указан{/if}</dd></div>
                   </dl>
                   <div class="project-general-actions">
                     <button class="btn preset-tonal" type="button" onclick={() => requestProjectAction(selectedProject.enabled ? 'disable' : 'enable', selectedProject)}>
@@ -534,7 +625,29 @@
                     </button>
                   </div>
                 </Collapsible.Content>
-              </Collapsible>
+                </Collapsible>
+                <Collapsible defaultOpen={true} class="collapsible card preset-filled-surface-100-900 project-notes">
+                <Collapsible.Trigger class="collapsible-trigger">
+                  <span>Заметки</span>
+                  <Collapsible.Indicator class="collapsible-indicator">⌄</Collapsible.Indicator>
+                </Collapsible.Trigger>
+                <Collapsible.Content class="collapsible-content notes-content">
+                  <label class="label">
+                    <span class="label-text">Теги</span>
+                    <span class="notes-tags-input input">
+                      {#each noteTags as tag (tag)}
+                        <span class="search-tag">{tag}<button type="button" aria-label={`Удалить тег ${tag}`} onclick={() => removeNoteTag(tag)}>×</button></span>
+                      {/each}
+                      <input value={noteTagInput} oninput={validateNoteTagInput} onkeydown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addNoteTag(); } }} placeholder={noteTags.length ? 'Добавить тег…' : 'Введите тег и нажмите Enter'} />
+                    </span>
+                  </label>
+                  <label class="label">
+                    <span class="label-text">Заметки</span>
+                    <textarea class="textarea notes-textarea" bind:value={noteDescription} rows="8" placeholder="Произвольные заметки о проекте"></textarea>
+                  </label>
+                </Collapsible.Content>
+                </Collapsible>
+              </div>
             {:else}
               <div class="select-project">Выберите проект</div>
             {/if}
@@ -545,6 +658,30 @@
     {/if}
   </main>
 </div>
+
+{#if projectContextMenu}
+  <div
+    class="project-context-menu card preset-filled-surface-100-900 shadow-2xl"
+    role="menu"
+    aria-label={`Действия с проектом ${projectContextMenu.project.name}`}
+    style={`left: ${projectContextMenu.x}px; top: ${projectContextMenu.y}px;`}
+  >
+    {#if projectContextMenu.project.url}
+      <a href={projectContextMenu.project.url} target="_blank" rel="noreferrer" role="menuitem" onclick={() => { projectContextMenu = null; }}>
+        <ExternalLink size={16} aria-hidden="true" />Открыть
+      </a>
+    {:else}
+      <button type="button" role="menuitem" disabled><ExternalLink size={16} aria-hidden="true" />Открыть</button>
+    {/if}
+    <hr />
+    <button type="button" role="menuitem" onclick={() => runContextProjectAction(projectContextMenu.project.enabled ? 'disable' : 'enable')}>
+      <Power size={16} aria-hidden="true" />{projectContextMenu.project.enabled ? 'Отключить' : 'Включить'}
+    </button>
+    <button class="danger" type="button" role="menuitem" onclick={() => runContextProjectAction('wipe')}>
+      <Trash2 size={16} aria-hidden="true" />Стереть
+    </button>
+  </div>
+{/if}
 
 <Dialog open={Boolean(projectConfirmation)} onOpenChange={({ open }) => { if (!open) projectConfirmation = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
