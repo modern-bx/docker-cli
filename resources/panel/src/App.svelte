@@ -35,8 +35,23 @@
   let selectedProjectName = '';
   let projectsLoading = false;
   let projectsError = '';
+  let projectQuery = '';
+  let projectTags = [];
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
+  $: filteredProjects = projects.filter((project) => {
+    const matchesName = project.name.toLocaleLowerCase().includes(projectQuery.trim().toLocaleLowerCase());
+    const tags = [project.language || 'no-language', project.framework || 'no-framework'];
+    return matchesName && projectTags.every((tag) => tags.includes(tag));
+  });
+
+  function addProjectTag(tag) {
+    if (!projectTags.includes(tag)) projectTags = [...projectTags, tag];
+  }
+
+  function removeProjectTag(tag) {
+    projectTags = projectTags.filter((item) => item !== tag);
+  }
 
   function applyAppearance() {
     document.documentElement.dataset.theme = theme;
@@ -246,26 +261,42 @@
               <h1>Проекты</h1>
               <span>{projects.length}</span>
             </div>
+            <label class="project-search" aria-label="Поиск проектов">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg>
+              {#each projectTags as tag (tag)}
+                <span class="search-tag">
+                  {tag}
+                  <button type="button" aria-label={`Удалить тег ${tag}`} onclick={() => removeProjectTag(tag)}>×</button>
+                </span>
+              {/each}
+              <input type="search" bind:value={projectQuery} placeholder={projectTags.length ? 'Название…' : 'Поиск по названию…'} />
+            </label>
             {#if projectsLoading}
               <p class="project-message animate-pulse">Загрузка проектов…</p>
-            {:else if projects.length === 0}
-              <p class="project-message">Проекты не найдены</p>
+            {:else if filteredProjects.length === 0}
+              <p class="project-message">{projects.length ? 'Ничего не найдено' : 'Проекты не найдены'}</p>
             {:else}
               <div class="project-list">
-                {#each projects as project (project.name)}
-                  <button
-                    type="button"
+                {#each filteredProjects as project (project.name)}
+                  <div
+                    role="button"
+                    tabindex="0"
                     class="project-item"
                     class:selected={selectedProjectName === project.name}
                     aria-pressed={selectedProjectName === project.name}
                     onclick={() => { selectedProjectName = project.name; }}
+                    onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectedProjectName = project.name; } }}
                   >
                     <span class:enabled={project.enabled} class="status-dot" title={project.enabled ? 'Включен' : 'Выключен'}></span>
                     <span class="project-summary">
                       <strong>{project.name}</strong>
-                      <small>{project.language || 'Язык не указан'} · {project.framework || 'Без фреймворка'}</small>
+                      <span class="project-tags">
+                        {#each [project.language || 'no-language', project.framework || 'no-framework'] as tag}
+                          <button type="button" onclick={(event) => { event.stopPropagation(); addProjectTag(tag); }}>{tag}</button>
+                        {/each}
+                      </span>
                     </span>
-                  </button>
+                  </div>
                 {/each}
               </div>
             {/if}
@@ -280,8 +311,8 @@
                 <Collapsible.Content class="collapsible-content">
                   <dl class="project-fields">
                     <div><dt>Название</dt><dd>{selectedProject.name}</dd></div>
-                    <div><dt>Язык</dt><dd>{selectedProject.language || 'Не указан'}</dd></div>
-                    <div><dt>Фреймворк</dt><dd>{selectedProject.framework || 'Не указан'}</dd></div>
+                    <div><dt>Язык</dt><dd>{selectedProject.language || 'no-language'}</dd></div>
+                    <div><dt>Фреймворк</dt><dd>{selectedProject.framework || 'no-framework'}</dd></div>
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
                   </dl>
                 </Collapsible.Content>

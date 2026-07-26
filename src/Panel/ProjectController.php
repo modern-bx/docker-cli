@@ -24,7 +24,9 @@ final class ProjectController
                 name: is_string($project['name'] ?? null) && $project['name'] !== '' ? $project['name'] : $name,
                 language: $this->nullableString($project['language'] ?? null),
                 framework: $this->nullableString($project['framework'] ?? null),
-                enabled: ($project['enabled'] ?? false) === true,
+                // Older project configs predate this flag and are enabled by default,
+                // just like OpenRestyHostRenderer treats them.
+                enabled: ($project['enabled'] ?? true) !== false,
             );
         }
 
