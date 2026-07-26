@@ -29,7 +29,15 @@ final class OpenRestyHostRenderer
         $baseHost = $this->requiredEnvValue($envValues, 'BASE_HOST', $compose->envFile());
         $openRestyPort = $this->openRestyPort($envValues, $compose->envFile());
         $hostNames = [];
+        $disabledHostNames = [];
         foreach ($this->registeredProjects() as $project) {
+            $hostName = sprintf('web-%s.%s', $project['name'], $baseHost);
+            $hostNames[] = $hostName;
+            if (!$project['enabled']) {
+                $disabledHostNames[] = $hostName;
+                continue;
+            }
+
             $template = $this->templateFile($project['framework']);
             if (!is_file($template)) {
                 throw new \RuntimeException(sprintf('OpenResty host template for framework "%s" not found.', $project['framework']));
@@ -40,8 +48,6 @@ final class OpenRestyHostRenderer
                 throw new \RuntimeException(sprintf('Unable to read OpenResty host template "%s".', $template));
             }
 
-            $hostName = sprintf('web-%s.%s', $project['name'], $baseHost);
-            $hostNames[] = $hostName;
             $target = join_path($hostsDirectory, $project['name'] . '.web.conf');
             file_put_contents($target, strtr($contents, [
                 '{{ project_name }}' => $project['name'],
@@ -53,6 +59,8 @@ final class OpenRestyHostRenderer
             ]));
         }
 
+        $this->renderFallbackHost($hostsDirectory, $openRestyPort, [$baseHost, ...$disabledHostNames]);
+
         $this->writeProjectWebDnsdockAliases($compose->envFile(), $hostNames);
     }
 
@@ -61,7 +69,7 @@ final class OpenRestyHostRenderer
         return join_path($compose->directory(), self::HOSTS_RELATIVE_PATH);
     }
 
-    /** @return list<array{name: string, framework: string, document_root: string, xdebug_client_port?: int, language?: string, version?: string}> */
+    /** @return list<array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?: int, language?: string, version?: string}> */
     private function registeredProjects(): array
     {
         $projectsDirectory = $this->projectsDirectory();
@@ -91,6 +99,7 @@ final class OpenRestyHostRenderer
             if (is_string($name) && is_string($framework) && is_string($documentRoot)) {
                 $projects[] = array_filter([
                     'name' => $name,
+                    'enabled' => ($project['enabled'] ?? true) !== false,
                     'framework' => $framework,
                     'language' => is_string($project['language'] ?? null) ? $project['language'] : null,
                     'version' => is_string($project['version'] ?? null) ? $project['version'] : null,
@@ -101,6 +110,21 @@ final class OpenRestyHostRenderer
         }
 
         return $projects;
+    }
+
+    /** @param list<string> $hostNames */
+    private function renderFallbackHost(string $hostsDirectory, int $port, array $hostNames): void
+    {
+        $template = join_path(dirname(__DIR__, 2), 'resources', 'compose', 'system', 'config', 'openresty', 'fallback.conf');
+        $contents = file_get_contents($template);
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf('Unable to read OpenResty fallback template "%s".', $template));
+        }
+
+        file_put_contents(join_path($hostsDirectory, 'fallback.web.conf'), strtr($contents, [
+            '{{ openresty_port }}' => (string) $port,
+            '{{ host_names }}' => implode(' ', $hostNames),
+        ]));
     }
 
     /** @param array<string, mixed> $project */
@@ -118,7 +142,7 @@ final class OpenRestyHostRenderer
         return 9003;
     }
 
-    /** @param array{name: string, framework: string, document_root: string, xdebug_client_port?: int, language?: string, version?: string} $project */
+    /** @param array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?: int, language?: string, version?: string} $project */
     private function phpFpmUpstream(array $project): string
     {
         $language = $project['language'] ?? 'php';

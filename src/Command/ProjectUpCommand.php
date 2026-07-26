@@ -94,6 +94,7 @@ final class ProjectUpCommand extends Command
             'data' => [
                 'project' => [
                     'name' => $projectName,
+                    'enabled' => true,
                     'framework' => $description?->getCodeName()->value ?? false,
                     'language' => 'php',
                     ...$this->languageVersionConfig($projectRoot),

@@ -58,7 +58,7 @@ final class PanelUpCommand extends Command
 
         $server = new HttpServer(HttpResponse::forRequest(...));
         $server->listen($socket);
-        $output->writeln(sprintf('<info>Панель запущена на https://panel.%s.</info>', $compose->envValue('BASE_HOST', '')));
+        $output->writeln(sprintf('<info>Панель запущена на https://panel.%s</info>', $compose->envValue('BASE_HOST', '')));
         Loop::run();
 
         return Command::SUCCESS;

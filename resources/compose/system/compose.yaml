@@ -35,7 +35,7 @@ services:
       - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
     environment:
       CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
-      DNSDOCK_ALIAS: dockge.${BASE_HOST},adminer.${BASE_HOST},panel.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
+      DNSDOCK_ALIAS: ${BASE_HOST},dockge.${BASE_HOST},adminer.${BASE_HOST},panel.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
     ports:
       - "${TRAEFIK_HTTP_PORT:-80}:80"
       - "${TRAEFIK_HTTPS_PORT:-443}:443"
@@ -213,11 +213,11 @@ services:
       - /:/host:ro
     labels:
       traefik.enable: "true"
-      traefik.http.routers.openresty-http.rule: HostRegexp(`^web-.+\.${BASE_HOST}$`)
+      traefik.http.routers.openresty-http.rule: Host(`${BASE_HOST}`) || HostRegexp(`^web-.+\.${BASE_HOST}$`)
       traefik.http.routers.openresty-http.entrypoints: web
       traefik.http.routers.openresty-http.middlewares: openresty-https-redirect
       traefik.http.routers.openresty-http.service: openresty
-      traefik.http.routers.openresty.rule: HostRegexp(`^web-.+\.${BASE_HOST}$`)
+      traefik.http.routers.openresty.rule: Host(`${BASE_HOST}`) || HostRegexp(`^web-.+\.${BASE_HOST}$`)
       traefik.http.routers.openresty.entrypoints: websecure
       traefik.http.routers.openresty.tls: "true"
       traefik.http.routers.openresty.tls.certresolver: cloudflare
