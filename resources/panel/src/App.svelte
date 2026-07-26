@@ -422,7 +422,7 @@
 
 <svelte:head><title>{token ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
 
-<div class="min-h-screen bg-surface-50-950 text-surface-950-50 flex flex-col">
+<div class:panel-shell={token && !loading} class="min-h-screen bg-surface-50-950 text-surface-950-50 flex flex-col">
   <header class="app-header h-16 border-b border-surface-200-800 bg-surface-100-900 flex items-center px-5 md:px-8 shadow-sm">
     {#if token}<a href="#/" class="font-bold text-xl no-underline">docker-cli</a>{/if}
     {#if token}
@@ -544,36 +544,38 @@
               {/each}
               <input type="search" bind:value={projectQuery} placeholder={projectTags.length ? 'Название…' : 'Поиск по названию…'} />
             </label>
-            {#if projectsLoading}
-              <p class="project-message animate-pulse">Загрузка проектов…</p>
-            {:else if filteredProjects.length === 0}
-              <p class="project-message">{projects.length ? 'Ничего не найдено' : 'Проекты не найдены'}</p>
-            {:else}
-              <div class="project-list">
-                {#each filteredProjects as project (project.name)}
-                  <div
-                    role="button"
-                    tabindex="0"
-                    class="project-item"
-                    class:selected={selectedProjectName === project.name}
-                    aria-pressed={selectedProjectName === project.name}
-                    onclick={() => { selectedProjectName = project.name; }}
-                    oncontextmenu={(event) => openProjectContextMenu(event, project)}
-                    onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectedProjectName = project.name; } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { openProjectContextMenu(event, project); } }}
-                  >
-                    <span class:enabled={project.enabled} class="status-dot" title={project.enabled ? 'Включен' : 'Выключен'}></span>
-                    <span class="project-summary">
-                      <strong>{project.name}</strong>
-                      <span class="project-tags">
-                        {#each [project.language || 'no-language', project.framework || 'no-framework', ...project.tags] as tag}
-                          <button type="button" onclick={(event) => { event.stopPropagation(); addProjectTag(tag); }}>{tag}</button>
-                        {/each}
+            <div class="project-list-scroll">
+              {#if projectsLoading}
+                <p class="project-message animate-pulse">Загрузка проектов…</p>
+              {:else if filteredProjects.length === 0}
+                <p class="project-message">{projects.length ? 'Ничего не найдено' : 'Проекты не найдены'}</p>
+              {:else}
+                <div class="project-list">
+                  {#each filteredProjects as project (project.name)}
+                    <div
+                      role="button"
+                      tabindex="0"
+                      class="project-item"
+                      class:selected={selectedProjectName === project.name}
+                      aria-pressed={selectedProjectName === project.name}
+                      onclick={() => { selectedProjectName = project.name; }}
+                      oncontextmenu={(event) => openProjectContextMenu(event, project)}
+                      onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectedProjectName = project.name; } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { openProjectContextMenu(event, project); } }}
+                    >
+                      <span class:enabled={project.enabled} class="status-dot" title={project.enabled ? 'Включен' : 'Выключен'}></span>
+                      <span class="project-summary">
+                        <strong>{project.name}</strong>
+                        <span class="project-tags">
+                          {#each [project.language || 'no-language', project.framework || 'no-framework', ...project.tags] as tag}
+                            <button type="button" onclick={(event) => { event.stopPropagation(); addProjectTag(tag); }}>{tag}</button>
+                          {/each}
+                        </span>
                       </span>
-                    </span>
-                  </div>
-                {/each}
-              </div>
-            {/if}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
           </aside>
           <div class="project-details">
             {#if selectedProject}
@@ -582,7 +584,8 @@
                   <Save size={16} aria-hidden="true" />{notesSaving ? 'Сохраняем…' : 'Сохранить'}
                 </button>
               </div>
-              <Collapsible defaultOpen={true} class="collapsible card preset-filled-surface-100-900">
+              <div class="project-details-scroll">
+                <Collapsible defaultOpen={true} class="collapsible card preset-filled-surface-100-900">
                 <Collapsible.Trigger class="collapsible-trigger">
                   <span>Общее</span>
                   <Collapsible.Indicator class="collapsible-indicator">⌄</Collapsible.Indicator>
@@ -604,8 +607,8 @@
                     </button>
                   </div>
                 </Collapsible.Content>
-              </Collapsible>
-              <Collapsible defaultOpen={true} class="collapsible card preset-filled-surface-100-900 project-notes">
+                </Collapsible>
+                <Collapsible defaultOpen={true} class="collapsible card preset-filled-surface-100-900 project-notes">
                 <Collapsible.Trigger class="collapsible-trigger">
                   <span>Заметки</span>
                   <Collapsible.Indicator class="collapsible-indicator">⌄</Collapsible.Indicator>
@@ -625,7 +628,8 @@
                     <textarea class="textarea notes-textarea" bind:value={noteDescription} rows="8" placeholder="Произвольные заметки о проекте"></textarea>
                   </label>
                 </Collapsible.Content>
-              </Collapsible>
+                </Collapsible>
+              </div>
             {:else}
               <div class="select-project">Выберите проект</div>
             {/if}
