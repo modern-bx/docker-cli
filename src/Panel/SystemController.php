@@ -7,6 +7,9 @@ namespace DockerCli\Panel;
 use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\Dto\SystemServiceDto;
 use DockerCli\Panel\Dto\SystemStatusDto;
+use DockerCli\Panel\Dto\Request\EmptyRequestDto;
+use DockerCli\Panel\Dto\Request\SystemActionRequestDto;
+use DockerCli\Panel\Http\Attribute\Route;
 
 final class SystemController
 {
@@ -14,7 +17,8 @@ final class SystemController
     {
     }
 
-    public function status(): SystemStatusDto
+    #[Route('GET', '/api/system', EmptyRequestDto::class, SystemStatusDto::class)]
+    public function status(EmptyRequestDto $request): SystemStatusDto
     {
         $configured = $this->configuredServices();
         $running = $this->runningServices();
@@ -29,8 +33,12 @@ final class SystemController
         return new SystemStatusDto($status, $services);
     }
 
-    public function act(string $action, ?string $service = null): SystemStatusDto
+    #[Route('POST', '/api/system/{action:start|stop|restart}', SystemActionRequestDto::class, SystemStatusDto::class)]
+    #[Route('POST', '/api/system/services/{service}/{action:start|stop|restart}', SystemActionRequestDto::class, SystemStatusDto::class)]
+    public function action(SystemActionRequestDto $request): SystemStatusDto
     {
+        $action = $request->action;
+        $service = $request->service;
         $arguments = match ($action) {
             'start' => ['up', '-d'],
             'stop' => ['stop'],
@@ -46,7 +54,7 @@ final class SystemController
 
         $this->run($arguments);
 
-        return $this->status();
+        return $this->status(new EmptyRequestDto());
     }
 
     /** @return array<string, string> */

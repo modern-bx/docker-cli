@@ -6,9 +6,15 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Config\SystemCompose;
-use DockerCli\Panel\HttpResponse;
+use DockerCli\Panel\AssetController;
+use DockerCli\Panel\AuthController;
+use DockerCli\Panel\Http\ControllerInvoker;
+use DockerCli\Panel\Http\Middleware\AuthMiddleware;
+use DockerCli\Panel\Http\ResponseEmitter;
 use DockerCli\Panel\JwtTokenService;
 use DockerCli\Panel\ProjectController;
+use DockerCli\Panel\Router;
+use DockerCli\Panel\StateController;
 use DockerCli\Panel\SystemController;
 use DockerCli\Panel\SystemdService;
 use DockerCli\Panel\UserRepository;
@@ -87,12 +93,16 @@ final class PanelUpCommand extends Command
         }
 
         $assets = dirname(__DIR__, 2) . '/resources/panel/dist';
-        $server = new HttpServer(new HttpResponse(
-            new UserRepository($salt),
-            new JwtTokenService($jwtSecret),
-            $assets,
-            new ProjectController(new ProjectRegistry(), $compose),
-            new SystemController($compose),
+        $users = new UserRepository($salt);
+        $tokens = new JwtTokenService($jwtSecret);
+        $projects = new ProjectController(new ProjectRegistry(), $compose);
+        $system = new SystemController($compose);
+        $responses = new ResponseEmitter($assets);
+        $server = new HttpServer(new Router(
+            [new AuthController($users, $tokens), new StateController($projects, $system), $projects, $system, new AssetController()],
+            new ControllerInvoker(),
+            new AuthMiddleware($tokens, $responses),
+            $responses,
         ));
         $server->listen($socket);
         $output->writeln(sprintf('<info>Панель запущена на https://panel.%s</info>', $compose->envValue('BASE_HOST', '')));

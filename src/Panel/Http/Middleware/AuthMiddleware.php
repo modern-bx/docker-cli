@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DockerCli\Panel\Http\Middleware;
+
+use DockerCli\Panel\Dto\ErrorResponseDto;
+use DockerCli\Panel\Http\ResponseEmitter;
+use DockerCli\Panel\JwtTokenService;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+
+final readonly class AuthMiddleware implements Middleware
+{
+    public const LOGIN_ATTRIBUTE = 'panel.authenticated_login';
+
+    public function __construct(private JwtTokenService $tokens, private ResponseEmitter $responses)
+    {
+    }
+
+    public function process(ServerRequestInterface $request, callable $next): ResponseInterface
+    {
+        $header = $request->getHeaderLine('Authorization');
+        $login = str_starts_with($header, 'Bearer ') ? $this->tokens->login(substr($header, 7)) : null;
+        if ($login === null) {
+            return $this->responses->json(401, new ErrorResponseDto('Сессия истекла.'));
+        }
+
+        return $next($request->withAttribute(self::LOGIN_ATTRIBUTE, $login));
+    }
+}
