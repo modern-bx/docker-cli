@@ -52,18 +52,73 @@ final class TaskListCommand extends Command
     private function signature(array $task): string
     {
         $parameters = [];
+        $details = [];
         foreach (($task['parameters'] ?? []) as $name => $spec) {
             if (!is_array($spec)) {
                 $parameters[] = sprintf('%s: ?', $name);
+                $details[] = sprintf("%s\n  Название: —\n  Тип: ?", $name);
                 continue;
             }
             $required = ($spec['required'] ?? false) === true;
             $parameters[] = sprintf('%s%s: %s', $required ? '' : '?', $name, $this->type($spec));
+            $details[] = $this->parameterDetails((string) $name, $spec);
         }
 
         $return = is_array($task['return'] ?? null) ? $this->type($task['return']) : 'void';
+        $signature = sprintf('(%s) → %s', implode(', ', $parameters), $return);
 
-        return sprintf('(%s) → %s', implode(', ', $parameters), $return);
+        return $details === [] ? $signature : $signature . "\n\n" . implode("\n\n", $details);
+    }
+
+    /** @param array<string, mixed> $spec */
+    private function parameterDetails(string $code, array $spec): string
+    {
+        $lines = [
+            $code,
+            '  Название: ' . $this->scalarText($spec['name'] ?? null),
+            '  Тип: ' . (string) ($spec['type'] ?? '?'),
+        ];
+
+        $constraints = [];
+        if (array_key_exists('required', $spec)) {
+            $constraints[] = 'required: ' . (($spec['required'] ?? false) === true ? 'true' : 'false');
+        }
+        foreach (['min', 'max'] as $constraint) {
+            if (array_key_exists($constraint, $spec)) {
+                $constraints[] = sprintf('%s: %s', $constraint, $this->scalarText($spec[$constraint]));
+            }
+        }
+        if (($spec['type'] ?? null) === 'list' && is_array($spec['items'] ?? null)) {
+            $items = [];
+            foreach ($spec['items'] as $item) {
+                if (is_array($item)) {
+                    $items[] = sprintf('%s (%s)', $this->scalarText($item['value'] ?? null), $this->scalarText($item['name'] ?? null));
+                }
+            }
+            if ($items !== []) {
+                $constraints[] = 'items: ' . implode(', ', $items);
+            }
+        }
+        if ($constraints !== []) {
+            $lines[] = '  Ограничения: ' . implode('; ', $constraints);
+        }
+        if (isset($spec['description']) && is_string($spec['description'])) {
+            $lines[] = "  Описание:\n" . $this->indent($spec['description'], 4);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private function scalarText(mixed $value): string
+    {
+        return is_scalar($value) ? (string) $value : '—';
+    }
+
+    private function indent(string $text, int $spaces): string
+    {
+        $text = rtrim($text, "\r\n");
+
+        return preg_replace('/^/m', str_repeat(' ', $spaces), $text) ?? $text;
     }
 
     /** @param array<string, mixed> $spec */
