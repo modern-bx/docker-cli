@@ -69,7 +69,7 @@ final class QueueRepository
             foreach (array_filter($files, 'is_file') as $file) {
                 $name = basename($file);
                 $parts = explode('.', substr($name, 0, -5), 3);
-                $microseconds = ctype_digit($parts[0] ?? '') ? (int) $parts[0] : ((int) filemtime($file) * 1_000_000);
+                $microseconds = $this->timestampMicroseconds($parts[0] ?? '', $file);
                 $items[] = [
                     'file' => $name,
                     'status' => $status,
@@ -81,6 +81,21 @@ final class QueueRepository
         usort($items, static fn (array $left, array $right): int => [$left['queuedAt'], $left['file']] <=> [$right['queuedAt'], $right['file']]);
 
         return $items;
+    }
+
+    private function timestampMicroseconds(string $timestamp, string $file): int
+    {
+        if (!ctype_digit($timestamp)) {
+            return ((int) filemtime($file)) * 1_000_000;
+        }
+
+        // Queue item names in the wild use Unix timestamps in seconds,
+        // milliseconds, or microseconds. Normalize all three before formatting.
+        return match (true) {
+            strlen($timestamp) <= 10 => (int) $timestamp * 1_000_000,
+            strlen($timestamp) <= 13 => (int) $timestamp * 1_000,
+            default => (int) substr($timestamp, 0, 16),
+        };
     }
 
     public function delete(string $queue, string $file): void
