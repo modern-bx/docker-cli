@@ -102,19 +102,19 @@ final class TaskListCommand extends Command
                 $constraints[] = sprintf('%s: %s', $constraint, $this->scalarText($spec[$constraint]));
             }
         }
-        if (($spec['type'] ?? null) === 'list' && is_array($spec['items'] ?? null)) {
+        if ($constraints !== []) {
+            $lines[] = '  Ограничения: ' . implode('; ', $constraints);
+        }
+        if (($spec['type'] ?? null) === 'list' && is_array($spec['items'] ?? null) && $spec['items'] !== []) {
             $items = [];
             foreach ($spec['items'] as $item) {
                 if (is_array($item)) {
-                    $items[] = sprintf('%s (%s)', $this->scalarText($item['value'] ?? null), $this->scalarText($item['name'] ?? null));
+                    $items[] = sprintf('%s: %s', $this->scalarText($item['value'] ?? null), $this->scalarText($item['name'] ?? null));
                 }
             }
             if ($items !== []) {
-                $constraints[] = 'items: ' . implode(', ', $items);
+                $lines[] = "  Элементы:\n" . $this->indent(implode("\n", $items), 4);
             }
-        }
-        if ($constraints !== []) {
-            $lines[] = '  Ограничения: ' . implode('; ', $constraints);
         }
         if (is_array($spec['tags'] ?? null) && $spec['tags'] !== []) {
             $lines[] = '  Теги: ' . implode(', ', array_map('strval', $spec['tags']));

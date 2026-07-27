@@ -127,8 +127,13 @@ final class TaskRunCommand extends Command
         if ($return && $spec['type'] === 'list') {
             throw new \RuntimeException('Возвращаемый тип list не поддерживается.');
         }
-        if (($spec['type'] ?? null) === 'list' && (!isset($spec['items']) || !is_array($spec['items']))) {
-            throw new \RuntimeException(sprintf('Для list-параметра "%s" необходимо указать items.', $name));
+        if (($spec['type'] ?? null) === 'list' && isset($spec['items']) && !is_array($spec['items'])) {
+            throw new \RuntimeException(sprintf('Поле items list-параметра "%s" должно быть списком.', $name));
+        }
+        foreach (($spec['type'] ?? null) === 'list' ? ($spec['items'] ?? []) : [] as $item) {
+            if (!is_array($item) || !array_key_exists('name', $item) || !array_key_exists('value', $item)) {
+                throw new \RuntimeException(sprintf('Каждый элемент list-параметра "%s" должен содержать name и value.', $name));
+            }
         }
     }
 
@@ -169,8 +174,8 @@ final class TaskRunCommand extends Command
                 }
                 $value = $validated;
             } elseif (($spec['type'] ?? null) === 'list') {
-                $allowed = array_column($spec['items'], 'value');
-                if (!in_array($value, array_map('strval', $allowed), true)) {
+                $allowed = is_array($spec['items'] ?? null) ? array_column($spec['items'], 'value') : [];
+                if ($allowed !== [] && !in_array($value, array_map('strval', $allowed), true)) {
                     throw new \RuntimeException(sprintf('Недопустимое значение параметра "%s". Допустимо: %s.', $name, implode(', ', $allowed)));
                 }
             }
