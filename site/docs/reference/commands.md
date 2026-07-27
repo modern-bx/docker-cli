@@ -214,13 +214,30 @@ bin/docker-cli queue:step --queue=default
 
 Структура каталогов, формат элемента и журналирование описаны в разделе [«Очереди»](/guide/queues).
 
-### `bin/docker-cli queue:run [--queue=<queue-code>]`
+### `bin/docker-cli queue:start [--queue=<queue-code>]`
 
 Запускает постоянный обработчик очереди: команда последовательно обрабатывает новые элементы и ожидает следующие. По умолчанию используется очередь `default`. Служебные сообщения и ошибки элементов не дублируются в `stdout`/`stderr`, поскольку они сохраняются в элементе и общем журнале очереди; в консоль попадают только критические ошибки самого обработчика. Собственный вывод выполняемых задач, например созданный через `echo`, остаётся видимым в `stdout`/`stderr`.
 
 ```bash
-bin/docker-cli queue:run
-bin/docker-cli queue:run --queue=notifications
+bin/docker-cli queue:start
+bin/docker-cli queue:start --queue=notifications
+```
+
+Опция `-d` (или `--daemon`) создаёт, включает и запускает systemd-сервис с именем `docker-cli.queue.<queue-code>`. Опция `--user` задаёт пользователя сервиса, а `--path` позволяет явно указать исполняемый файл:
+
+```bash
+sudo bin/docker-cli queue:start -d --queue=notifications
+sudo bin/docker-cli queue:start -d --queue=notifications --user=www-data --path=/usr/local/bin/docker-cli
+systemctl status docker-cli.queue.notifications
+```
+
+### `bin/docker-cli queue:stop [--queue=<queue-code>]`
+
+Останавливает и отключает systemd-сервис выбранной очереди, удаляет unit-файл и обновляет конфигурацию systemd. По умолчанию используется очередь `default`. Если сервис не установлен, команда завершается с ошибкой.
+
+```bash
+sudo bin/docker-cli queue:stop
+sudo bin/docker-cli queue:stop --queue=notifications
 ```
 
 ## Административная панель
