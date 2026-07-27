@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace DockerCli\Panel;
 
 use DockerCli\Panel\Dto\PanelStateDto;
+use FastRoute\Dispatcher;
+use FastRoute\RouteCollector;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use React\Http\Message\Response;
 
+use function FastRoute\simpleDispatcher;
+
 final class HttpResponse
 {
+    private Dispatcher $router;
+
     public function __construct(
         private readonly UserRepository $users,
         private readonly JwtTokenService $tokens,
@@ -18,91 +24,117 @@ final class HttpResponse
         private readonly ?ProjectController $projects = null,
         private readonly ?SystemController $system = null,
     ) {
+        $this->router = simpleDispatcher(static function (RouteCollector $routes): void {
+            $routes->addRoute('POST', '/api/auth/login', ['login', false]);
+            $routes->addRoute('GET', '/api/auth/session', ['session', false]);
+            $routes->addRoute('GET', '/api/state', ['state', true]);
+            $routes->addRoute('GET', '/api/projects', ['projects', true]);
+            $routes->addRoute('POST', '/api/projects/{name}/{action:enable|disable|wipe}', ['projectAction', true]);
+            $routes->addRoute('POST', '/api/projects/{name}/notes', ['saveProjectNotes', true]);
+            $routes->addRoute('GET', '/api/system', ['systemStatus', true]);
+            $routes->addRoute('POST', '/api/system/{action:start|stop|restart}', ['systemAction', true]);
+            $routes->addRoute('POST', '/api/system/services/{service}/{action:start|stop|restart}', ['systemServiceAction', true]);
+            $routes->addRoute('GET', '/', ['index', false]);
+            $routes->addRoute('GET', '/assets/{path:.+}', ['assetRoute', false]);
+        });
     }
 
     public function __invoke(ServerRequestInterface $request): ResponseInterface
     {
-        $path = $request->getUri()->getPath();
-        if ($request->getMethod() === 'POST' && $path === '/api/auth/login') {
-            return $this->login($request);
+        $route = $this->router->dispatch($request->getMethod(), $request->getUri()->getPath());
+        if ($route[0] === Dispatcher::NOT_FOUND) {
+            return $this->json(404, ['error' => 'Страница не найдена.']);
         }
-        if ($request->getMethod() === 'GET' && $path === '/api/auth/session') {
-            return $this->session($request);
-        }
-        if ($request->getMethod() === 'GET' && $path === '/api/state') {
-            if ($this->authenticatedLogin($request) === null) {
-                return $this->json(401, ['error' => 'Сессия истекла.']);
-            }
-
-            $projects = ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->index();
-            $system = ($this->system ?? new SystemController(new \DockerCli\Config\SystemCompose()))->status();
-
-            return $this->json(200, new PanelStateDto($projects->projects, $system));
-        }
-        if ($request->getMethod() === 'GET' && $path === '/api/projects') {
-            if ($this->authenticatedLogin($request) === null) {
-                return $this->json(401, ['error' => 'Сессия истекла.']);
-            }
-
-            return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->index());
-        }
-        if ($request->getMethod() === 'POST' && preg_match('#^/api/projects/([^/]+)/(enable|disable|wipe)$#', $path, $matches) === 1) {
-            if ($this->authenticatedLogin($request) === null) {
-                return $this->json(401, ['error' => 'Сессия истекла.']);
-            }
-            try {
-                return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->act(rawurldecode($matches[1]), $matches[2]));
-            } catch (ProjectActionException $exception) {
-                return $this->json($exception->httpStatus, ['error' => $exception->getMessage()]);
-            }
-        }
-        if ($request->getMethod() === 'POST' && preg_match('#^/api/projects/([^/]+)/notes$#', $path, $matches) === 1) {
-            if ($this->authenticatedLogin($request) === null) {
-                return $this->json(401, ['error' => 'Сессия истекла.']);
-            }
-            try {
-                $body = json_decode((string) $request->getBody(), true, 8, JSON_THROW_ON_ERROR);
-                if (!is_array($body) || !is_array($body['tags'] ?? null) || !is_string($body['description'] ?? null)) {
-                    throw new ProjectActionException('Некорректные данные заметок.', 400);
-                }
-                return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->saveNotes(
-                    rawurldecode($matches[1]),
-                    array_values($body['tags']),
-                    $body['description'],
-                ));
-            } catch (\JsonException) {
-                return $this->json(400, ['error' => 'Некорректный запрос.']);
-            } catch (ProjectActionException $exception) {
-                return $this->json($exception->httpStatus, ['error' => $exception->getMessage()]);
-            }
-        }
-        if (str_starts_with($path, '/api/system')) {
-            if ($this->authenticatedLogin($request) === null) {
-                return $this->json(401, ['error' => 'Сессия истекла.']);
-            }
-            $system = $this->system ?? new SystemController(new \DockerCli\Config\SystemCompose());
-            try {
-                if ($request->getMethod() === 'GET' && $path === '/api/system') {
-                    return $this->json(200, $system->status());
-                }
-                if ($request->getMethod() === 'POST' && preg_match('#^/api/system/(start|stop|restart)$#', $path, $matches) === 1) {
-                    return $this->json(200, $system->act($matches[1]));
-                }
-                if ($request->getMethod() === 'POST' && preg_match('#^/api/system/services/([^/]+)/(start|stop|restart)$#', $path, $matches) === 1) {
-                    return $this->json(200, $system->act($matches[2], rawurldecode($matches[1])));
-                }
-            } catch (SystemActionException $exception) {
-                return $this->json($exception->httpStatus, ['error' => $exception->getMessage()]);
-            }
-        }
-        if ($request->getMethod() === 'GET' && ($path === '/' || str_starts_with($path, '/assets/'))) {
-            return $this->asset($path === '/' ? 'index.html' : ltrim($path, '/'));
+        if ($route[0] === Dispatcher::METHOD_NOT_ALLOWED) {
+            return new Response(405, ['Allow' => implode(', ', $route[1])]);
         }
 
-        return $this->json(404, ['error' => 'Страница не найдена.']);
+        [$handler, $authenticated] = $route[1];
+        if ($authenticated && $this->authenticatedLogin($request) === null) {
+            return $this->json(401, ['error' => 'Сессия истекла.']);
+        }
+
+        return $this->{$handler}($request, $route[2]);
     }
 
-    private function login(ServerRequestInterface $request): ResponseInterface
+    /** @param array<string, string> $variables */
+    private function state(ServerRequestInterface $request, array $variables): ResponseInterface
+    {
+        $projects = ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->index();
+        $system = ($this->system ?? new SystemController(new \DockerCli\Config\SystemCompose()))->status();
+
+        return $this->json(200, new PanelStateDto($projects->projects, $system));
+    }
+
+    /** @param array<string, string> $variables */
+    private function projects(ServerRequestInterface $request, array $variables): ResponseInterface
+    {
+        return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->index());
+    }
+
+    /** @param array{name: string, action: string} $variables */
+    private function projectAction(ServerRequestInterface $request, array $variables): ResponseInterface
+    {
+        try {
+            return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->act(
+                rawurldecode($variables['name']),
+                $variables['action'],
+            ));
+        } catch (ProjectActionException $exception) {
+            return $this->json($exception->httpStatus, ['error' => $exception->getMessage()]);
+        }
+    }
+
+    /** @param array{name: string} $variables */
+    private function saveProjectNotes(ServerRequestInterface $request, array $variables): ResponseInterface
+    {
+        try {
+            $body = json_decode((string) $request->getBody(), true, 8, JSON_THROW_ON_ERROR);
+            if (!is_array($body) || !is_array($body['tags'] ?? null) || !is_string($body['description'] ?? null)) {
+                throw new ProjectActionException('Некорректные данные заметок.', 400);
+            }
+
+            return $this->json(200, ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->saveNotes(
+                rawurldecode($variables['name']),
+                array_values($body['tags']),
+                $body['description'],
+            ));
+        } catch (\JsonException) {
+            return $this->json(400, ['error' => 'Некорректный запрос.']);
+        } catch (ProjectActionException $exception) {
+            return $this->json($exception->httpStatus, ['error' => $exception->getMessage()]);
+        }
+    }
+
+    /** @param array<string, string> $variables */
+    private function systemStatus(ServerRequestInterface $request, array $variables): ResponseInterface
+    {
+        return $this->json(200, ($this->system ?? new SystemController(new \DockerCli\Config\SystemCompose()))->status());
+    }
+
+    /** @param array{action: string} $variables */
+    private function systemAction(ServerRequestInterface $request, array $variables): ResponseInterface
+    {
+        return $this->runSystemAction($variables['action']);
+    }
+
+    /** @param array{service: string, action: string} $variables */
+    private function systemServiceAction(ServerRequestInterface $request, array $variables): ResponseInterface
+    {
+        return $this->runSystemAction($variables['action'], rawurldecode($variables['service']));
+    }
+
+    private function runSystemAction(string $action, ?string $service = null): ResponseInterface
+    {
+        try {
+            return $this->json(200, ($this->system ?? new SystemController(new \DockerCli\Config\SystemCompose()))->act($action, $service));
+        } catch (SystemActionException $exception) {
+            return $this->json($exception->httpStatus, ['error' => $exception->getMessage()]);
+        }
+    }
+
+    /** @param array<string, string> $variables */
+    private function login(ServerRequestInterface $request, array $variables): ResponseInterface
     {
         try {
             $body = json_decode((string) $request->getBody(), true, 8, JSON_THROW_ON_ERROR);
@@ -124,7 +156,8 @@ final class HttpResponse
         return $this->authorized($login);
     }
 
-    private function session(ServerRequestInterface $request): ResponseInterface
+    /** @param array<string, string> $variables */
+    private function session(ServerRequestInterface $request, array $variables): ResponseInterface
     {
         $login = $this->authenticatedLogin($request);
         if ($login === null) {
@@ -148,6 +181,18 @@ final class HttpResponse
             'token' => $this->tokens->issue($login),
             'expiresIn' => JwtTokenService::LIFETIME,
         ]);
+    }
+
+    /** @param array<string, string> $variables */
+    private function index(ServerRequestInterface $request, array $variables): ResponseInterface
+    {
+        return $this->asset('index.html');
+    }
+
+    /** @param array{path: string} $variables */
+    private function assetRoute(ServerRequestInterface $request, array $variables): ResponseInterface
+    {
+        return $this->asset('assets/' . $variables['path']);
     }
 
     private function asset(string $relativePath): ResponseInterface
