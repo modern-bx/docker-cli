@@ -201,6 +201,19 @@ bin/docker-cli task:run --project=my-project demo.do-something hello 2
 
 `--project` обязателен для задач с `context: project`. `--no-delete` оставляет скомпилированный файл после выполнения и печатает его путь.
 
+## Очереди
+
+### `bin/docker-cli queue:step [--queue=<queue-code>]`
+
+Атомарно забирает самый ранний YAML-файл из `10-pending`, проверяет его и выполняет перечисленные задачи по порядку. По умолчанию используется очередь `default`; параллельная обработка одной очереди блокируется. Успешные элементы перемещаются в `30-success`, завершившиеся ненулевым кодом — в `40-failure`, а некорректные — в `50-error`.
+
+```bash
+bin/docker-cli queue:step
+bin/docker-cli queue:step --queue=default
+```
+
+Структура каталогов, формат элемента и журналирование описаны в разделе [«Очереди»](/guide/queues).
+
 ## Административная панель
 
 ### `bin/docker-cli panel:up [-d]`
