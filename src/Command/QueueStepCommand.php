@@ -47,8 +47,8 @@ final class QueueStepCommand extends Command
                 $parsed = Yaml::parseFile($active);
                 $item = is_array($parsed) ? $parsed : [];
                 $repository->trace($active, $queue, $item, 'Элемент перемещен из 10-pending в 20-active.');
-                $commands = new TaskRepository(join_path($repository->configDirectory(), 'commands'));
-                $errors = (new QueueItemValidator($commands))->validate($parsed);
+                $tasks = new TaskRepository(join_path($repository->configDirectory(), 'tasks'));
+                $errors = (new QueueItemValidator($tasks))->validate($parsed);
             } catch (ParseException $exception) {
                 $errors = ['Ошибка YAML: ' . $exception->getMessage()];
             }
@@ -61,23 +61,23 @@ final class QueueStepCommand extends Command
                 $repository->move($active, $queue, '50-error');
                 return Command::INVALID;
             }
-            foreach ($item['task']['commands'] as $command) {
-                $repository->trace($active, $queue, $item, sprintf('Запуск команды %s.', $command['code']));
-                $arguments = ['task-code' => $command['code']];
-                if (isset($command['project'])) {
-                    $arguments['--project'] = $command['project'];
+            foreach ($item['task']['tasks'] as $task) {
+                $repository->trace($active, $queue, $item, sprintf('Запуск задачи %s.', $task['code']));
+                $arguments = ['task-code' => $task['code']];
+                if (isset($task['project'])) {
+                    $arguments['--project'] = $task['project'];
                 }
                 $arguments['task-args'] = array_map(
                     static fn (mixed $value, string $name): string => $name . '=' . (is_scalar($value['value'] ?? null) ? (string) $value['value'] : json_encode($value['value'] ?? null)),
-                    $command['arguments'] ?? [],
-                    array_keys($command['arguments'] ?? []),
+                    $task['arguments'] ?? [],
+                    array_keys($task['arguments'] ?? []),
                 );
-                $runner = new TaskRunCommand($commands);
+                $runner = new TaskRunCommand($tasks);
                 $runner->setApplication($this->getApplication());
                 $exitCode = $runner->run(new ArrayInput($arguments), $output);
-                $repository->trace($active, $queue, $item, sprintf('Команда %s завершилась с кодом %d.', $command['code'], $exitCode));
+                $repository->trace($active, $queue, $item, sprintf('Задача %s завершилась с кодом %d.', $task['code'], $exitCode));
                 if ($exitCode !== Command::SUCCESS) {
-                    $repository->trace($active, $queue, $item, 'Элемент перемещен в 40-failure; последующие команды пропущены.');
+                    $repository->trace($active, $queue, $item, 'Элемент перемещен в 40-failure; последующие задачи пропущены.');
                     $repository->move($active, $queue, '40-failure');
                     return $exitCode;
                 }

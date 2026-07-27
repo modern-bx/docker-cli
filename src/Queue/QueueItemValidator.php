@@ -8,7 +8,7 @@ use DockerCli\Task\TaskRepository;
 
 final class QueueItemValidator
 {
-    public function __construct(private readonly TaskRepository $commands)
+    public function __construct(private readonly TaskRepository $tasks)
     {
     }
 
@@ -25,35 +25,35 @@ final class QueueItemValidator
         if ((string) ($item['meta']['version'] ?? '') !== '0.1') {
             $errors[] = 'meta.version должен быть равен 0.1.';
         }
-        $commands = $item['task']['commands'] ?? null;
-        if (!is_array($commands) || !array_is_list($commands) || $commands === []) {
-            $errors[] = 'task.commands должен быть непустым списком.';
+        $tasks = $item['task']['tasks'] ?? null;
+        if (!is_array($tasks) || !array_is_list($tasks) || $tasks === []) {
+            $errors[] = 'task.tasks должен быть непустым списком.';
 
             return $errors;
         }
-        foreach ($commands as $index => $command) {
-            $prefix = sprintf('task.commands.%d', $index);
-            if (!is_array($command) || !is_string($command['code'] ?? null) || $command['code'] === '') {
+        foreach ($tasks as $index => $task) {
+            $prefix = sprintf('task.tasks.%d', $index);
+            if (!is_array($task) || !is_string($task['code'] ?? null) || $task['code'] === '') {
                 $errors[] = $prefix . '.code должен быть непустой строкой.';
                 continue;
             }
-            if (isset($command['project']) && !is_string($command['project'])) {
+            if (isset($task['project']) && !is_string($task['project'])) {
                 $errors[] = $prefix . '.project должен быть строкой.';
             }
-            if (isset($command['arguments']) && !is_array($command['arguments'])) {
+            if (isset($task['arguments']) && !is_array($task['arguments'])) {
                 $errors[] = $prefix . '.arguments должен быть объектом.';
                 continue;
             }
             try {
-                $spec = $this->commands->find($command['code'])['task'];
+                $spec = $this->tasks->find($task['code'])['task'];
             } catch (\Throwable $exception) {
                 $errors[] = $prefix . ': ' . $exception->getMessage();
                 continue;
             }
-            $arguments = $command['arguments'] ?? [];
+            $arguments = $task['arguments'] ?? [];
             foreach ($arguments as $name => $argument) {
                 if (!array_key_exists($name, $spec['parameters'] ?? [])) {
-                    $errors[] = sprintf('%s.arguments.%s не описан в команде.', $prefix, $name);
+                    $errors[] = sprintf('%s.arguments.%s не описан в задаче.', $prefix, $name);
                 }
                 if (!is_array($argument) || !array_key_exists('value', $argument)) {
                     $errors[] = sprintf('%s.arguments.%s должен содержать value.', $prefix, $name);
@@ -74,8 +74,8 @@ final class QueueItemValidator
                     $errors[] = sprintf('%s.arguments.%s является обязательным.', $prefix, $name);
                 }
             }
-            if (($spec['context'] ?? null) === 'project' && (!isset($command['project']) || $command['project'] === '')) {
-                $errors[] = $prefix . '.project обязателен для команды с context: project.';
+            if (($spec['context'] ?? null) === 'project' && (!isset($task['project']) || $task['project'] === '')) {
+                $errors[] = $prefix . '.project обязателен для задачи с context: project.';
             }
         }
 
