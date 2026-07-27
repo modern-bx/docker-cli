@@ -7,6 +7,7 @@
   const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
+  const FONT_KEY = 'docker-cli-panel-font';
   const themes = [
     ['vox', 'Vox'], ['cerberus', 'Cerberus'], ['concord', 'Concord'],
     ['crimson', 'Crimson'], ['dracula', 'Dracula'], ['fennec', 'Fennec'],
@@ -19,6 +20,9 @@
   ];
   const modes = [
     ['light', 'Светлая'], ['dark', 'Тёмная'], ['system', 'Системная'],
+  ];
+  const fonts = [
+    ['ubuntu', 'Ubuntu Regular'], ['noto', 'Noto Sans'],
   ];
   let login = '';
   let password = '';
@@ -33,6 +37,7 @@
   let themeOpen = false;
   let theme = 'vox';
   let mode = 'system';
+  let font = 'ubuntu';
   let systemDark = false;
   let projects = [];
   let selectedProjectName = '';
@@ -123,7 +128,14 @@
 
   function applyAppearance() {
     document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.font = font;
     document.documentElement.classList.toggle('dark', mode === 'dark' || (mode === 'system' && systemDark));
+  }
+
+  function setFont(value) {
+    font = value;
+    localStorage.setItem(FONT_KEY, font);
+    applyAppearance();
   }
 
   function setTheme(value) {
@@ -404,6 +416,8 @@
     theme = themes.some(([value]) => value === savedTheme) ? savedTheme : 'vox';
     const savedMode = localStorage.getItem(MODE_KEY);
     mode = modes.some(([value]) => value === savedMode) ? savedMode : 'system';
+    const savedFont = localStorage.getItem(FONT_KEY);
+    font = fonts.some(([value]) => value === savedFont) ? savedFont : 'ubuntu';
     applyAppearance();
     const updateSystemMode = (event) => {
       systemDark = event.matches;
@@ -498,6 +512,14 @@
                 </button>
               {/each}
             </div>
+            <label class="font-switch mt-4">
+              <span>Шрифт</span>
+              <select value={font} onchange={(event) => setFont(event.currentTarget.value)}>
+                {#each fonts as [value, label]}
+                  <option value={value}>{label}</option>
+                {/each}
+              </select>
+            </label>
           </div>
         {/if}
       </div>
