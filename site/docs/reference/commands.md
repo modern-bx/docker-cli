@@ -203,6 +203,15 @@ bin/docker-cli task:run --project=my-project demo.do-something hello 2
 
 ## Очереди
 
+### `bin/docker-cli queue:item-create [--queue=<queue-code>] --mode=task --task=<task-code> [--project=<project>] [task-args...]`
+
+Проверяет аргументы по спеке задачи и создаёт в `10-pending` элемент ровно с одной задачей. Аргументы можно передавать позиционно или в виде `name=value`. Для задач с `context: project` требуется `--project`.
+
+```bash
+bin/docker-cli queue:item-create --mode=task --task=demo.do-something message=hello count=2
+bin/docker-cli queue:item-create --queue=notifications --mode=task --task=project.cleanup --project=my-project
+```
+
 ### `bin/docker-cli queue:step [--queue=<queue-code>]`
 
 Атомарно забирает самый ранний YAML-файл из `10-pending`, проверяет его и выполняет перечисленные задачи по порядку. По умолчанию используется очередь `default`; параллельная обработка одной очереди блокируется. Успешные элементы перемещаются в `30-success`, завершившиеся ненулевым кодом — в `40-failure`, а некорректные — в `50-error`.

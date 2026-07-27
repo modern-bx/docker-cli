@@ -82,6 +82,34 @@ final class QueueRepository
         return $files[0] ?? null;
     }
 
+    /** @param array<string, mixed> $item */
+    public function create(string $queue, string $code, array $item): string
+    {
+        $this->initialize($queue);
+        $timestamp = (int) floor(microtime(true) * 1_000_000);
+        $safeCode = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', $code), '.-');
+        $safeCode = $safeCode !== '' ? $safeCode : 'task';
+        for ($counter = 0; $counter <= 999; ++$counter) {
+            $file = join_path($this->queueDirectory($queue), '10-pending', sprintf('%d.%03d.%s.yaml', $timestamp, $counter, $safeCode));
+            $handle = @fopen($file, 'x');
+            if ($handle === false) {
+                continue;
+            }
+            try {
+                if (fwrite($handle, Yaml::dump($item, 8, 2)) === false) {
+                    throw new \RuntimeException(sprintf('Не удалось записать элемент очереди "%s".', $file));
+                }
+            } catch (\Throwable $exception) {
+                @unlink($file);
+                throw $exception;
+            } finally {
+                fclose($handle);
+            }
+            return $file;
+        }
+        throw new \RuntimeException('Не удалось подобрать уникальное имя элемента очереди.');
+    }
+
     /** @return list<array{file: string, status: string, queuedAt: string, code: string}> */
     public function items(string $queue): array
     {
