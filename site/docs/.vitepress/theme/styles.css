@@ -1,0 +1,27 @@
+:root {
+  --site-font-family: Ubuntu, sans-serif;
+  --site-font-family-mono: "Ubuntu Mono", monospace;
+  --vp-font-family-base: var(--site-font-family);
+  --vp-font-family-mono: var(--site-font-family-mono);
+}
+
+:root[data-font='noto'] {
+  --site-font-family: "Noto Sans", sans-serif;
+  --site-font-family-mono: "Noto Sans Mono", monospace;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--site-font-family) !important;
+}
+
+pre,
+code,
+kbd,
+samp,
+var {
+  font-family: var(--site-font-family-mono) !important;
+}
