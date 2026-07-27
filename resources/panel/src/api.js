@@ -27,28 +27,6 @@ export async function getProjects(request) {
   return /** @type {ProjectListDto} */ (data);
 }
 
-/**
- * @typedef {object} PanelStateDto
- * @property {ProjectDto[]} projects Project data used by the admin panel.
- * @property {SystemStatusDto} system System data used by the admin panel.
- */
-
-/**
- * Load all data needed to refresh the admin panel.
- * @param {(path: string, options?: RequestInit) => Promise<unknown>} request
- * @returns {Promise<PanelStateDto>}
- */
-export async function getPanelState(request) {
-  const data = await request('/api/state');
-  if (!data || typeof data !== 'object'
-    || !('projects' in data) || !Array.isArray(data.projects)
-    || !('system' in data) || !data.system || typeof data.system !== 'object'
-    || !('status' in data.system) || !('services' in data.system) || !Array.isArray(data.system.services)) {
-    throw new Error('Сервер вернул некорректное состояние панели.');
-  }
-  return /** @type {PanelStateDto} */ (data);
-}
-
 /** @returns {Promise<ProjectListDto>} */
 export async function runProjectAction(request, project, action) {
   return /** @type {Promise<ProjectListDto>} */ (request(`/api/projects/${encodeURIComponent(project)}/${action}`, { method: 'POST' }));

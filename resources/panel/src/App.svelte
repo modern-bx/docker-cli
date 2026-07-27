@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { Collapsible, Combobox, Dialog, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
-  import { getPanelState, getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
+  import { getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -61,6 +61,10 @@
   let noteDescription = '';
   let notesSaving = false;
   const panelServices = ['dnsdock', 'panel-gateway', 'traefik'];
+  const PANEL_CHANNEL = 'panel:system';
+  let panelSocket = null;
+  let panelReconnectTimer = null;
+  let panelChannelEnabled = false;
 
   $: hasRunningServices = systemServices.some((service) => service.running);
   $: hasStoppedServices = systemServices.some((service) => !service.running);
@@ -212,9 +216,11 @@
     currentLogin = data.login;
     localStorage.setItem(TOKEN_KEY, token);
     window.location.hash = '#/';
+    connectPanelChannel();
   }
 
   function logout() {
+    disconnectPanelChannel();
     token = '';
     currentLogin = '';
     profileOpen = false;
@@ -233,26 +239,43 @@
     }
   }
 
-  async function refreshPanel() {
-    if (!token || systemPending) return;
+  function applyPanelState(data) {
+    if (!data || !Array.isArray(data.projects) || !data.system || !Array.isArray(data.system.services)) return;
+    projects = data.projects;
+    projectsError = '';
+    systemStatus = data.system.status;
+    systemServices = data.system.services;
+    projectsLoading = false;
+    if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) selectedProjectName = '';
+  }
+
+  function connectPanelChannel() {
+    if (!panelChannelEnabled || !token || panelSocket?.readyState === WebSocket.OPEN || panelSocket?.readyState === WebSocket.CONNECTING) return;
+    clearTimeout(panelReconnectTimer);
     if (projects.length === 0) projectsLoading = true;
-    try {
-      const data = await getPanelState(api);
-      projects = data.projects;
-      projectsError = '';
-      systemStatus = data.system.status;
-      systemServices = data.system.services;
-      if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) {
-        selectedProjectName = '';
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const query = new URLSearchParams({ channel: PANEL_CHANNEL, token });
+    const socket = new WebSocket(`${protocol}//${location.host}/ws?${query}`);
+    panelSocket = socket;
+    socket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.channel === PANEL_CHANNEL) applyPanelState(message.data);
+      } catch {
+        // Ignore malformed messages and keep waiting for the next state snapshot.
       }
-    } catch (cause) {
-      systemStatus = 'stopped';
-      if (cause instanceof Error && 'status' in cause && typeof cause.status === 'number' && cause.status < 500) {
-        projectsError = cause.message;
-      }
-    } finally {
-      projectsLoading = false;
-    }
+    };
+    socket.onclose = () => {
+      if (panelSocket === socket) panelSocket = null;
+      if (panelChannelEnabled && token) panelReconnectTimer = setTimeout(connectPanelChannel, 1_000);
+    };
+  }
+
+  function disconnectPanelChannel() {
+    panelChannelEnabled = false;
+    clearTimeout(panelReconnectTimer);
+    panelSocket?.close();
+    panelSocket = null;
   }
 
   async function projectAction(action, name) {
@@ -279,7 +302,6 @@
       }
     } finally {
       systemPending = false;
-      refreshPanel();
     }
   }
 
@@ -355,7 +377,6 @@
       }
     } finally {
       systemPending = false;
-      refreshPanel();
     }
   }
 
@@ -421,13 +442,13 @@
     media.addEventListener('change', updateSystemMode);
     token = localStorage.getItem(TOKEN_KEY) || '';
     if (!token) window.location.hash = '#/login';
+    panelChannelEnabled = true;
+    connectPanelChannel();
     checkSession().finally(() => { loading = false; });
     const interval = setInterval(checkSession, 60_000);
-    refreshPanel();
-    const panelInterval = setInterval(refreshPanel, 1_000);
     return () => {
       clearInterval(interval);
-      clearInterval(panelInterval);
+      disconnectPanelChannel();
       media.removeEventListener('change', updateSystemMode);
     };
   });

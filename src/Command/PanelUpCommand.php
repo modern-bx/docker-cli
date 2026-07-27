@@ -18,6 +18,7 @@ use DockerCli\Panel\StateController;
 use DockerCli\Panel\SystemController;
 use DockerCli\Panel\SystemdService;
 use DockerCli\Panel\UserRepository;
+use DockerCli\Panel\WebSocket\PanelStateChannel;
 use DockerCli\Project\ProjectRegistry;
 use React\EventLoop\Loop;
 use React\Http\HttpServer;
@@ -98,12 +99,15 @@ final class PanelUpCommand extends Command
         $projects = new ProjectController(new ProjectRegistry(), $compose);
         $system = new SystemController($compose);
         $responses = new ResponseEmitter($assets);
-        $server = new HttpServer(new Router(
-            [new AuthController($users, $tokens), new StateController($projects, $system), $projects, $system, new AssetController()],
+        $state = new StateController($projects, $system);
+        $router = new Router(
+            [new AuthController($users, $tokens), $state, $projects, $system, new AssetController()],
             new ControllerInvoker(),
             new AuthMiddleware($tokens, $responses),
             $responses,
-        ));
+        );
+        $channel = new PanelStateChannel($state, $tokens, $responses);
+        $server = new HttpServer(static fn ($request) => $channel->handles($request) ? $channel->upgrade($request) : $router($request));
         $server->listen($socket);
         $output->writeln(sprintf('<info>Панель запущена на https://panel.%s</info>', $compose->envValue('BASE_HOST', '')));
         Loop::run();
