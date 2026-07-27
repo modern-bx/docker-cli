@@ -54,7 +54,10 @@ button { cursor: pointer; }
 .system-dot.running { background: var(--color-success-500); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-success-500) 16%, transparent); }
 .system-dot.partial { background: var(--color-warning-500); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-warning-500) 18%, transparent); }
 .system-menu { position: absolute; top: calc(100% + 0.5rem); left: 50%; width: min(36rem, calc(100vw - 2rem)); max-height: min(32rem, calc(100vh - 6rem)); overflow-y: auto; z-index: 30; transform: translateX(-50%); }
-.queue-menu { position: absolute; top: calc(100% + 0.5rem); left: 0; width: min(42rem, calc(100vw - 2rem)); max-height: min(32rem, calc(100vh - 6rem)); overflow-y: auto; z-index: 30; }
+.queue-menu { position: absolute; top: calc(100% + 0.5rem); left: 50%; width: min(42rem, calc(100vw - 2rem)); max-height: min(32rem, calc(100vh - 6rem)); overflow-y: auto; z-index: 30; transform: translateX(-50%); }
+.queue-summary-dot { width: 0.65rem; height: 0.65rem; flex: 0 0 auto; border-radius: 999px; background: var(--color-success-500); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-success-500) 16%, transparent); }
+.queue-summary-dot.failure { background: var(--color-error-500); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-error-500) 16%, transparent); }
+.queue-summary-dot.error { background: #9333ea; box-shadow: 0 0 0 3px color-mix(in oklab, #9333ea 18%, transparent); }
 .queue-item { display: grid; grid-template-columns: auto minmax(10rem, auto) minmax(8rem, 1fr) auto; align-items: center; gap: 0.75rem; padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--color-surface-200); }
 .dark .queue-item { border-color: var(--color-surface-800); }
 .queue-item:last-child { border-bottom: 0; }
@@ -71,8 +74,9 @@ button { cursor: pointer; }
 .system-service-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .system-actions { display: flex; align-items: center; gap: 0.25rem; }
 .system-actions .btn { padding-inline: 0.6rem; font-size: 0.7rem; }
-.system-global-actions { padding-left: 0.5rem; border-left: 1px solid var(--color-surface-300); }
-.dark .system-global-actions { border-color: var(--color-surface-700); }
+.system-menu-global-actions { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.8rem; }
+.system-menu-divider { height: 1px; background: var(--color-surface-200); }
+.dark .system-menu-divider { background: var(--color-surface-800); }
 .system-empty { padding: 1.25rem; color: var(--color-surface-500); text-align: center; }
 .system-wait-dialog { text-align: center; }
 .system-spinner { width: 2rem; height: 2rem; margin: 0 auto 1rem; border: 3px solid var(--color-surface-300); border-top-color: var(--color-primary-500); border-radius: 999px; animation: system-spin 0.8s linear infinite; }
@@ -211,9 +215,8 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 
 @media (max-width: 700px) {
   .system-header { position: static; margin-left: auto; transform: none; }
-  .system-global-actions { display: none; }
   .system-menu { position: fixed; top: 4.5rem; left: 1rem; right: 1rem; width: auto; transform: none; }
-  .queue-menu { position: fixed; top: 4.5rem; left: 1rem; right: 1rem; width: auto; }
+  .queue-menu { position: fixed; top: 4.5rem; left: 1rem; right: 1rem; width: auto; transform: none; }
   .queue-item { grid-template-columns: auto minmax(0, 1fr) auto; }
   .queue-item time { grid-column: 2; }
   .queue-item-code { grid-column: 2; grid-row: 2; }

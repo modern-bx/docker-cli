@@ -71,6 +71,9 @@
 
   $: hasRunningServices = systemServices.some((service) => service.running);
   $: hasStoppedServices = systemServices.some((service) => !service.running);
+  $: queueStatus = queueItems.some((item) => item.status === '50-error')
+    ? 'error'
+    : queueItems.some((item) => item.status === '40-failure') ? 'failure' : 'healthy';
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
   $: if (selectedProject && selectedProject.name !== notesProjectName) {
@@ -490,7 +493,7 @@
       <div class="system-header header-menu">
         <div class="queue-main-control">
           <button class="btn preset-tonal system-trigger" type="button" aria-expanded={queueOpen} onclick={() => { queueOpen = !queueOpen; systemOpen = false; themeOpen = false; profileOpen = false; }}>
-            <span>Очередь</span>
+            <span class={`queue-summary-dot ${queueStatus}`} aria-hidden="true"></span><span>Очередь</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
           </button>
           {#if queueOpen}
@@ -516,6 +519,12 @@
           </button>
           {#if systemOpen}
             <div class="system-menu card preset-filled-surface-100-900 shadow-2xl">
+              <div class="system-menu-global-actions">
+                {#if hasStoppedServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('start')}><Play size={14} aria-hidden="true" />Запустить</button>{/if}
+                {#if hasRunningServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('stop')}><Square size={14} aria-hidden="true" />Остановить</button>{/if}
+                <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart')}><RotateCw size={14} aria-hidden="true" />Перезапустить</button>
+              </div>
+              <div class="system-menu-divider" aria-hidden="true"></div>
               {#if systemServices.length === 0}<p class="system-empty">Сервисы не найдены</p>{/if}
               {#each systemServices as service (service.name)}
                 <div class="system-service">
@@ -532,11 +541,6 @@
               {/each}
             </div>
           {/if}
-        </div>
-        <div class="system-actions system-global-actions">
-          {#if hasStoppedServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('start')}><Play size={14} aria-hidden="true" />Запустить</button>{/if}
-          {#if hasRunningServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('stop')}><Square size={14} aria-hidden="true" />Остановить</button>{/if}
-          <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart')}><RotateCw size={14} aria-hidden="true" />Перезапустить</button>
         </div>
       </div>
     {/if}
