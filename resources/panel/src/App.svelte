@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Collapsible, Dialog } from '@skeletonlabs/skeleton-svelte';
+  import { Collapsible, Combobox, Dialog, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
 
@@ -22,8 +22,10 @@
     ['light', 'Светлая'], ['dark', 'Тёмная'], ['system', 'Системная'],
   ];
   const fonts = [
-    ['ubuntu', 'Ubuntu Regular'], ['noto', 'Noto Sans'],
+    { value: 'ubuntu', label: 'Ubuntu Regular' },
+    { value: 'noto', label: 'Noto Sans' },
   ];
+  const fontCollection = useListCollection({ items: fonts });
   let login = '';
   let password = '';
   let currentLogin = '';
@@ -417,7 +419,7 @@
     const savedMode = localStorage.getItem(MODE_KEY);
     mode = modes.some(([value]) => value === savedMode) ? savedMode : 'system';
     const savedFont = localStorage.getItem(FONT_KEY);
-    font = fonts.some(([value]) => value === savedFont) ? savedFont : 'ubuntu';
+    font = fonts.some((item) => item.value === savedFont) ? savedFont : 'ubuntu';
     applyAppearance();
     const updateSystemMode = (event) => {
       systemDark = event.matches;
@@ -512,14 +514,31 @@
                 </button>
               {/each}
             </div>
-            <label class="font-switch mt-4">
-              <span>Шрифт</span>
-              <select value={font} onchange={(event) => setFont(event.currentTarget.value)}>
-                {#each fonts as [value, label]}
-                  <option value={value}>{label}</option>
-                {/each}
-              </select>
-            </label>
+            <div class="font-switch mt-4">
+              <span id="font-switch-label">Шрифт</span>
+              <Combobox
+                collection={fontCollection}
+                value={[font]}
+                readOnly
+                openOnClick
+                onValueChange={(details) => details.value[0] && setFont(details.value[0])}
+              >
+                <Combobox.Control class="font-combobox-control">
+                  <Combobox.Input aria-labelledby="font-switch-label" class="font-combobox-input" />
+                  <Combobox.Trigger class="font-combobox-trigger" />
+                </Combobox.Control>
+                <Combobox.Positioner class="font-combobox-positioner">
+                  <Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">
+                    {#each fonts as item}
+                      <Combobox.Item {item} class="font-combobox-item">
+                        <Combobox.ItemText>{item.label}</Combobox.ItemText>
+                        <Combobox.ItemIndicator class="font-combobox-indicator" />
+                      </Combobox.Item>
+                    {/each}
+                  </Combobox.Content>
+                </Combobox.Positioner>
+              </Combobox>
+            </div>
           </div>
         {/if}
       </div>
