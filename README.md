@@ -12,6 +12,7 @@
 - [настройка домена в Cloudflare](site/docs/guide/cloudflare.md);
 - [настройка DNS и браузеров](site/docs/guide/dns.md);
 - [Xdebug](site/docs/guide/xdebug.md);
+- [пользовательские задачи](site/docs/guide/tasks.md);
 - [сборка и публикация образов](site/docs/guide/images.md);
 - [упаковка в PHAR](site/docs/guide/phar.md).
 
