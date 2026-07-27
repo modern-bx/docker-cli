@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DockerCli\Panel;
 
+use DockerCli\Panel\Dto\PanelStateDto;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use React\Http\Message\Response;
@@ -27,6 +28,16 @@ final class HttpResponse
         }
         if ($request->getMethod() === 'GET' && $path === '/api/auth/session') {
             return $this->session($request);
+        }
+        if ($request->getMethod() === 'GET' && $path === '/api/state') {
+            if ($this->authenticatedLogin($request) === null) {
+                return $this->json(401, ['error' => 'Сессия истекла.']);
+            }
+
+            $projects = ($this->projects ?? new ProjectController(new \DockerCli\Project\ProjectRegistry()))->index();
+            $system = ($this->system ?? new SystemController(new \DockerCli\Config\SystemCompose()))->status();
+
+            return $this->json(200, new PanelStateDto($projects->projects, $system));
         }
         if ($request->getMethod() === 'GET' && $path === '/api/projects') {
             if ($this->authenticatedLogin($request) === null) {
