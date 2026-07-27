@@ -57,6 +57,12 @@ final class TaskRepository
             if (($document['meta']['schema'] ?? null) !== 'task' || (string) ($document['meta']['version'] ?? '') !== '0.1') {
                 throw new \RuntimeException(sprintf('Задача "%s" должна иметь meta.schema=task и meta.version=0.1.', $code));
             }
+            $this->validateTags($document['task']['tags'] ?? null, sprintf('задачи "%s"', $code));
+            foreach (($document['task']['parameters'] ?? []) as $name => $parameter) {
+                if (is_array($parameter)) {
+                    $this->validateTags($parameter['tags'] ?? null, sprintf('параметра "%s"', $name));
+                }
+            }
             $definitions[] = ['file' => $file, 'task' => $document['task']];
         }
         usort($definitions, static fn (array $left, array $right): int => strcmp((string) ($left['task']['code'] ?? ''), (string) ($right['task']['code'] ?? '')));
@@ -82,5 +88,20 @@ final class TaskRepository
         sort($files, SORT_STRING);
 
         return $files;
+    }
+
+    private function validateTags(mixed $tags, string $owner): void
+    {
+        if ($tags === null) {
+            return;
+        }
+        if (!is_array($tags)) {
+            throw new \RuntimeException(sprintf('Теги %s должны быть списком.', $owner));
+        }
+        foreach ($tags as $tag) {
+            if (!is_string($tag) || preg_match('/^[A-Za-z][A-Za-z0-9._-]*$/', $tag) !== 1) {
+                throw new \RuntimeException(sprintf('Некорректный тег %s: "%s".', $owner, is_scalar($tag) ? (string) $tag : get_debug_type($tag)));
+            }
+        }
     }
 }

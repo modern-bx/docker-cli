@@ -8,6 +8,7 @@ use DockerCli\Task\TaskRepository;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 final class TaskListCommand extends Command
@@ -16,12 +17,15 @@ final class TaskListCommand extends Command
     {
         parent::__construct('task:list');
         $this->setDescription('Вывести список пользовательских задач.');
+        $this->addOption('short', null, InputOption::VALUE_NONE, 'Вывести только краткую сигнатуру без подробностей.');
+        $this->addOption('task', null, InputOption::VALUE_REQUIRED, 'Коды задач через запятую, которые нужно вывести.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         try {
             $definitions = ($this->repository ?? new TaskRepository())->all();
+            $definitions = $this->filterDefinitions($definitions, $input->getOption('task'));
         } catch (\Throwable $exception) {
             $output->writeln('<error>' . $exception->getMessage() . '</error>');
 
@@ -35,7 +39,7 @@ final class TaskListCommand extends Command
                 (string) ($task['code'] ?? '—'),
                 (string) ($task['name'] ?? '—'),
                 trim((string) ($task['description'] ?? '—')),
-                $this->signature($task),
+                $this->signature($task, (bool) $input->getOption('short')),
             ];
         }
 
@@ -49,7 +53,7 @@ final class TaskListCommand extends Command
     }
 
     /** @param array<string, mixed> $task */
-    private function signature(array $task): string
+    private function signature(array $task, bool $short): string
     {
         $parameters = [];
         $details = [];
@@ -67,7 +71,17 @@ final class TaskListCommand extends Command
         $return = is_array($task['return'] ?? null) ? $this->type($task['return']) : 'void';
         $signature = sprintf('(%s) → %s', implode(', ', $parameters), $return);
 
-        return $details === [] ? $signature : $signature . "\n\n" . implode("\n\n", $details);
+        if ($short) {
+            return $signature;
+        }
+
+        $sections = [];
+        if (is_array($task['tags'] ?? null) && $task['tags'] !== []) {
+            $sections[] = 'Теги задачи: ' . implode(', ', array_map('strval', $task['tags']));
+        }
+        array_push($sections, ...$details);
+
+        return $sections === [] ? $signature : $signature . "\n\n" . implode("\n\n", $sections);
     }
 
     /** @param array<string, mixed> $spec */
@@ -102,11 +116,34 @@ final class TaskListCommand extends Command
         if ($constraints !== []) {
             $lines[] = '  Ограничения: ' . implode('; ', $constraints);
         }
+        if (is_array($spec['tags'] ?? null) && $spec['tags'] !== []) {
+            $lines[] = '  Теги: ' . implode(', ', array_map('strval', $spec['tags']));
+        }
         if (isset($spec['description']) && is_string($spec['description'])) {
             $lines[] = "  Описание:\n" . $this->indent($spec['description'], 4);
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * @param list<array{file: string, task: array<string, mixed>}> $definitions
+     * @return list<array{file: string, task: array<string, mixed>}>
+     */
+    private function filterDefinitions(array $definitions, mixed $option): array
+    {
+        if (!is_string($option) || trim($option) === '') {
+            return $definitions;
+        }
+
+        $codes = array_values(array_unique(array_filter(array_map('trim', explode(',', $option)), static fn (string $code): bool => $code !== '')));
+        $available = array_map(static fn (array $definition): string => (string) ($definition['task']['code'] ?? ''), $definitions);
+        $missing = array_values(array_diff($codes, $available));
+        if ($missing !== []) {
+            throw new \RuntimeException('Задачи не найдены: ' . implode(', ', $missing) . '.');
+        }
+
+        return array_values(array_filter($definitions, static fn (array $definition): bool => in_array($definition['task']['code'] ?? null, $codes, true)));
     }
 
     private function scalarText(mixed $value): string

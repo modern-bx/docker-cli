@@ -94,11 +94,28 @@ final class TaskRunCommand extends Command
         if (isset($task['return'])) {
             $this->validateParameter('return', $task['return'], true);
         }
+        $this->validateTags($task['tags'] ?? null, 'задачи');
         foreach ($task['parameters'] ?? [] as $name => $spec) {
             if (!is_string($name) || $name === '' || preg_match('/^[A-Za-z_][A-Za-z0-9_-]*$/', $name) !== 1) {
                 throw new \RuntimeException(sprintf('Некорректное имя параметра "%s".', (string) $name));
             }
             $this->validateParameter($name, $spec);
+            $this->validateTags($spec['tags'] ?? null, sprintf('параметра "%s"', $name));
+        }
+    }
+
+    private function validateTags(mixed $tags, string $owner): void
+    {
+        if ($tags === null) {
+            return;
+        }
+        if (!is_array($tags)) {
+            throw new \RuntimeException(sprintf('Теги %s должны быть списком.', $owner));
+        }
+        foreach ($tags as $tag) {
+            if (!is_string($tag) || preg_match('/^[A-Za-z][A-Za-z0-9._-]*$/', $tag) !== 1) {
+                throw new \RuntimeException(sprintf('Некорректный тег %s: "%s".', $owner, is_scalar($tag) ? (string) $tag : get_debug_type($tag)));
+            }
         }
     }
 

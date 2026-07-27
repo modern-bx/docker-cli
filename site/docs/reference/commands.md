@@ -174,6 +174,33 @@ bin/docker-cli data:apply --dbms=mysql ./backup.sql.zip
 bin/docker-cli data:apply --dbms=mysql './backups/*'
 ```
 
+## Пользовательские задачи
+
+Полная спецификация YAML и описание выполнения приведены в разделе [«Пользовательские задачи»](/guide/tasks).
+
+### `bin/docker-cli task:list [--short] [--task=<code[,code2]>]`
+
+Выводит найденные задачи, отсортированные по коду. Полный режим показывает код, название и описание задачи, краткую сигнатуру, теги задачи, а также код, название, тип, ограничения, теги и полное многострочное описание каждого параметра.
+
+`--short` скрывает подробные сведения под сигнатурой. `--task` принимает один или несколько разделённых запятыми кодов и оставляет в результате только эти задачи:
+
+```bash
+bin/docker-cli task:list
+bin/docker-cli task:list --short
+bin/docker-cli task:list --task=demo.do-something,project.cleanup
+```
+
+### `bin/docker-cli task:run [--project=<project>] [--no-delete] <task-code> [task-args...]`
+
+Проверяет интерфейс задачи, компилирует её `action` во временный строгий Bash-скрипт и возвращает код его завершения. Аргументы принимаются позиционно либо в виде `name=value`:
+
+```bash
+bin/docker-cli task:run demo.do-something message=hello count=2
+bin/docker-cli task:run --project=my-project demo.do-something hello 2
+```
+
+`--project` обязателен для задач с `context: project`. `--no-delete` оставляет скомпилированный файл после выполнения и печатает его путь.
+
 ## Административная панель
 
 ### `bin/docker-cli panel:up [-d]`

@@ -36,6 +36,7 @@ export default defineConfig({
           { text: 'Домен в Cloudflare', link: '/guide/cloudflare' },
           { text: 'DNS и браузеры', link: '/guide/dns' },
           { text: 'Xdebug', link: '/guide/xdebug' },
+          { text: 'Задачи', link: '/guide/tasks' },
           { text: 'Образы', link: '/guide/images' },
           { text: 'PHAR', link: '/guide/phar' }
         ]
