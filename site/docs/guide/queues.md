@@ -8,7 +8,7 @@
 meta:
   schema: queue-item
   version: 0.1
-task:
+queue-item:
   tasks:
     - code: demo.do-something
       project: my-project
@@ -19,7 +19,7 @@ task:
           value: 3
 ```
 
-Спеки задач загружаются рекурсивно из `~/.config/docker-cli/tasks`. Каждая запись `arguments` содержит поле `value`. Для задач с `context: project` обязательно поле `project`.
+Задачи элемента перечисляются в `queue-item.tasks`. Их спеки загружаются рекурсивно из `~/.config/docker-cli/tasks`. Каждая запись `arguments` содержит поле `value`. Для задач с `context: project` обязательно поле `project`.
 
 `queue:step` удерживает неблокирующую эксклюзивную блокировку на всё время шага. Элемент сначала переносится в `20-active`. Ошибки YAML и все найденные расхождения со спекой отправляют его в `50-error`; ненулевой код задачи останавливает цепочку и отправляет элемент в `40-failure`; полностью выполненная цепочка попадает в `30-success`.
 

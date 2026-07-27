@@ -25,14 +25,14 @@ final class QueueItemValidator
         if ((string) ($item['meta']['version'] ?? '') !== '0.1') {
             $errors[] = 'meta.version должен быть равен 0.1.';
         }
-        $tasks = $item['task']['tasks'] ?? null;
+        $tasks = $item['queue-item']['tasks'] ?? null;
         if (!is_array($tasks) || !array_is_list($tasks) || $tasks === []) {
-            $errors[] = 'task.tasks должен быть непустым списком.';
+            $errors[] = 'queue-item.tasks должен быть непустым списком.';
 
             return $errors;
         }
         foreach ($tasks as $index => $task) {
-            $prefix = sprintf('task.tasks.%d', $index);
+            $prefix = sprintf('queue-item.tasks.%d', $index);
             if (!is_array($task) || !is_string($task['code'] ?? null) || $task['code'] === '') {
                 $errors[] = $prefix . '.code должен быть непустой строкой.';
                 continue;

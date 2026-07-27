@@ -61,7 +61,7 @@ final class QueueStepCommand extends Command
                 $repository->move($active, $queue, '50-error');
                 return Command::INVALID;
             }
-            foreach ($item['task']['tasks'] as $task) {
+            foreach ($item['queue-item']['tasks'] as $task) {
                 $repository->trace($active, $queue, $item, sprintf('Запуск задачи %s.', $task['code']));
                 $arguments = ['task-code' => $task['code']];
                 if (isset($task['project'])) {
