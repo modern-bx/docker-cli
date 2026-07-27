@@ -27,8 +27,21 @@
 @source '../index.html';
 @source './**/*.{svelte,js}';
 
+html {
+  --panel-font-family: Ubuntu, sans-serif;
+  --panel-mono-font-family: "Ubuntu Mono", monospace;
+  --typo-base--font-family: var(--panel-font-family);
+  --typo-heading--font-family: var(--panel-font-family);
+  --typo-anchor--font-family: var(--panel-font-family);
+}
+html[data-font='noto'] {
+  --panel-font-family: "Noto Sans", sans-serif;
+  --panel-mono-font-family: "Noto Sans Mono", monospace;
+}
 html, body, #app { min-height: 100%; }
 body { margin: 0; }
+body, button, input, select, textarea { font-family: var(--panel-font-family) !important; }
+pre, code, kbd, samp { font-family: var(--panel-mono-font-family) !important; }
 button { cursor: pointer; }
 .panel-shell { height: 100dvh; min-height: 0; overflow: hidden; }
 
@@ -166,6 +179,19 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .mode-switch button { display: flex; align-items: center; justify-content: center; gap: 0.35rem; padding: 0.55rem 0.25rem; border-radius: var(--radius-base); font-size: 0.75rem; }
 .mode-switch button.active { background: var(--color-surface-50); box-shadow: 0 1px 3px rgb(0 0 0 / 0.16); }
 .dark .mode-switch button.active { background: var(--color-surface-950); }
+.font-switch { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 1rem; }
+.font-switch span { font-size: 0.85rem; font-weight: 600; }
+.font-combobox-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; width: 100%; border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); background: var(--color-surface-50); color: var(--color-surface-950); }
+.dark .font-combobox-control { border-color: var(--color-surface-700); background: var(--color-surface-950); color: var(--color-surface-50); }
+.font-combobox-input { min-width: 0; padding: 0.55rem 0.7rem; outline: none; background: transparent; }
+.font-combobox-trigger { display: grid; width: 2.25rem; place-items: center; }
+.font-combobox-trigger svg { width: 1rem; }
+.font-combobox-positioner { z-index: 30; }
+.font-combobox-content { width: var(--reference-width); margin-top: 0.25rem; padding: 0.25rem; }
+.font-combobox-item { display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.65rem; border-radius: var(--radius-base); cursor: pointer; }
+.font-combobox-item[data-highlighted] { background: var(--color-surface-200); }
+.dark .font-combobox-item[data-highlighted] { background: var(--color-surface-800); }
+.font-combobox-indicator { width: 1rem; }
 
 @media (max-width: 420px) {
   .theme-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
