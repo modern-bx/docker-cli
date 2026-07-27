@@ -29,6 +29,7 @@ use DockerCli\Command\PanelUserDeleteCommand;
 use DockerCli\Command\ProjectDisableCommand;
 use DockerCli\Command\ProjectEnableCommand;
 use DockerCli\Command\TaskRunCommand;
+use DockerCli\Command\TaskListCommand;
 use Symfony\Component\Console\Application;
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -62,5 +63,6 @@ $application->add(new PanelUserDeleteCommand());
 $application->add(new ProjectEnableCommand());
 $application->add(new ProjectDisableCommand());
 $application->add(new TaskRunCommand());
+$application->add(new TaskListCommand());
 $application->setDefaultCommand('list');
 $application->run();

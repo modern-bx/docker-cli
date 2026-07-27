@@ -31,27 +31,37 @@ final class TaskRepository
     /** @return array{file: string, task: array<string, mixed>} */
     public function find(string $code): array
     {
+        foreach ($this->all() as $definition) {
+            if (($definition['task']['code'] ?? null) === $code) {
+                return $definition;
+            }
+        }
+
+        throw new \RuntimeException(sprintf('Задача с кодом "%s" не найдена в "%s".', $code, $this->directory()));
+    }
+
+    /** @return list<array{file: string, task: array<string, mixed>}> */
+    public function all(): array
+    {
+        $definitions = [];
         foreach ($this->files() as $file) {
             try {
                 $document = Yaml::parseFile($file);
             } catch (ParseException $exception) {
                 throw new \RuntimeException(sprintf('Ошибка YAML в "%s": %s', $file, $exception->getMessage()), 0, $exception);
             }
-
-            if (!is_array($document) || ($document['task']['code'] ?? null) !== $code) {
-                continue;
+            if (!is_array($document) || !is_array($document['task'] ?? null)) {
+                throw new \RuntimeException(sprintf('Некорректный блок task в "%s".', $file));
             }
+            $code = $document['task']['code'] ?? basename($file);
             if (($document['meta']['schema'] ?? null) !== 'task' || (string) ($document['meta']['version'] ?? '') !== '0.1') {
                 throw new \RuntimeException(sprintf('Задача "%s" должна иметь meta.schema=task и meta.version=0.1.', $code));
             }
-            if (!is_array($document['task'])) {
-                throw new \RuntimeException(sprintf('Некорректный блок task в "%s".', $file));
-            }
-
-            return ['file' => $file, 'task' => $document['task']];
+            $definitions[] = ['file' => $file, 'task' => $document['task']];
         }
+        usort($definitions, static fn (array $left, array $right): int => strcmp((string) ($left['task']['code'] ?? ''), (string) ($right['task']['code'] ?? '')));
 
-        throw new \RuntimeException(sprintf('Задача с кодом "%s" не найдена в "%s".', $code, $this->directory()));
+        return $definitions;
     }
 
     /** @return list<string> */

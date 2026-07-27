@@ -22,6 +22,7 @@ final class TaskRunCommand extends Command
         parent::__construct('task:run');
         $this->setDescription('Найти и выполнить пользовательскую задачу.');
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта для задачи с context: project.');
+        $this->addOption('no-delete', null, InputOption::VALUE_NONE, 'Не удалять скомпилированный временный скрипт после выполнения.');
         $this->addArgument('task-code', InputArgument::REQUIRED, 'Код задачи.');
         $this->addArgument('task-args', InputArgument::IS_ARRAY, 'Значения параметров: name=value или позиционные значения в порядке спеки.');
     }
@@ -65,7 +66,11 @@ final class TaskRunCommand extends Command
 
             return is_int($exitCode) ? $exitCode : Command::FAILURE;
         } finally {
-            @unlink($scriptFile);
+            if ($input->getOption('no-delete')) {
+                $output->writeln(sprintf('<comment>Скомпилированный скрипт сохранен: %s</comment>', $scriptFile));
+            } else {
+                @unlink($scriptFile);
+            }
         }
     }
 
