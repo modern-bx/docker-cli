@@ -13,6 +13,7 @@ use DockerCli\Panel\Http\Middleware\AuthMiddleware;
 use DockerCli\Panel\Http\ResponseEmitter;
 use DockerCli\Panel\JwtTokenService;
 use DockerCli\Panel\ProjectController;
+use DockerCli\Panel\QueueController;
 use DockerCli\Panel\Router;
 use DockerCli\Panel\StateController;
 use DockerCli\Panel\SystemController;
@@ -20,6 +21,7 @@ use DockerCli\Panel\SystemdService;
 use DockerCli\Panel\UserRepository;
 use DockerCli\Panel\WebSocket\PanelStateChannel;
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Queue\QueueRepository;
 use React\EventLoop\Loop;
 use React\Http\HttpServer;
 use React\Socket\SocketServer;
@@ -98,10 +100,11 @@ final class PanelUpCommand extends Command
         $tokens = new JwtTokenService($jwtSecret);
         $projects = new ProjectController(new ProjectRegistry(), $compose);
         $system = new SystemController($compose);
+        $queue = new QueueController(new QueueRepository());
         $responses = new ResponseEmitter($assets);
-        $state = new StateController($projects, $system);
+        $state = new StateController($projects, $system, $queue);
         $router = new Router(
-            [new AuthController($users, $tokens), $state, $projects, $system, new AssetController()],
+            [new AuthController($users, $tokens), $state, $projects, $system, $queue, new AssetController()],
             new ControllerInvoker(),
             new AuthMiddleware($tokens, $responses),
             $responses,

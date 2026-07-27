@@ -48,6 +48,9 @@
   let projectQuery = '';
   let projectTags = [];
   let systemOpen = false;
+  let queueOpen = false;
+  let queueItems = [];
+  let queueConfirmation = null;
   let systemStatus = 'stopped';
   let systemServices = [];
   let systemPending = false;
@@ -163,6 +166,7 @@
     themeOpen = false;
     profileOpen = false;
     systemOpen = false;
+    queueOpen = false;
   }
 
   function openProjectContextMenu(event, project) {
@@ -245,6 +249,7 @@
     projectsError = '';
     systemStatus = data.system.status;
     systemServices = data.system.services;
+    if (data.queue?.name === 'default' && Array.isArray(data.queue.items)) queueItems = data.queue.items;
     projectsLoading = false;
     if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) selectedProjectName = '';
   }
@@ -276,6 +281,23 @@
     clearTimeout(panelReconnectTimer);
     panelSocket?.close();
     panelSocket = null;
+  }
+
+  function formatQueueDate(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString('ru-RU');
+  }
+
+  async function deleteQueueItem(item) {
+    queueConfirmation = null;
+    try {
+      const data = await api(`/api/queue/default/${encodeURIComponent(item.file)}`, { method: 'DELETE' });
+      queueItems = data.items;
+    } catch (cause) {
+      errorTitle = 'Не удалось удалить элемент очереди';
+      error = cause instanceof Error ? cause.message : 'Не удалось удалить элемент очереди.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    }
   }
 
   async function projectAction(action, name) {
@@ -456,7 +478,7 @@
 
 <svelte:window
   onclick={closeMenus}
-  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; profileOpen = false; systemOpen = false; } }}
+  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; } }}
 />
 
 <svelte:head><title>{token ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
@@ -466,8 +488,29 @@
     {#if token}<a href="#/" class="font-bold text-xl no-underline">docker-cli</a>{/if}
     {#if token}
       <div class="system-header header-menu">
+        <div class="queue-main-control">
+          <button class="btn preset-tonal system-trigger" type="button" aria-expanded={queueOpen} onclick={() => { queueOpen = !queueOpen; systemOpen = false; themeOpen = false; profileOpen = false; }}>
+            <span>Очередь</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+          </button>
+          {#if queueOpen}
+            <div class="queue-menu card preset-filled-surface-100-900 shadow-2xl">
+              {#if queueItems.length === 0}<p class="system-empty">Очередь пуста</p>{/if}
+              {#each queueItems as item (item.file)}
+                <div class="queue-item">
+                  <span class={`queue-dot status-${item.status}`} aria-hidden="true"></span>
+                  <time datetime={item.queuedAt}>{formatQueueDate(item.queuedAt)}</time>
+                  <span class="queue-item-code" title={item.code}>{item.code}</span>
+                  {#if item.status !== '20-active'}
+                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => { queueOpen = false; queueConfirmation = item; }}><Trash2 size={14} aria-hidden="true" />Удалить</button>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
         <div class="system-main-control">
-          <button class="btn preset-tonal system-trigger" type="button" aria-expanded={systemOpen} onclick={() => { systemOpen = !systemOpen; themeOpen = false; profileOpen = false; }}>
+          <button class="btn preset-tonal system-trigger" type="button" aria-expanded={systemOpen} onclick={() => { systemOpen = !systemOpen; queueOpen = false; themeOpen = false; profileOpen = false; }}>
             <span class={`system-dot ${systemStatus}`} aria-hidden="true"></span><span>Система</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
           </button>
@@ -774,6 +817,22 @@
       <div class="login-error-actions system-confirm-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
         <button class="btn preset-filled-primary-500" type="button" onclick={() => { const action = systemConfirmation; systemConfirmation = null; if (action) systemAction(action.action, action.service); }}>Продолжить</button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(queueConfirmation)} onOpenChange={({ open }) => { if (!open) queueConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Удалить элемент очереди?</Dialog.Title>
+      <Dialog.Description class="login-error-description">
+        Элемент «{queueConfirmation?.code}» будет безвозвратно удалён из очереди default.
+      </Dialog.Description>
+      <div class="login-error-actions system-confirm-actions">
+        <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
+        <button class="btn preset-filled-error-500" type="button" onclick={() => queueConfirmation && deleteQueueItem(queueConfirmation)}>Удалить</button>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>

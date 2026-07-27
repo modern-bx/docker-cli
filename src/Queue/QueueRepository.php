@@ -60,6 +60,47 @@ final class QueueRepository
         return $files[0] ?? null;
     }
 
+    /** @return list<array{file: string, status: string, queuedAt: string, code: string}> */
+    public function items(string $queue): array
+    {
+        $items = [];
+        foreach (['10-pending', '20-active', '40-failure', '50-error'] as $status) {
+            $files = glob(join_path($this->queueDirectory($queue), $status, '*.yaml')) ?: [];
+            foreach (array_filter($files, 'is_file') as $file) {
+                $name = basename($file);
+                $parts = explode('.', substr($name, 0, -5), 3);
+                $microseconds = ctype_digit($parts[0] ?? '') ? (int) $parts[0] : ((int) filemtime($file) * 1_000_000);
+                $items[] = [
+                    'file' => $name,
+                    'status' => $status,
+                    'queuedAt' => sprintf('%s.%06dZ', gmdate('Y-m-d\TH:i:s', intdiv($microseconds, 1_000_000)), $microseconds % 1_000_000),
+                    'code' => $parts[2] ?? pathinfo($name, PATHINFO_FILENAME),
+                ];
+            }
+        }
+        usort($items, static fn (array $left, array $right): int => [$left['queuedAt'], $left['file']] <=> [$right['queuedAt'], $right['file']]);
+
+        return $items;
+    }
+
+    public function delete(string $queue, string $file): void
+    {
+        if (basename($file) !== $file || preg_match('/^[A-Za-z0-9._-]+\.yaml$/D', $file) !== 1) {
+            throw new \InvalidArgumentException('Некорректное имя элемента очереди.');
+        }
+        foreach (['10-pending', '40-failure', '50-error'] as $status) {
+            $path = join_path($this->queueDirectory($queue), $status, $file);
+            if (is_file($path)) {
+                if (!unlink($path)) throw new \RuntimeException('Не удалось удалить элемент очереди.');
+                return;
+            }
+        }
+        if (is_file(join_path($this->queueDirectory($queue), '20-active', $file))) {
+            throw new \RuntimeException('Нельзя удалить выполняющийся элемент очереди.');
+        }
+        throw new \RuntimeException('Элемент очереди не найден.');
+    }
+
     public function move(string $file, string $queue, string $status): string
     {
         if (!in_array($status, self::STATUSES, true)) {
