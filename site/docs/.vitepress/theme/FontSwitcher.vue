@@ -69,7 +69,12 @@ select {
   display: none;
 }
 
-@media (min-width: 1280px) {
+/*
+ * VitePress moves its appearance control into the header's "more" menu below
+ * 1280px. Keep the font control visible throughout the desktop/tablet header
+ * range instead of tying it to the much wider appearance-toggle breakpoint.
+ */
+@media (min-width: 768px) {
   .compact {
     display: flex;
     margin: 0 0 0 12px;
