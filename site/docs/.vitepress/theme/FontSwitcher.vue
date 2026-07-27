@@ -7,6 +7,7 @@ type Font = 'ubuntu' | 'noto'
 
 const storageKey = 'preferred-font'
 const selectedFont = ref<Font>('ubuntu')
+const isMounted = ref(false)
 
 function applyFont(font: Font) {
   selectedFont.value = font
@@ -15,6 +16,7 @@ function applyFont(font: Font) {
 }
 
 onMounted(() => {
+  isMounted.value = true
   const savedFont = localStorage.getItem(storageKey)
   applyFont(savedFont === 'noto' ? 'noto' : 'ubuntu')
 })
@@ -32,6 +34,21 @@ onMounted(() => {
       <option value="noto">Noto Sans</option>
     </select>
   </label>
+
+  <!-- At tablet widths VitePress moves the theme switch into this flyout. -->
+  <Teleport v-if="compact && isMounted" to=".VPNavBarExtra .group">
+    <label class="FontSwitcher flyout">
+      <span class="label">Шрифт</span>
+      <select
+        :value="selectedFont"
+        aria-label="Шрифт"
+        @change="applyFont(($event.target as HTMLSelectElement).value as Font)"
+      >
+        <option value="ubuntu">Ubuntu Regular</option>
+        <option value="noto">Noto Sans</option>
+      </select>
+    </label>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -69,12 +86,7 @@ select {
   display: none;
 }
 
-/*
- * VitePress moves its appearance control into the header's "more" menu below
- * 1280px. Keep the font control visible throughout the desktop/tablet header
- * range instead of tying it to the much wider appearance-toggle breakpoint.
- */
-@media (min-width: 768px) {
+@media (min-width: 1280px) {
   .compact {
     display: flex;
     margin: 0 0 0 12px;
@@ -89,6 +101,21 @@ select {
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
+  }
+}
+
+.flyout {
+  display: none;
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  .flyout {
+    display: flex;
+    margin: 8px 0 0;
+    border-top: 1px solid var(--vp-c-divider);
+    border-radius: 0;
+    padding: 12px;
+    background: transparent;
   }
 }
 </style>
