@@ -37,6 +37,7 @@ export default defineConfig({
           { text: 'DNS и браузеры', link: '/guide/dns' },
           { text: 'Xdebug', link: '/guide/xdebug' },
           { text: 'Задачи', link: '/guide/tasks' },
+          { text: 'Очереди', link: '/guide/queues' },
           { text: 'Образы', link: '/guide/images' },
           { text: 'PHAR', link: '/guide/phar' }
         ]
