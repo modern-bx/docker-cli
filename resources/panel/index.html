@@ -8,7 +8,9 @@
       (() => {
         const mode = localStorage.getItem('docker-cli-panel-theme') || 'system';
         const theme = localStorage.getItem('docker-cli-panel-color-theme') || 'vox';
+        const font = localStorage.getItem('docker-cli-panel-font') || 'ubuntu';
         document.documentElement.dataset.theme = theme;
+        document.documentElement.dataset.font = font === 'noto' ? 'noto' : 'ubuntu';
         document.documentElement.classList.toggle('dark', mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches));
       })();
     </script>

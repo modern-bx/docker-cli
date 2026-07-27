@@ -1,12 +1,13 @@
 <script>
   import { onMount } from 'svelte';
-  import { Collapsible, Dialog } from '@skeletonlabs/skeleton-svelte';
+  import { Collapsible, Combobox, Dialog, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
+  const FONT_KEY = 'docker-cli-panel-font';
   const themes = [
     ['vox', 'Vox'], ['cerberus', 'Cerberus'], ['concord', 'Concord'],
     ['crimson', 'Crimson'], ['dracula', 'Dracula'], ['fennec', 'Fennec'],
@@ -20,6 +21,11 @@
   const modes = [
     ['light', 'Светлая'], ['dark', 'Тёмная'], ['system', 'Системная'],
   ];
+  const fonts = [
+    { value: 'ubuntu', label: 'Ubuntu Regular' },
+    { value: 'noto', label: 'Noto Sans' },
+  ];
+  const fontCollection = useListCollection({ items: fonts });
   let login = '';
   let password = '';
   let currentLogin = '';
@@ -33,6 +39,7 @@
   let themeOpen = false;
   let theme = 'vox';
   let mode = 'system';
+  let font = 'ubuntu';
   let systemDark = false;
   let projects = [];
   let selectedProjectName = '';
@@ -123,7 +130,14 @@
 
   function applyAppearance() {
     document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.font = font;
     document.documentElement.classList.toggle('dark', mode === 'dark' || (mode === 'system' && systemDark));
+  }
+
+  function setFont(value) {
+    font = value;
+    localStorage.setItem(FONT_KEY, font);
+    applyAppearance();
   }
 
   function setTheme(value) {
@@ -404,6 +418,8 @@
     theme = themes.some(([value]) => value === savedTheme) ? savedTheme : 'vox';
     const savedMode = localStorage.getItem(MODE_KEY);
     mode = modes.some(([value]) => value === savedMode) ? savedMode : 'system';
+    const savedFont = localStorage.getItem(FONT_KEY);
+    font = fonts.some((item) => item.value === savedFont) ? savedFont : 'ubuntu';
     applyAppearance();
     const updateSystemMode = (event) => {
       systemDark = event.matches;
@@ -497,6 +513,31 @@
                   {label}
                 </button>
               {/each}
+            </div>
+            <div class="font-switch mt-4">
+              <span id="font-switch-label">Шрифт</span>
+              <Combobox
+                collection={fontCollection}
+                value={[font]}
+                readOnly
+                openOnClick
+                onValueChange={(details) => details.value[0] && setFont(details.value[0])}
+              >
+                <Combobox.Control class="font-combobox-control">
+                  <Combobox.Input aria-labelledby="font-switch-label" class="font-combobox-input" />
+                  <Combobox.Trigger class="font-combobox-trigger" />
+                </Combobox.Control>
+                <Combobox.Positioner class="font-combobox-positioner">
+                  <Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">
+                    {#each fonts as item}
+                      <Combobox.Item {item} class="font-combobox-item">
+                        <Combobox.ItemText>{item.label}</Combobox.ItemText>
+                        <Combobox.ItemIndicator class="font-combobox-indicator" />
+                      </Combobox.Item>
+                    {/each}
+                  </Combobox.Content>
+                </Combobox.Positioner>
+              </Combobox>
             </div>
           </div>
         {/if}
