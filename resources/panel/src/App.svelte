@@ -523,6 +523,7 @@
               <Combobox
                 collection={fontCollection}
                 value={[font]}
+                readOnly
                 openOnClick
                 onValueChange={(details) => details.value[0] && setFont(details.value[0])}
               >
