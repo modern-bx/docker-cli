@@ -7,6 +7,10 @@ namespace DockerCli\Panel;
 use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\Dto\SystemServiceDto;
 use DockerCli\Panel\Dto\SystemStatusDto;
+use DockerCli\Panel\Dto\Request\EmptyRequestDto;
+use DockerCli\Panel\Dto\Request\SystemActionRequestDto;
+use DockerCli\Panel\Enum\SystemActionEnum;
+use DockerCli\Panel\Http\Attribute\Route;
 
 final class SystemController
 {
@@ -14,7 +18,8 @@ final class SystemController
     {
     }
 
-    public function status(): SystemStatusDto
+    #[Route('GET', '/api/system', EmptyRequestDto::class, SystemStatusDto::class)]
+    public function status(EmptyRequestDto $request): SystemStatusDto
     {
         $configured = $this->configuredServices();
         $running = $this->runningServices();
@@ -29,14 +34,21 @@ final class SystemController
         return new SystemStatusDto($status, $services);
     }
 
-    public function act(string $action, ?string $service = null): SystemStatusDto
+    #[Route('POST', '/api/system/{action:' . SystemActionEnum::ROUTE_PATTERN . '}', SystemActionRequestDto::class, SystemStatusDto::class)]
+    #[Route('POST', '/api/system/services/{service}/{action:' . SystemActionEnum::ROUTE_PATTERN . '}', SystemActionRequestDto::class, SystemStatusDto::class)]
+    public function action(SystemActionRequestDto $request): SystemStatusDto
     {
-        $arguments = match ($action) {
-            'start' => ['up', '-d'],
-            'stop' => ['stop'],
-            'restart' => ['restart'],
-            default => throw new SystemActionException('Неизвестное действие.', 400),
-        };
+        $action = $request->action;
+        $service = $request->service;
+        if (SystemActionEnum::isStart($action)) {
+            $arguments = ['up', '-d'];
+        } elseif (SystemActionEnum::isStop($action)) {
+            $arguments = ['stop'];
+        } elseif (SystemActionEnum::isRestart($action)) {
+            $arguments = ['restart'];
+        } else {
+            throw new SystemActionException('Неизвестное действие.', 400);
+        }
         if ($service !== null) {
             if (!array_key_exists($service, $this->configuredServices())) {
                 throw new SystemActionException('Сервис не найден.', 404);
@@ -46,7 +58,7 @@ final class SystemController
 
         $this->run($arguments);
 
-        return $this->status();
+        return $this->status(new EmptyRequestDto());
     }
 
     /** @return array<string, string> */

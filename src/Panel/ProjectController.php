@@ -7,6 +7,11 @@ namespace DockerCli\Panel;
 use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\Dto\ProjectDto;
 use DockerCli\Panel\Dto\ProjectListDto;
+use DockerCli\Panel\Dto\Request\EmptyRequestDto;
+use DockerCli\Panel\Dto\Request\ProjectActionRequestDto;
+use DockerCli\Panel\Dto\Request\ProjectNotesRequestDto;
+use DockerCli\Panel\Enum\ProjectActionEnum;
+use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
 
@@ -19,8 +24,11 @@ final class ProjectController
     {
     }
 
-    public function act(string $name, string $action): ProjectListDto
+    #[Route('POST', '/api/projects/{name}/{action:' . ProjectActionEnum::ROUTE_PATTERN . '}', ProjectActionRequestDto::class, ProjectListDto::class)]
+    public function action(ProjectActionRequestDto $request): ProjectListDto
     {
+        $name = $request->name;
+        $action = $request->action;
         if (!$this->projects->hasProject($name)) {
             throw new ProjectActionException('Проект не найден.', 404);
         }
@@ -30,21 +38,22 @@ final class ProjectController
             throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
         }
 
-        if ($action === 'enable' || $action === 'disable') {
-            $config['data']['project']['enabled'] = $action === 'enable';
+        if (ProjectActionEnum::isEnable($action) || ProjectActionEnum::isDisable($action)) {
+            $config['data']['project']['enabled'] = ProjectActionEnum::isEnable($action);
             $this->projects->writeProjectConfig($name, $config);
             (new OpenRestyHostRenderer())->render();
             $this->reloadOpenResty();
-        } elseif ($action === 'wipe') {
+        } elseif (ProjectActionEnum::isWipe($action)) {
             $this->wipe($name, $project);
         } else {
             throw new ProjectActionException('Неизвестное действие.', 400);
         }
 
-        return $this->index();
+        return $this->projects(new EmptyRequestDto());
     }
 
-    public function index(): ProjectListDto
+    #[Route('GET', '/api/projects', EmptyRequestDto::class, ProjectListDto::class)]
+    public function projects(EmptyRequestDto $request): ProjectListDto
     {
         $projects = [];
         $baseHost = ($this->compose ?? new SystemCompose())->envValue('BASE_HOST', '');
@@ -68,9 +77,12 @@ final class ProjectController
         return new ProjectListDto($projects);
     }
 
-    /** @param list<mixed> $tags */
-    public function saveNotes(string $name, array $tags, string $description): ProjectListDto
+    #[Route('POST', '/api/projects/{name}/notes', ProjectNotesRequestDto::class, ProjectListDto::class)]
+    public function saveNotes(ProjectNotesRequestDto $request): ProjectListDto
     {
+        $name = $request->name;
+        $tags = $request->tags;
+        $description = $request->description;
         if (!$this->projects->hasProject($name)) {
             throw new ProjectActionException('Проект не найден.', 404);
         }
@@ -92,7 +104,7 @@ final class ProjectController
         $config['data']['project']['description'] = $description;
         $this->projects->writeProjectConfig($name, $config);
 
-        return $this->index();
+        return $this->projects(new EmptyRequestDto());
     }
 
     /** @return list<string> */

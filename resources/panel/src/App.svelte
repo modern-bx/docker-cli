@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { Collapsible, Combobox, Dialog, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
-  import { getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
+  import { getPanelState, getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -233,35 +233,25 @@
     }
   }
 
-  async function refreshProjects() {
+  async function refreshPanel() {
     if (!token || systemPending) return;
     if (projects.length === 0) projectsLoading = true;
     try {
-      const data = await getProjects(api);
+      const data = await getPanelState(api);
       projects = data.projects;
       projectsError = '';
+      systemStatus = data.system.status;
+      systemServices = data.system.services;
       if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) {
         selectedProjectName = '';
       }
     } catch (cause) {
-      // A service can accept Docker's "running" state before its HTTP
-      // endpoint is ready. Do not turn these short transport gaps into toasts.
+      systemStatus = 'stopped';
       if (cause instanceof Error && 'status' in cause && typeof cause.status === 'number' && cause.status < 500) {
         projectsError = cause.message;
       }
     } finally {
       projectsLoading = false;
-    }
-  }
-
-  async function refreshSystem() {
-    if (!token || systemPending) return;
-    try {
-      const data = await getSystemStatus(api);
-      systemStatus = data.status;
-      systemServices = data.services;
-    } catch {
-      systemStatus = 'stopped';
     }
   }
 
@@ -289,8 +279,7 @@
       }
     } finally {
       systemPending = false;
-      refreshProjects();
-      refreshSystem();
+      refreshPanel();
     }
   }
 
@@ -366,7 +355,7 @@
       }
     } finally {
       systemPending = false;
-      refreshSystem();
+      refreshPanel();
     }
   }
 
@@ -434,14 +423,11 @@
     if (!token) window.location.hash = '#/login';
     checkSession().finally(() => { loading = false; });
     const interval = setInterval(checkSession, 60_000);
-    refreshProjects();
-    const projectsInterval = setInterval(refreshProjects, 1_000);
-    refreshSystem();
-    const systemInterval = setInterval(refreshSystem, 1_000);
+    refreshPanel();
+    const panelInterval = setInterval(refreshPanel, 1_000);
     return () => {
       clearInterval(interval);
-      clearInterval(projectsInterval);
-      clearInterval(systemInterval);
+      clearInterval(panelInterval);
       media.removeEventListener('change', updateSystemMode);
     };
   });
