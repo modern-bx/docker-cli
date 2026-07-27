@@ -31,6 +31,8 @@ use DockerCli\Command\ProjectEnableCommand;
 use DockerCli\Command\TaskRunCommand;
 use DockerCli\Command\TaskListCommand;
 use DockerCli\Command\QueueStepCommand;
+use DockerCli\Command\QueueStartCommand;
+use DockerCli\Command\QueueStopCommand;
 use Symfony\Component\Console\Application;
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -66,5 +68,7 @@ $application->add(new ProjectDisableCommand());
 $application->add(new TaskRunCommand());
 $application->add(new TaskListCommand());
 $application->add(new QueueStepCommand());
+$application->add(new QueueStartCommand());
+$application->add(new QueueStopCommand());
 $application->setDefaultCommand('list');
 $application->run();
