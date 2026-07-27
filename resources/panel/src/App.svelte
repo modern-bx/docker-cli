@@ -50,6 +50,8 @@
   let systemOpen = false;
   let queueOpen = false;
   let queueItems = [];
+  let queuePaused = false;
+  let queueActionPending = false;
   let queueConfirmation = null;
   let systemStatus = 'stopped';
   let systemServices = [];
@@ -71,9 +73,11 @@
 
   $: hasRunningServices = systemServices.some((service) => service.running);
   $: hasStoppedServices = systemServices.some((service) => !service.running);
-  $: queueStatus = queueItems.some((item) => item.status === '50-error')
-    ? 'error'
-    : queueItems.some((item) => item.status === '40-failure') ? 'failure' : 'healthy';
+  $: queueStatus = queuePaused
+    ? 'paused'
+    : queueItems.some((item) => item.status === '50-error')
+      ? 'error'
+      : queueItems.some((item) => item.status === '40-failure') ? 'failure' : 'healthy';
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
   $: if (selectedProject && selectedProject.name !== notesProjectName) {
@@ -252,7 +256,10 @@
     projectsError = '';
     systemStatus = data.system.status;
     systemServices = data.system.services;
-    if (data.queue?.name === 'default' && Array.isArray(data.queue.items)) queueItems = data.queue.items;
+    if (data.queue?.name === 'default' && Array.isArray(data.queue.items)) {
+      queueItems = data.queue.items;
+      queuePaused = data.queue.paused === true;
+    }
     projectsLoading = false;
     if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) selectedProjectName = '';
   }
@@ -300,6 +307,23 @@
       errorTitle = 'Не удалось удалить элемент очереди';
       error = cause instanceof Error ? cause.message : 'Не удалось удалить элемент очереди.';
       errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    }
+  }
+
+  async function toggleQueue() {
+    if (queueActionPending) return;
+    queueActionPending = true;
+    try {
+      const action = queuePaused ? 'resume' : 'pause';
+      const data = await api(`/api/queue/default/${action}`, { method: 'POST' });
+      queuePaused = data.paused === true;
+      queueItems = data.items;
+    } catch (cause) {
+      errorTitle = queuePaused ? 'Не удалось возобновить очередь' : 'Не удалось приостановить очередь';
+      error = cause instanceof Error ? cause.message : 'Не удалось изменить состояние очереди.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      queueActionPending = false;
     }
   }
 
@@ -498,6 +522,13 @@
           </button>
           {#if queueOpen}
             <div class="queue-menu card preset-filled-surface-100-900 shadow-2xl">
+              <div class="queue-menu-actions">
+                <button class="btn btn-sm preset-tonal" type="button" disabled={queueActionPending} onclick={toggleQueue}>
+                  {#if queuePaused}<Play size={14} aria-hidden="true" />{:else}<Square size={14} aria-hidden="true" />{/if}
+                  {queueActionPending ? 'Подождите…' : queuePaused ? 'Возобновить' : 'Приостановить'}
+                </button>
+              </div>
+              <div class="system-menu-divider" aria-hidden="true"></div>
               {#if queueItems.length === 0}<p class="system-empty">Очередь пуста</p>{/if}
               {#each queueItems as item (item.file)}
                 <div class="queue-item">

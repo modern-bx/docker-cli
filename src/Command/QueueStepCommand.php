@@ -36,6 +36,10 @@ final class QueueStepCommand extends Command
                 $output->writeln(sprintf('<error>Очередь "%s" уже обрабатывается.</error>', $queue));
                 return Command::FAILURE;
             }
+            if ($repository->isPaused($queue)) {
+                $output->writeln(sprintf('<comment>Очередь "%s" приостановлена.</comment>', $queue));
+                return Command::SUCCESS;
+            }
             $pending = $repository->nextPending($queue);
             if ($pending === null) {
                 $output->writeln(sprintf('<info>В очереди "%s" нет элементов для обработки.</info>', $queue));

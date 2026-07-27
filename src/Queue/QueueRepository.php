@@ -51,6 +51,28 @@ final class QueueRepository
         }
     }
 
+    public function isPaused(string $queue): bool
+    {
+        return is_file(join_path($this->queueDirectory($queue), '.pause'));
+    }
+
+    public function pause(string $queue): void
+    {
+        $this->initialize($queue);
+        $file = join_path($this->queueDirectory($queue), '.pause');
+        if (file_put_contents($file, '', LOCK_EX) === false) {
+            throw new \RuntimeException(sprintf('Не удалось приостановить очередь "%s".', $queue));
+        }
+    }
+
+    public function resume(string $queue): void
+    {
+        $file = join_path($this->queueDirectory($queue), '.pause');
+        if (is_file($file) && !unlink($file)) {
+            throw new \RuntimeException(sprintf('Не удалось возобновить очередь "%s".', $queue));
+        }
+    }
+
     public function nextPending(string $queue): ?string
     {
         $files = glob(join_path($this->queueDirectory($queue), '10-pending', '*.yaml')) ?: [];
