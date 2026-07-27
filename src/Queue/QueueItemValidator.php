@@ -66,12 +66,28 @@ final class QueueItemValidator
                     $errors[] = sprintf('%s.arguments.%s.value должен быть строкой.', $prefix, $name);
                 } elseif ($type === 'integer' && !is_int($value)) {
                     $errors[] = sprintf('%s.arguments.%s.value должен быть целым числом.', $prefix, $name);
+                } elseif ($type === 'integer' && ((isset($spec['parameters'][$name]['min']) && $value < $spec['parameters'][$name]['min'])
+                    || (isset($spec['parameters'][$name]['max']) && $value > $spec['parameters'][$name]['max']))) {
+                    $errors[] = sprintf('%s.arguments.%s.value находится вне допустимого диапазона.', $prefix, $name);
                 } elseif ($type === 'list' && !is_scalar($value)) {
                     $errors[] = sprintf('%s.arguments.%s.value должен быть скалярным значением списка.', $prefix, $name);
+                } elseif ($type === 'list') {
+                    $items = $spec['parameters'][$name]['items'] ?? [];
+                    $allowed = is_array($items) ? array_column($items, 'value') : [];
+                    if ($allowed !== [] && !in_array((string) $value, array_map('strval', $allowed), true)) {
+                        $errors[] = sprintf(
+                            '%s.arguments.%s.value имеет недопустимое значение. Допустимо: %s.',
+                            $prefix,
+                            $name,
+                            implode(', ', $allowed),
+                        );
+                    }
                 }
             }
             foreach ($spec['parameters'] ?? [] as $name => $parameter) {
-                if (($parameter['required'] ?? false) === true && !array_key_exists($name, $arguments)) {
+                $argument = $arguments[$name] ?? null;
+                $value = is_array($argument) ? ($argument['value'] ?? null) : null;
+                if (($parameter['required'] ?? false) === true && (!array_key_exists($name, $arguments) || $value === null || $value === '')) {
                     $errors[] = sprintf('%s.arguments.%s является обязательным.', $prefix, $name);
                 }
             }
