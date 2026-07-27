@@ -9,6 +9,7 @@ use DockerCli\Panel\Dto\SystemServiceDto;
 use DockerCli\Panel\Dto\SystemStatusDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\SystemActionRequestDto;
+use DockerCli\Panel\Enum\SystemActionEnum;
 use DockerCli\Panel\Http\Attribute\Route;
 
 final class SystemController
@@ -33,18 +34,21 @@ final class SystemController
         return new SystemStatusDto($status, $services);
     }
 
-    #[Route('POST', '/api/system/{action:start|stop|restart}', SystemActionRequestDto::class, SystemStatusDto::class)]
-    #[Route('POST', '/api/system/services/{service}/{action:start|stop|restart}', SystemActionRequestDto::class, SystemStatusDto::class)]
+    #[Route('POST', '/api/system/{action:' . SystemActionEnum::ROUTE_PATTERN . '}', SystemActionRequestDto::class, SystemStatusDto::class)]
+    #[Route('POST', '/api/system/services/{service}/{action:' . SystemActionEnum::ROUTE_PATTERN . '}', SystemActionRequestDto::class, SystemStatusDto::class)]
     public function action(SystemActionRequestDto $request): SystemStatusDto
     {
         $action = $request->action;
         $service = $request->service;
-        $arguments = match ($action) {
-            'start' => ['up', '-d'],
-            'stop' => ['stop'],
-            'restart' => ['restart'],
-            default => throw new SystemActionException('Неизвестное действие.', 400),
-        };
+        if (SystemActionEnum::isStart($action)) {
+            $arguments = ['up', '-d'];
+        } elseif (SystemActionEnum::isStop($action)) {
+            $arguments = ['stop'];
+        } elseif (SystemActionEnum::isRestart($action)) {
+            $arguments = ['restart'];
+        } else {
+            throw new SystemActionException('Неизвестное действие.', 400);
+        }
         if ($service !== null) {
             if (!array_key_exists($service, $this->configuredServices())) {
                 throw new SystemActionException('Сервис не найден.', 404);

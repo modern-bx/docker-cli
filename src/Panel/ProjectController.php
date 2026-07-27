@@ -10,6 +10,7 @@ use DockerCli\Panel\Dto\ProjectListDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectActionRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectNotesRequestDto;
+use DockerCli\Panel\Enum\ProjectActionEnum;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
@@ -23,7 +24,7 @@ final class ProjectController
     {
     }
 
-    #[Route('POST', '/api/projects/{name}/{action:enable|disable|wipe}', ProjectActionRequestDto::class, ProjectListDto::class)]
+    #[Route('POST', '/api/projects/{name}/{action:' . ProjectActionEnum::ROUTE_PATTERN . '}', ProjectActionRequestDto::class, ProjectListDto::class)]
     public function action(ProjectActionRequestDto $request): ProjectListDto
     {
         $name = $request->name;
@@ -37,12 +38,12 @@ final class ProjectController
             throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
         }
 
-        if ($action === 'enable' || $action === 'disable') {
-            $config['data']['project']['enabled'] = $action === 'enable';
+        if (ProjectActionEnum::isEnable($action) || ProjectActionEnum::isDisable($action)) {
+            $config['data']['project']['enabled'] = ProjectActionEnum::isEnable($action);
             $this->projects->writeProjectConfig($name, $config);
             (new OpenRestyHostRenderer())->render();
             $this->reloadOpenResty();
-        } elseif ($action === 'wipe') {
+        } elseif (ProjectActionEnum::isWipe($action)) {
             $this->wipe($name, $project);
         } else {
             throw new ProjectActionException('Неизвестное действие.', 400);
