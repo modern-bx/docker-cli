@@ -10,6 +10,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use function DockerCli\Util\join_path;
 
@@ -55,7 +56,10 @@ final class TaskRunCommand extends Command
         }
 
         try {
-            $process = proc_open(['bash', $scriptFile], [STDIN, STDOUT, STDERR], $pipes, $cwd, $environment);
+            $descriptors = $output instanceof NullOutput
+                ? [STDIN, ['file', '/dev/null', 'w'], ['file', '/dev/null', 'w']]
+                : [STDIN, STDOUT, STDERR];
+            $process = proc_open(['bash', $scriptFile], $descriptors, $pipes, $cwd, $environment);
             if (!is_resource($process)) {
                 $output->writeln('<error>Не удалось запустить bash.</error>');
 
