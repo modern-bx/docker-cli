@@ -50,7 +50,9 @@ final class QueueStartCommand extends Command
         $quietOutput = new NullOutput();
 
         while (true) {
-            $runner->run(new ArrayInput(['--queue' => $queue]), $quietOutput);
+            if (!$repository->isPaused($queue)) {
+                $runner->run(new ArrayInput(['--queue' => $queue]), $quietOutput);
+            }
             usleep(self::POLL_INTERVAL_MICROSECONDS);
         }
     }

@@ -11,12 +11,13 @@ final readonly class PanelStateDto implements \JsonSerializable
     public function __construct(
         public array $projects,
         public SystemStatusDto $system,
+        public QueueStateDto $queue,
     ) {
     }
 
-    /** @return array{projects: list<ProjectDto>, system: SystemStatusDto} */
+    /** @return array{projects: list<ProjectDto>, system: SystemStatusDto, queue: QueueStateDto} */
     public function jsonSerialize(): array
     {
-        return ['projects' => $this->projects, 'system' => $this->system];
+        return ['projects' => $this->projects, 'system' => $this->system, 'queue' => $this->queue];
     }
 }

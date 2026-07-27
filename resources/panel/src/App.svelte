@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { Collapsible, Combobox, Dialog, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
-  import { getPanelState, getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
+  import { getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -48,6 +48,11 @@
   let projectQuery = '';
   let projectTags = [];
   let systemOpen = false;
+  let queueOpen = false;
+  let queueItems = [];
+  let queuePaused = false;
+  let queueActionPending = false;
+  let queueConfirmation = null;
   let systemStatus = 'stopped';
   let systemServices = [];
   let systemPending = false;
@@ -61,9 +66,18 @@
   let noteDescription = '';
   let notesSaving = false;
   const panelServices = ['dnsdock', 'panel-gateway', 'traefik'];
+  const PANEL_CHANNEL = 'panel:system';
+  let panelSocket = null;
+  let panelReconnectTimer = null;
+  let panelChannelEnabled = false;
 
   $: hasRunningServices = systemServices.some((service) => service.running);
   $: hasStoppedServices = systemServices.some((service) => !service.running);
+  $: queueStatus = queuePaused
+    ? 'paused'
+    : queueItems.some((item) => item.status === '50-error')
+      ? 'error'
+      : queueItems.some((item) => item.status === '40-failure') ? 'failure' : 'healthy';
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
   $: if (selectedProject && selectedProject.name !== notesProjectName) {
@@ -159,6 +173,7 @@
     themeOpen = false;
     profileOpen = false;
     systemOpen = false;
+    queueOpen = false;
   }
 
   function openProjectContextMenu(event, project) {
@@ -212,9 +227,11 @@
     currentLogin = data.login;
     localStorage.setItem(TOKEN_KEY, token);
     window.location.hash = '#/';
+    connectPanelChannel();
   }
 
   function logout() {
+    disconnectPanelChannel();
     token = '';
     currentLogin = '';
     profileOpen = false;
@@ -233,25 +250,80 @@
     }
   }
 
-  async function refreshPanel() {
-    if (!token || systemPending) return;
+  function applyPanelState(data) {
+    if (!data || !Array.isArray(data.projects) || !data.system || !Array.isArray(data.system.services)) return;
+    projects = data.projects;
+    projectsError = '';
+    systemStatus = data.system.status;
+    systemServices = data.system.services;
+    if (data.queue?.name === 'default' && Array.isArray(data.queue.items)) {
+      queueItems = data.queue.items;
+      queuePaused = data.queue.paused === true;
+    }
+    projectsLoading = false;
+    if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) selectedProjectName = '';
+  }
+
+  function connectPanelChannel() {
+    if (!panelChannelEnabled || !token || panelSocket?.readyState === WebSocket.OPEN || panelSocket?.readyState === WebSocket.CONNECTING) return;
+    clearTimeout(panelReconnectTimer);
     if (projects.length === 0) projectsLoading = true;
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const query = new URLSearchParams({ channel: PANEL_CHANNEL, token });
+    const socket = new WebSocket(`${protocol}//${location.host}/ws?${query}`);
+    panelSocket = socket;
+    socket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.channel === PANEL_CHANNEL) applyPanelState(message.data);
+      } catch {
+        // Ignore malformed messages and keep waiting for the next state snapshot.
+      }
+    };
+    socket.onclose = () => {
+      if (panelSocket === socket) panelSocket = null;
+      if (panelChannelEnabled && token) panelReconnectTimer = setTimeout(connectPanelChannel, 1_000);
+    };
+  }
+
+  function disconnectPanelChannel() {
+    panelChannelEnabled = false;
+    clearTimeout(panelReconnectTimer);
+    panelSocket?.close();
+    panelSocket = null;
+  }
+
+  function formatQueueDate(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString('ru-RU');
+  }
+
+  async function deleteQueueItem(item) {
+    queueConfirmation = null;
     try {
-      const data = await getPanelState(api);
-      projects = data.projects;
-      projectsError = '';
-      systemStatus = data.system.status;
-      systemServices = data.system.services;
-      if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) {
-        selectedProjectName = '';
-      }
+      const data = await api(`/api/queue/default/${encodeURIComponent(item.file)}`, { method: 'DELETE' });
+      queueItems = data.items;
     } catch (cause) {
-      systemStatus = 'stopped';
-      if (cause instanceof Error && 'status' in cause && typeof cause.status === 'number' && cause.status < 500) {
-        projectsError = cause.message;
-      }
+      errorTitle = 'Не удалось удалить элемент очереди';
+      error = cause instanceof Error ? cause.message : 'Не удалось удалить элемент очереди.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    }
+  }
+
+  async function toggleQueue() {
+    if (queueActionPending) return;
+    queueActionPending = true;
+    try {
+      const action = queuePaused ? 'resume' : 'pause';
+      const data = await api(`/api/queue/default/${action}`, { method: 'POST' });
+      queuePaused = data.paused === true;
+      queueItems = data.items;
+    } catch (cause) {
+      errorTitle = queuePaused ? 'Не удалось возобновить очередь' : 'Не удалось приостановить очередь';
+      error = cause instanceof Error ? cause.message : 'Не удалось изменить состояние очереди.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
     } finally {
-      projectsLoading = false;
+      queueActionPending = false;
     }
   }
 
@@ -279,7 +351,6 @@
       }
     } finally {
       systemPending = false;
-      refreshPanel();
     }
   }
 
@@ -355,7 +426,6 @@
       }
     } finally {
       systemPending = false;
-      refreshPanel();
     }
   }
 
@@ -421,13 +491,13 @@
     media.addEventListener('change', updateSystemMode);
     token = localStorage.getItem(TOKEN_KEY) || '';
     if (!token) window.location.hash = '#/login';
+    panelChannelEnabled = true;
+    connectPanelChannel();
     checkSession().finally(() => { loading = false; });
     const interval = setInterval(checkSession, 60_000);
-    refreshPanel();
-    const panelInterval = setInterval(refreshPanel, 1_000);
     return () => {
       clearInterval(interval);
-      clearInterval(panelInterval);
+      disconnectPanelChannel();
       media.removeEventListener('change', updateSystemMode);
     };
   });
@@ -435,7 +505,7 @@
 
 <svelte:window
   onclick={closeMenus}
-  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; profileOpen = false; systemOpen = false; } }}
+  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; } }}
 />
 
 <svelte:head><title>{token ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
@@ -445,13 +515,47 @@
     {#if token}<a href="#/" class="font-bold text-xl no-underline">docker-cli</a>{/if}
     {#if token}
       <div class="system-header header-menu">
+        <div class="queue-main-control">
+          <button class="btn preset-tonal system-trigger" type="button" aria-expanded={queueOpen} onclick={() => { queueOpen = !queueOpen; systemOpen = false; themeOpen = false; profileOpen = false; }}>
+            <span class={`queue-summary-dot ${queueStatus}`} aria-hidden="true"></span><span>Очередь</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+          </button>
+          {#if queueOpen}
+            <div class="queue-menu card preset-filled-surface-100-900 shadow-2xl">
+              <div class="queue-menu-actions">
+                <button class="btn btn-sm preset-tonal" type="button" disabled={queueActionPending} onclick={toggleQueue}>
+                  {#if queuePaused}<Play size={14} aria-hidden="true" />{:else}<Square size={14} aria-hidden="true" />{/if}
+                  {queueActionPending ? 'Подождите…' : queuePaused ? 'Возобновить' : 'Приостановить'}
+                </button>
+              </div>
+              <div class="system-menu-divider" aria-hidden="true"></div>
+              {#if queueItems.length === 0}<p class="system-empty">Очередь пуста</p>{/if}
+              {#each queueItems as item (item.file)}
+                <div class="queue-item">
+                  <span class={`queue-dot status-${item.status}`} aria-hidden="true"></span>
+                  <time datetime={item.queuedAt}>{formatQueueDate(item.queuedAt)}</time>
+                  <span class="queue-item-code" title={item.code}>{item.code}</span>
+                  {#if item.status !== '20-active'}
+                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => { queueOpen = false; queueConfirmation = item; }}><Trash2 size={14} aria-hidden="true" />Удалить</button>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
         <div class="system-main-control">
-          <button class="btn preset-tonal system-trigger" type="button" aria-expanded={systemOpen} onclick={() => { systemOpen = !systemOpen; themeOpen = false; profileOpen = false; }}>
+          <button class="btn preset-tonal system-trigger" type="button" aria-expanded={systemOpen} onclick={() => { systemOpen = !systemOpen; queueOpen = false; themeOpen = false; profileOpen = false; }}>
             <span class={`system-dot ${systemStatus}`} aria-hidden="true"></span><span>Система</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
           </button>
           {#if systemOpen}
             <div class="system-menu card preset-filled-surface-100-900 shadow-2xl">
+              <div class="system-menu-global-actions">
+                {#if hasStoppedServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('start')}><Play size={14} aria-hidden="true" />Запустить</button>{/if}
+                {#if hasRunningServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('stop')}><Square size={14} aria-hidden="true" />Остановить</button>{/if}
+                <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart')}><RotateCw size={14} aria-hidden="true" />Перезапустить</button>
+              </div>
+              <div class="system-menu-divider" aria-hidden="true"></div>
               {#if systemServices.length === 0}<p class="system-empty">Сервисы не найдены</p>{/if}
               {#each systemServices as service (service.name)}
                 <div class="system-service">
@@ -468,11 +572,6 @@
               {/each}
             </div>
           {/if}
-        </div>
-        <div class="system-actions system-global-actions">
-          {#if hasStoppedServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('start')}><Play size={14} aria-hidden="true" />Запустить</button>{/if}
-          {#if hasRunningServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('stop')}><Square size={14} aria-hidden="true" />Остановить</button>{/if}
-          <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart')}><RotateCw size={14} aria-hidden="true" />Перезапустить</button>
         </div>
       </div>
     {/if}
@@ -753,6 +852,22 @@
       <div class="login-error-actions system-confirm-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
         <button class="btn preset-filled-primary-500" type="button" onclick={() => { const action = systemConfirmation; systemConfirmation = null; if (action) systemAction(action.action, action.service); }}>Продолжить</button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(queueConfirmation)} onOpenChange={({ open }) => { if (!open) queueConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Удалить элемент очереди?</Dialog.Title>
+      <Dialog.Description class="login-error-description">
+        Элемент «{queueConfirmation?.code}» будет безвозвратно удалён из очереди default.
+      </Dialog.Description>
+      <div class="login-error-actions system-confirm-actions">
+        <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
+        <button class="btn preset-filled-error-500" type="button" onclick={() => queueConfirmation && deleteQueueItem(queueConfirmation)}>Удалить</button>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>

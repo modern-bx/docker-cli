@@ -10,13 +10,13 @@ use DockerCli\Panel\Http\Attribute\Route;
 
 final readonly class StateController
 {
-    public function __construct(private ProjectController $projects, private SystemController $system)
+    public function __construct(private ProjectController $projects, private SystemController $system, private QueueController $queue)
     {
     }
 
     #[Route('GET', '/api/state', EmptyRequestDto::class, PanelStateDto::class)]
     public function state(EmptyRequestDto $request): PanelStateDto
     {
-        return new PanelStateDto($this->projects->projects($request)->projects, $this->system->status($request));
+        return new PanelStateDto($this->projects->projects($request)->projects, $this->system->status($request), $this->queue->state($request));
     }
 }

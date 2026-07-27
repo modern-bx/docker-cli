@@ -13,12 +13,15 @@ use DockerCli\Panel\Http\Middleware\AuthMiddleware;
 use DockerCli\Panel\Http\ResponseEmitter;
 use DockerCli\Panel\JwtTokenService;
 use DockerCli\Panel\ProjectController;
+use DockerCli\Panel\QueueController;
 use DockerCli\Panel\Router;
 use DockerCli\Panel\StateController;
 use DockerCli\Panel\SystemController;
 use DockerCli\Panel\SystemdService;
 use DockerCli\Panel\UserRepository;
+use DockerCli\Panel\WebSocket\PanelStateChannel;
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Queue\QueueRepository;
 use React\EventLoop\Loop;
 use React\Http\HttpServer;
 use React\Socket\SocketServer;
@@ -97,13 +100,17 @@ final class PanelUpCommand extends Command
         $tokens = new JwtTokenService($jwtSecret);
         $projects = new ProjectController(new ProjectRegistry(), $compose);
         $system = new SystemController($compose);
+        $queue = new QueueController(new QueueRepository());
         $responses = new ResponseEmitter($assets);
-        $server = new HttpServer(new Router(
-            [new AuthController($users, $tokens), new StateController($projects, $system), $projects, $system, new AssetController()],
+        $state = new StateController($projects, $system, $queue);
+        $router = new Router(
+            [new AuthController($users, $tokens), $state, $projects, $system, $queue, new AssetController()],
             new ControllerInvoker(),
             new AuthMiddleware($tokens, $responses),
             $responses,
-        ));
+        );
+        $channel = new PanelStateChannel($state, $tokens, $responses);
+        $server = new HttpServer(static fn ($request) => $channel->handles($request) ? $channel->upgrade($request) : $router($request));
         $server->listen($socket);
         $output->writeln(sprintf('<info>Панель запущена на https://panel.%s</info>', $compose->envValue('BASE_HOST', '')));
         Loop::run();
