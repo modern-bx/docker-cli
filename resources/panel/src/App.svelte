@@ -162,6 +162,10 @@
   }
 
   function openProjectContextMenu(event, project) {
+    if (event.ctrlKey) {
+      projectContextMenu = null;
+      return;
+    }
     event.preventDefault();
     const bounds = event.currentTarget.getBoundingClientRect();
     const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
@@ -523,7 +527,7 @@
                 onValueChange={(details) => details.value[0] && setFont(details.value[0])}
               >
                 <Combobox.Control class="font-combobox-control">
-                  <Combobox.Input aria-labelledby="font-switch-label" class="font-combobox-input" />
+                  <Combobox.Input aria-labelledby="font-switch-label" class="font-combobox-input" readonly />
                   <Combobox.Trigger class="font-combobox-trigger" />
                 </Combobox.Control>
                 <Combobox.Positioner class="font-combobox-positioner">
