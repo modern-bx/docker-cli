@@ -61,7 +61,8 @@ final class QueueItemValidator
                 }
                 $type = $spec['parameters'][$name]['type'] ?? null;
                 $value = $argument['value'];
-                if ($type === 'string' && !is_string($value)) {
+                $strictTypes = ($spec['parameters'][$name]['strict-types'] ?? false) === true;
+                if ($type === 'string' && !is_string($value) && !(!$strictTypes && is_int($value))) {
                     $errors[] = sprintf('%s.arguments.%s.value должен быть строкой.', $prefix, $name);
                 } elseif ($type === 'integer' && !is_int($value)) {
                     $errors[] = sprintf('%s.arguments.%s.value должен быть целым числом.', $prefix, $name);
