@@ -124,7 +124,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .log-pagination > span { color: var(--color-surface-500); font-size: 0.8rem; }
 .log-pagination-controls { display: flex; grid-column: 2; align-items: center; gap: 0.5rem; }
 .log-page-size { grid-column: 3; justify-self: end; }
-.page-size-control.font-combobox-control { width: 1.2rem; }
+.page-size-control.font-combobox-control { width: 6rem; }
 .page-size-control .font-combobox-input { padding: 0.45rem 0.15rem 0.45rem 0.65rem; }
 .page-size-control .font-combobox-trigger { width: 100%; padding-right: 0.1rem; }
 .log-view .font-combobox-positioner, .project-log-view .font-combobox-positioner { z-index: 50; }
