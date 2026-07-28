@@ -106,8 +106,9 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .log-table td { max-width: 28rem; padding: 0.7rem 0.75rem; border-top: 1px solid var(--color-surface-200); overflow-wrap: anywhere; vertical-align: top; }
 .dark .log-table td { border-color: var(--color-surface-800); }
 .log-empty { color: var(--color-surface-500); text-align: center; }
-.log-pagination { display: flex; flex: none; align-items: end; justify-content: flex-end; gap: 0.5rem; }
-.log-pagination > span { align-self: center; margin-right: 0.5rem; color: var(--color-surface-500); font-size: 0.8rem; }
+.log-pagination { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 1rem; }
+.log-pagination > span { color: var(--color-surface-500); font-size: 0.8rem; }
+.log-pagination-controls { display: flex; align-items: end; gap: 0.5rem; }
 .log-pagination label { display: grid; gap: 0.25rem; margin-left: 0.75rem; }
 .page-size-control { width: 6rem; }
 .project-sidebar { display: flex; min-height: 0; overflow: hidden; flex-direction: column; border-right: 1px solid var(--color-surface-200); background: var(--color-surface-50); }

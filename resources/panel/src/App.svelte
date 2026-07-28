@@ -132,6 +132,10 @@
     if (!token) return;
     const segments = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
     if (segments[0] === 'logs') {
+      window.location.hash = '#/journal';
+      return;
+    }
+    if (segments[0] === 'journal') {
       activeSection = 'logs';
       selectedProjectName = '';
       loadLogs();
@@ -722,7 +726,6 @@
               <Combobox
                 collection={fontCollection}
                 value={[font]}
-                readOnly
                 openOnClick
                 onValueChange={(details) => details.value[0] && setFont(details.value[0])}
               >
@@ -783,7 +786,7 @@
       <section class="projects-view" aria-label="Рабочая область">
         <nav class="tabs" aria-label="Разделы панели">
           <a class:active={activeSection === 'projects'} class="tab" href="#/projects" aria-current={activeSection === 'projects' ? 'page' : undefined}>Проекты</a>
-          <a class:active={activeSection === 'logs'} class="tab" href="#/logs" aria-current={activeSection === 'logs' ? 'page' : undefined}>Журнал</a>
+          <a class:active={activeSection === 'logs'} class="tab" href="#/journal" aria-current={activeSection === 'logs' ? 'page' : undefined}>Журнал</a>
         </nav>
         {#if activeSection === 'projects'}
         <div class="projects-layout">
@@ -899,15 +902,15 @@
             <div class="log-toolbar card preset-filled-surface-100-900">
               <label>
                 <span>Тип записи</span>
-                <Combobox collection={logTypeCollection} value={['queue']} readOnly openOnClick>
-                  <Combobox.Control class="font-combobox-control"><Combobox.Input readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                <Combobox collection={logTypeCollection} value={['queue']} openOnClick>
+                  <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                   <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl"><Combobox.Item item={{ value: 'queue', label: 'Очередь' }} class="font-combobox-item"><Combobox.ItemText>Очередь</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item></Combobox.Content></Combobox.Positioner>
                 </Combobox>
               </label>
               <label>
                 <span>Проект</span>
-                <Combobox collection={logProjectCollection} value={[logProject]} readOnly openOnClick onValueChange={(details) => changeLogProject(details.value[0] || '')}>
-                  <Combobox.Control class="font-combobox-control"><Combobox.Input readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                <Combobox collection={logProjectCollection} value={[logProject]} openOnClick onValueChange={(details) => changeLogProject(details.value[0] || '')}>
+                  <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                   <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                 </Combobox>
               </label>
@@ -928,9 +931,11 @@
             </div>
             <footer class="log-pagination">
               <span>{logTotal ? `${(logPage - 1) * logPageSize + 1}–${Math.min(logPage * logPageSize, logTotal)} из ${logTotal}` : '0 записей'}</span>
-              <button class="btn btn-sm preset-tonal" type="button" disabled={logPage === 1 || logsLoading} onclick={() => changeLogPage(logPage - 1)}>Назад</button>
-              <button class="btn btn-sm preset-tonal" type="button" disabled={logPage >= Math.ceil(logTotal / logPageSize) || logsLoading} onclick={() => changeLogPage(logPage + 1)}>Вперёд</button>
-              <label><span>На странице</span><Combobox collection={pageSizeCollection} value={[String(logPageSize)]} readOnly openOnClick onValueChange={(details) => details.value[0] && changeLogPageSize(details.value[0])}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+              <div class="log-pagination-controls">
+                <button class="btn btn-sm preset-tonal" type="button" disabled={logPage === 1 || logsLoading} onclick={() => changeLogPage(logPage - 1)}>Назад</button>
+                <button class="btn btn-sm preset-tonal" type="button" disabled={logPage >= Math.ceil(logTotal / logPageSize) || logsLoading} onclick={() => changeLogPage(logPage + 1)}>Вперёд</button>
+                <label><span>На странице</span><Combobox collection={pageSizeCollection} value={[String(logPageSize)]} openOnClick onValueChange={(details) => details.value[0] && changeLogPageSize(details.value[0])}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+              </div>
             </footer>
           </section>
         {/if}
