@@ -114,9 +114,19 @@ final class QueueListCommand extends Command
     {
         $lines = [];
         foreach (($document['trace'] ?? []) as $timestamp => $message) {
-            $lines[] = sprintf('[%s] %s', $timestamp, $this->value($message));
+            $lines[] = sprintf('[%s] %s', $this->time($timestamp), $this->value($message));
         }
         return $lines !== [] ? implode("\n", $lines) : '—';
+    }
+
+    private function time(mixed $timestamp): string
+    {
+        $timestamp = is_scalar($timestamp) ? (string) $timestamp : '';
+        if (preg_match('/^(\d+)(?:\.(\d{1,6}))?$/D', $timestamp, $matches) !== 1) {
+            return $timestamp !== '' ? $timestamp : '—';
+        }
+        $microseconds = str_pad($matches[2] ?? '', 6, '0');
+        return sprintf('%s.%s UTC', gmdate('Y-m-d H:i:s', (int) $matches[1]), $microseconds);
     }
 
     private function value(mixed $value): string

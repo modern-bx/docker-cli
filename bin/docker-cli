@@ -37,6 +37,7 @@ use DockerCli\Command\QueuePauseCommand;
 use DockerCli\Command\QueueResumeCommand;
 use DockerCli\Command\QueueItemCreateCommand;
 use DockerCli\Command\QueueListCommand;
+use DockerCli\Command\QueueItemDeleteCommand;
 use Symfony\Component\Console\Application;
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -78,5 +79,6 @@ $application->add(new QueuePauseCommand());
 $application->add(new QueueResumeCommand());
 $application->add(new QueueItemCreateCommand());
 $application->add(new QueueListCommand());
+$application->add(new QueueItemDeleteCommand());
 $application->setDefaultCommand('list');
 $application->run();

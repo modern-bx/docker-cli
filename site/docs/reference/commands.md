@@ -203,6 +203,15 @@ bin/docker-cli task:run --project=my-project demo.do-something hello 2
 
 ## Очереди
 
+### `bin/docker-cli queue:item-delete [--queue=<queue-code>] <item>`
+
+Удаляет элемент из выбранной очереди (`default` по умолчанию). Короткое имя принимается с расширением `.yaml` или без него. Элемент в статусе `20-active` удалить нельзя.
+
+```bash
+bin/docker-cli queue:item-delete 1720000000000000.000.demo.do-something
+bin/docker-cli queue:item-delete --queue=notifications 1720000000000001.000.notify.yaml
+```
+
 ### `bin/docker-cli queue:list [--queue=<queue-code>] [--status=<status>] [--short]`
 
 Выводит таблицу элементов всех очередей с их статусами, задачами и журналами. `--queue` выбирает одну очередь, а `--status` принимает полный статус (`10-pending`), его номер (`10`) или символьный код (`pending`). С `--short` команда выводит только пути относительно `docker-cli/queue`.

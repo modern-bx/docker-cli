@@ -192,15 +192,15 @@ final class QueueRepository
         if (basename($file) !== $file || preg_match('/^[A-Za-z0-9._-]+\.yaml$/D', $file) !== 1) {
             throw new \InvalidArgumentException('Некорректное имя элемента очереди.');
         }
-        foreach (['10-pending', '40-failure', '50-error'] as $status) {
+        if (is_file(join_path($this->queueDirectory($queue), '20-active', $file))) {
+            throw new \RuntimeException('Нельзя удалить выполняющийся элемент очереди.');
+        }
+        foreach (array_diff(self::STATUSES, ['20-active']) as $status) {
             $path = join_path($this->queueDirectory($queue), $status, $file);
             if (is_file($path)) {
                 if (!unlink($path)) throw new \RuntimeException('Не удалось удалить элемент очереди.');
                 return;
             }
-        }
-        if (is_file(join_path($this->queueDirectory($queue), '20-active', $file))) {
-            throw new \RuntimeException('Нельзя удалить выполняющийся элемент очереди.');
         }
         throw new \RuntimeException('Элемент очереди не найден.');
     }
