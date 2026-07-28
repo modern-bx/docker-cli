@@ -176,10 +176,11 @@
       if (window.location.hash !== projectHash()) navigateToProject('', 'info');
       return;
     }
-    const tab = segments[2] === 'notes' ? 'notes' : 'info';
+    const tab = ['notes', 'journal'].includes(segments[2]) ? segments[2] : 'info';
     selectedProjectName = projectName;
     projectDetailTab = tab;
-    if (segments.length !== 3 || !['info', 'notes'].includes(segments[2])) navigateToProject(projectName, tab);
+    if (tab === 'journal') loadLogs();
+    if (segments.length !== 3 || !['info', 'notes', 'journal'].includes(segments[2])) navigateToProject(projectName, tab);
   }
 
   async function loadLogs() {
@@ -188,9 +189,10 @@
     logsLoading = true;
     projectsError = '';
     try {
+      const projectJournal = activeSection === 'projects' && projectDetailTab === 'journal';
       const data = await getLogs(api, {
         page: String(logPage), pageSize: String(logPageSize), sort: logSort, direction: logDirection,
-        ...(logProject !== 'all' ? { project: logProject } : {}),
+        ...(projectJournal ? { project: selectedProjectName } : logProject !== 'all' ? { project: logProject } : {}),
         ...(logStatus !== 'all' ? { status: logStatus } : {}),
         ...(logQueueItem ? { queueItem: logQueueItem } : {}),
         ...(logItemCode ? { itemCode: logItemCode } : {}),
@@ -892,6 +894,7 @@
               <nav class="project-detail-tabs" aria-label={`Разделы проекта ${selectedProject.name}`}>
                 <a class:active={projectDetailTab === 'info'} class="project-detail-tab" href={projectHash(selectedProject.name, 'info')} aria-current={projectDetailTab === 'info' ? 'page' : undefined}>Общее</a>
                 <a class:active={projectDetailTab === 'notes'} class="project-detail-tab" href={projectHash(selectedProject.name, 'notes')} aria-current={projectDetailTab === 'notes' ? 'page' : undefined}>Заметки</a>
+                <a class:active={projectDetailTab === 'journal'} class="project-detail-tab" href={projectHash(selectedProject.name, 'journal')} aria-current={projectDetailTab === 'journal' ? 'page' : undefined}>Журнал</a>
               </nav>
               <div class="project-details-scroll">
                 {#if projectDetailTab === 'info'}
@@ -912,7 +915,7 @@
                     </button>
                   </div>
                 </section>
-                {:else}
+                {:else if projectDetailTab === 'notes'}
                 <div class="project-toolbar">
                   <button class="btn preset-filled-primary-500" type="button" disabled={notesSaving} onclick={saveNotes}>
                     <Save size={16} aria-hidden="true" />{notesSaving ? 'Сохраняем…' : 'Сохранить'}
@@ -932,6 +935,42 @@
                     <span class="label-text">Заметки</span>
                     <textarea class="textarea notes-textarea" bind:value={noteDescription} rows="8" placeholder="Произвольные заметки о проекте"></textarea>
                   </label>
+                </section>
+                {:else}
+                <section class="project-log-view" aria-label={`Журнал проекта ${selectedProject.name}`}>
+                  <div class="log-toolbar card preset-filled-surface-100-900">
+                    <label>
+                      <span>Тип записи</span>
+                      <Combobox collection={logTypeCollection} value={[logType]} openOnClick>
+                        <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                        <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logTypes as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
+                      </Combobox>
+                    </label>
+                    <label>
+                      <span>Статус</span>
+                      <Combobox collection={logStatusCollection} value={[logStatus]} openOnClick onValueChange={(details) => changeLogStatus(details.value[0] || 'all')}>
+                        <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly />{#if logStatus !== 'all'}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); changeLogStatus('all'); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                        <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logStatuses as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
+                      </Combobox>
+                    </label>
+                    {#each [['queueItem', 'Элемент очереди', logQueueItem], ['itemCode', 'Код элемента', logItemCode], ['taskCode', 'Задача', logTaskCode]] as [field, label, value]}
+                      <label><span>{label}</span><span class="log-text-filter"><input value={value} oninput={(event) => changeTextLogFilter(field, event.currentTarget.value)} />{#if value}<button type="button" aria-label={`Сбросить фильтр «${label}»`} onclick={() => changeTextLogFilter(field, '')}>×</button>{/if}</span></label>
+                    {/each}
+                  </div>
+                  <div class="log-table-wrap card preset-filled-surface-100-900">
+                    <table class="table log-table project-log-table">
+                      <thead><tr>{#each [['timestamp', 'Время'], ['queueItem', 'Элемент очереди'], ['itemCode', 'Код элемента'], ['queueCode', 'Очередь'], ['status', 'Статус'], ['taskCode', 'Задача'], ['result', 'Результат'], ['message', 'Сообщение']] as [field, label]}<th><button type="button" onclick={() => sortLogs(field)}>{label}<span aria-hidden="true">{logSort === field ? (logDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
+                      <tbody>
+                        {#if logsLoading}<tr><td colspan="8" class="log-empty animate-pulse">Загрузка…</td></tr>
+                        {:else if logItems.length === 0}<tr><td colspan="8" class="log-empty">Записей нет</td></tr>
+                        {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('queueItem', item.queueItem)}>{formatLogValue(item.queueItem)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('itemCode', item.itemCode)}>{formatLogValue(item.itemCode)}</button></td><td>{formatLogValue(item.queueCode)}</td><td>{#if item.status}<button class="log-filter-link" type="button" onclick={() => changeLogStatus(item.status)}>{logStatusLabel(item.status)}</button>{:else}—{/if}</td><td>{#if item.taskCode}<button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('taskCode', item.taskCode)}>{item.taskCode}</button>{:else}—{/if}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
+                      </tbody>
+                    </table>
+                  </div>
+                  <footer class="log-pagination">
+                    <span>{logTotal ? `${(logPage - 1) * logPageSize + 1}–${Math.min(logPage * logPageSize, logTotal)} из ${logTotal}` : '0 записей'}</span>
+                    <div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={logPage === 1 || logsLoading} onclick={() => changeLogPage(logPage - 1)}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={logPage >= Math.ceil(logTotal / logPageSize) || logsLoading} onclick={() => changeLogPage(logPage + 1)}>Вперёд</button><label><span>На странице</span><Combobox collection={pageSizeCollection} value={[String(logPageSize)]} openOnClick onValueChange={(details) => details.value[0] && changeLogPageSize(details.value[0])}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label></div>
+                  </footer>
                 </section>
                 {/if}
               </div>
