@@ -203,6 +203,16 @@ bin/docker-cli task:run --project=my-project demo.do-something hello 2
 
 ## Очереди
 
+### `bin/docker-cli queue:list [--queue=<queue-code>] [--status=<status>] [--short]`
+
+Выводит таблицу элементов всех очередей с их статусами, задачами и журналами. `--queue` выбирает одну очередь, а `--status` принимает полный статус (`10-pending`), его номер (`10`) или символьный код (`pending`). С `--short` команда выводит только пути относительно `docker-cli/queue`.
+
+```bash
+bin/docker-cli queue:list
+bin/docker-cli queue:list --queue=default --status=pending
+bin/docker-cli queue:list --status=30 --short
+```
+
 ### `bin/docker-cli queue:item-create [--queue=<queue-code>] --mode=task --task=<task-code> [--project=<project>] [task-args...]`
 
 Проверяет аргументы по спеке задачи и создаёт в `10-pending` элемент ровно с одной задачей. Аргументы можно передавать позиционно или в виде `name=value`. Для задач с `context: project` требуется `--project`.

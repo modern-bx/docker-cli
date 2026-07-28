@@ -133,6 +133,45 @@ final class QueueRepository
         return $items;
     }
 
+    /**
+     * @return list<array{queue: string, status: string, file: string, path: string, relativePath: string}>
+     */
+    public function listItems(?string $queue = null, ?string $status = null): array
+    {
+        if ($status !== null && !in_array($status, self::STATUSES, true)) {
+            throw new \InvalidArgumentException(sprintf('Неизвестный статус "%s".', $status));
+        }
+        if ($queue !== null) {
+            $directories = [$queue => $this->queueDirectory($queue)];
+        } else {
+            $directories = [];
+            foreach (glob(join_path($this->configDirectory(), 'queue', '*'), GLOB_ONLYDIR) ?: [] as $directory) {
+                $directories[basename($directory)] = $directory;
+            }
+            ksort($directories, SORT_STRING);
+        }
+
+        $items = [];
+        foreach ($directories as $queueCode => $directory) {
+            foreach ($status === null ? self::STATUSES : [$status] as $statusCode) {
+                $files = glob(join_path($directory, $statusCode, '*.yaml')) ?: [];
+                sort($files, SORT_STRING);
+                foreach (array_filter($files, 'is_file') as $file) {
+                    $name = basename($file);
+                    $items[] = [
+                        'queue' => $queueCode,
+                        'status' => $statusCode,
+                        'file' => $name,
+                        'path' => $file,
+                        'relativePath' => join_path($queueCode, $statusCode, $name),
+                    ];
+                }
+            }
+        }
+
+        return $items;
+    }
+
     private function timestampMicroseconds(string $timestamp, string $file): int
     {
         if (!ctype_digit($timestamp)) {
