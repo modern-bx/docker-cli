@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace DockerCli\Command;
 
+use DockerCli\Config\MissingConfigException;
 use DockerCli\Framework\FrameworkDetectionService;
 use DockerCli\Project\ConfigurableServicesRestarter;
+use DockerCli\Project\DataInitializer;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
@@ -17,15 +19,25 @@ use function DockerCli\Util\join_path;
 
 final class ProjectDownCommand extends Command
 {
-    public function __construct(private readonly ?FrameworkDetectionService $detectionService = null)
-    {
+    public function __construct(
+        private readonly ?FrameworkDetectionService $detectionService = null,
+        private readonly ?DataInitializer $dataInitializer = null,
+    ) {
         parent::__construct('project:down');
         $this->setDescription('Удалить регистрацию проекта docker-cli.');
         $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
+        $this->addOption('drop', null, InputOption::VALUE_NONE, 'Удалить базы данных и пользователей проекта во всех СУБД.');
+        $this->addOption('force', 'f', InputOption::VALUE_NONE, 'Подтвердить удаление баз данных и пользователей с --drop.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        if ($input->getOption('drop') && !$input->getOption('force')) {
+            $output->writeln('<error>Опция --drop удаляет базы данных и пользователей проекта. Повторите команду с --force.</error>');
+
+            return Command::FAILURE;
+        }
+
         $framework = ($this->detectionService ?? FrameworkDetectionService::createDefault())->detect();
         $registry = new ProjectRegistry();
         $projectRoot = $framework?->getProjectRoot() ?? $this->projectRootFromContext($registry);
@@ -48,6 +60,21 @@ final class ProjectDownCommand extends Command
             $output->writeln(sprintf('<error>В файле "%s" не найдено имя проекта.</error>', $metaFile));
 
             return Command::FAILURE;
+        }
+
+        if ($input->getOption('drop')) {
+            try {
+                $dropCode = ($this->dataInitializer ?? new DataInitializer())->drop($projectName, $output);
+            } catch (MissingConfigException $exception) {
+                $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+
+                return Command::FAILURE;
+            }
+            if ($dropCode !== Command::SUCCESS) {
+                $output->writeln(sprintf('<error>Не удалось удалить базы данных и пользователей проекта "%s". Регистрация проекта сохранена.</error>', $projectName));
+
+                return $dropCode;
+            }
         }
 
         $projectDirectory = join_path($this->projectsDirectory(), $projectName);

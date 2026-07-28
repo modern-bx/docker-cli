@@ -67,6 +67,7 @@ bin/docker-cli project:list
 
 ```bash
 bin/docker-cli project:down
+bin/docker-cli project:down --drop --force
 ```
 
 Опция:
@@ -76,6 +77,10 @@ bin/docker-cli project:down --no-restart
 ```
 
 `--no-restart` пропускает перезапуск общего пула проектных сервисов.
+
+`--drop` перед удалением регистрации удаляет базы данных и пользователей проекта
+во всех поддерживаемых СУБД. Это необратимое действие требует одновременной опции
+`--force`. Если удаление данных завершилось ошибкой, регистрация проекта сохраняется.
 
 ### `bin/docker-cli project:show [project]`
 
@@ -114,6 +119,36 @@ bin/docker-cli project:wipe --project=my-project
 ## Данные проекта
 
 Команды без явного аргумента или опции проекта определяют его по текущей директории.
+
+### `bin/docker-cli data:database-create [--user=<user1,user2>] [--dbms=<dbms>] <database>`
+
+Создаёт базу в MySQL и PostgreSQL либо только в выбранной через `--dbms` СУБД.
+Перечисленные через запятую пользователи при необходимости создаются и получают
+полные права на новую базу. Для каждого пользователя генерируется новый случайный
+24-символьный пароль из латинских букв в обоих регистрах и цифр; учетные данные
+выводятся после успешного выполнения команды.
+
+```bash
+bin/docker-cli data:database-create --user=developer,reporter application
+bin/docker-cli data:database-create --dbms=mysql cache
+```
+
+### `bin/docker-cli data:database-delete [--force] [--dbms=<dbms>] <database1,database2>`
+
+Удаляет перечисленные базы. Без `--dbms` команда работает с обеими СУБД, без
+`--force` запрашивает подтверждение. Для уже отсутствующих баз выводится предупреждение.
+
+### `bin/docker-cli data:dbuser-create [--dbms=<dbms>] [--database=<database1,database2>] <user>`
+
+Создаёт пользователя в одной или обеих СУБД. Если указаны базы, команда сначала
+проверяет наличие всех баз во всех выбранных СУБД и только затем создаёт пользователя
+и выдаёт права. Поэтому ошибка проверки не оставляет частично выданных прав. Новый
+случайный 24-символьный пароль выводится после успешного выполнения команды.
+
+### `bin/docker-cli data:dbuser-delete [--force] [--dbms=<dbms>] <user1,user2>`
+
+Удаляет пользователей в одной или обеих СУБД. Требует подтверждения, если не передан
+`--force`, и предупреждает об отсутствующих пользователях.
 
 ### `bin/docker-cli data:init [project]`
 
@@ -173,6 +208,49 @@ bin/docker-cli data:apply --dbms=postgres --project=my-project './migrations/*.s
 bin/docker-cli data:apply --dbms=mysql ./backup.sql.zip
 bin/docker-cli data:apply --dbms=mysql './backups/*'
 ```
+
+## Быстрые параллельные дампы MySQL
+
+### `bin/docker-cli mysql:dump [path]`
+
+Создаёт согласованный многопоточный дамп только MySQL-базы выбранного проекта через
+контейнер `mydumper/mydumper:v1.0.3-1`. Проект выбирается через `--project` или по
+текущей директории. По умолчанию несжатый дамп пишется в
+`.docker-cli/backups/mysql/<проект>-<дата>`: отсутствие сжатия уменьшает нагрузку
+на CPU и ускоряет последующую загрузку.
+
+```bash
+bin/docker-cli mysql:dump
+bin/docker-cli mysql:dump --project=my-project --threads=8 /mnt/fast/backups/release-42
+```
+
+`--threads` (`-j`, по умолчанию `4`) управляет числом потоков mydumper. Каталог
+назначения должен быть пустым. MySQL продолжает обслуживать запросы во время
+создания дампа.
+
+### `bin/docker-cli mysql:load <path> --force`
+
+Полностью заменяет и многопоточно загружает только MySQL-базу выбранного проекта.
+Другие базы общего системного MySQL не удаляются и сам сервер не останавливается.
+`--threads` (`-j`) задаёт параллелизм myloader; индексы создаются после загрузки
+данных всех таблиц, чтобы сократить время восстановления.
+
+```bash
+bin/docker-cli mysql:load --force .docker-cli/backups/mysql/my-project-20260728-120000
+bin/docker-cli mysql:load --project=my-project --threads=8 --force /mnt/fast/backups/release-42
+bin/docker-cli mysql:load --force --skip-checks /mnt/fast/backups/another-project
+```
+
+Команда требует явный `--force`, проверяет формат дампа и метаданные проектного
+контекста. Опция `--skip-checks` отключает только проверку проекта и имени базы в
+`docker-cli.json`: дамп загружается в MySQL-базу из `project.yaml` текущего проекта.
+Проверка формата дампа mydumper при этом сохраняется. Это позволяет, например,
+загрузить копию базы одного проекта в базу другого проекта для тестирования.
+
+Опция `--disable-redo-log` может существенно ускорить большую загрузку,
+но временно отключает InnoDB redo log глобально для системного MySQL. Её следует
+использовать только когда параллельная работа с другими базами остановлена; при
+аварии MySQL во время загрузки может потребоваться пересоздание экземпляра.
 
 ## Пользовательские задачи
 
@@ -310,12 +388,12 @@ systemctl status docker-cli.panel
 sudo bin/docker-cli panel:down
 ```
 
-### `bin/docker-cli panel:user-add`
+### `bin/docker-cli panel:user-create`
 
 Интерактивно запрашивает логин в формате email и пароль, затем добавляет пользователя панели. Пароль сохраняется в виде солёного хеша в `~/.config/docker-cli/panel/users.yaml`.
 
 ```bash
-bin/docker-cli panel:user-add
+bin/docker-cli panel:user-create
 ```
 
 ### `bin/docker-cli panel:user-delete <логин>`

@@ -8,14 +8,25 @@ final class DatabasePasswordGenerator
 {
     public function generate(): string
     {
-        $letters = 'abcdefghijklmnopqrstuvwxyz';
-        $alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
-        $password = $letters[random_int(0, strlen($letters) - 1)];
+        $lowercase = 'abcdefghijklmnopqrstuvwxyz';
+        $uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $digits = '0123456789';
+        $alphabet = $lowercase . $uppercase . $digits;
+        $characters = [
+            $lowercase[random_int(0, strlen($lowercase) - 1)],
+            $uppercase[random_int(0, strlen($uppercase) - 1)],
+            $digits[random_int(0, strlen($digits) - 1)],
+        ];
 
-        for ($i = 1; $i < 24; $i++) {
-            $password .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        for ($i = count($characters); $i < 24; $i++) {
+            $characters[] = $alphabet[random_int(0, strlen($alphabet) - 1)];
         }
 
-        return $password;
+        for ($i = count($characters) - 1; $i > 0; $i--) {
+            $position = random_int(0, $i);
+            [$characters[$i], $characters[$position]] = [$characters[$position], $characters[$i]];
+        }
+
+        return implode('', $characters);
     }
 }

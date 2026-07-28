@@ -142,6 +142,16 @@ services:
           - mysql.${BASE_HOST}
     restart: unless-stopped
 
+  mydumper:
+    image: mydumper/mydumper:v1.0.3-1
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    networks:
+      docker-cli:
+    profiles:
+      - tools
+    restart: "no"
+
   postgres:
     image: postgres:18
     container_name: docker-cli-postgres
