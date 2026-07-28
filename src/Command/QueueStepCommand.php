@@ -61,12 +61,12 @@ final class QueueStepCommand extends Command
                     $output->writeln('<error>' . $error . '</error>');
                     $repository->trace($active, $queue, $item, 'Ошибка валидации: ' . $error);
                 }
+                $active = $repository->move($active, $queue, '50-error');
                 $repository->trace($active, $queue, $item, 'Элемент перемещен в 50-error.');
-                $repository->move($active, $queue, '50-error');
                 return Command::INVALID;
             }
             foreach ($item['queue-item']['tasks'] as $task) {
-                $repository->trace($active, $queue, $item, sprintf('Запуск задачи %s.', $task['code']));
+                $repository->trace($active, $queue, $item, sprintf('Запуск задачи %s.', $task['code']), $task['code'], $task['project'] ?? null);
                 $arguments = ['task-code' => $task['code']];
                 if (isset($task['project'])) {
                     $arguments['--project'] = $task['project'];
@@ -79,23 +79,23 @@ final class QueueStepCommand extends Command
                 $runner = new TaskRunCommand($tasks);
                 $runner->setApplication($this->getApplication());
                 $exitCode = $runner->run(new ArrayInput($arguments), $output);
-                $repository->trace($active, $queue, $item, sprintf('Задача %s завершилась с кодом %d.', $task['code'], $exitCode));
+                $repository->trace($active, $queue, $item, sprintf('Задача %s завершилась с кодом %d.', $task['code'], $exitCode), $task['code'], $task['project'] ?? null, $exitCode);
                 if ($exitCode !== Command::SUCCESS) {
+                    $active = $repository->move($active, $queue, '40-failure');
                     $repository->trace($active, $queue, $item, 'Элемент перемещен в 40-failure; последующие задачи пропущены.');
-                    $repository->move($active, $queue, '40-failure');
                     return $exitCode;
                 }
             }
+            $active = $repository->move($active, $queue, '30-success');
             $repository->trace($active, $queue, $item, 'Элемент перемещен в 30-success.');
-            $repository->move($active, $queue, '30-success');
             return Command::SUCCESS;
         } catch (\Throwable $exception) {
             $output->writeln('<error>' . $exception->getMessage() . '</error>');
             if (isset($active, $item) && is_string($active) && is_file($active) && is_array($item)) {
                 try {
                     $repository->trace($active, $queue, $item, 'Ошибка обработки: ' . $exception->getMessage());
+                    $active = $repository->move($active, $queue, '50-error');
                     $repository->trace($active, $queue, $item, 'Элемент перемещен в 50-error.');
-                    $repository->move($active, $queue, '50-error');
                 } catch (\Throwable) {
                     // Preserve the original processing error.
                 }
