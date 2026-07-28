@@ -224,7 +224,7 @@ SH,
         $password = str_replace("'", "''", $password);
         $drop = $rebuild ? "DROP USER IF EXISTS '{$user}'@'%'; DROP DATABASE IF EXISTS `{$identifier}`;" : '';
 
-        return $drop . " CREATE DATABASE IF NOT EXISTS `{$identifier}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS '{$user}'@'%' IDENTIFIED BY '{$password}'; GRANT ALL PRIVILEGES ON `{$identifier}`.* TO '{$user}'@'%'; FLUSH PRIVILEGES;";
+        return $drop . " CREATE DATABASE IF NOT EXISTS `{$identifier}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS '{$user}'@'%' IDENTIFIED BY '{$password}'; ALTER USER '{$user}'@'%' IDENTIFIED BY '{$password}'; GRANT ALL PRIVILEGES ON `{$identifier}`.* TO '{$user}'@'%'; FLUSH PRIVILEGES;";
     }
 
     private function mysqlDropSql(string $name): string
@@ -243,7 +243,7 @@ SH,
         $quotedIdentifier = '"' . str_replace('"', '""', $name) . '"';
 
         return [
-            "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{$literalName}') THEN EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', '{$literalName}', '{$literalPassword}'); END IF; END $$;",
+            "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{$literalName}') THEN EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', '{$literalName}', '{$literalPassword}'); ELSE EXECUTE format('ALTER ROLE %I LOGIN PASSWORD %L', '{$literalName}', '{$literalPassword}'); END IF; END $$;",
             "DROP ROLE IF EXISTS {$quotedIdentifier};",
             "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{$literalName}' AND pid <> pg_backend_pid();",
             "SELECT 1 FROM pg_database WHERE datname = '{$literalName}'",
