@@ -145,16 +145,61 @@
     }
   }
 
+  function journalFilterHash(projectJournal = false) {
+    const path = projectJournal ? projectHash(selectedProjectName, 'journal') : '#/journal';
+    const parameters = new URLSearchParams();
+    if (logType !== 'queue') parameters.set('type', logType);
+    if (!projectJournal && logProject !== 'all') parameters.set('project', logProject);
+    if (logStatus !== 'all') parameters.set('status', logStatus);
+    if (logQueueItem) parameters.set('queueItem', logQueueItem);
+    if (logItemCode) parameters.set('itemCode', logItemCode);
+    if (logTaskCode) parameters.set('taskCode', logTaskCode);
+    const query = parameters.toString().replaceAll('%2C', ',');
+    return query ? `${path}?${query}` : path;
+  }
+
+  function syncJournalFilters(projectJournal = activeSection === 'projects' && projectDetailTab === 'journal') {
+    const hash = journalFilterHash(projectJournal);
+    if (window.location.hash !== hash) history.replaceState(history.state, '', hash);
+  }
+
+  function applyJournalFilters(projectJournal) {
+    clearTimeout(logFilterTimer);
+    const query = window.location.hash.split('?', 2)[1] || '';
+    const parameters = new URLSearchParams(query);
+    const values = (name) => parameters.getAll(name);
+    const scalar = (name) => values(name).length === 1 ? values(name)[0] : '';
+    const validText = (value) => value.length <= 500 && !/[\u0000-\u001f\u007f]/.test(value);
+    const type = scalar('type');
+    const project = scalar('project');
+    const status = scalar('status');
+    const queueItem = scalar('queueItem');
+    const itemCode = scalar('itemCode');
+    const taskCode = scalar('taskCode');
+
+    logType = logTypes.some((item) => item.value === type) ? type : 'queue';
+    logProject = !projectJournal && project && (!projects.length || projects.some((item) => item.name === project)) ? project : 'all';
+    logStatus = logStatuses.some((item) => item.value === status) ? status : 'all';
+    logQueueItem = queueItem && validText(queueItem) ? queueItem : '';
+    logItemCode = itemCode && validText(itemCode) ? itemCode : '';
+    logTaskCode = taskCode && validText(taskCode) ? taskCode : '';
+    logPage = 1;
+    syncJournalFilters(projectJournal);
+  }
+
   function applyHashNavigation() {
     if (!token) return;
-    const segments = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+    const [hashPath] = window.location.hash.split('?', 1);
+    const segments = hashPath.replace(/^#\/?/, '').split('/').filter(Boolean);
     if (segments[0] === 'logs') {
-      window.location.hash = '#/journal';
+      const query = window.location.hash.split('?', 2)[1];
+      window.location.hash = `#/journal${query ? `?${query}` : ''}`;
       return;
     }
     if (segments[0] === 'journal') {
       activeSection = 'logs';
       selectedProjectName = '';
+      applyJournalFilters(false);
       loadLogs();
       return;
     }
@@ -179,7 +224,10 @@
     const tab = ['notes', 'journal'].includes(segments[2]) ? segments[2] : 'info';
     selectedProjectName = projectName;
     projectDetailTab = tab;
-    if (tab === 'journal') loadLogs();
+    if (tab === 'journal') {
+      applyJournalFilters(true);
+      loadLogs();
+    }
     if (segments.length !== 3 || !['info', 'notes', 'journal'].includes(segments[2])) navigateToProject(projectName, tab);
   }
 
@@ -203,6 +251,12 @@
       logTotal = Number(data.total) || 0;
       logProjects = Array.isArray(data.projects) ? data.projects : [];
       logProjectCollection = useListCollection({ items: [{ value: 'all', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] });
+      if (!projectJournal && logProject !== 'all' && !logProjects.includes(logProject)) {
+        logProject = 'all';
+        syncJournalFilters(false);
+        void loadLogs();
+        return;
+      }
     } catch (cause) {
       if (requestId === logRequestId) {
         projectsError = cause instanceof Error ? cause.message : 'Не удалось загрузить журнал.';
@@ -215,12 +269,14 @@
   function changeLogProject(value) {
     logProject = value || 'all';
     logPage = 1;
+    syncJournalFilters();
     loadLogs();
   }
 
   function changeLogStatus(value) {
     logStatus = value || 'all';
     logPage = 1;
+    syncJournalFilters();
     loadLogs();
   }
 
@@ -233,6 +289,7 @@
     else if (field === 'itemCode') logItemCode = value;
     else logTaskCode = value;
     logPage = 1;
+    syncJournalFilters();
     clearTimeout(logFilterTimer);
     logFilterTimer = setTimeout(loadLogs, 250);
   }
@@ -241,7 +298,7 @@
     logQueueItem = item.file;
     logPage = 1;
     queueOpen = false;
-    window.location.hash = '#/journal';
+    window.location.hash = journalFilterHash(false);
     if (activeSection === 'logs') loadLogs();
   }
 
