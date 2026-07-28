@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Collapsible, Combobox, Dialog, useListCollection } from '@skeletonlabs/skeleton-svelte';
+  import { Combobox, Dialog, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
 
@@ -43,6 +43,7 @@
   let systemDark = false;
   let projects = [];
   let selectedProjectName = '';
+  let projectDetailTab = 'info';
   let projectsLoading = false;
   let projectsError = '';
   let projectQuery = '';
@@ -98,6 +99,46 @@
 
   function removeProjectTag(tag) {
     projectTags = projectTags.filter((item) => item !== tag);
+  }
+
+  function projectHash(name = '', tab = 'info') {
+    return name ? `#/projects/${encodeURIComponent(name)}/${tab}` : '#/projects';
+  }
+
+  function navigateToProject(name, tab = 'info') {
+    const hash = projectHash(name, tab);
+    if (window.location.hash === hash) {
+      selectedProjectName = name;
+      projectDetailTab = tab;
+    } else {
+      window.location.hash = hash;
+    }
+  }
+
+  function applyHashNavigation() {
+    if (!token) return;
+    const segments = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+    if (segments[0] !== 'projects') {
+      navigateToProject('', 'info');
+      return;
+    }
+    let projectName = '';
+    try {
+      projectName = segments[1] ? decodeURIComponent(segments[1]) : '';
+    } catch {
+      navigateToProject('', 'info');
+      return;
+    }
+    if (!projectName) {
+      selectedProjectName = '';
+      projectDetailTab = 'info';
+      if (window.location.hash !== projectHash()) navigateToProject('', 'info');
+      return;
+    }
+    const tab = segments[2] === 'notes' ? 'notes' : 'info';
+    selectedProjectName = projectName;
+    projectDetailTab = tab;
+    if (segments.length !== 3 || !['info', 'notes'].includes(segments[2])) navigateToProject(projectName, tab);
   }
 
   function addProjectTagFromInput() {
@@ -185,7 +226,7 @@
     const bounds = event.currentTarget.getBoundingClientRect();
     const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
     const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.top;
-    selectedProjectName = project.name;
+    navigateToProject(project.name, projectDetailTab);
     projectContextMenu = {
       project,
       x: Math.max(8, Math.min(x, window.innerWidth - 184)),
@@ -222,11 +263,12 @@
     return data;
   }
 
-  function acceptSession(data) {
+  function acceptSession(data, resetNavigation = false) {
     token = data.token;
     currentLogin = data.login;
     localStorage.setItem(TOKEN_KEY, token);
-    window.location.hash = '#/';
+    if (resetNavigation || window.location.hash === '#/login') navigateToProject('', 'info');
+    else applyHashNavigation();
     connectPanelChannel();
   }
 
@@ -261,7 +303,7 @@
       queuePaused = data.queue.paused === true;
     }
     projectsLoading = false;
-    if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) selectedProjectName = '';
+    if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) navigateToProject('', 'info');
   }
 
   function connectPanelChannel() {
@@ -465,7 +507,7 @@
         body: JSON.stringify({ login, password }),
       });
       password = '';
-      acceptSession(data);
+      acceptSession(data, true);
     } catch (cause) {
       error = cause instanceof Error ? cause.message : 'Не удалось выполнить вход.';
       errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
@@ -491,6 +533,8 @@
     media.addEventListener('change', updateSystemMode);
     token = localStorage.getItem(TOKEN_KEY) || '';
     if (!token) window.location.hash = '#/login';
+    else applyHashNavigation();
+    window.addEventListener('hashchange', applyHashNavigation);
     panelChannelEnabled = true;
     connectPanelChannel();
     checkSession().finally(() => { loading = false; });
@@ -498,6 +542,7 @@
     return () => {
       clearInterval(interval);
       disconnectPanelChannel();
+      window.removeEventListener('hashchange', applyHashNavigation);
       media.removeEventListener('change', updateSystemMode);
     };
   });
@@ -512,7 +557,7 @@
 
 <div class:panel-shell={token && !loading} class="min-h-screen bg-surface-50-950 text-surface-950-50 flex flex-col">
   <header class="app-header h-16 border-b border-surface-200-800 bg-surface-100-900 flex items-center px-5 md:px-8 shadow-sm">
-    {#if token}<a href="#/" class="font-bold text-xl no-underline">docker-cli</a>{/if}
+    {#if token}<a href="#/projects" class="font-bold text-xl no-underline">docker-cli</a>{/if}
     {#if token}
       <div class="system-header header-menu">
         <div class="queue-main-control">
@@ -706,9 +751,9 @@
                       class="project-item"
                       class:selected={selectedProjectName === project.name}
                       aria-pressed={selectedProjectName === project.name}
-                      onclick={() => { selectedProjectName = project.name; }}
+                      onclick={() => navigateToProject(project.name, 'info')}
                       oncontextmenu={(event) => openProjectContextMenu(event, project)}
-                      onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectedProjectName = project.name; } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { openProjectContextMenu(event, project); } }}
+                      onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigateToProject(project.name, 'info'); } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { openProjectContextMenu(event, project); } }}
                     >
                       <span class:enabled={project.enabled} class="status-dot" title={project.enabled ? 'Включен' : 'Выключен'}></span>
                       <span class="project-summary">
@@ -727,18 +772,13 @@
           </aside>
           <div class="project-details">
             {#if selectedProject}
-              <div class="project-toolbar">
-                <button class="btn preset-filled-primary-500" type="button" disabled={notesSaving} onclick={saveNotes}>
-                  <Save size={16} aria-hidden="true" />{notesSaving ? 'Сохраняем…' : 'Сохранить'}
-                </button>
-              </div>
+              <nav class="project-detail-tabs" aria-label={`Разделы проекта ${selectedProject.name}`}>
+                <a class:active={projectDetailTab === 'info'} class="project-detail-tab" href={projectHash(selectedProject.name, 'info')} aria-current={projectDetailTab === 'info' ? 'page' : undefined}>Общее</a>
+                <a class:active={projectDetailTab === 'notes'} class="project-detail-tab" href={projectHash(selectedProject.name, 'notes')} aria-current={projectDetailTab === 'notes' ? 'page' : undefined}>Заметки</a>
+              </nav>
               <div class="project-details-scroll">
-                <Collapsible defaultOpen={true} class="collapsible card preset-filled-surface-100-900">
-                <Collapsible.Trigger class="collapsible-trigger">
-                  <span>Общее</span>
-                  <Collapsible.Indicator class="collapsible-indicator">⌄</Collapsible.Indicator>
-                </Collapsible.Trigger>
-                <Collapsible.Content class="collapsible-content">
+                {#if projectDetailTab === 'info'}
+                <section class="project-tab-content card preset-filled-surface-100-900" aria-label="Общее">
                   <dl class="project-fields">
                     <div><dt>Название</dt><dd>{selectedProject.name}</dd></div>
                     <div><dt>Язык</dt><dd>{selectedProject.language || 'Не указан'}</dd></div>
@@ -754,14 +794,14 @@
                       <Trash2 size={16} aria-hidden="true" />Стереть
                     </button>
                   </div>
-                </Collapsible.Content>
-                </Collapsible>
-                <Collapsible defaultOpen={true} class="collapsible card preset-filled-surface-100-900 project-notes">
-                <Collapsible.Trigger class="collapsible-trigger">
-                  <span>Заметки</span>
-                  <Collapsible.Indicator class="collapsible-indicator">⌄</Collapsible.Indicator>
-                </Collapsible.Trigger>
-                <Collapsible.Content class="collapsible-content notes-content">
+                </section>
+                {:else}
+                <div class="project-toolbar">
+                  <button class="btn preset-filled-primary-500" type="button" disabled={notesSaving} onclick={saveNotes}>
+                    <Save size={16} aria-hidden="true" />{notesSaving ? 'Сохраняем…' : 'Сохранить'}
+                  </button>
+                </div>
+                <section class="project-tab-content notes-content card preset-filled-surface-100-900" aria-label="Заметки">
                   <label class="label">
                     <span class="label-text">Теги</span>
                     <span class="notes-tags-input input">
@@ -775,8 +815,8 @@
                     <span class="label-text">Заметки</span>
                     <textarea class="textarea notes-textarea" bind:value={noteDescription} rows="8" placeholder="Произвольные заметки о проекте"></textarea>
                   </label>
-                </Collapsible.Content>
-                </Collapsible>
+                </section>
+                {/if}
               </div>
             {:else}
               <div class="select-project">Выберите проект</div>
