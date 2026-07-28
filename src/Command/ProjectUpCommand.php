@@ -34,7 +34,7 @@ final class ProjectUpCommand extends Command
     ) {
         parent::__construct('project:up');
         $this->setDescription('Зарегистрировать проект docker-cli.');
-        $this->addArgument('project-name', InputArgument::OPTIONAL, 'Имя проекта. По умолчанию генерируется случайный идентификатор adjective-animal.');
+        $this->addArgument('project-name', InputArgument::OPTIONAL, 'Имя проекта. По умолчанию используется нормализованное имя директории проекта.');
         $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
         $this->addOption('force', null, InputOption::VALUE_NONE, 'Зарегистрировать проект, даже если фреймворк не удалось определить.');
     }
@@ -51,7 +51,8 @@ final class ProjectUpCommand extends Command
 
         $registry = new ProjectRegistry();
         $projectsDirectory = $registry->projectsDirectory();
-        $projectName = $this->resolveProjectName($input, $projectsDirectory);
+        $projectRoot = $framework === null ? (string) getcwd() : $framework->getProjectRoot();
+        $projectName = $this->resolveProjectName($input, $output, $projectRoot, $projectsDirectory);
         if (!$this->isValidProjectName($projectName)) {
             $output->writeln(sprintf('<error>Имя проекта "%s" не соответствует конвенции: используйте строчные латинские буквы, цифры и дефисы; имя должно начинаться и заканчиваться буквой или цифрой.</error>', $projectName));
 
@@ -79,7 +80,6 @@ final class ProjectUpCommand extends Command
         }
 
         $description = $framework === null ? null : ($this->descriptionService ?? new FrameworkDescriptionService())->describe($framework);
-        $projectRoot = $framework === null ? (string) getcwd() : $framework->getProjectRoot();
         $documentRoot = $framework === null ? $projectRoot : $framework->getDocumentRoot();
 
         if ($framework === null) {
@@ -203,14 +203,48 @@ final class ProjectUpCommand extends Command
         return $matches[1];
     }
 
-    private function resolveProjectName(InputInterface $input, string $projectsDirectory): string
+    private function resolveProjectName(
+        InputInterface $input,
+        OutputInterface $output,
+        string $projectRoot,
+        string $projectsDirectory,
+    ): string
     {
         $projectName = $input->getArgument('project-name');
         if (is_string($projectName) && $projectName !== '') {
             return $projectName;
         }
 
-        return (new ProjectNameGenerator())->generate($this->registeredProjectNames($projectsDirectory));
+        $registeredNames = $this->registeredProjectNames($projectsDirectory);
+        $directoryName = $this->normalizeProjectName(basename($projectRoot));
+        if ($directoryName !== '' && !in_array($directoryName, $registeredNames, true)) {
+            return $directoryName;
+        }
+
+        $generatedName = (new ProjectNameGenerator())->generate($registeredNames);
+        if ($directoryName === '') {
+            $output->writeln(sprintf(
+                '<comment>Не удалось сформировать имя проекта из имени директории "%s"; используется сгенерированное имя "%s".</comment>',
+                basename($projectRoot),
+                $generatedName,
+            ));
+        } else {
+            $output->writeln(sprintf(
+                '<comment>Проект "%s" уже зарегистрирован; используется сгенерированное имя "%s".</comment>',
+                $directoryName,
+                $generatedName,
+            ));
+        }
+
+        return $generatedName;
+    }
+
+    private function normalizeProjectName(string $directoryName): string
+    {
+        $name = strtolower($directoryName);
+        $name = preg_replace('/[^a-z0-9]+/', '-', $name) ?? '';
+
+        return trim($name, '-');
     }
 
     /** @return list<string> */
