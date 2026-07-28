@@ -82,6 +82,34 @@ final class QueueRepository
         return $files[0] ?? null;
     }
 
+    /** @param array<string, mixed> $item */
+    public function create(string $queue, string $code, array $item): string
+    {
+        $this->initialize($queue);
+        $timestamp = (int) floor(microtime(true) * 1_000_000);
+        $safeCode = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', $code), '.-');
+        $safeCode = $safeCode !== '' ? $safeCode : 'task';
+        for ($counter = 0; $counter <= 999; ++$counter) {
+            $file = join_path($this->queueDirectory($queue), '10-pending', sprintf('%d.%03d.%s.yaml', $timestamp, $counter, $safeCode));
+            $handle = @fopen($file, 'x');
+            if ($handle === false) {
+                continue;
+            }
+            try {
+                if (fwrite($handle, Yaml::dump($item, 8, 2)) === false) {
+                    throw new \RuntimeException(sprintf('Не удалось записать элемент очереди "%s".', $file));
+                }
+            } catch (\Throwable $exception) {
+                @unlink($file);
+                throw $exception;
+            } finally {
+                fclose($handle);
+            }
+            return $file;
+        }
+        throw new \RuntimeException('Не удалось подобрать уникальное имя элемента очереди.');
+    }
+
     /** @return list<array{file: string, status: string, queuedAt: string, code: string}> */
     public function items(string $queue): array
     {
@@ -101,6 +129,45 @@ final class QueueRepository
             }
         }
         usort($items, static fn (array $left, array $right): int => [$left['queuedAt'], $left['file']] <=> [$right['queuedAt'], $right['file']]);
+
+        return $items;
+    }
+
+    /**
+     * @return list<array{queue: string, status: string, file: string, path: string, relativePath: string}>
+     */
+    public function listItems(?string $queue = null, ?string $status = null): array
+    {
+        if ($status !== null && !in_array($status, self::STATUSES, true)) {
+            throw new \InvalidArgumentException(sprintf('Неизвестный статус "%s".', $status));
+        }
+        if ($queue !== null) {
+            $directories = [$queue => $this->queueDirectory($queue)];
+        } else {
+            $directories = [];
+            foreach (glob(join_path($this->configDirectory(), 'queue', '*'), GLOB_ONLYDIR) ?: [] as $directory) {
+                $directories[basename($directory)] = $directory;
+            }
+            ksort($directories, SORT_STRING);
+        }
+
+        $items = [];
+        foreach ($directories as $queueCode => $directory) {
+            foreach ($status === null ? self::STATUSES : [$status] as $statusCode) {
+                $files = glob(join_path($directory, $statusCode, '*.yaml')) ?: [];
+                sort($files, SORT_STRING);
+                foreach (array_filter($files, 'is_file') as $file) {
+                    $name = basename($file);
+                    $items[] = [
+                        'queue' => $queueCode,
+                        'status' => $statusCode,
+                        'file' => $name,
+                        'path' => $file,
+                        'relativePath' => join_path($queueCode, $statusCode, $name),
+                    ];
+                }
+            }
+        }
 
         return $items;
     }
@@ -125,15 +192,15 @@ final class QueueRepository
         if (basename($file) !== $file || preg_match('/^[A-Za-z0-9._-]+\.yaml$/D', $file) !== 1) {
             throw new \InvalidArgumentException('Некорректное имя элемента очереди.');
         }
-        foreach (['10-pending', '40-failure', '50-error'] as $status) {
+        if (is_file(join_path($this->queueDirectory($queue), '20-active', $file))) {
+            throw new \RuntimeException('Нельзя удалить выполняющийся элемент очереди.');
+        }
+        foreach (array_diff(self::STATUSES, ['20-active']) as $status) {
             $path = join_path($this->queueDirectory($queue), $status, $file);
             if (is_file($path)) {
                 if (!unlink($path)) throw new \RuntimeException('Не удалось удалить элемент очереди.');
                 return;
             }
-        }
-        if (is_file(join_path($this->queueDirectory($queue), '20-active', $file))) {
-            throw new \RuntimeException('Нельзя удалить выполняющийся элемент очереди.');
         }
         throw new \RuntimeException('Элемент очереди не найден.');
     }
