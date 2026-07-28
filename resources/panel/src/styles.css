@@ -116,11 +116,12 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .dark .log-filter-link { color: var(--color-primary-300); }
 .dark .log-table td { border-color: var(--color-surface-800); }
 .log-empty { color: var(--color-surface-500); text-align: center; }
-.log-pagination { position: relative; z-index: 5; display: flex; flex: none; align-items: center; justify-content: space-between; gap: 1rem; }
+.log-pagination { position: relative; z-index: 5; display: grid; flex: none; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 1rem; }
 .log-pagination > span { color: var(--color-surface-500); font-size: 0.8rem; }
-.log-pagination-controls { display: flex; align-items: end; gap: 0.5rem; }
-.log-pagination label { display: grid; gap: 0.25rem; margin-left: 0.75rem; }
-.page-size-control { width: 6rem; }
+.log-pagination-controls { display: flex; grid-column: 2; align-items: center; gap: 0.5rem; }
+.page-size-control { width: 2.4rem; }
+.page-size-control .font-combobox-input { padding: 0.45rem 0.15rem 0.45rem 0.35rem; }
+.page-size-control .font-combobox-trigger { width: 1rem; }
 .log-view .font-combobox-positioner, .project-log-view .font-combobox-positioner { z-index: 50; }
 .project-sidebar { display: flex; min-height: 0; overflow: hidden; flex-direction: column; border-right: 1px solid var(--color-surface-200); background: var(--color-surface-50); }
 .dark .project-sidebar { border-color: var(--color-surface-800); background: var(--color-surface-950); }
