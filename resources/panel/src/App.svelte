@@ -26,7 +26,8 @@
     { value: 'noto', label: 'Noto Sans' },
   ];
   const fontCollection = useListCollection({ items: fonts });
-  const logTypeCollection = useListCollection({ items: [{ value: 'queue', label: 'Очередь' }] });
+  const logTypes = [{ value: 'all', label: 'Все типы записей' }, { value: 'queue', label: 'Очередь' }];
+  const logTypeCollection = useListCollection({ items: logTypes });
   const pageSizeCollection = useListCollection({ items: [25, 50, 100].map((value) => ({ value: String(value), label: String(value) })) });
   let login = '';
   let password = '';
@@ -49,14 +50,20 @@
   let activeSection = 'projects';
   let logItems = [];
   let logProjects = [];
-  let logProject = '';
+  let logType = 'queue';
+  let logProject = 'all';
+  let logQueueItem = '';
+  let logItemCode = '';
+  let logTaskCode = '';
   let logPage = 1;
   let logPageSize = 25;
   let logTotal = 0;
   let logSort = 'timestamp';
   let logDirection = 'desc';
   let logsLoading = false;
-  let logProjectCollection = useListCollection({ items: [{ value: '', label: 'Все проекты' }] });
+  let logProjectCollection = useListCollection({ items: [{ value: 'all', label: 'Все проекты' }] });
+  let logFilterTimer = null;
+  let logRequestId = 0;
   let projectsLoading = false;
   let projectsError = '';
   let projectQuery = '';
@@ -166,29 +173,55 @@
   }
 
   async function loadLogs() {
-    if (!token || logsLoading) return;
+    if (!token) return;
+    const requestId = ++logRequestId;
     logsLoading = true;
     projectsError = '';
     try {
       const data = await getLogs(api, {
         page: String(logPage), pageSize: String(logPageSize), sort: logSort, direction: logDirection,
-        ...(logProject ? { project: logProject } : {}),
+        ...(logProject !== 'all' ? { project: logProject } : {}),
+        ...(logQueueItem ? { queueItem: logQueueItem } : {}),
+        ...(logItemCode ? { itemCode: logItemCode } : {}),
+        ...(logTaskCode ? { taskCode: logTaskCode } : {}),
       });
+      if (requestId !== logRequestId) return;
       logItems = Array.isArray(data.items) ? data.items : [];
       logTotal = Number(data.total) || 0;
       logProjects = Array.isArray(data.projects) ? data.projects : [];
-      logProjectCollection = useListCollection({ items: [{ value: '', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] });
+      logProjectCollection = useListCollection({ items: [{ value: 'all', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] });
     } catch (cause) {
       projectsError = cause instanceof Error ? cause.message : 'Не удалось загрузить журнал.';
     } finally {
-      logsLoading = false;
+      if (requestId === logRequestId) logsLoading = false;
     }
   }
 
-  function changeLogProject(value) {
-    logProject = value;
+  function changeLogType(value) {
+    logType = value || 'all';
+    if (logType === 'all') {
+      logProject = 'all';
+      logQueueItem = '';
+      logItemCode = '';
+      logTaskCode = '';
+    }
     logPage = 1;
     loadLogs();
+  }
+
+  function changeLogProject(value) {
+    logProject = value || 'all';
+    logPage = 1;
+    loadLogs();
+  }
+
+  function changeTextLogFilter(field, value) {
+    if (field === 'queueItem') logQueueItem = value;
+    else if (field === 'itemCode') logItemCode = value;
+    else logTaskCode = value;
+    logPage = 1;
+    clearTimeout(logFilterTimer);
+    logFilterTimer = setTimeout(loadLogs, 250);
   }
 
   function changeLogPageSize(value) {
@@ -614,6 +647,7 @@
     const interval = setInterval(checkSession, 60_000);
     return () => {
       clearInterval(interval);
+      clearTimeout(logFilterTimer);
       disconnectPanelChannel();
       window.removeEventListener('hashchange', applyHashNavigation);
       media.removeEventListener('change', updateSystemMode);
@@ -902,30 +936,35 @@
             <div class="log-toolbar card preset-filled-surface-100-900">
               <label>
                 <span>Тип записи</span>
-                <Combobox collection={logTypeCollection} value={['queue']} openOnClick>
-                  <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
-                  <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl"><Combobox.Item item={{ value: 'queue', label: 'Очередь' }} class="font-combobox-item"><Combobox.ItemText>Очередь</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item></Combobox.Content></Combobox.Positioner>
+                <Combobox collection={logTypeCollection} value={[logType]} openOnClick onValueChange={(details) => changeLogType(details.value[0] || 'all')}>
+                  <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><button class="log-filter-clear" type="button" aria-label="Сбросить тип записи" onclick={(event) => { event.stopPropagation(); changeLogType('all'); }}>×</button><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                  <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logTypes as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                 </Combobox>
               </label>
+              {#if logType === 'queue'}
               <label>
                 <span>Проект</span>
-                <Combobox collection={logProjectCollection} value={[logProject]} openOnClick onValueChange={(details) => changeLogProject(details.value[0] || '')}>
-                  <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
-                  <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
+                <Combobox collection={logProjectCollection} value={[logProject]} openOnClick onValueChange={(details) => changeLogProject(details.value[0] || 'all')}>
+                  <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><button class="log-filter-clear" type="button" aria-label="Сбросить проект" onclick={(event) => { event.stopPropagation(); changeLogProject('all'); }}>×</button><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                  <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: 'all', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                 </Combobox>
               </label>
+              {#each [['queueItem', 'Элемент очереди', logQueueItem], ['itemCode', 'Код элемента', logItemCode], ['taskCode', 'Задача', logTaskCode]] as [field, label, value]}
+                <label><span>{label}</span><span class="log-text-filter"><input value={value} oninput={(event) => changeTextLogFilter(field, event.currentTarget.value)} /><button type="button" aria-label={`Сбросить фильтр «${label}»`} onclick={() => changeTextLogFilter(field, '')}>×</button></span></label>
+              {/each}
+              {/if}
             </div>
             <div class="log-table-wrap card preset-filled-surface-100-900">
               <table class="table log-table">
                 <thead><tr>
-                  {#each [['timestamp', 'Время'], ['queueItem', 'Queue-item'], ['itemCode', 'Код элемента'], ['project', 'Проект'], ['queueCode', 'Очередь'], ['taskCode', 'Задача'], ['result', 'Результат'], ['message', 'Сообщение']] as [field, label]}
+                  {#each [['timestamp', 'Время'], ['queueItem', 'Элемент очереди'], ['itemCode', 'Код элемента'], ['project', 'Проект'], ['queueCode', 'Очередь'], ['taskCode', 'Задача'], ['result', 'Результат'], ['message', 'Сообщение']] as [field, label]}
                     <th><button type="button" onclick={() => sortLogs(field)}>{label}<span aria-hidden="true">{logSort === field ? (logDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>
                   {/each}
                 </tr></thead>
                 <tbody>
                   {#if logsLoading}<tr><td colspan="8" class="log-empty animate-pulse">Загрузка…</td></tr>
                   {:else if logItems.length === 0}<tr><td colspan="8" class="log-empty">Записей нет</td></tr>
-                  {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td>{formatLogValue(item.queueItem)}</td><td>{formatLogValue(item.itemCode)}</td><td>{formatLogValue(item.project)}</td><td>{formatLogValue(item.queueCode)}</td><td>{formatLogValue(item.taskCode)}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
+                  {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('queueItem', item.queueItem)}>{formatLogValue(item.queueItem)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('itemCode', item.itemCode)}>{formatLogValue(item.itemCode)}</button></td><td>{formatLogValue(item.project)}</td><td>{formatLogValue(item.queueCode)}</td><td>{#if item.taskCode}<button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('taskCode', item.taskCode)}>{item.taskCode}</button>{:else}—{/if}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
                 </tbody>
               </table>
             </div>

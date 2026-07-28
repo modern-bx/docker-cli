@@ -257,7 +257,7 @@ final class QueueRepository
     }
 
     /** @return array{items: list<array<string, mixed>>, total: int, projects: list<string>} */
-    public function logs(int $page, int $pageSize, string $sort, string $direction, ?string $project): array
+    public function logs(int $page, int $pageSize, string $sort, string $direction, ?string $project, ?string $queueItem = null, ?string $itemCode = null, ?string $taskCode = null): array
     {
         $items = [];
         $projects = [];
@@ -269,7 +269,11 @@ final class QueueRepository
                     $record = json_decode($line, true, 16, JSON_THROW_ON_ERROR);
                     if (!is_array($record)) continue;
                     if (is_string($record['project'] ?? null) && $record['project'] !== '') $projects[] = $record['project'];
-                    if ($project === null || ($record['project'] ?? null) === $project) $items[] = $record;
+                    if ($project !== null && ($record['project'] ?? null) !== $project) continue;
+                    if ($queueItem !== null && !str_contains(mb_strtolower((string) ($record['queueItem'] ?? '')), mb_strtolower($queueItem))) continue;
+                    if ($itemCode !== null && !str_contains(mb_strtolower((string) ($record['itemCode'] ?? '')), mb_strtolower($itemCode))) continue;
+                    if ($taskCode !== null && !str_contains(mb_strtolower((string) ($record['taskCode'] ?? '')), mb_strtolower($taskCode))) continue;
+                    $items[] = $record;
                 } catch (\JsonException) {
                     // A partially written line must not make the complete log unavailable.
                 }
