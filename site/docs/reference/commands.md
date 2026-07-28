@@ -174,6 +174,43 @@ bin/docker-cli data:apply --dbms=mysql ./backup.sql.zip
 bin/docker-cli data:apply --dbms=mysql './backups/*'
 ```
 
+## Быстрые физические бэкапы MySQL
+
+### `bin/docker-cli mysql:xbackup [path]`
+
+Создаёт онлайн-бэкап всего экземпляра MySQL через контейнер
+`percona/percona-xtrabackup:8.0`. Проект выбирается через `--project` или по текущей
+директории и используется для безопасного имени и проверки бэкапа. По умолчанию
+несжатый бэкап пишется в `.docker-cli/backups/mysql/<проект>-<дата>`: отсутствие
+сжатия намеренно ускоряет и создание, и особенно последующее восстановление.
+
+```bash
+bin/docker-cli mysql:xbackup
+bin/docker-cli mysql:xbackup --project=my-project --parallel=8 /mnt/fast/backups/release-42
+```
+
+`--parallel` (`-j`, по умолчанию `4`) управляет числом потоков XtraBackup. Каталог
+назначения должен быть пустым. MySQL продолжает обслуживать запросы во время
+создания бэкапа.
+
+### `bin/docker-cli mysql:xrestore <path> --force`
+
+Останавливает MySQL, подготавливает бэкап, напрямую копирует физические файлы в
+datadir и снова запускает MySQL. Это значительно быстрее импорта SQL на больших
+базах. `--parallel` (`-j`) управляет параллелизмом подготовки и копирования.
+
+```bash
+bin/docker-cli mysql:xrestore --force .docker-cli/backups/mysql/my-project-20260728-120000
+bin/docker-cli mysql:xrestore --project=my-project --parallel=8 --force /mnt/fast/backups/release-42
+```
+
+> XtraBackup является физическим бэкапом экземпляра, а системный MySQL общий для
+> проектов. Поэтому восстановление атомарно заменяет **весь** datadir, включая
+> базы других проектов. Команда требует явный `--force`, проверяет формат каталога
+> и, для бэкапов docker-cli, совпадение проектного контекста. Если подготовка или
+> копирование завершатся ошибкой, команда всё равно попытается снова запустить
+> MySQL.
+
 ## Пользовательские задачи
 
 Полная спецификация YAML и описание выполнения приведены в разделе [«Пользовательские задачи»](/guide/tasks).
