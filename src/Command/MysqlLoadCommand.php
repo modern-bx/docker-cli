@@ -36,7 +36,7 @@ final class MysqlLoadCommand extends Command
             return Command::FAILURE;
         }
         if (!$input->getOption('force')) {
-            $output->writeln('<error>Загрузка полностью заменит MySQL-базу проекта. Повторите с --force.</error>');
+            $output->writeln(sprintf('<error>Загрузка полностью заменит MySQL-базу проекта "%s". Повторите с --force.</error>', $project));
             return Command::FAILURE;
         }
         $threads = filter_var($input->getOption('threads'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);

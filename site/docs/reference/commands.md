@@ -67,6 +67,7 @@ bin/docker-cli project:list
 
 ```bash
 bin/docker-cli project:down
+bin/docker-cli project:down --drop --force
 ```
 
 Опция:
@@ -76,6 +77,10 @@ bin/docker-cli project:down --no-restart
 ```
 
 `--no-restart` пропускает перезапуск общего пула проектных сервисов.
+
+`--drop` перед удалением регистрации удаляет базы данных и пользователей проекта
+во всех поддерживаемых СУБД. Это необратимое действие требует одновременной опции
+`--force`. Если удаление данных завершилось ошибкой, регистрация проекта сохраняется.
 
 ### `bin/docker-cli project:show [project]`
 
