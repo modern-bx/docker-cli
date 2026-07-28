@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
-use DockerCli\Project\MysqlXtrabackup;
+use DockerCli\Project\MysqlDumpLoader;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -13,15 +13,15 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class MysqlXbackupCommand extends Command
+final class MysqlDumpCommand extends Command
 {
-    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?MysqlXtrabackup $xtrabackup = null)
+    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?MysqlDumpLoader $dumpLoader = null)
     {
-        parent::__construct('mysql:xbackup');
-        $this->setDescription('Создать быстрый физический бэкап MySQL средствами Percona XtraBackup.');
-        $this->addArgument('path', InputArgument::OPTIONAL, 'Директория бэкапа (по умолчанию .docker-cli/backups/mysql/<дата>).');
+        parent::__construct('mysql:dump');
+        $this->setDescription('Создать параллельный дамп MySQL-базы проекта через mydumper.');
+        $this->addArgument('path', InputArgument::OPTIONAL, 'Директория дампа (по умолчанию .docker-cli/backups/mysql/<дата>).');
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
-        $this->addOption('parallel', 'j', InputOption::VALUE_REQUIRED, 'Число параллельных потоков.', '4');
+        $this->addOption('threads', 'j', InputOption::VALUE_REQUIRED, 'Число параллельных потоков.', '4');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -32,23 +32,28 @@ final class MysqlXbackupCommand extends Command
             $output->writeln('<error>Укажите зарегистрированный проект через --project или запустите команду из проекта.</error>');
             return Command::FAILURE;
         }
-        $parallel = filter_var($input->getOption('parallel'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        if ($parallel === false) {
-            $output->writeln('<error>Опция --parallel должна быть положительным целым числом.</error>');
+        $threads = filter_var($input->getOption('threads'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($threads === false) {
+            $output->writeln('<error>Опция --threads должна быть положительным целым числом.</error>');
             return Command::INVALID;
+        }
+        $database = $registry->readProjectConfig($project)['data']['databases']['mysql']['database'] ?? $project;
+        if (!is_string($database) || $database === '') {
+            $output->writeln(sprintf('<error>В конфигурации проекта "%s" не задана база MySQL.</error>', $project));
+            return Command::FAILURE;
         }
         $path = $input->getArgument('path');
         $path = is_string($path) && $path !== '' ? $path : sprintf('.docker-cli/backups/mysql/%s-%s', $project, date('Ymd-His'));
         $path = $this->absolutePath($path);
         try {
-            $code = ($this->xtrabackup ?? new MysqlXtrabackup())->backup($path, $parallel, $output);
-        } catch (MissingConfigException $e) {
+            $code = ($this->dumpLoader ?? new MysqlDumpLoader())->dump($database, $path, $threads, $output);
+        } catch (MissingConfigException) {
             $output->writeln('<error>Системная конфигурация не инициализирована.</error>');
             return Command::FAILURE;
         }
         if ($code === Command::SUCCESS) {
-            file_put_contents($path . '/docker-cli.json', json_encode(['project' => $project, 'createdAt' => date(DATE_ATOM), 'scope' => 'mysql-instance'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
-            $output->writeln(sprintf('<info>Физический бэкап MySQL записан в "%s".</info>', $path));
+            file_put_contents($path . '/docker-cli.json', json_encode(['project' => $project, 'database' => $database, 'createdAt' => date(DATE_ATOM)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+            $output->writeln(sprintf('<info>Дамп базы "%s" записан в "%s".</info>', $database, $path));
         }
         return $code;
     }

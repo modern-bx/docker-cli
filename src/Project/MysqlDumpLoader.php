@@ -8,11 +8,11 @@ use DockerCli\Config\SystemCompose;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class MysqlXtrabackup
+final class MysqlDumpLoader
 {
     public function __construct(private readonly ?SystemCompose $compose = null) {}
 
-    public function backup(string $directory, int $parallel, OutputInterface $output): int
+    public function dump(string $database, string $directory, int $threads, OutputInterface $output): int
     {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
@@ -22,7 +22,7 @@ final class MysqlXtrabackup
             return Command::FAILURE;
         }
         if (is_dir($directory) && (new \FilesystemIterator($directory))->valid()) {
-            $output->writeln(sprintf('<error>Директория бэкапа "%s" не пуста.</error>', $directory));
+            $output->writeln(sprintf('<error>Директория дампа "%s" не пуста.</error>', $directory));
             return Command::FAILURE;
         }
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
@@ -32,38 +32,24 @@ final class MysqlXtrabackup
 
         return $this->run(array_merge($compose->dockerComposeCommand('run'), [
             '--rm', '-T', '--no-deps', '--user', 'root', '--entrypoint', 'sh',
-            '--volume', $directory . ':/backup', 'xtrabackup', '-ec',
-            'xtrabackup --backup --host=mysql --user=root --password="${MYSQL_ROOT_PASSWORD:?}" --target-dir=/backup --parallel="$1" && chown -R "$2:$3" /backup',
-            'sh', (string) $parallel, (string) $this->uid(), (string) $this->gid(),
+            '--volume', $directory . ':/dump', 'mydumper', '-ec',
+            'mydumper --host=mysql --user=root --password="${MYSQL_ROOT_PASSWORD:?}" --database="$1" --outputdir=/dump --threads="$2" && chown -R "$3:$4" /dump',
+            'sh', $database, (string) $threads, (string) $this->uid(), (string) $this->gid(),
         ]), $compose, $output);
     }
 
-    public function restore(string $directory, int $parallel, OutputInterface $output): int
+    public function load(string $database, string $directory, int $threads, bool $disableRedoLog, OutputInterface $output): int
     {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
+        $redoOption = $disableRedoLog ? '--disable-redo-log' : '';
 
-        $stopCode = $this->run(array_merge($compose->dockerComposeCommand('stop'), ['mysql']), $compose, $output);
-        if ($stopCode !== Command::SUCCESS) {
-            return $stopCode;
-        }
-
-        $restoreCode = $this->run(array_merge($compose->dockerComposeCommand('run'), [
-            '--rm', '-T', '--no-deps', '--user', 'root', '--entrypoint', 'sh',
-            '--volume', $directory . ':/backup', 'xtrabackup', '-ec',
-            'xtrabackup --prepare --target-dir=/backup --parallel="$1" && find /var/lib/mysql -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + && xtrabackup --copy-back --target-dir=/backup --parallel="$1"',
-            'sh', (string) $parallel,
+        return $this->run(array_merge($compose->dockerComposeCommand('run'), [
+            '--rm', '-T', '--no-deps', '--entrypoint', 'sh',
+            '--volume', $directory . ':/dump:ro', 'mydumper', '-ec',
+            'myloader --host=mysql --user=root --password="${MYSQL_ROOT_PASSWORD:?}" --database="$1" --directory=/dump --threads="$2" --drop-database --optimize-keys=AFTER_IMPORT_ALL_TABLES $3',
+            'sh', $database, (string) $threads, $redoOption,
         ]), $compose, $output);
-
-        if ($restoreCode === Command::SUCCESS) {
-            $restoreCode = $this->run(array_merge($compose->dockerComposeCommand('run'), [
-                '--rm', '-T', '--no-deps', '--user', 'root', '--entrypoint', 'sh',
-                'mysql', '-ec', 'chown -R mysql:mysql /var/lib/mysql',
-            ]), $compose, $output);
-        }
-
-        $startCode = $this->run(array_merge($compose->dockerComposeCommand('up'), ['-d', 'mysql']), $compose, $output);
-        return $restoreCode !== Command::SUCCESS ? $restoreCode : $startCode;
     }
 
     /** @param list<string> $command */
@@ -74,6 +60,7 @@ final class MysqlXtrabackup
         if (!is_resource($process)) {
             throw new \RuntimeException('Unable to start Docker Compose process.');
         }
+
         return proc_close($process);
     }
 

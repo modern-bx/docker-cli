@@ -174,42 +174,42 @@ bin/docker-cli data:apply --dbms=mysql ./backup.sql.zip
 bin/docker-cli data:apply --dbms=mysql './backups/*'
 ```
 
-## Быстрые физические бэкапы MySQL
+## Быстрые параллельные дампы MySQL
 
-### `bin/docker-cli mysql:xbackup [path]`
+### `bin/docker-cli mysql:dump [path]`
 
-Создаёт онлайн-бэкап всего экземпляра MySQL через контейнер
-`percona/percona-xtrabackup:8.0`. Проект выбирается через `--project` или по текущей
-директории и используется для безопасного имени и проверки бэкапа. По умолчанию
-несжатый бэкап пишется в `.docker-cli/backups/mysql/<проект>-<дата>`: отсутствие
-сжатия намеренно ускоряет и создание, и особенно последующее восстановление.
+Создаёт согласованный многопоточный дамп только MySQL-базы выбранного проекта через
+контейнер `mydumper/mydumper:v1.0.3-1`. Проект выбирается через `--project` или по
+текущей директории. По умолчанию несжатый дамп пишется в
+`.docker-cli/backups/mysql/<проект>-<дата>`: отсутствие сжатия уменьшает нагрузку
+на CPU и ускоряет последующую загрузку.
 
 ```bash
-bin/docker-cli mysql:xbackup
-bin/docker-cli mysql:xbackup --project=my-project --parallel=8 /mnt/fast/backups/release-42
+bin/docker-cli mysql:dump
+bin/docker-cli mysql:dump --project=my-project --threads=8 /mnt/fast/backups/release-42
 ```
 
-`--parallel` (`-j`, по умолчанию `4`) управляет числом потоков XtraBackup. Каталог
+`--threads` (`-j`, по умолчанию `4`) управляет числом потоков mydumper. Каталог
 назначения должен быть пустым. MySQL продолжает обслуживать запросы во время
-создания бэкапа.
+создания дампа.
 
-### `bin/docker-cli mysql:xrestore <path> --force`
+### `bin/docker-cli mysql:load <path> --force`
 
-Останавливает MySQL, подготавливает бэкап, напрямую копирует физические файлы в
-datadir и снова запускает MySQL. Это значительно быстрее импорта SQL на больших
-базах. `--parallel` (`-j`) управляет параллелизмом подготовки и копирования.
+Полностью заменяет и многопоточно загружает только MySQL-базу выбранного проекта.
+Другие базы общего системного MySQL не удаляются и сам сервер не останавливается.
+`--threads` (`-j`) задаёт параллелизм myloader; индексы создаются после загрузки
+данных всех таблиц, чтобы сократить время восстановления.
 
 ```bash
-bin/docker-cli mysql:xrestore --force .docker-cli/backups/mysql/my-project-20260728-120000
-bin/docker-cli mysql:xrestore --project=my-project --parallel=8 --force /mnt/fast/backups/release-42
+bin/docker-cli mysql:load --force .docker-cli/backups/mysql/my-project-20260728-120000
+bin/docker-cli mysql:load --project=my-project --threads=8 --force /mnt/fast/backups/release-42
 ```
 
-> XtraBackup является физическим бэкапом экземпляра, а системный MySQL общий для
-> проектов. Поэтому восстановление атомарно заменяет **весь** datadir, включая
-> базы других проектов. Команда требует явный `--force`, проверяет формат каталога
-> и, для бэкапов docker-cli, совпадение проектного контекста. Если подготовка или
-> копирование завершатся ошибкой, команда всё равно попытается снова запустить
-> MySQL.
+Команда требует явный `--force`, проверяет формат дампа и метаданные проектного
+контекста. Опция `--disable-redo-log` может существенно ускорить большую загрузку,
+но временно отключает InnoDB redo log глобально для системного MySQL. Её следует
+использовать только когда параллельная работа с другими базами остановлена; при
+аварии MySQL во время загрузки может потребоваться пересоздание экземпляра.
 
 ## Пользовательские задачи
 

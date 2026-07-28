@@ -142,12 +142,10 @@ services:
           - mysql.${BASE_HOST}
     restart: unless-stopped
 
-  xtrabackup:
-    image: percona/percona-xtrabackup:8.0
+  mydumper:
+    image: mydumper/mydumper:v1.0.3-1
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    volumes:
-      - ./data/mysql/data:/var/lib/mysql
     networks:
       docker-cli:
     profiles:
