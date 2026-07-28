@@ -233,10 +233,16 @@ bin/docker-cli mysql:dump --project=my-project --threads=8 /mnt/fast/backups/rel
 ```bash
 bin/docker-cli mysql:load --force .docker-cli/backups/mysql/my-project-20260728-120000
 bin/docker-cli mysql:load --project=my-project --threads=8 --force /mnt/fast/backups/release-42
+bin/docker-cli mysql:load --force --skip-checks /mnt/fast/backups/another-project
 ```
 
 Команда требует явный `--force`, проверяет формат дампа и метаданные проектного
-контекста. Опция `--disable-redo-log` может существенно ускорить большую загрузку,
+контекста. Опция `--skip-checks` отключает только проверку проекта и имени базы в
+`docker-cli.json`: дамп загружается в MySQL-базу из `project.yaml` текущего проекта.
+Проверка формата дампа mydumper при этом сохраняется. Это позволяет, например,
+загрузить копию базы одного проекта в базу другого проекта для тестирования.
+
+Опция `--disable-redo-log` может существенно ускорить большую загрузку,
 но временно отключает InnoDB redo log глобально для системного MySQL. Её следует
 использовать только когда параллельная работа с другими базами остановлена; при
 аварии MySQL во время загрузки может потребоваться пересоздание экземпляра.

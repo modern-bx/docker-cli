@@ -23,6 +23,7 @@ final class MysqlLoadCommand extends Command
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
         $this->addOption('threads', 'j', InputOption::VALUE_REQUIRED, 'Число параллельных потоков.', '4');
         $this->addOption('force', 'f', InputOption::VALUE_NONE, 'Подтвердить полную замену выбранной базы.');
+        $this->addOption('skip-checks', null, InputOption::VALUE_NONE, 'Не проверять соответствие проекта и базы метаданным дампа.');
         $this->addOption('disable-redo-log', null, InputOption::VALUE_NONE, 'Ускорить загрузку, временно отключив InnoDB redo log для всего MySQL.');
     }
 
@@ -54,9 +55,12 @@ final class MysqlLoadCommand extends Command
             return Command::FAILURE;
         }
         $metadata = json_decode((string) @file_get_contents($path . '/docker-cli.json'), true);
-        if (is_array($metadata) && (($metadata['project'] ?? null) !== $project || ($metadata['database'] ?? null) !== $database)) {
+        if (!$input->getOption('skip-checks') && is_array($metadata) && (($metadata['project'] ?? null) !== $project || ($metadata['database'] ?? null) !== $database)) {
             $output->writeln('<error>Дамп создан для другого проекта или базы данных.</error>');
             return Command::FAILURE;
+        }
+        if ($input->getOption('skip-checks')) {
+            $output->writeln(sprintf('<comment>Проверка проекта и базы дампа пропущена; данные будут загружены в "%s".</comment>', $database));
         }
         try {
             $code = ($this->dumpLoader ?? new MysqlDumpLoader())->load($database, $path, $threads, (bool) $input->getOption('disable-redo-log'), $output);
