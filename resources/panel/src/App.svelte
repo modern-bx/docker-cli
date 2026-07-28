@@ -204,7 +204,9 @@
       logProjects = Array.isArray(data.projects) ? data.projects : [];
       logProjectCollection = useListCollection({ items: [{ value: 'all', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] });
     } catch (cause) {
-      projectsError = cause instanceof Error ? cause.message : 'Не удалось загрузить журнал.';
+      if (requestId === logRequestId) {
+        projectsError = cause instanceof Error ? cause.message : 'Не удалось загрузить журнал.';
+      }
     } finally {
       if (requestId === logRequestId) logsLoading = false;
     }
@@ -398,11 +400,14 @@
   }
 
   function logout() {
-    disconnectPanelChannel();
     token = '';
     currentLogin = '';
     profileOpen = false;
+    projectsLoading = false;
+    projectsError = '';
+    logRequestId += 1;
     localStorage.removeItem(TOKEN_KEY);
+    disconnectPanelChannel(false);
     window.location.hash = '#/login';
   }
 
@@ -453,8 +458,8 @@
     };
   }
 
-  function disconnectPanelChannel() {
-    panelChannelEnabled = false;
+  function disconnectPanelChannel(disable = true) {
+    if (disable) panelChannelEnabled = false;
     clearTimeout(panelReconnectTimer);
     panelSocket?.close();
     panelSocket = null;
