@@ -227,7 +227,7 @@ final class QueueRepository
     }
 
     /** @param array<string, mixed> $item */
-    public function trace(string $file, string $queue, array &$item, string $message): void
+    public function trace(string $file, string $queue, array &$item, string $message, ?string $taskCode = null, ?string $project = null, ?int $result = null): void
     {
         $timestamp = sprintf('%.6f', microtime(true));
         while (isset($item['trace'][$timestamp])) {
@@ -236,9 +236,53 @@ final class QueueRepository
         $item['trace'] ??= [];
         $item['trace'][$timestamp] = $message;
         $this->write($file, $item);
-        $line = sprintf("[%s] %s %s\n", $timestamp, basename($file), $message);
-        if (file_put_contents(join_path($this->configDirectory(), 'logs', 'queue', $queue . '.log'), $line, FILE_APPEND | LOCK_EX) === false) {
+        $name = basename($file);
+        $parts = explode('.', substr($name, 0, -5), 3);
+        [$seconds, $fraction] = array_pad(explode('.', $timestamp, 2), 2, '0');
+        $record = [
+            'type' => 'queue',
+            'timestamp' => sprintf('%s.%sZ', gmdate('Y-m-d\TH:i:s', (int) $seconds), str_pad(substr($fraction, 0, 6), 6, '0')),
+            'queueItem' => $name,
+            'itemCode' => $parts[2] ?? pathinfo($name, PATHINFO_FILENAME),
+            'project' => $project,
+            'queueCode' => $queue,
+            'taskCode' => $taskCode,
+            'result' => $result,
+            'message' => $message,
+        ];
+        $line = json_encode($record, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
+        if (file_put_contents(join_path($this->configDirectory(), 'logs', 'queue', $queue . '.jsonl'), $line, FILE_APPEND | LOCK_EX) === false) {
             throw new \RuntimeException('Не удалось записать общий лог очереди.');
         }
+    }
+
+    /** @return array{items: list<array<string, mixed>>, total: int, projects: list<string>} */
+    public function logs(int $page, int $pageSize, string $sort, string $direction, ?string $project): array
+    {
+        $items = [];
+        $projects = [];
+        foreach (glob(join_path($this->configDirectory(), 'logs', 'queue', '*.jsonl')) ?: [] as $file) {
+            $handle = fopen($file, 'r');
+            if ($handle === false) continue;
+            while (($line = fgets($handle)) !== false) {
+                try {
+                    $record = json_decode($line, true, 16, JSON_THROW_ON_ERROR);
+                    if (!is_array($record)) continue;
+                    if (is_string($record['project'] ?? null) && $record['project'] !== '') $projects[] = $record['project'];
+                    if ($project === null || ($record['project'] ?? null) === $project) $items[] = $record;
+                } catch (\JsonException) {
+                    // A partially written line must not make the complete log unavailable.
+                }
+            }
+            fclose($handle);
+        }
+        $projects = array_values(array_unique($projects));
+        sort($projects, SORT_NATURAL | SORT_FLAG_CASE);
+        usort($items, static function (array $left, array $right) use ($sort, $direction): int {
+            $result = ($left[$sort] ?? null) <=> ($right[$sort] ?? null);
+            return $direction === 'asc' ? $result : -$result;
+        });
+        $total = count($items);
+        return ['items' => array_slice($items, ($page - 1) * $pageSize, $pageSize), 'total' => $total, 'projects' => $projects];
     }
 }

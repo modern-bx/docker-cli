@@ -66,7 +66,7 @@ final class QueueStepCommand extends Command
                 return Command::INVALID;
             }
             foreach ($item['queue-item']['tasks'] as $task) {
-                $repository->trace($active, $queue, $item, sprintf('Запуск задачи %s.', $task['code']));
+                $repository->trace($active, $queue, $item, sprintf('Запуск задачи %s.', $task['code']), $task['code'], $task['project'] ?? null);
                 $arguments = ['task-code' => $task['code']];
                 if (isset($task['project'])) {
                     $arguments['--project'] = $task['project'];
@@ -79,7 +79,7 @@ final class QueueStepCommand extends Command
                 $runner = new TaskRunCommand($tasks);
                 $runner->setApplication($this->getApplication());
                 $exitCode = $runner->run(new ArrayInput($arguments), $output);
-                $repository->trace($active, $queue, $item, sprintf('Задача %s завершилась с кодом %d.', $task['code'], $exitCode));
+                $repository->trace($active, $queue, $item, sprintf('Задача %s завершилась с кодом %d.', $task['code'], $exitCode), $task['code'], $task['project'] ?? null, $exitCode);
                 if ($exitCode !== Command::SUCCESS) {
                     $repository->trace($active, $queue, $item, 'Элемент перемещен в 40-failure; последующие задачи пропущены.');
                     $repository->move($active, $queue, '40-failure');

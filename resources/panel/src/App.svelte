@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { Combobox, Dialog, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
-  import { getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
+  import { getLogs, getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -26,6 +26,8 @@
     { value: 'noto', label: 'Noto Sans' },
   ];
   const fontCollection = useListCollection({ items: fonts });
+  const logTypeCollection = useListCollection({ items: [{ value: 'queue', label: 'Очередь' }] });
+  const pageSizeCollection = useListCollection({ items: [25, 50, 100].map((value) => ({ value: String(value), label: String(value) })) });
   let login = '';
   let password = '';
   let currentLogin = '';
@@ -44,6 +46,17 @@
   let projects = [];
   let selectedProjectName = '';
   let projectDetailTab = 'info';
+  let activeSection = 'projects';
+  let logItems = [];
+  let logProjects = [];
+  let logProject = '';
+  let logPage = 1;
+  let logPageSize = 25;
+  let logTotal = 0;
+  let logSort = 'timestamp';
+  let logDirection = 'desc';
+  let logsLoading = false;
+  let logProjectCollection = useListCollection({ items: [{ value: '', label: 'Все проекты' }] });
   let projectsLoading = false;
   let projectsError = '';
   let projectQuery = '';
@@ -118,6 +131,13 @@
   function applyHashNavigation() {
     if (!token) return;
     const segments = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+    if (segments[0] === 'logs') {
+      activeSection = 'logs';
+      selectedProjectName = '';
+      loadLogs();
+      return;
+    }
+    activeSection = 'projects';
     if (segments[0] !== 'projects') {
       navigateToProject('', 'info');
       return;
@@ -139,6 +159,55 @@
     selectedProjectName = projectName;
     projectDetailTab = tab;
     if (segments.length !== 3 || !['info', 'notes'].includes(segments[2])) navigateToProject(projectName, tab);
+  }
+
+  async function loadLogs() {
+    if (!token || logsLoading) return;
+    logsLoading = true;
+    projectsError = '';
+    try {
+      const data = await getLogs(api, {
+        page: String(logPage), pageSize: String(logPageSize), sort: logSort, direction: logDirection,
+        ...(logProject ? { project: logProject } : {}),
+      });
+      logItems = Array.isArray(data.items) ? data.items : [];
+      logTotal = Number(data.total) || 0;
+      logProjects = Array.isArray(data.projects) ? data.projects : [];
+      logProjectCollection = useListCollection({ items: [{ value: '', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] });
+    } catch (cause) {
+      projectsError = cause instanceof Error ? cause.message : 'Не удалось загрузить журнал.';
+    } finally {
+      logsLoading = false;
+    }
+  }
+
+  function changeLogProject(value) {
+    logProject = value;
+    logPage = 1;
+    loadLogs();
+  }
+
+  function changeLogPageSize(value) {
+    logPageSize = Number(value);
+    logPage = 1;
+    loadLogs();
+  }
+
+  function sortLogs(field) {
+    logDirection = logSort === field && logDirection === 'asc' ? 'desc' : 'asc';
+    logSort = field;
+    logPage = 1;
+    loadLogs();
+  }
+
+  function changeLogPage(page) {
+    if (page < 1 || page > Math.max(1, Math.ceil(logTotal / logPageSize))) return;
+    logPage = page;
+    loadLogs();
+  }
+
+  function formatLogValue(value) {
+    return value === null || value === undefined || value === '' ? '—' : String(value);
   }
 
   function addProjectTagFromInput() {
@@ -713,8 +782,10 @@
     {:else}
       <section class="projects-view" aria-label="Рабочая область">
         <nav class="tabs" aria-label="Разделы панели">
-          <button class="tab active" type="button" aria-current="page">Проекты</button>
+          <a class:active={activeSection === 'projects'} class="tab" href="#/projects" aria-current={activeSection === 'projects' ? 'page' : undefined}>Проекты</a>
+          <a class:active={activeSection === 'logs'} class="tab" href="#/logs" aria-current={activeSection === 'logs' ? 'page' : undefined}>Журнал</a>
         </nav>
+        {#if activeSection === 'projects'}
         <div class="projects-layout">
           <aside class="project-sidebar" aria-label="Список проектов">
             <div class="project-sidebar-title">
@@ -823,6 +894,46 @@
             {/if}
           </div>
         </div>
+        {:else}
+          <section class="log-view" aria-label="Журнал">
+            <div class="log-toolbar card preset-filled-surface-100-900">
+              <label>
+                <span>Тип записи</span>
+                <Combobox collection={logTypeCollection} value={['queue']} readOnly openOnClick>
+                  <Combobox.Control class="font-combobox-control"><Combobox.Input readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                  <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl"><Combobox.Item item={{ value: 'queue', label: 'Очередь' }} class="font-combobox-item"><Combobox.ItemText>Очередь</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item></Combobox.Content></Combobox.Positioner>
+                </Combobox>
+              </label>
+              <label>
+                <span>Проект</span>
+                <Combobox collection={logProjectCollection} value={[logProject]} readOnly openOnClick onValueChange={(details) => changeLogProject(details.value[0] || '')}>
+                  <Combobox.Control class="font-combobox-control"><Combobox.Input readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                  <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
+                </Combobox>
+              </label>
+            </div>
+            <div class="log-table-wrap card preset-filled-surface-100-900">
+              <table class="table log-table">
+                <thead><tr>
+                  {#each [['timestamp', 'Время'], ['queueItem', 'Queue-item'], ['itemCode', 'Код элемента'], ['project', 'Проект'], ['queueCode', 'Очередь'], ['taskCode', 'Задача'], ['result', 'Результат'], ['message', 'Сообщение']] as [field, label]}
+                    <th><button type="button" onclick={() => sortLogs(field)}>{label}<span aria-hidden="true">{logSort === field ? (logDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>
+                  {/each}
+                </tr></thead>
+                <tbody>
+                  {#if logsLoading}<tr><td colspan="8" class="log-empty animate-pulse">Загрузка…</td></tr>
+                  {:else if logItems.length === 0}<tr><td colspan="8" class="log-empty">Записей нет</td></tr>
+                  {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td>{formatLogValue(item.queueItem)}</td><td>{formatLogValue(item.itemCode)}</td><td>{formatLogValue(item.project)}</td><td>{formatLogValue(item.queueCode)}</td><td>{formatLogValue(item.taskCode)}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
+                </tbody>
+              </table>
+            </div>
+            <footer class="log-pagination">
+              <span>{logTotal ? `${(logPage - 1) * logPageSize + 1}–${Math.min(logPage * logPageSize, logTotal)} из ${logTotal}` : '0 записей'}</span>
+              <button class="btn btn-sm preset-tonal" type="button" disabled={logPage === 1 || logsLoading} onclick={() => changeLogPage(logPage - 1)}>Назад</button>
+              <button class="btn btn-sm preset-tonal" type="button" disabled={logPage >= Math.ceil(logTotal / logPageSize) || logsLoading} onclick={() => changeLogPage(logPage + 1)}>Вперёд</button>
+              <label><span>На странице</span><Combobox collection={pageSizeCollection} value={[String(logPageSize)]} readOnly openOnClick onValueChange={(details) => details.value[0] && changeLogPageSize(details.value[0])}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+            </footer>
+          </section>
+        {/if}
         {#if projectsError}<p class="projects-error" role="status">{projectsError}</p>{/if}
       </section>
     {/if}

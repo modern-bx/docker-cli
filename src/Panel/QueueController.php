@@ -6,9 +6,11 @@ namespace DockerCli\Panel;
 
 use DockerCli\Panel\Dto\QueueItemDto;
 use DockerCli\Panel\Dto\QueueStateDto;
+use DockerCli\Panel\Dto\LogListDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\QueueItemRequestDto;
 use DockerCli\Panel\Dto\Request\QueueActionRequestDto;
+use DockerCli\Panel\Dto\Request\LogRequestDto;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Queue\QueueRepository;
 
@@ -54,5 +56,12 @@ final readonly class QueueController
             throw new QueueActionException($exception->getMessage());
         }
         return $this->state(new EmptyRequestDto());
+    }
+
+    #[Route('GET', '/api/logs', LogRequestDto::class, LogListDto::class)]
+    public function logs(LogRequestDto $request): LogListDto
+    {
+        $data = $this->queues->logs($request->page, $request->pageSize, $request->sort, $request->direction, $request->project);
+        return new LogListDto($data['items'], $data['total'], $data['projects']);
     }
 }

@@ -63,3 +63,7 @@ export async function runSystemAction(request, action, service = '') {
   const target = service ? `/api/system/services/${encodeURIComponent(service)}/${action}` : `/api/system/${action}`;
   return /** @type {Promise<SystemStatusDto>} */ (request(target, { method: 'POST' }));
 }
+
+export async function getLogs(request, parameters) {
+  return request(`/api/logs?${new URLSearchParams(parameters)}`);
+}
