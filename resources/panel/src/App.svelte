@@ -151,9 +151,9 @@
     if (logType !== 'queue') parameters.set('type', logType);
     if (!projectJournal && logProject !== 'all') parameters.set('project', logProject);
     if (logStatus !== 'all') parameters.set('status', logStatus);
-    if (logQueueItem) parameters.set('queueItem', logQueueItem);
-    if (logItemCode) parameters.set('itemCode', logItemCode);
-    if (logTaskCode) parameters.set('taskCode', logTaskCode);
+    if (logQueueItem) parameters.set('queue_item', logQueueItem);
+    if (logItemCode) parameters.set('item_code', logItemCode);
+    if (logTaskCode) parameters.set('task_code', logTaskCode);
     const query = parameters.toString().replaceAll('%2C', ',');
     return query ? `${path}?${query}` : path;
   }
@@ -173,9 +173,9 @@
     const type = scalar('type');
     const project = scalar('project');
     const status = scalar('status');
-    const queueItem = scalar('queueItem');
-    const itemCode = scalar('itemCode');
-    const taskCode = scalar('taskCode');
+    const queueItem = scalar('queue_item');
+    const itemCode = scalar('item_code');
+    const taskCode = scalar('task_code');
 
     logType = logTypes.some((item) => item.value === type) ? type : 'queue';
     logProject = !projectJournal && project && (!projects.length || projects.some((item) => item.name === project)) ? project : 'all';
@@ -191,11 +191,6 @@
     if (!token) return;
     const [hashPath] = window.location.hash.split('?', 1);
     const segments = hashPath.replace(/^#\/?/, '').split('/').filter(Boolean);
-    if (segments[0] === 'logs') {
-      const query = window.location.hash.split('?', 2)[1];
-      window.location.hash = `#/journal${query ? `?${query}` : ''}`;
-      return;
-    }
     if (segments[0] === 'journal') {
       activeSection = 'logs';
       selectedProjectName = '';
