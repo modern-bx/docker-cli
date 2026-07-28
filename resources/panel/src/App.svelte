@@ -145,16 +145,56 @@
     }
   }
 
+  function journalFilterHash(projectJournal = false) {
+    const path = projectJournal ? projectHash(selectedProjectName, 'journal') : '#/journal';
+    const parameters = new URLSearchParams();
+    if (logType !== 'queue') parameters.set('type', logType);
+    if (!projectJournal && logProject !== 'all') parameters.set('project', logProject);
+    if (logStatus !== 'all') parameters.set('status', logStatus);
+    if (logQueueItem) parameters.set('queue_item', logQueueItem);
+    if (logItemCode) parameters.set('item_code', logItemCode);
+    if (logTaskCode) parameters.set('task_code', logTaskCode);
+    const query = parameters.toString().replaceAll('%2C', ',');
+    return query ? `${path}?${query}` : path;
+  }
+
+  function syncJournalFilters(projectJournal = activeSection === 'projects' && projectDetailTab === 'journal') {
+    const hash = journalFilterHash(projectJournal);
+    if (window.location.hash !== hash) history.replaceState(history.state, '', hash);
+  }
+
+  function applyJournalFilters(projectJournal) {
+    clearTimeout(logFilterTimer);
+    const query = window.location.hash.split('?', 2)[1] || '';
+    const parameters = new URLSearchParams(query);
+    const values = (name) => parameters.getAll(name);
+    const scalar = (name) => values(name).length === 1 ? values(name)[0] : '';
+    const validText = (value) => value.length <= 500 && !/[\u0000-\u001f\u007f]/.test(value);
+    const type = scalar('type');
+    const project = scalar('project');
+    const status = scalar('status');
+    const queueItem = scalar('queue_item');
+    const itemCode = scalar('item_code');
+    const taskCode = scalar('task_code');
+
+    logType = logTypes.some((item) => item.value === type) ? type : 'queue';
+    logProject = !projectJournal && project && (!projects.length || projects.some((item) => item.name === project)) ? project : 'all';
+    logStatus = logStatuses.some((item) => item.value === status) ? status : 'all';
+    logQueueItem = queueItem && validText(queueItem) ? queueItem : '';
+    logItemCode = itemCode && validText(itemCode) ? itemCode : '';
+    logTaskCode = taskCode && validText(taskCode) ? taskCode : '';
+    logPage = 1;
+    syncJournalFilters(projectJournal);
+  }
+
   function applyHashNavigation() {
     if (!token) return;
-    const segments = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
-    if (segments[0] === 'logs') {
-      window.location.hash = '#/journal';
-      return;
-    }
+    const [hashPath] = window.location.hash.split('?', 1);
+    const segments = hashPath.replace(/^#\/?/, '').split('/').filter(Boolean);
     if (segments[0] === 'journal') {
       activeSection = 'logs';
       selectedProjectName = '';
+      applyJournalFilters(false);
       loadLogs();
       return;
     }
@@ -179,7 +219,10 @@
     const tab = ['notes', 'journal'].includes(segments[2]) ? segments[2] : 'info';
     selectedProjectName = projectName;
     projectDetailTab = tab;
-    if (tab === 'journal') loadLogs();
+    if (tab === 'journal') {
+      applyJournalFilters(true);
+      loadLogs();
+    }
     if (segments.length !== 3 || !['info', 'notes', 'journal'].includes(segments[2])) navigateToProject(projectName, tab);
   }
 
@@ -203,6 +246,12 @@
       logTotal = Number(data.total) || 0;
       logProjects = Array.isArray(data.projects) ? data.projects : [];
       logProjectCollection = useListCollection({ items: [{ value: 'all', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] });
+      if (!projectJournal && logProject !== 'all' && !logProjects.includes(logProject)) {
+        logProject = 'all';
+        syncJournalFilters(false);
+        void loadLogs();
+        return;
+      }
     } catch (cause) {
       if (requestId === logRequestId) {
         projectsError = cause instanceof Error ? cause.message : 'Не удалось загрузить журнал.';
@@ -215,12 +264,14 @@
   function changeLogProject(value) {
     logProject = value || 'all';
     logPage = 1;
+    syncJournalFilters();
     loadLogs();
   }
 
   function changeLogStatus(value) {
     logStatus = value || 'all';
     logPage = 1;
+    syncJournalFilters();
     loadLogs();
   }
 
@@ -233,6 +284,7 @@
     else if (field === 'itemCode') logItemCode = value;
     else logTaskCode = value;
     logPage = 1;
+    syncJournalFilters();
     clearTimeout(logFilterTimer);
     logFilterTimer = setTimeout(loadLogs, 250);
   }
@@ -241,7 +293,7 @@
     logQueueItem = item.file;
     logPage = 1;
     queueOpen = false;
-    window.location.hash = '#/journal';
+    window.location.hash = journalFilterHash(false);
     if (activeSection === 'logs') loadLogs();
   }
 
@@ -982,7 +1034,8 @@
                   </div>
                   <footer class="log-pagination">
                     <span>{logTotal ? `${(logPage - 1) * logPageSize + 1}–${Math.min(logPage * logPageSize, logTotal)} из ${logTotal}` : '0 записей'}</span>
-                    <div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={logPage === 1 || logsLoading} onclick={() => changeLogPage(logPage - 1)}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={logPage >= Math.ceil(logTotal / logPageSize) || logsLoading} onclick={() => changeLogPage(logPage + 1)}>Вперёд</button><div aria-label="Количество записей на странице"><Combobox collection={pageSizeCollection} value={[String(logPageSize)]} openOnClick onValueChange={(details) => details.value[0] && changeLogPageSize(details.value[0])}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество записей на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div></div>
+                    <div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={logPage === 1 || logsLoading} onclick={() => changeLogPage(logPage - 1)}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={logPage >= Math.ceil(logTotal / logPageSize) || logsLoading} onclick={() => changeLogPage(logPage + 1)}>Вперёд</button></div>
+                    <div class="log-page-size" aria-label="Количество записей на странице"><Combobox collection={pageSizeCollection} value={[String(logPageSize)]} openOnClick onValueChange={(details) => details.value[0] && changeLogPageSize(details.value[0])}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество записей на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
                   </footer>
                 </section>
                 {/if}
@@ -1039,8 +1092,8 @@
               <div class="log-pagination-controls">
                 <button class="btn btn-sm preset-tonal" type="button" disabled={logPage === 1 || logsLoading} onclick={() => changeLogPage(logPage - 1)}>Назад</button>
                 <button class="btn btn-sm preset-tonal" type="button" disabled={logPage >= Math.ceil(logTotal / logPageSize) || logsLoading} onclick={() => changeLogPage(logPage + 1)}>Вперёд</button>
-                <div aria-label="Количество записей на странице"><Combobox collection={pageSizeCollection} value={[String(logPageSize)]} openOnClick onValueChange={(details) => details.value[0] && changeLogPageSize(details.value[0])}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество записей на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
               </div>
+              <div class="log-page-size" aria-label="Количество записей на странице"><Combobox collection={pageSizeCollection} value={[String(logPageSize)]} openOnClick onValueChange={(details) => details.value[0] && changeLogPageSize(details.value[0])}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество записей на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
             </footer>
           </section>
         {/if}

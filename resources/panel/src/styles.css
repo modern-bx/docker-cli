@@ -123,9 +123,10 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .log-pagination { position: relative; z-index: 5; display: grid; flex: none; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 1rem; }
 .log-pagination > span { color: var(--color-surface-500); font-size: 0.8rem; }
 .log-pagination-controls { display: flex; grid-column: 2; align-items: center; gap: 0.5rem; }
-.page-size-control { width: 2.4rem; }
-.page-size-control .font-combobox-input { padding: 0.45rem 0.15rem 0.45rem 0.35rem; }
-.page-size-control .font-combobox-trigger { width: 1rem; }
+.log-page-size { grid-column: 3; justify-self: end; }
+.page-size-control.font-combobox-control { width: 6rem; }
+.page-size-control .font-combobox-input { padding: 0.45rem 0.15rem 0.45rem 0.65rem; }
+.page-size-control .font-combobox-trigger { width: 100%; padding-right: 0.1rem; }
 .log-view .font-combobox-positioner, .project-log-view .font-combobox-positioner { z-index: 50; }
 .project-sidebar { display: flex; min-height: 0; overflow: hidden; flex-direction: column; border-right: 1px solid var(--color-surface-200); background: var(--color-surface-50); }
 .dark .project-sidebar { border-color: var(--color-surface-800); background: var(--color-surface-950); }
@@ -231,12 +232,14 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .dark .mode-switch button.active { background: var(--color-surface-950); }
 .font-switch { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 1rem; }
 .font-switch span { font-size: 0.85rem; font-weight: 600; }
-.font-combobox-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; width: 100%; border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); background: var(--color-surface-50); color: var(--color-surface-950); }
+.font-combobox-control { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; width: 100%; border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); background: var(--color-surface-50); color: var(--color-surface-950); }
 .dark .font-combobox-control { border-color: var(--color-surface-700); background: var(--color-surface-950); color: var(--color-surface-50); }
 .font-combobox-control, .font-combobox-input, .font-combobox-trigger { cursor: default; }
 .font-combobox-input { min-width: 0; caret-color: transparent; padding: 0.55rem 0.7rem; outline: none; background: transparent; }
-.font-combobox-trigger { display: grid; width: 2.25rem; place-items: center; }
+.font-combobox-input[readonly] { pointer-events: none; user-select: none; }
+.font-combobox-trigger { position: absolute; inset: 0; display: flex; width: 100%; align-items: center; justify-content: flex-end; padding-right: 0.6rem; }
 .font-combobox-trigger svg { width: 1rem; }
+.font-combobox-control > button:not(.font-combobox-trigger) { position: relative; z-index: 1; }
 .font-combobox-positioner { z-index: 30; }
 .font-combobox-content { width: var(--reference-width); margin-top: 0.25rem; padding: 0.25rem; }
 .font-combobox-item { display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.65rem; border-radius: var(--radius-base); cursor: pointer; }
