@@ -11,12 +11,12 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\Question;
 
-final class PanelUserAddCommand extends Command
+final class PanelUserCreateCommand extends Command
 {
     public function __construct()
     {
-        parent::__construct('panel:user-add');
-        $this->setDescription('Добавить пользователя административной панели.');
+        parent::__construct('panel:user-create');
+        $this->setDescription('Создать пользователя административной панели.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -47,7 +47,7 @@ final class PanelUserAddCommand extends Command
             $output->writeln(sprintf('<error>Пользователь %s уже существует.</error>', $login));
             return Command::FAILURE;
         }
-        $output->writeln(sprintf('<info>Пользователь %s добавлен.</info>', $login));
+        $output->writeln(sprintf('<info>Пользователь %s создан.</info>', $login));
         return Command::SUCCESS;
     }
 }

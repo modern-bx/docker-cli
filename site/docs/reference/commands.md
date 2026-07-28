@@ -115,6 +115,33 @@ bin/docker-cli project:wipe --project=my-project
 
 Команды без явного аргумента или опции проекта определяют его по текущей директории.
 
+### `bin/docker-cli data:database-create [--user=<user1,user2>] [--dbms=<dbms>] <database>`
+
+Создаёт базу в MySQL и PostgreSQL либо только в выбранной через `--dbms` СУБД.
+Перечисленные через запятую пользователи при необходимости создаются и получают
+полные права на новую базу.
+
+```bash
+bin/docker-cli data:database-create --user=developer,reporter application
+bin/docker-cli data:database-create --dbms=mysql cache
+```
+
+### `bin/docker-cli data:database-delete [--force] [--dbms=<dbms>] <database1,database2>`
+
+Удаляет перечисленные базы. Без `--dbms` команда работает с обеими СУБД, без
+`--force` запрашивает подтверждение. Для уже отсутствующих баз выводится предупреждение.
+
+### `bin/docker-cli data:dbuser-create [--dbms=<dbms>] [--database=<database1,database2>] <user>`
+
+Создаёт пользователя в одной или обеих СУБД. Если указаны базы, команда сначала
+проверяет наличие всех баз во всех выбранных СУБД и только затем создаёт пользователя
+и выдаёт права. Поэтому ошибка проверки не оставляет частично выданных прав.
+
+### `bin/docker-cli data:dbuser-delete [--force] [--dbms=<dbms>] <user1,user2>`
+
+Удаляет пользователей в одной или обеих СУБД. Требует подтверждения, если не передан
+`--force`, и предупреждает об отсутствующих пользователях.
+
 ### `bin/docker-cli data:init [project]`
 
 Создаёт базы и пользователей MySQL и PostgreSQL зарегистрированного проекта. `--rebuild` предварительно удаляет существующие базы и пользователей:
@@ -347,12 +374,12 @@ systemctl status docker-cli.panel
 sudo bin/docker-cli panel:down
 ```
 
-### `bin/docker-cli panel:user-add`
+### `bin/docker-cli panel:user-create`
 
 Интерактивно запрашивает логин в формате email и пароль, затем добавляет пользователя панели. Пароль сохраняется в виде солёного хеша в `~/.config/docker-cli/panel/users.yaml`.
 
 ```bash
-bin/docker-cli panel:user-add
+bin/docker-cli panel:user-create
 ```
 
 ### `bin/docker-cli panel:user-delete <логин>`
