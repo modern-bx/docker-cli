@@ -12,21 +12,26 @@ final class DatabaseManager
 {
     public const DBMS = ['mysql', 'postgres'];
 
-    public function __construct(private readonly ?SystemCompose $compose = null) {}
+    public function __construct(
+        private readonly ?SystemCompose $compose = null,
+        private readonly ?DatabasePasswordGenerator $passwordGenerator = null,
+    ) {}
 
     /** @param list<string> $dbms @param list<string> $users */
     public function createDatabases(array $dbms, string $database, array $users, OutputInterface $output): int
     {
+        $passwords = $this->generatePasswords($users);
         foreach ($dbms as $engine) {
             $sql = $engine === 'mysql'
-                ? $this->mysqlCreateDatabaseSql($database, $users)
-                : $this->postgresCreateDatabaseScript($database, $users);
+                ? $this->mysqlCreateDatabaseSql($database, $passwords)
+                : $this->postgresCreateDatabaseScript($database, $passwords);
             $code = $this->execute($engine, $sql, $output);
             if ($code !== Command::SUCCESS) {
                 return $code;
             }
             $output->writeln(sprintf('<info>База "%s" создана в %s.</info>', $database, $engine));
         }
+        $this->printCredentials($passwords, $output);
         return Command::SUCCESS;
     }
 
@@ -59,15 +64,17 @@ final class DatabaseManager
                 return $code;
             }
         }
+        $passwords = $this->generatePasswords([$user]);
         foreach ($dbms as $engine) {
             $code = $this->execute($engine, $engine === 'mysql'
-                ? $this->mysqlCreateUserSql($user, $databases)
-                : $this->postgresCreateUserScript($user, $databases), $output);
+                ? $this->mysqlCreateUserSql($user, $passwords[$user], $databases)
+                : $this->postgresCreateUserScript($user, $passwords[$user], $databases), $output);
             if ($code !== Command::SUCCESS) {
                 return $code;
             }
             $output->writeln(sprintf('<info>Пользователь "%s" создан в %s.</info>', $user, $engine));
         }
+        $this->printCredentials($passwords, $output);
         return Command::SUCCESS;
     }
 
@@ -92,7 +99,9 @@ final class DatabaseManager
         $command = array_merge($compose->dockerComposeCommand('exec'), ['-T', $dbms, 'sh', '-ec', $dbms === 'mysql'
             ? 'MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}" mysql -uroot --show-warnings -e "$1"'
             : 'export PGPASSWORD="${POSTGRES_PASSWORD:?}"; sh -ec "$1"', 'sh', $payload]);
-        $output->writeln('<comment>' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
+        $displayCommand = $command;
+        $displayCommand[array_key_last($displayCommand)] = '<SQL/script hidden: may contain credentials>';
+        $output->writeln('<comment>' . implode(' ', array_map('escapeshellarg', $displayCommand)) . '</comment>');
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
         if (!is_resource($process)) {
             throw new \RuntimeException('Unable to start docker compose process.');
@@ -100,12 +109,12 @@ final class DatabaseManager
         return proc_close($process);
     }
 
-    /** @param list<string> $users */
-    private function mysqlCreateDatabaseSql(string $database, array $users): string
+    /** @param array<string, string> $passwords */
+    private function mysqlCreateDatabaseSql(string $database, array $passwords): string
     {
         $sql = 'CREATE DATABASE IF NOT EXISTS ' . $this->mysqlIdentifier($database) . ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;';
-        foreach ($users as $user) {
-            $sql .= ' CREATE USER IF NOT EXISTS ' . $this->mysqlUser($user) . '; GRANT ALL PRIVILEGES ON ' . $this->mysqlIdentifier($database) . '.* TO ' . $this->mysqlUser($user) . ';';
+        foreach ($passwords as $user => $password) {
+            $sql .= ' CREATE USER IF NOT EXISTS ' . $this->mysqlUser($user) . ' IDENTIFIED BY ' . $this->mysqlLiteral($password) . '; ALTER USER ' . $this->mysqlUser($user) . ' IDENTIFIED BY ' . $this->mysqlLiteral($password) . '; GRANT ALL PRIVILEGES ON ' . $this->mysqlIdentifier($database) . '.* TO ' . $this->mysqlUser($user) . ';';
         }
         return $sql;
     }
@@ -128,9 +137,9 @@ final class DatabaseManager
     }
 
     /** @param list<string> $databases */
-    private function mysqlCreateUserSql(string $user, array $databases): string
+    private function mysqlCreateUserSql(string $user, string $password, array $databases): string
     {
-        $sql = 'CREATE USER IF NOT EXISTS ' . $this->mysqlUser($user) . ';';
+        $sql = 'CREATE USER IF NOT EXISTS ' . $this->mysqlUser($user) . ' IDENTIFIED BY ' . $this->mysqlLiteral($password) . '; ALTER USER ' . $this->mysqlUser($user) . ' IDENTIFIED BY ' . $this->mysqlLiteral($password) . ';';
         foreach ($databases as $database) {
             $sql .= ' GRANT ALL PRIVILEGES ON ' . $this->mysqlIdentifier($database) . '.* TO ' . $this->mysqlUser($user) . ';';
         }
@@ -148,14 +157,14 @@ final class DatabaseManager
         return $sql;
     }
 
-    /** @param list<string> $users */
-    private function postgresCreateDatabaseScript(string $database, array $users): string
+    /** @param array<string, string> $passwords */
+    private function postgresCreateDatabaseScript(string $database, array $passwords): string
     {
         $root = '"${POSTGRES_USER:-system}"';
-        $script = $this->postgresCreateUsersSql($users);
+        $script = $this->postgresCreateUsersSql($passwords);
         $script = "root={$root}; psql -v ON_ERROR_STOP=1 -U \"\$root\" -d postgres -c " . escapeshellarg($script) . '; ';
         $script .= 'if ! psql -U "$root" -d postgres -Atqc ' . escapeshellarg('SELECT 1 FROM pg_database WHERE datname=' . $this->postgresLiteral($database)) . ' | grep -qx 1; then createdb -U "$root" ' . escapeshellarg($database) . '; fi; ';
-        foreach ($users as $user) {
+        foreach (array_keys($passwords) as $user) {
             $script .= 'psql -v ON_ERROR_STOP=1 -U "$root" -d postgres -c ' . escapeshellarg('GRANT ALL PRIVILEGES ON DATABASE ' . $this->postgresIdentifier($database) . ' TO ' . $this->postgresIdentifier($user)) . '; ';
         }
         return $script;
@@ -184,9 +193,9 @@ final class DatabaseManager
     }
 
     /** @param list<string> $databases */
-    private function postgresCreateUserScript(string $user, array $databases): string
+    private function postgresCreateUserScript(string $user, string $password, array $databases): string
     {
-        $script = 'root="${POSTGRES_USER:-system}"; psql -v ON_ERROR_STOP=1 -U "$root" -d postgres -c ' . escapeshellarg($this->postgresCreateUsersSql([$user])) . '; ';
+        $script = 'root="${POSTGRES_USER:-system}"; psql -v ON_ERROR_STOP=1 -U "$root" -d postgres -c ' . escapeshellarg($this->postgresCreateUsersSql([$user => $password])) . '; ';
         foreach ($databases as $database) {
             $script .= 'psql -v ON_ERROR_STOP=1 -U "$root" -d postgres -c ' . escapeshellarg('GRANT ALL PRIVILEGES ON DATABASE ' . $this->postgresIdentifier($database) . ' TO ' . $this->postgresIdentifier($user)) . '; ';
         }
@@ -203,15 +212,35 @@ final class DatabaseManager
         return 'root="${POSTGRES_USER:-system}"; psql -v ON_ERROR_STOP=1 -U "$root" -d postgres -c ' . escapeshellarg($sql);
     }
 
-    /** @param list<string> $users */
-    private function postgresCreateUsersSql(array $users): string
+    /** @param array<string, string> $passwords */
+    private function postgresCreateUsersSql(array $passwords): string
     {
         $sql = '';
-        foreach ($users as $user) {
+        foreach ($passwords as $user => $password) {
             $literal = $this->postgresLiteral($user);
-            $sql .= "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname={$literal}) THEN EXECUTE 'CREATE ROLE ' || quote_ident({$literal}) || ' LOGIN'; END IF; END $$;";
+            $passwordLiteral = $this->postgresLiteral($password);
+            $sql .= "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname={$literal}) THEN EXECUTE 'CREATE ROLE ' || quote_ident({$literal}) || ' LOGIN PASSWORD ' || quote_literal({$passwordLiteral}); ELSE EXECUTE 'ALTER ROLE ' || quote_ident({$literal}) || ' PASSWORD ' || quote_literal({$passwordLiteral}); END IF; END $$;";
         }
         return $sql === '' ? 'SELECT 1;' : $sql;
+    }
+
+    /** @param list<string> $users @return array<string, string> */
+    private function generatePasswords(array $users): array
+    {
+        $generator = $this->passwordGenerator ?? new DatabasePasswordGenerator();
+        $passwords = [];
+        foreach ($users as $user) {
+            $passwords[$user] = $generator->generate();
+        }
+        return $passwords;
+    }
+
+    /** @param array<string, string> $passwords */
+    private function printCredentials(array $passwords, OutputInterface $output): void
+    {
+        foreach ($passwords as $user => $password) {
+            $output->writeln(sprintf('<info>Учетные данные пользователя "%s": пароль %s</info>', $user, $password));
+        }
     }
 
     private function mysqlIdentifier(string $value): string { return '`' . str_replace('`', '``', $value) . '`'; }
