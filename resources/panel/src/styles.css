@@ -65,10 +65,13 @@ button { cursor: pointer; }
 .queue-item:last-child { border-bottom: 0; }
 .queue-item time { white-space: nowrap; color: var(--color-surface-500); font-size: 0.8rem; }
 .queue-item-code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.queue-item-link { color: var(--color-primary-700); text-align: left; text-decoration: underline; text-underline-offset: 0.15rem; }
+.dark .queue-item-link { color: var(--color-primary-300); }
 .queue-dot { width: 0.65rem; height: 0.65rem; flex: 0 0 auto; border-radius: 999px; background: var(--color-success-500); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-success-500) 16%, transparent); }
 .queue-dot.status-40-failure { background: var(--color-error-500); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-error-500) 16%, transparent); }
 .queue-dot.status-50-error { background: #9333ea; box-shadow: 0 0 0 3px color-mix(in oklab, #9333ea 18%, transparent); }
 .queue-dot.status-20-active { animation: queue-active-pulse 1s ease-in-out infinite; }
+.queue-dot.status-30-success { background: #0ea5e9; box-shadow: 0 0 0 3px color-mix(in oklab, #0ea5e9 18%, transparent); }
 @keyframes queue-active-pulse { 50% { opacity: 0.25; transform: scale(0.75); } }
 .system-service { display: grid; grid-template-columns: auto minmax(7rem, 1fr) auto; align-items: center; gap: 0.75rem; padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--color-surface-200); }
 .dark .system-service { border-color: var(--color-surface-800); }
@@ -113,6 +116,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .log-table th button { width: 100%; padding: 0.75rem; text-align: left; font-weight: 700; white-space: nowrap; }
 .log-table td { max-width: 28rem; padding: 0.7rem 0.75rem; border-top: 1px solid var(--color-surface-200); overflow-wrap: anywhere; vertical-align: top; }
 .log-filter-link { color: var(--color-primary-700); text-align: left; text-decoration: underline; text-underline-offset: 0.15rem; }
+.log-status-link { display: inline-flex; align-items: center; gap: 0.55rem; }
 .dark .log-filter-link { color: var(--color-primary-300); }
 .dark .log-table td { border-color: var(--color-surface-800); }
 .log-empty { color: var(--color-surface-500); text-align: center; }

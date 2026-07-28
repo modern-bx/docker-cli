@@ -235,6 +235,14 @@
     logFilterTimer = setTimeout(loadLogs, 250);
   }
 
+  function openQueueItemJournal(item) {
+    logQueueItem = item.file;
+    logPage = 1;
+    queueOpen = false;
+    window.location.hash = '#/journal';
+    if (activeSection === 'logs') loadLogs();
+  }
+
   function changeLogPageSize(value) {
     logPageSize = Number(value);
     logPage = 1;
@@ -697,7 +705,7 @@
                 <div class="queue-item">
                   <span class={`queue-dot status-${item.status}`} aria-hidden="true"></span>
                   <time datetime={item.queuedAt}>{formatQueueDate(item.queuedAt)}</time>
-                  <span class="queue-item-code" title={item.code}>{item.code}</span>
+                  <button class="queue-item-code queue-item-link" type="button" title={`Открыть журнал элемента ${item.code}`} onclick={() => openQueueItemJournal(item)}>{item.code}</button>
                   {#if item.status !== '20-active'}
                     <button class="btn btn-sm preset-tonal" type="button" onclick={() => { queueOpen = false; queueConfirmation = item; }}><Trash2 size={14} aria-hidden="true" />Удалить</button>
                   {/if}
@@ -963,7 +971,7 @@
                       <tbody>
                         {#if logsLoading}<tr><td colspan="8" class="log-empty animate-pulse">Загрузка…</td></tr>
                         {:else if logItems.length === 0}<tr><td colspan="8" class="log-empty">Записей нет</td></tr>
-                        {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('queueItem', item.queueItem)}>{formatLogValue(item.queueItem)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('itemCode', item.itemCode)}>{formatLogValue(item.itemCode)}</button></td><td>{formatLogValue(item.queueCode)}</td><td>{#if item.status}<button class="log-filter-link" type="button" onclick={() => changeLogStatus(item.status)}>{logStatusLabel(item.status)}</button>{:else}—{/if}</td><td>{#if item.taskCode}<button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('taskCode', item.taskCode)}>{item.taskCode}</button>{:else}—{/if}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
+                        {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('queueItem', item.queueItem)}>{formatLogValue(item.queueItem)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('itemCode', item.itemCode)}>{formatLogValue(item.itemCode)}</button></td><td>{formatLogValue(item.queueCode)}</td><td>{#if item.status}<button class="log-filter-link log-status-link" type="button" onclick={() => changeLogStatus(item.status)}><span class={`queue-dot status-${item.status}`} aria-hidden="true"></span>{logStatusLabel(item.status)}</button>{:else}—{/if}</td><td>{#if item.taskCode}<button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('taskCode', item.taskCode)}>{item.taskCode}</button>{:else}—{/if}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
                       </tbody>
                     </table>
                   </div>
@@ -1017,7 +1025,7 @@
                 <tbody>
                   {#if logsLoading}<tr><td colspan="9" class="log-empty animate-pulse">Загрузка…</td></tr>
                   {:else if logItems.length === 0}<tr><td colspan="9" class="log-empty">Записей нет</td></tr>
-                  {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('queueItem', item.queueItem)}>{formatLogValue(item.queueItem)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('itemCode', item.itemCode)}>{formatLogValue(item.itemCode)}</button></td><td>{formatLogValue(item.project)}</td><td>{formatLogValue(item.queueCode)}</td><td>{#if item.status}<button class="log-filter-link" type="button" onclick={() => changeLogStatus(item.status)}>{logStatusLabel(item.status)}</button>{:else}—{/if}</td><td>{#if item.taskCode}<button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('taskCode', item.taskCode)}>{item.taskCode}</button>{:else}—{/if}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
+                  {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('queueItem', item.queueItem)}>{formatLogValue(item.queueItem)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('itemCode', item.itemCode)}>{formatLogValue(item.itemCode)}</button></td><td>{formatLogValue(item.project)}</td><td>{formatLogValue(item.queueCode)}</td><td>{#if item.status}<button class="log-filter-link log-status-link" type="button" onclick={() => changeLogStatus(item.status)}><span class={`queue-dot status-${item.status}`} aria-hidden="true"></span>{logStatusLabel(item.status)}</button>{:else}—{/if}</td><td>{#if item.taskCode}<button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('taskCode', item.taskCode)}>{item.taskCode}</button>{:else}—{/if}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
                 </tbody>
               </table>
             </div>
