@@ -100,7 +100,6 @@ final class TaskRunCommand extends Command
                 throw new \RuntimeException(sprintf('Некорректное имя параметра "%s".', (string) $name));
             }
             $this->validateParameter($name, $spec);
-            $this->validateTags($spec['tags'] ?? null, sprintf('параметра "%s"', $name));
         }
     }
 
