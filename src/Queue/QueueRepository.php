@@ -246,6 +246,7 @@ final class QueueRepository
             'itemCode' => $parts[2] ?? pathinfo($name, PATHINFO_FILENAME),
             'project' => $project,
             'queueCode' => $queue,
+            'status' => basename(dirname($file)),
             'taskCode' => $taskCode,
             'result' => $result,
             'message' => $message,
@@ -257,7 +258,7 @@ final class QueueRepository
     }
 
     /** @return array{items: list<array<string, mixed>>, total: int, projects: list<string>} */
-    public function logs(int $page, int $pageSize, string $sort, string $direction, ?string $project, ?string $queueItem = null, ?string $itemCode = null, ?string $taskCode = null): array
+    public function logs(int $page, int $pageSize, string $sort, string $direction, ?string $project, ?string $status = null, ?string $queueItem = null, ?string $itemCode = null, ?string $taskCode = null): array
     {
         $items = [];
         $projects = [];
@@ -270,6 +271,7 @@ final class QueueRepository
                     if (!is_array($record)) continue;
                     if (is_string($record['project'] ?? null) && $record['project'] !== '') $projects[] = $record['project'];
                     if ($project !== null && ($record['project'] ?? null) !== $project) continue;
+                    if ($status !== null && ($record['status'] ?? null) !== $status) continue;
                     if ($queueItem !== null && !str_contains(mb_strtolower((string) ($record['queueItem'] ?? '')), mb_strtolower($queueItem))) continue;
                     if ($itemCode !== null && !str_contains(mb_strtolower((string) ($record['itemCode'] ?? '')), mb_strtolower($itemCode))) continue;
                     if ($taskCode !== null && !str_contains(mb_strtolower((string) ($record['taskCode'] ?? '')), mb_strtolower($taskCode))) continue;
