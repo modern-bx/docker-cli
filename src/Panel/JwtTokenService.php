@@ -9,16 +9,21 @@ final class JwtTokenService
     public const LIFETIME = 600;
     public const COOKIE = '__Host-docker-cli-panel-session';
 
-    public function __construct(private readonly string $secret, private readonly TokenRepository $repository)
+    public function __construct(
+        private readonly string $secret,
+        private readonly TokenRepository $repository,
+        private readonly SecuritySettingsRepository $settings,
+    )
     {
         if ($secret === '') {
             throw new \InvalidArgumentException('JWT secret must not be empty.');
         }
     }
 
-    public function issue(string $login, ?int $now = null): string
+    public function issue(string $login, ?int $now = null, ?int $sessionStartedAt = null): string
     {
         $now ??= time();
+        $sessionStartedAt ??= $now;
         $header = $this->encode(['alg' => 'HS256', 'typ' => 'JWT']);
         $jti = bin2hex(random_bytes(12));
         $expiresAt = $now + self::LIFETIME;
@@ -27,6 +32,7 @@ final class JwtTokenService
             'iat' => $now,
             'exp' => $expiresAt,
             'jti' => $jti,
+            'session_started_at' => $sessionStartedAt,
         ]);
         $signature = $this->base64UrlEncode(hash_hmac('sha256', $header . '.' . $payload, $this->secret, true));
 
@@ -54,11 +60,22 @@ final class JwtTokenService
             || !is_string($claims['sub'] ?? null)
             || !is_int($claims['exp'] ?? null)
             || !is_string($claims['jti'] ?? null)
+            || !is_int($claims['session_started_at'] ?? null)
+            || $claims['session_started_at'] > $now
+            || $claims['session_started_at'] + ($this->settings->sessionHours() * 3600) <= $now
             || $claims['exp'] <= $now) {
             return null;
         }
 
         return $this->repository->contains($token, $claims['jti'], $claims['sub'], $claims['exp'], $now) ? $claims['sub'] : null;
+    }
+
+    public function sessionStartedAt(string $token, ?int $now = null): ?int
+    {
+        if ($this->login($token, $now) === null) return null;
+        $parts = explode('.', $token);
+        $claims = $this->decode($parts[1] ?? '');
+        return is_int($claims['session_started_at'] ?? null) ? $claims['session_started_at'] : null;
     }
 
     /** @param array<string, int|string> $value */

@@ -40,7 +40,7 @@ final readonly class AuthController
         if (!$this->users->contains($request->login)) {
             throw new UnauthorizedException('Сессия истекла.');
         }
-        return $this->authorized($request->login);
+        return $this->authorized($request->login, $request->sessionStartedAt);
     }
 
     #[Route('POST', '/api/auth/logout', EmptyRequestDto::class, LogoutResponseDto::class, authenticated: false)]
@@ -49,8 +49,8 @@ final readonly class AuthController
         return new LogoutResponseDto();
     }
 
-    private function authorized(string $login): AuthResponseDto
+    private function authorized(string $login, ?int $sessionStartedAt = null): AuthResponseDto
     {
-        return new AuthResponseDto($login, $this->tokens->issue($login), JwtTokenService::LIFETIME);
+        return new AuthResponseDto($login, $this->tokens->issue($login, sessionStartedAt: $sessionStartedAt), JwtTokenService::LIFETIME);
     }
 }

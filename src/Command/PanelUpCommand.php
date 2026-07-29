@@ -100,7 +100,8 @@ final class PanelUpCommand extends Command
         $assets = dirname(__DIR__, 2) . '/resources/panel/dist';
         $users = new UserRepository($salt);
         $tokenRepository = new \DockerCli\Panel\TokenRepository();
-        $tokens = new JwtTokenService($jwtSecret, $tokenRepository);
+        $securitySettings = new \DockerCli\Panel\SecuritySettingsRepository();
+        $tokens = new JwtTokenService($jwtSecret, $tokenRepository, $securitySettings);
         $queues = new QueueRepository();
         $projects = new ProjectController(new ProjectRegistry(), $compose, $queues);
         $system = new SystemController($compose);
@@ -109,7 +110,7 @@ final class PanelUpCommand extends Command
         $responses = new ResponseEmitter($assets);
         $state = new StateController($projects, $system, $queue, $notifications);
         $router = new Router(
-            [new AuthController($users, $tokens), $state, $projects, $system, $queue, $notifications, new AssetController()],
+            [new AuthController($users, $tokens), new \DockerCli\Panel\SecuritySettingsController($securitySettings), $state, $projects, $system, $queue, $notifications, new AssetController()],
             new ControllerInvoker(),
             new AuthMiddleware($tokens, $responses),
             $responses,
