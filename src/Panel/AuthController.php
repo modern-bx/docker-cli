@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace DockerCli\Panel;
 
 use DockerCli\Panel\Dto\AuthResponseDto;
+use DockerCli\Panel\Dto\LogoutResponseDto;
+use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\LoginRequestDto;
 use DockerCli\Panel\Dto\Request\SessionRequestDto;
 use DockerCli\Panel\Http\Attribute\Route;
@@ -35,7 +37,16 @@ final readonly class AuthController
     #[Route('GET', '/api/auth/session', SessionRequestDto::class, AuthResponseDto::class)]
     public function session(SessionRequestDto $request): AuthResponseDto
     {
+        if (!$this->users->contains($request->login)) {
+            throw new UnauthorizedException('Сессия истекла.');
+        }
         return $this->authorized($request->login);
+    }
+
+    #[Route('POST', '/api/auth/logout', EmptyRequestDto::class, LogoutResponseDto::class, authenticated: false)]
+    public function logout(EmptyRequestDto $request): LogoutResponseDto
+    {
+        return new LogoutResponseDto();
     }
 
     private function authorized(string $login): AuthResponseDto

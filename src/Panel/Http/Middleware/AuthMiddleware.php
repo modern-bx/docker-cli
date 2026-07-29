@@ -20,8 +20,8 @@ final readonly class AuthMiddleware implements Middleware
 
     public function process(ServerRequestInterface $request, callable $next): ResponseInterface
     {
-        $header = $request->getHeaderLine('Authorization');
-        $login = str_starts_with($header, 'Bearer ') ? $this->tokens->login(substr($header, 7)) : null;
+        $token = $request->getCookieParams()[JwtTokenService::COOKIE] ?? null;
+        $login = is_string($token) ? $this->tokens->login($token) : null;
         if ($login === null) {
             return $this->responses->json(401, new ErrorResponseDto('Сессия истекла.'));
         }

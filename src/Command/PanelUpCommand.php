@@ -99,7 +99,8 @@ final class PanelUpCommand extends Command
 
         $assets = dirname(__DIR__, 2) . '/resources/panel/dist';
         $users = new UserRepository($salt);
-        $tokens = new JwtTokenService($jwtSecret);
+        $tokenRepository = new \DockerCli\Panel\TokenRepository();
+        $tokens = new JwtTokenService($jwtSecret, $tokenRepository);
         $queues = new QueueRepository();
         $projects = new ProjectController(new ProjectRegistry(), $compose, $queues);
         $system = new SystemController($compose);
@@ -113,7 +114,7 @@ final class PanelUpCommand extends Command
             new AuthMiddleware($tokens, $responses),
             $responses,
         );
-        $channel = new PanelStateChannel($state, $tokens, $responses);
+        $channel = new PanelStateChannel($state, $tokens, $responses, 'https://panel.' . $compose->envValue('BASE_HOST', ''));
         $server = new HttpServer(static fn ($request) => $channel->handles($request) ? $channel->upgrade($request) : $router($request));
         $server->listen($socket);
         $output->writeln(sprintf('<info>Панель запущена на https://panel.%s</info>', $compose->envValue('BASE_HOST', '')));

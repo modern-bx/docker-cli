@@ -5,7 +5,6 @@
   import { micromark } from 'micromark';
   import { getLogs, getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity } from './api.js';
 
-  const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
   const FONT_KEY = 'docker-cli-panel-font';
@@ -43,7 +42,7 @@
   let login = '';
   let password = '';
   let currentLogin = '';
-  let token = '';
+  let authenticated = false;
   let error = '';
   let errorStatus = 0;
   let errorTitle = 'Ошибка';
@@ -204,7 +203,7 @@
   }
 
   function applyHashNavigation() {
-    if (!token) return;
+    if (!authenticated) return;
     const [hashPath] = window.location.hash.split('?', 1);
     const segments = hashPath.replace(/^#\/?/, '').split('/').filter(Boolean);
     if (segments[0] === 'journal') {
@@ -243,7 +242,7 @@
   }
 
   async function loadLogs() {
-    if (!token) return;
+    if (!authenticated) return;
     const requestId = ++logRequestId;
     logsLoading = true;
     projectsError = '';
@@ -461,7 +460,6 @@
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers || {}),
       },
     });
@@ -480,16 +478,16 @@
   }
 
   function acceptSession(data, resetNavigation = false) {
-    token = data.token;
+    authenticated = true;
     currentLogin = data.login;
-    localStorage.setItem(TOKEN_KEY, token);
     if (resetNavigation || window.location.hash === '#/login') navigateToProject('', 'info');
     else applyHashNavigation();
     connectPanelChannel();
   }
 
   function logout() {
-    token = '';
+    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    authenticated = false;
     currentLogin = '';
     profileOpen = false;
     projectsLoading = false;
@@ -498,13 +496,12 @@
     notificationsInitialized = false;
     knownNotificationFiles.clear();
     logRequestId += 1;
-    localStorage.removeItem(TOKEN_KEY);
     disconnectPanelChannel(false);
     window.location.hash = '#/login';
   }
 
   async function checkSession() {
-    if (!token || systemPending) return;
+    if (!authenticated || systemPending) return;
     try {
       acceptSession(await api('/api/auth/session'));
     } catch (cause) {
@@ -534,11 +531,11 @@
   }
 
   function connectPanelChannel() {
-    if (!panelChannelEnabled || !token || panelSocket?.readyState === WebSocket.OPEN || panelSocket?.readyState === WebSocket.CONNECTING) return;
+    if (!panelChannelEnabled || !authenticated || panelSocket?.readyState === WebSocket.OPEN || panelSocket?.readyState === WebSocket.CONNECTING) return;
     clearTimeout(panelReconnectTimer);
     if (projects.length === 0) projectsLoading = true;
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const query = new URLSearchParams({ channel: PANEL_CHANNEL, token });
+    const query = new URLSearchParams({ channel: PANEL_CHANNEL });
     const socket = new WebSocket(`${protocol}//${location.host}/ws?${query}`);
     panelSocket = socket;
     socket.onmessage = (event) => {
@@ -551,7 +548,7 @@
     };
     socket.onclose = () => {
       if (panelSocket === socket) panelSocket = null;
-      if (panelChannelEnabled && token) panelReconnectTimer = setTimeout(connectPanelChannel, 1_000);
+      if (panelChannelEnabled && authenticated) panelReconnectTimer = setTimeout(connectPanelChannel, 1_000);
     };
   }
 
@@ -816,8 +813,8 @@
       if (mode === 'system') applyAppearance();
     };
     media.addEventListener('change', updateSystemMode);
-    token = localStorage.getItem(TOKEN_KEY) || '';
-    if (!token) window.location.hash = '#/login';
+    authenticated = true;
+    if (!window.location.hash) window.location.hash = '#/login';
     else applyHashNavigation();
     window.addEventListener('hashchange', applyHashNavigation);
     panelChannelEnabled = true;
@@ -839,12 +836,12 @@
   onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; notificationsOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; } }}
 />
 
-<svelte:head><title>{token ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
+<svelte:head><title>{authenticated ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
 
-<div class:panel-shell={token && !loading} class="min-h-screen bg-surface-50-950 text-surface-950-50 flex flex-col">
+<div class:panel-shell={authenticated && !loading} class="min-h-screen bg-surface-50-950 text-surface-950-50 flex flex-col">
   <header class="app-header h-16 border-b border-surface-200-800 bg-surface-100-900 flex items-center px-5 md:px-8 shadow-sm">
-    {#if token}<a href="#/projects" class="font-bold text-xl no-underline">docker-cli</a>{/if}
-    {#if token}
+    {#if authenticated}<a href="#/projects" class="font-bold text-xl no-underline">docker-cli</a>{/if}
+    {#if authenticated}
       <div class="system-header header-menu">
         <div class="queue-main-control">
           <button class="btn preset-tonal system-trigger" type="button" aria-expanded={queueOpen} onclick={() => { queueOpen = !queueOpen; systemOpen = false; themeOpen = false; profileOpen = false; }}>
@@ -907,7 +904,7 @@
       </div>
     {/if}
     <div class="ml-auto flex items-center gap-3">
-      {#if token}
+      {#if authenticated}
         <div class="relative header-menu">
           <button class="btn-icon preset-tonal notification-trigger" type="button" aria-label="Уведомления" aria-haspopup="dialog" aria-expanded={notificationsOpen} onclick={() => { notificationsOpen = !notificationsOpen; themeOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; }}>
             <Bell size={19} aria-hidden="true" />
@@ -987,7 +984,7 @@
           </div>
         {/if}
       </div>
-      {#if token}
+      {#if authenticated}
         <div class="relative header-menu">
           <button class="btn preset-tonal" type="button" aria-expanded={profileOpen} onclick={() => { profileOpen = !profileOpen; themeOpen = false; notificationsOpen = false; }}>{currentLogin}</button>
           {#if profileOpen}
@@ -1000,10 +997,10 @@
     </div>
   </header>
 
-  <main class:workspace={token && !loading} class="flex-1 flex items-center justify-center p-5">
+  <main class:workspace={authenticated && !loading} class="flex-1 flex items-center justify-center p-5">
     {#if loading}
       <div class="animate-pulse text-surface-500">Проверка сессии…</div>
-    {:else if !token}
+    {:else if !authenticated}
       <section class="card preset-filled-surface-100-900 w-full max-w-md p-7 md:p-9 shadow-xl" aria-labelledby="login-title">
         <h1 id="login-title" class="h2 text-center mb-2">Вход в панель</h1>
         <p class="text-center text-surface-500 mb-8">Введите данные пользователя docker-cli</p>

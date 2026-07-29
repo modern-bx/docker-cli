@@ -66,6 +66,12 @@ final class UserRepository
         return is_string($hash) && password_verify(hash_hmac('sha256', $password, $this->salt), $hash);
     }
 
+    public function contains(string $login): bool
+    {
+        $login = self::normalizeLogin($login);
+        return isset($this->read()[$login]);
+    }
+
     public static function normalizeLogin(string $login): string
     {
         $login = strtolower(trim($login));

@@ -7,8 +7,9 @@ namespace DockerCli\Panel;
 final class JwtTokenService
 {
     public const LIFETIME = 600;
+    public const COOKIE = '__Host-docker-cli-panel-session';
 
-    public function __construct(private readonly string $secret)
+    public function __construct(private readonly string $secret, private readonly TokenRepository $repository)
     {
         if ($secret === '') {
             throw new \InvalidArgumentException('JWT secret must not be empty.');
@@ -19,15 +20,20 @@ final class JwtTokenService
     {
         $now ??= time();
         $header = $this->encode(['alg' => 'HS256', 'typ' => 'JWT']);
+        $jti = bin2hex(random_bytes(12));
+        $expiresAt = $now + self::LIFETIME;
         $payload = $this->encode([
             'sub' => $login,
             'iat' => $now,
-            'exp' => $now + self::LIFETIME,
-            'jti' => bin2hex(random_bytes(12)),
+            'exp' => $expiresAt,
+            'jti' => $jti,
         ]);
         $signature = $this->base64UrlEncode(hash_hmac('sha256', $header . '.' . $payload, $this->secret, true));
 
-        return $header . '.' . $payload . '.' . $signature;
+        $token = $header . '.' . $payload . '.' . $signature;
+        $this->repository->store($token, $jti, $login, $now, $expiresAt);
+
+        return $token;
     }
 
     public function login(string $token, ?int $now = null): ?string
@@ -47,11 +53,12 @@ final class JwtTokenService
         if (($decodedHeader['alg'] ?? null) !== 'HS256'
             || !is_string($claims['sub'] ?? null)
             || !is_int($claims['exp'] ?? null)
+            || !is_string($claims['jti'] ?? null)
             || $claims['exp'] <= $now) {
             return null;
         }
 
-        return $claims['sub'];
+        return $this->repository->contains($token, $claims['jti'], $claims['sub'], $claims['exp'], $now) ? $claims['sub'] : null;
     }
 
     /** @param array<string, int|string> $value */

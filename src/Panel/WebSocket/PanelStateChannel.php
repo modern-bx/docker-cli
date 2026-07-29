@@ -25,6 +25,7 @@ final readonly class PanelStateChannel
         private StateController $state,
         private JwtTokenService $tokens,
         private ResponseEmitter $responses,
+        private string $origin,
     ) {
     }
 
@@ -36,8 +37,11 @@ final readonly class PanelStateChannel
     public function upgrade(ServerRequestInterface $request): ResponseInterface
     {
         parse_str($request->getUri()->getQuery(), $query);
-        $token = is_string($query['token'] ?? null) ? $query['token'] : '';
-        if (($query['channel'] ?? null) !== self::NAME || $this->tokens->login($token) === null) {
+        $token = $request->getCookieParams()[JwtTokenService::COOKIE] ?? null;
+        if (($query['channel'] ?? null) !== self::NAME
+            || $request->getHeaderLine('Origin') !== $this->origin
+            || !is_string($token)
+            || $this->tokens->login($token) === null) {
             return $this->responses->json(401, new ErrorResponseDto('Сессия истекла.'));
         }
 
