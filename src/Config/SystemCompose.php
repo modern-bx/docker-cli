@@ -41,7 +41,7 @@ final class SystemCompose
     {
         $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
 
-        return join_path($home, '.config', 'docker-cli', 'playwright', 'data');
+        return join_path($home, '.config', 'docker-cli', 'actions', 'playwright', 'data');
     }
 
     public function coreTasksDirectory(): string
