@@ -29,9 +29,12 @@ final class TokenRepository
             throw new \RuntimeException('Unable to lock token directory.');
         }
         try {
-            $counter = 1;
+            $counter = 0;
             do {
-                $file = join_path($this->directory, sprintf('%d.%d.%s.yaml', $issuedAt * 1_000, $counter++, $login));
+                if ($counter > 999) {
+                    throw new \RuntimeException('Unable to select a unique token filename.');
+                }
+                $file = join_path($this->directory, sprintf('%d.%03d.%s.yaml', $issuedAt * 1_000, $counter++, $login));
             } while (file_exists($file));
             $data = [
                 'meta' => ['schema' => 'token.jwt', 'version' => 0.1],
