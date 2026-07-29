@@ -28,7 +28,12 @@ final class SecuritySettingsRepository
     {
         if (!is_file($this->file)) return self::DEFAULT_SESSION_HOURS;
         $data = Yaml::parseFile($this->file);
-        $hours = is_array($data) ? ($data['authorization']['maximum_session_hours'] ?? null) : null;
+        $settings = is_array($data)
+            && ($data['meta']['schema'] ?? null) === 'settings.security'
+            && ($data['meta']['version'] ?? null) === 0.1
+            && is_array($data['settings.security'] ?? null)
+            ? $data['settings.security'] : [];
+        $hours = $settings['authorization']['maximum_session_hours'] ?? null;
         return is_int($hours) && $hours >= 1 && $hours <= self::MAX_SESSION_HOURS
             ? $hours
             : self::DEFAULT_SESSION_HOURS;
@@ -43,7 +48,10 @@ final class SecuritySettingsRepository
         if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf('Unable to create settings directory "%s".', $directory));
         }
-        $contents = Yaml::dump(['authorization' => ['maximum_session_hours' => $hours]], 3, 2);
+        $contents = Yaml::dump([
+            'meta' => ['schema' => 'settings.security', 'version' => 0.1],
+            'settings.security' => ['authorization' => ['maximum_session_hours' => $hours]],
+        ], 4, 2);
         if (file_put_contents($this->file, $contents, LOCK_EX) === false) {
             throw new \RuntimeException(sprintf('Unable to write security settings "%s".', $this->file));
         }

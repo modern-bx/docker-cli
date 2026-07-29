@@ -33,13 +33,16 @@ final class TokenRepository
             do {
                 $file = join_path($this->directory, sprintf('%d.%d.%s.yaml', $issuedAt, $counter++, $login));
             } while (file_exists($file));
-            $data = ['token' => [
-                'id' => $jti,
-                'login' => $login,
-                'issued_at' => $issuedAt,
-                'expires_at' => $expiresAt,
-                'sha256' => hash('sha256', $token),
-            ]];
+            $data = [
+                'meta' => ['schema' => 'token.jwt', 'version' => 0.1],
+                'token.jwt' => [
+                    'id' => $jti,
+                    'login' => $login,
+                    'issued_at' => $issuedAt,
+                    'expires_at' => $expiresAt,
+                    'sha256' => hash('sha256', $token),
+                ],
+            ];
             if (file_put_contents($file, Yaml::dump($data, 3, 2), LOCK_EX) === false) {
                 throw new \RuntimeException(sprintf('Unable to write token file "%s".', $file));
             }
@@ -97,7 +100,11 @@ final class TokenRepository
             } catch (\Throwable) {
                 continue;
             }
-            $record = is_array($data) && is_array($data['token'] ?? null) ? $data['token'] : null;
+            $record = is_array($data)
+                && ($data['meta']['schema'] ?? null) === 'token.jwt'
+                && ($data['meta']['version'] ?? null) === 0.1
+                && is_array($data['token.jwt'] ?? null)
+                ? $data['token.jwt'] : null;
             if (is_array($record)) $records[] = [$file, $record];
         }
         return $records;

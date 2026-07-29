@@ -34,7 +34,10 @@ final class NotificationRepository
         $time ??= new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $timestamp = (int) floor(microtime(true) * 1_000_000);
         $code = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', $origin), '.-') ?: 'notification';
-        $data = ['time' => $time->format('Y-m-d\TH:i:s.uP'), 'origin' => $origin, 'class' => $class, 'level' => $level, 'message' => $message];
+        $data = [
+            'meta' => ['schema' => 'notification', 'version' => 0.1],
+            'notification' => ['time' => $time->format('Y-m-d\TH:i:s.uP'), 'origin' => $origin, 'class' => $class, 'level' => $level, 'message' => $message],
+        ];
         for ($counter = 0; $counter <= 999; ++$counter) {
             $file = join_path($this->directory('current'), sprintf('%d.%03d.%s.yaml', $timestamp, $counter, $code));
             $handle = @fopen($file, 'x');
@@ -62,10 +65,15 @@ final class NotificationRepository
         foreach (glob(join_path($this->directory('current'), '*.yaml')) ?: [] as $file) {
             if (!is_file($file)) continue;
             try {
-                $data = Yaml::parseFile($file);
+                $document = Yaml::parseFile($file);
             } catch (\Throwable) {
                 continue;
             }
+            $data = is_array($document)
+                && ($document['meta']['schema'] ?? null) === 'notification'
+                && ($document['meta']['version'] ?? null) === 0.1
+                && is_array($document['notification'] ?? null)
+                ? $document['notification'] : null;
             if (!is_array($data) || !is_string($data['time'] ?? null) || !is_string($data['message'] ?? null)
                 || !in_array($data['level'] ?? null, self::LEVELS, true)) continue;
             $result[] = [
