@@ -121,7 +121,7 @@ final class ProjectDownCommand extends Command
             throw new \RuntimeException('Unable to determine HOME directory.');
         }
 
-        return join_path($home, '.config', 'docker-cli', 'projects');
+        return join_path($home, '.config', 'docker-cli', 'state', 'projects');
     }
 
     private function readProjectName(string $file): ?string

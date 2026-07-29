@@ -71,7 +71,7 @@ final class ConfigInitCommand extends Command
     {
         $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
 
-        return $home . DIRECTORY_SEPARATOR . '.config' . DIRECTORY_SEPARATOR . 'docker-cli' . DIRECTORY_SEPARATOR . 'projects';
+        return $home . DIRECTORY_SEPARATOR . '.config' . DIRECTORY_SEPARATOR . 'docker-cli' . DIRECTORY_SEPARATOR . 'state' . DIRECTORY_SEPARATOR . 'projects';
     }
 
     private function ensureBitrixWizardPassword(SystemCompose $compose): bool

@@ -20,7 +20,7 @@ final class UserRepository
         }
         if ($file === null) {
             $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
-            $file = join_path($home, '.config', 'docker-cli', 'panel', 'users.yaml');
+            $file = join_path($home, '.config', 'docker-cli', 'state', 'panel', 'users.yaml');
         }
         $this->file = $file;
         $this->dummyPasswordHash = $this->hashPassword(bin2hex(random_bytes(16)));

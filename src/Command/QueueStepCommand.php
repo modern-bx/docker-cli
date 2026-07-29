@@ -52,7 +52,7 @@ final class QueueStepCommand extends Command
                 $parsed = Yaml::parseFile($active);
                 $item = is_array($parsed) ? $parsed : [];
                 $repository->trace($active, $queue, $item, 'Элемент перемещен из 10-pending в 20-active.');
-                $tasks = new TaskRepository(join_path($repository->configDirectory(), 'tasks'));
+                $tasks = new TaskRepository(join_path($repository->configDirectory(), 'actions', 'tasks'));
                 $errors = (new QueueItemValidator($tasks))->validate($parsed);
             } catch (ParseException $exception) {
                 $errors = ['Ошибка YAML: ' . $exception->getMessage()];

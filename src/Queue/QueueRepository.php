@@ -34,7 +34,7 @@ final class QueueRepository
             throw new \InvalidArgumentException(sprintf('Некорректный код очереди "%s".', $queue));
         }
 
-        return join_path($this->configDirectory(), 'queue', $queue);
+        return join_path($this->configDirectory(), 'state', 'queue', $queue);
     }
 
     public function initialize(string $queue): void
@@ -145,7 +145,7 @@ final class QueueRepository
             $directories = [$queue => $this->queueDirectory($queue)];
         } else {
             $directories = [];
-            foreach (glob(join_path($this->configDirectory(), 'queue', '*'), GLOB_ONLYDIR) ?: [] as $directory) {
+            foreach (glob(join_path($this->configDirectory(), 'state', 'queue', '*'), GLOB_ONLYDIR) ?: [] as $directory) {
                 $directories[basename($directory)] = $directory;
             }
             ksort($directories, SORT_STRING);

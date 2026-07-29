@@ -311,7 +311,7 @@ services:
       NODE_PATH: /docker-cli/playwright/runtime/node_modules
       PLAYWRIGHT_VERSION: ${PLAYWRIGHT_VERSION:-1.61.0}
     volumes:
-      - ../../playwright/scripts:/docker-cli/playwright/scripts:ro
+      - ../../actions/playwright/scripts:/docker-cli/playwright/scripts:ro
       - playwright-node-modules:/docker-cli/playwright/runtime
       - /home:/home
       - /:/host

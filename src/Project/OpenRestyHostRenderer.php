@@ -159,7 +159,7 @@ final class OpenRestyHostRenderer
     {
         $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
 
-        return join_path($home, '.config', 'docker-cli', 'projects');
+        return join_path($home, '.config', 'docker-cli', 'state', 'projects');
     }
 
     private function templateFile(string $framework): string

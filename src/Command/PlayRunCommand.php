@@ -21,7 +21,7 @@ final class PlayRunCommand extends Command
     {
         parent::__construct('play:run');
         $this->setDescription('Запустить Playwright-сценарий в контексте текущего проекта.');
-        $this->addArgument('script', InputArgument::REQUIRED, 'Путь к js-сценарию относительно ~/.config/docker-cli/playwright/scripts; расширение .js можно опустить.');
+        $this->addArgument('script', InputArgument::REQUIRED, 'Путь к js-сценарию относительно ~/.config/docker-cli/actions/playwright/scripts; расширение .js можно опустить.');
         $this->addOption('show', null, InputOption::VALUE_NONE, 'Показывать управляемый браузер в окне через локальный noVNC viewer.');
         $this->addOption('browser', null, InputOption::VALUE_REQUIRED, 'Браузер для выполнения сценария: chromium, firefox или webkit.');
     }

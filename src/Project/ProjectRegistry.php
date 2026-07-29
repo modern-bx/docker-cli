@@ -16,7 +16,7 @@ final class ProjectRegistry
             throw new \RuntimeException('Unable to determine HOME directory.');
         }
 
-        return join_path($home, '.config', 'docker-cli', 'projects');
+        return join_path($home, '.config', 'docker-cli', 'state', 'projects');
     }
 
     /** @return list<string> */

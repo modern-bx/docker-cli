@@ -72,8 +72,8 @@ final class ProjectWipeCommand extends Command
 
         $output->writeln(sprintf('<info>Файлы проекта "%s" удалены, директория .docker-cli сохранена.</info>', $projectName));
         $this->context->addNotification(
-            'core.project.wipe',
-            'task',
+            'project.wipe',
+            'command',
             'info',
             sprintf("Файлы проекта **%s** успешно удалены. Служебная директория `.docker-cli` сохранена.", $projectName),
         );

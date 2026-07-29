@@ -55,7 +55,12 @@ final class TaskRunCommand extends Command
 
         $environment = getenv();
         $environment = is_array($environment) ? $environment : [];
-        $contextFile = tempnam('/tmp', '.docker-cli-command-context-');
+        $contextDirectory = $this->contextDirectory();
+        if (!is_dir($contextDirectory) && !mkdir($contextDirectory, 0775, true) && !is_dir($contextDirectory)) {
+            $output->writeln('<error>Не удалось создать директорию контекста выполнения команды.</error>');
+            return Command::FAILURE;
+        }
+        $contextFile = tempnam($contextDirectory, 'context-');
         if ($contextFile === false) {
             $output->writeln('<error>Не удалось создать контекст выполнения команды.</error>');
             return Command::FAILURE;
@@ -76,7 +81,7 @@ final class TaskRunCommand extends Command
             $exitCode = proc_close($process);
             foreach (CommandContext::read($contextFile) as $notification) {
                 ($this->notifications ?? new NotificationRepository())->create(
-                    $notification['origin'], $notification['class'], $notification['level'], $notification['message'],
+                    $task['code'], 'task', $notification['level'], $notification['message'],
                 );
             }
 
@@ -89,6 +94,16 @@ final class TaskRunCommand extends Command
             }
             @unlink($contextFile);
         }
+    }
+
+    private function contextDirectory(): string
+    {
+        $home = getenv('HOME');
+        if (!is_string($home) || $home === '') {
+            throw new \RuntimeException('Не удалось определить домашнюю директорию (HOME).');
+        }
+
+        return join_path($home, '.config', 'docker-cli', 'cache', '.notifications', 'context');
     }
 
     /** @param array<string, mixed> $task */

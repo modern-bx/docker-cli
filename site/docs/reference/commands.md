@@ -292,7 +292,7 @@ bin/docker-cli queue:item-delete --queue=notifications 1720000000000001.000.noti
 
 ### `bin/docker-cli queue:list [--queue=<queue-code>] [--status=<status>] [--short]`
 
-Выводит таблицу элементов всех очередей с их статусами, задачами и журналами. `--queue` выбирает одну очередь, а `--status` принимает полный статус (`10-pending`), его номер (`10`) или символьный код (`pending`). С `--short` команда выводит только пути относительно `docker-cli/queue`.
+Выводит таблицу элементов всех очередей с их статусами, задачами и журналами. `--queue` выбирает одну очередь, а `--status` принимает полный статус (`10-pending`), его номер (`10`) или символьный код (`pending`). С `--short` команда выводит только пути относительно `docker-cli/state/queue`.
 
 ```bash
 bin/docker-cli queue:list
@@ -390,7 +390,7 @@ sudo bin/docker-cli panel:down
 
 ### `bin/docker-cli panel:user-create`
 
-Интерактивно запрашивает логин в формате email и пароль, затем добавляет пользователя панели. Пароль сохраняется в виде солёного хеша в `~/.config/docker-cli/panel/users.yaml`.
+Интерактивно запрашивает логин в формате email и пароль, затем добавляет пользователя панели. Пароль сохраняется в виде солёного хеша в `~/.config/docker-cli/state/panel/users.yaml`.
 
 ```bash
 bin/docker-cli panel:user-create
@@ -481,7 +481,7 @@ docker-cli image:publish --tag=1.0.0
 
 ### `docker-cli play:run <script>`
 
-Запускает JavaScript-сценарий из `~/.config/docker-cli/playwright/scripts`; расширение `.js` можно опустить. `--browser` выбирает `chromium`, `firefox` или `webkit`, а `--show` открывает управляемый браузер через локальный noVNC viewer:
+Запускает JavaScript-сценарий из `~/.config/docker-cli/actions/playwright/scripts`; расширение `.js` можно опустить. `--browser` выбирает `chromium`, `firefox` или `webkit`, а `--show` открывает управляемый браузер через локальный noVNC viewer:
 
 ```bash
 docker-cli play:run bitrix/setup

@@ -7,7 +7,7 @@ const path = require('path');
  * The helper always writes a timestamped line with a severity level to stdout
  * and mirrors the same plain-text line into a per-run log file. docker-cli
  * passes PLAYWRIGHT_LOG_DIR to point at
- * ~/.config/docker-cli/projects/<project>/logs/playwright on the host.
+ * ~/.config/docker-cli/state/projects/<project>/logs/playwright on the host.
  *
  * Public API:
  *   dockerCli.logging.info(message)
