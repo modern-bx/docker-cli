@@ -229,6 +229,7 @@ final class QueueRepository
     /** @param array<string, mixed> $item */
     public function trace(string $file, string $queue, array &$item, string $message, ?string $taskCode = null, ?string $project = null, ?int $result = null): void
     {
+        $project ??= $this->projectFromItem($item, $taskCode);
         $timestamp = sprintf('%.6f', microtime(true));
         while (isset($item['trace'][$timestamp])) {
             $timestamp = sprintf('%.6f', (float) $timestamp + 0.000001);
@@ -255,6 +256,23 @@ final class QueueRepository
         if (file_put_contents(join_path($this->configDirectory(), 'logs', 'queue', $queue . '.jsonl'), $line, FILE_APPEND | LOCK_EX) === false) {
             throw new \RuntimeException('Не удалось записать общий лог очереди.');
         }
+    }
+
+    /** @param array<string, mixed> $item */
+    private function projectFromItem(array $item, ?string $taskCode): ?string
+    {
+        $projects = [];
+        foreach ($item['queue-item']['tasks'] ?? [] as $task) {
+            if (!is_array($task) || ($taskCode !== null && ($task['code'] ?? null) !== $taskCode)) {
+                continue;
+            }
+            $project = $task['project'] ?? null;
+            if (is_string($project) && $project !== '' && !in_array($project, $projects, true)) {
+                $projects[] = $project;
+            }
+        }
+
+        return count($projects) === 1 ? $projects[0] : null;
     }
 
     /** @return array{items: list<array<string, mixed>>, total: int, projects: list<string>} */
