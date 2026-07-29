@@ -36,6 +36,9 @@ final class TaskRunCommand extends Command
             $this->validateTask($task, $code);
             $values = $this->mapArguments($task['parameters'] ?? [], $input->getArgument('task-args'));
             $cwd = $this->workingDirectory($task, $input->getOption('project'));
+            if (($task['context'] ?? null) === 'project') {
+                $values['project'] = (string) $input->getOption('project');
+            }
             $this->ensureDirectory($cwd);
             $script = $this->compileScript($task, $values);
             $scriptFile = tempnam($cwd, '.docker-cli-task-');
