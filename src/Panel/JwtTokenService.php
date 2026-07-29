@@ -8,6 +8,9 @@ final class JwtTokenService
 {
     public const LIFETIME = 600;
     public const COOKIE = '__Host-docker-cli-panel-session';
+    private const ISSUER = 'docker-cli-panel';
+    private const AUDIENCE = 'docker-cli-panel';
+    private const CLOCK_SKEW = 30;
 
     public function __construct(
         private readonly string $secret,
@@ -29,6 +32,8 @@ final class JwtTokenService
         $expiresAt = $now + self::LIFETIME;
         $payload = $this->encode([
             'sub' => $login,
+            'iss' => self::ISSUER,
+            'aud' => self::AUDIENCE,
             'iat' => $now,
             'exp' => $expiresAt,
             'jti' => $jti,
@@ -57,13 +62,26 @@ final class JwtTokenService
         $claims = $this->decode($payload);
         $now ??= time();
         if (($decodedHeader['alg'] ?? null) !== 'HS256'
+            || ($decodedHeader['typ'] ?? null) !== 'JWT'
             || !is_string($claims['sub'] ?? null)
+            || ($claims['iss'] ?? null) !== self::ISSUER
+            || ($claims['aud'] ?? null) !== self::AUDIENCE
+            || !is_int($claims['iat'] ?? null)
             || !is_int($claims['exp'] ?? null)
             || !is_string($claims['jti'] ?? null)
+            || preg_match('/^[a-f0-9]{24}$/D', $claims['jti']) !== 1
             || !is_int($claims['session_started_at'] ?? null)
-            || $claims['session_started_at'] > $now
+            || $claims['iat'] > $now + self::CLOCK_SKEW
+            || $claims['exp'] - $claims['iat'] !== self::LIFETIME
+            || $claims['session_started_at'] > $claims['iat']
             || $claims['session_started_at'] + ($this->settings->sessionHours() * 3600) <= $now
             || $claims['exp'] <= $now) {
+            return null;
+        }
+
+        try {
+            if (UserRepository::normalizeLogin($claims['sub']) !== $claims['sub']) return null;
+        } catch (\InvalidArgumentException) {
             return null;
         }
 

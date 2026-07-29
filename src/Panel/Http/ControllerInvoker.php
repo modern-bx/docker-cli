@@ -15,6 +15,9 @@ final class ControllerInvoker
     {
         $body = [];
         $rawBody = (string) $request->getBody();
+        if (strlen($rawBody) > 16384) {
+            throw new RequestValidationException('Размер запроса превышает допустимый предел.');
+        }
         if ($rawBody !== '') {
             try {
                 $decoded = json_decode($rawBody, true, 8, JSON_THROW_ON_ERROR);

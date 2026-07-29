@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Config\SystemCompose;
+use DockerCli\Panel\PanelPasswordGenerator;
 use DockerCli\Panel\UserRepository;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Question\Question;
 
 final class PanelUserCreateCommand extends Command
 {
@@ -17,6 +18,7 @@ final class PanelUserCreateCommand extends Command
     {
         parent::__construct('panel:user-create');
         $this->setDescription('Создать пользователя административной панели.');
+        $this->addArgument('login', InputArgument::REQUIRED, 'Логин пользователя (email).');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -28,26 +30,21 @@ final class PanelUserCreateCommand extends Command
             return Command::FAILURE;
         }
 
-        $loginQuestion = new Question('Логин (email): ');
-        $loginQuestion->setValidator(static fn (mixed $answer): string => UserRepository::normalizeLogin(is_string($answer) ? $answer : ''));
-        $passwordQuestion = new Question('Пароль: ');
-        $passwordQuestion->setHidden(true);
-        $passwordQuestion->setValidator(static function (mixed $answer): string {
-            if (!is_string($answer) || $answer === '') {
-                throw new \InvalidArgumentException('Пароль не должен быть пустым.');
-            }
-            return $answer;
-        });
-
-        $helper = $this->getHelper('question');
-        $login = $helper->ask($input, $output, $loginQuestion);
-        $password = $helper->ask($input, $output, $passwordQuestion);
+        try {
+            $value = $input->getArgument('login');
+            $login = UserRepository::normalizeLogin(is_string($value) ? $value : '');
+        } catch (\InvalidArgumentException $exception) {
+            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            return Command::INVALID;
+        }
+        $password = (new PanelPasswordGenerator())->generate();
         $repository = new UserRepository($salt);
         if (!$repository->add($login, $password)) {
             $output->writeln(sprintf('<error>Пользователь %s уже существует.</error>', $login));
             return Command::FAILURE;
         }
         $output->writeln(sprintf('<info>Пользователь %s создан.</info>', $login));
+        $output->writeln(sprintf('<info>Пароль: %s</info>', $password));
         return Command::SUCCESS;
     }
 }

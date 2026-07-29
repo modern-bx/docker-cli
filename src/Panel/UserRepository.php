@@ -11,6 +11,7 @@ use function DockerCli\Util\join_path;
 final class UserRepository
 {
     private readonly string $file;
+    private readonly string $dummyPasswordHash;
 
     public function __construct(private readonly string $salt, ?string $file = null)
     {
@@ -22,24 +23,30 @@ final class UserRepository
             $file = join_path($home, '.config', 'docker-cli', 'panel', 'users.yaml');
         }
         $this->file = $file;
+        $this->dummyPasswordHash = $this->hashPassword(bin2hex(random_bytes(16)));
     }
 
     public function add(string $login, string $password): bool
     {
         $login = self::normalizeLogin($login);
-        if ($password === '') {
-            throw new \InvalidArgumentException('Пароль не должен быть пустым.');
-        }
+        $this->validatePassword($password);
 
         return $this->update(function (array &$users) use ($login, $password): bool {
             if (isset($users[$login])) {
                 return false;
             }
-            $hash = password_hash(hash_hmac('sha256', $password, $this->salt), PASSWORD_DEFAULT);
-            if (!is_string($hash)) {
-                throw new \RuntimeException('Unable to hash password.');
-            }
-            $users[$login] = ['password' => $hash];
+            $users[$login] = ['password' => $this->hashPassword($password)];
+            return true;
+        });
+    }
+
+    public function rotatePassword(string $login, string $password): bool
+    {
+        $login = self::normalizeLogin($login);
+        $this->validatePassword($password);
+        return $this->update(function (array &$users) use ($login, $password): bool {
+            if (!isset($users[$login])) return false;
+            $users[$login] = ['password' => $this->hashPassword($password)];
             return true;
         });
     }
@@ -61,9 +68,12 @@ final class UserRepository
     {
         $login = self::normalizeLogin($login);
         $users = $this->read();
-        $hash = $users[$login]['password'] ?? null;
+        $storedHash = $users[$login]['password'] ?? null;
+        $exists = is_string($storedHash);
+        $hash = $exists ? $storedHash : $this->dummyPasswordHash;
+        $valid = password_verify(hash_hmac('sha256', $password, $this->salt), $hash);
 
-        return is_string($hash) && password_verify(hash_hmac('sha256', $password, $this->salt), $hash);
+        return $exists && $valid;
     }
 
     public function contains(string $login): bool
@@ -79,6 +89,20 @@ final class UserRepository
             throw new \InvalidArgumentException('Логин должен быть корректным email-адресом.');
         }
         return $login;
+    }
+
+    private function validatePassword(string $password): void
+    {
+        if (strlen($password) < 16 || strlen($password) > 1024) {
+            throw new \InvalidArgumentException('Пароль должен содержать от 16 до 1024 байт.');
+        }
+    }
+
+    private function hashPassword(string $password): string
+    {
+        $hash = password_hash(hash_hmac('sha256', $password, $this->salt), PASSWORD_DEFAULT);
+        if (!is_string($hash)) throw new \RuntimeException('Unable to hash password.');
+        return $hash;
     }
 
     /** @return array<string, array{password: string}> */

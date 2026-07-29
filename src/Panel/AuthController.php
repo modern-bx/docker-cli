@@ -6,7 +6,6 @@ namespace DockerCli\Panel;
 
 use DockerCli\Panel\Dto\AuthResponseDto;
 use DockerCli\Panel\Dto\LogoutResponseDto;
-use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\LoginRequestDto;
 use DockerCli\Panel\Dto\Request\SessionRequestDto;
 use DockerCli\Panel\Http\Attribute\Route;
@@ -14,7 +13,7 @@ use DockerCli\Panel\Http\UnauthorizedException;
 
 final readonly class AuthController
 {
-    public function __construct(private UserRepository $users, private JwtTokenService $tokens)
+    public function __construct(private UserRepository $users, private JwtTokenService $tokens, private TokenRepository $tokenRepository)
     {
     }
 
@@ -43,9 +42,10 @@ final readonly class AuthController
         return $this->authorized($request->login, $request->sessionStartedAt);
     }
 
-    #[Route('POST', '/api/auth/logout', EmptyRequestDto::class, LogoutResponseDto::class, authenticated: false)]
-    public function logout(EmptyRequestDto $request): LogoutResponseDto
+    #[Route('POST', '/api/auth/logout', SessionRequestDto::class, LogoutResponseDto::class)]
+    public function logout(SessionRequestDto $request): LogoutResponseDto
     {
+        $this->tokenRepository->revoke([$request->login]);
         return new LogoutResponseDto();
     }
 
