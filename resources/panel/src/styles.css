@@ -209,6 +209,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .login-error-positioner { position: fixed; inset: 0; z-index: 41; display: grid; place-items: center; padding: 1rem; }
 .login-error-dialog { width: min(28rem, 100%); padding: 1.5rem; border: 1px solid var(--color-surface-200); outline: 0; }
 .dark .login-error-dialog { border-color: var(--color-surface-800); }
+.login-error-dialog.info-dialog { border-color: var(--color-primary-500); }
 .login-error-dialog.error-alert { border-color: var(--color-error-500); }
 .login-error-title { font-size: 1.2rem; font-weight: 700; }
 .login-error-dialog.error-alert .login-error-title { color: var(--color-error-600); }

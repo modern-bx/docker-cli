@@ -88,6 +88,7 @@
   let systemServices = [];
   let systemPending = false;
   let systemPendingMessage = '';
+  let queuedOperationNotice = '';
   let systemConfirmation = null;
   let projectConfirmation = null;
   let projectContextMenu = null;
@@ -558,6 +559,10 @@
     }
   }
 
+  function notifyQueuedOperation(description) {
+    queuedOperationNotice = `${description} поставлена в очередь.`;
+  }
+
   async function projectAction(action, name) {
     systemPending = true;
     projectsError = '';
@@ -567,6 +572,7 @@
     try {
       const data = await runProjectAction(api, name, action);
       projects = data.projects;
+      if (action === 'wipe') notifyQueuedOperation(`Очистка проекта «${name}»`);
       if (action !== 'wipe' && !projectHasState(data.projects, action, name) && !(await waitForProjectAction(action, name))) {
         throw Object.assign(new Error('Не удалось дождаться подтверждения статуса проекта.'), { status: 504 });
       }
@@ -1151,6 +1157,19 @@
         <button class={`btn ${projectConfirmation?.action === 'wipe' ? 'preset-filled-error-500' : 'preset-filled-primary-500'}`} type="button" onclick={() => { const confirmation = projectConfirmation; projectConfirmation = null; if (confirmation) projectAction(confirmation.action, confirmation.project.name); }}>
           {projectConfirmation?.action === 'wipe' ? 'Стереть' : 'Отключить'}
         </button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(queuedOperationNotice)} onOpenChange={({ open }) => { if (!open) queuedOperationNotice = ''; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog info-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Операция поставлена в очередь</Dialog.Title>
+      <Dialog.Description class="login-error-description">{queuedOperationNotice}</Dialog.Description>
+      <div class="login-error-actions">
+        <Dialog.CloseTrigger class="btn preset-filled-primary-500" type="button">ОК</Dialog.CloseTrigger>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>
