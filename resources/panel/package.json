@@ -19,6 +19,7 @@
     "vite": "^7.3.1"
   },
   "dependencies": {
-    "@lucide/svelte": "^1.27.0"
+    "@lucide/svelte": "^1.27.0",
+    "micromark": "^4.0.2"
   }
 }

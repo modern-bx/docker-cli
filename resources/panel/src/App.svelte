@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { Combobox, Dialog, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { Bell, ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { micromark } from 'micromark';
   import { getLogs, getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
@@ -552,6 +553,10 @@
     }
   }
 
+  function renderNotificationMarkdown(message) {
+    return micromark(message, { allowDangerousHtml: false, allowDangerousProtocol: false });
+  }
+
   async function deleteQueueItem(item) {
     queueConfirmation = null;
     try {
@@ -852,7 +857,7 @@
                 <article class="notification-item">
                   <div>
                     <time datetime={notification.time}>{formatQueueDate(notification.time)}</time>
-                    <p>{notification.message}</p>
+                    <div class="notification-message">{@html renderNotificationMarkdown(notification.message)}</div>
                   </div>
                   <button class="btn-icon preset-tonal notification-delete" type="button" aria-label="Удалить уведомление" title="Удалить" onclick={() => archiveNotification(notification)}><Trash2 size={16} aria-hidden="true" /></button>
                 </article>
