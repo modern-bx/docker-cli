@@ -62,6 +62,7 @@
   let selectedProjectName = '';
   let projectDetailTab = 'info';
   let activeSection = 'projects';
+  let settingsTab = 'projects';
   let logItems = [];
   let logProjects = [];
   let logType = 'queue';
@@ -219,16 +220,16 @@
       loadLogs();
       return;
     }
-    if (segments[0] === 'settings' && segments[1] === 'projects') {
+    if (segments[0] === 'settings' && ['projects', 'security'].includes(segments[1])) {
       activeSection = 'settings';
+      settingsTab = segments[1];
       selectedProjectName = '';
-      loadProjectsSettings();
+      if (settingsTab === 'projects') loadProjectsSettings();
+      else loadSecuritySettings();
       return;
     }
     if (segments[0] === 'security') {
-      activeSection = 'security';
-      selectedProjectName = '';
-      loadSecuritySettings();
+      window.location.hash = '#/settings/security/authorization';
       return;
     }
     activeSection = 'projects';
@@ -1128,7 +1129,6 @@
           <a class:active={activeSection === 'projects'} class="tab" href="#/projects" aria-current={activeSection === 'projects' ? 'page' : undefined}>Проекты</a>
           <a class:active={activeSection === 'logs'} class="tab" href="#/journal" aria-current={activeSection === 'logs' ? 'page' : undefined}>Журнал</a>
           <a class:active={activeSection === 'settings'} class="tab" href="#/settings/projects" aria-current={activeSection === 'settings' ? 'page' : undefined}>Настройки</a>
-          <a class:active={activeSection === 'security'} class="tab" href="#/security/authorization" aria-current={activeSection === 'security' ? 'page' : undefined}>Безопасность</a>
         </nav>
         {#if activeSection === 'projects'}
         <div class="projects-layout">
@@ -1343,8 +1343,10 @@
         {:else if activeSection === 'settings'}
           <section class="settings-view" aria-label="Настройки">
             <nav class="project-detail-tabs settings-tabs" aria-label="Разделы настроек">
-              <a class="project-detail-tab active" href="#/settings/projects" aria-current="page">Проекты</a>
+              <a class:active={settingsTab === 'projects'} class="project-detail-tab" href="#/settings/projects" aria-current={settingsTab === 'projects' ? 'page' : undefined}>Проекты</a>
+              <a class:active={settingsTab === 'security'} class="project-detail-tab" href="#/settings/security/authorization" aria-current={settingsTab === 'security' ? 'page' : undefined}>Безопасность</a>
             </nav>
+            {#if settingsTab === 'projects'}
             <div class="settings-scroll">
               <div class="project-toolbar">
                 <button class="btn preset-filled-primary-500" type="button" disabled={projectSettingsLoading || projectSettingsSaving || projectLocations.some((location) => !location.path.trim())} onclick={saveProjectLocations}>
@@ -1352,7 +1354,12 @@
                 </button>
               </div>
               <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Расположение">
-                <h2>Расположение</h2>
+                <h2>Расположение
+                  <Tooltip positioning={{ placement: 'right' }}>
+                    <Tooltip.Trigger class="security-help" aria-label="О расположениях проектов"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                    <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Эти пути будут использоваться в скриптах автоматической развертки проектов. Пока не добавлен хотя бы один путь, функционал автоматической развертки не заработает</Tooltip.Content></Tooltip.Positioner>
+                  </Tooltip>
+                </h2>
                 <div class="location-list">
                   {#each projectLocations as location, index}
                     <div class="location-item">
@@ -1360,19 +1367,18 @@
                         <input class="input" type="text" value={location.path} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="/путь/к/проектам" aria-label={`Расположение проектов ${index + 1}`} oninput={(event) => updateProjectLocation(index, event.currentTarget.value)} />
                         <button class="btn preset-tonal" type="button" disabled={!location.path.trim() || projectSettingsLoading || projectSettingsSaving} onclick={addProjectLocation}><Plus size={16} aria-hidden="true" />Добавить</button>
                         {#if projectLocations.length > 1}<button class="btn preset-tonal location-delete" type="button" disabled={projectSettingsLoading || projectSettingsSaving} onclick={() => removeProjectLocation(index)}><Trash2 size={16} aria-hidden="true" />Удалить</button>{/if}
+                        <input class="radio location-default" type="radio" name="default-project-location" checked={location.default} disabled={projectSettingsLoading || projectSettingsSaving} aria-label="Путь по умолчанию" onchange={() => setDefaultProjectLocation(index)} />
+                        <Tooltip positioning={{ placement: 'right' }}>
+                          <Tooltip.Trigger class="security-help location-default-help" aria-label="О пути по умолчанию"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                          <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Путь для автоматической развертки проектов по умолчанию</Tooltip.Content></Tooltip.Positioner>
+                        </Tooltip>
                       </div>
-                      <label class="location-default"><input class="radio" type="radio" name="default-project-location" checked={location.default} disabled={projectSettingsLoading || projectSettingsSaving} onchange={() => setDefaultProjectLocation(index)} />По умолчанию</label>
                     </div>
                   {/each}
                 </div>
               </section>
             </div>
-          </section>
-        {:else}
-          <section class="settings-view" aria-label="Безопасность">
-            <nav class="project-detail-tabs settings-tabs" aria-label="Разделы безопасности">
-              <a class="project-detail-tab active" href="#/security/authorization" aria-current="page">Авторизация</a>
-            </nav>
+            {:else}
             <div class="settings-scroll">
               <div class="project-toolbar">
                 <button class="btn preset-filled-primary-500" type="button" disabled={settingsLoading || settingsSaving} onclick={saveAuthorizationSettings}>
@@ -1392,6 +1398,7 @@
                 </label>
               </section>
             </div>
+            {/if}
           </section>
         {/if}
         {#if projectsError}<p class="projects-error" role="status">{projectsError}</p>{/if}
