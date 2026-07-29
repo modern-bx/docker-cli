@@ -35,6 +35,10 @@ final class MysqlLoadCommand extends Command
             $output->writeln('<error>Укажите зарегистрированный проект через --project или запустите команду из проекта.</error>');
             return Command::FAILURE;
         }
+        if ($registry->isProjectProtected($project)) {
+            $output->writeln(sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $project));
+            return Command::FAILURE;
+        }
         if (!$input->getOption('force')) {
             $output->writeln(sprintf('<error>Загрузка полностью заменит MySQL-базу проекта "%s". Повторите с --force.</error>', $project));
             return Command::FAILURE;

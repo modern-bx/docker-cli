@@ -36,6 +36,10 @@ final class ProjectWipeCommand extends Command
             $output->writeln(sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
             return Command::FAILURE;
         }
+        if ($registry->isProjectProtected($projectName)) {
+            $output->writeln(sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
+            return Command::FAILURE;
+        }
 
         $config = $registry->readProjectConfig($projectName);
         $projectRoot = $config['data']['project']['root'] ?? null;

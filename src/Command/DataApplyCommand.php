@@ -49,6 +49,10 @@ final class DataApplyCommand extends Command
             $output->writeln(sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
             return Command::FAILURE;
         }
+        if ($registry->isProjectProtected($projectName)) {
+            $output->writeln(sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
+            return Command::FAILURE;
+        }
 
         $paths = $input->getArgument('path');
         if (!is_array($paths)) {

@@ -10,6 +10,7 @@ use DockerCli\Panel\Dto\ProjectListDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectActionRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectNotesRequestDto;
+use DockerCli\Panel\Dto\Request\ProjectSecurityRequestDto;
 use DockerCli\Panel\Enum\ProjectActionEnum;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Project\OpenRestyHostRenderer;
@@ -46,6 +47,9 @@ final class ProjectController
             (new OpenRestyHostRenderer())->render();
             $this->reloadOpenResty();
         } elseif (ProjectActionEnum::isWipe($action)) {
+            if (($project['protected'] ?? false) === true) {
+                throw new ProjectActionException('Проект защищен.', 409);
+            }
             $this->enqueueWipe($name);
         } else {
             throw new ProjectActionException('Неизвестное действие.', 400);
@@ -70,6 +74,7 @@ final class ProjectController
                 // Older project configs predate this flag and are enabled by default,
                 // just like OpenRestyHostRenderer treats them.
                 enabled: ($project['enabled'] ?? true) !== false,
+                protected: ($project['protected'] ?? false) === true,
                 url: $baseHost !== '' ? sprintf('https://web-%s.%s', $projectName, $baseHost) : null,
                 tags: $this->tags($project['tags'] ?? []),
                 description: is_string($project['description'] ?? null) ? $project['description'] : '',
@@ -77,6 +82,22 @@ final class ProjectController
         }
 
         return new ProjectListDto($projects);
+    }
+
+    #[Route('POST', '/api/projects/{name}/security', ProjectSecurityRequestDto::class, ProjectListDto::class)]
+    public function saveSecurity(ProjectSecurityRequestDto $request): ProjectListDto
+    {
+        if (!$this->projects->hasProject($request->name)) {
+            throw new ProjectActionException('Проект не найден.', 404);
+        }
+        $config = $this->projects->readProjectConfig($request->name);
+        if (!is_array($config['data']['project'] ?? null)) {
+            throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
+        }
+        $config['data']['project']['protected'] = $request->protected;
+        $this->projects->writeProjectConfig($request->name, $config);
+
+        return $this->projects(new EmptyRequestDto());
     }
 
     #[Route('POST', '/api/projects/{name}/notes', ProjectNotesRequestDto::class, ProjectListDto::class)]

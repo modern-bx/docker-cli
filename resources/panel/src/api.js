@@ -4,6 +4,7 @@
  * @property {string|null} language Project programming language, when configured.
  * @property {string|null} framework Project framework, when configured.
  * @property {boolean} enabled Whether the project is enabled.
+ * @property {boolean} protected Whether destructive changes are forbidden.
  * @property {string|null} url HTTPS URL of the project's primary host.
  * @property {string[]} tags User-defined project tags.
  * @property {string} description Project notes.
@@ -37,6 +38,14 @@ export async function saveProjectNotes(request, project, tags, description) {
   return /** @type {Promise<ProjectListDto>} */ (request(`/api/projects/${encodeURIComponent(project)}/notes`, {
     method: 'POST',
     body: JSON.stringify({ tags, description }),
+  }));
+}
+
+/** @returns {Promise<ProjectListDto>} */
+export async function saveProjectSecurity(request, project, protectedProject) {
+  return /** @type {Promise<ProjectListDto>} */ (request(`/api/projects/${encodeURIComponent(project)}/security`, {
+    method: 'POST',
+    body: JSON.stringify({ protected: protectedProject }),
   }));
 }
 

@@ -52,6 +52,11 @@ final class ProjectRegistry
         return is_file($this->projectConfigFile($projectName));
     }
 
+    public function isProjectProtected(string $projectName): bool
+    {
+        return ($this->readProjectConfig($projectName)['data']['project']['protected'] ?? false) === true;
+    }
+
     /** @return array<string, mixed> */
     public function readProjectConfig(string $projectName): array
     {
