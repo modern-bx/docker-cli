@@ -22,6 +22,7 @@
   const modes = [
     ['light', 'Светлая'], ['dark', 'Тёмная'], ['system', 'Системная'],
   ];
+  const projectDetailTabs = ['info', 'notes', 'security', 'journal'];
   const fonts = [
     { value: 'ubuntu', label: 'Ubuntu Regular' },
     { value: 'noto', label: 'Noto Sans' },
@@ -231,14 +232,14 @@
       if (window.location.hash !== projectHash()) navigateToProject('', 'info');
       return;
     }
-    const tab = ['notes', 'journal'].includes(segments[2]) ? segments[2] : 'info';
+    const tab = projectDetailTabs.includes(segments[2]) ? segments[2] : 'info';
     selectedProjectName = projectName;
     projectDetailTab = tab;
     if (tab === 'journal') {
       applyJournalFilters(true);
       loadLogs();
     }
-    if (segments.length !== 3 || !['info', 'notes', 'journal'].includes(segments[2])) navigateToProject(projectName, tab);
+    if (segments.length !== 3 || !projectDetailTabs.includes(segments[2])) navigateToProject(projectName, tab);
   }
 
   async function loadLogs() {
