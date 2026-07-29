@@ -6,6 +6,7 @@ namespace DockerCli\Command;
 
 use DockerCli\Notification\NotificationRepository;
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Task\TaskExecutionContext;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -68,12 +69,14 @@ final class ProjectWipeCommand extends Command
         }
 
         $output->writeln(sprintf('<info>Файлы проекта "%s" удалены, директория .docker-cli сохранена.</info>', $projectName));
-        ($this->notifications ?? new NotificationRepository())->create(
-            'core.project.wipe',
-            'task',
-            'info',
-            sprintf("Файлы проекта **%s** успешно удалены. Служебная директория `.docker-cli` сохранена.", $projectName),
-        );
+        if (TaskExecutionContext::active()) {
+            ($this->notifications ?? new NotificationRepository())->create(
+                'core.project.wipe',
+                'task',
+                'info',
+                sprintf("Файлы проекта **%s** успешно удалены. Служебная директория `.docker-cli` сохранена.", $projectName),
+            );
+        }
 
         return Command::SUCCESS;
     }

@@ -6,6 +6,7 @@ namespace DockerCli\Command;
 
 use DockerCli\Project\ProjectRegistry;
 use DockerCli\Task\TaskRepository;
+use DockerCli\Task\TaskExecutionContext;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -53,6 +54,7 @@ final class TaskRunCommand extends Command
 
         $environment = getenv();
         $environment = is_array($environment) ? $environment : [];
+        $environment = TaskExecutionContext::apply($environment, $code);
         foreach ($values as $name => $value) {
             $environment[$this->normalizeName($name)] = (string) $value;
         }
