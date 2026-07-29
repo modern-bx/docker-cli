@@ -120,6 +120,6 @@ final class NotificationRepository
             if (!is_string($home) || $home === '') throw new \RuntimeException('Не удалось определить домашнюю директорию (HOME).');
             $root = join_path($home, '.config', 'docker-cli');
         }
-        return join_path($root, 'notifications', $status);
+        return join_path($root, 'state', 'notifications', $status);
     }
 }

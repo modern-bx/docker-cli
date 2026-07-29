@@ -34,21 +34,19 @@ final class SystemCompose
     {
         $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
 
-        return join_path($home, '.config', 'docker-cli', 'playwright', 'scripts');
+        return join_path($home, '.config', 'docker-cli', 'actions', 'playwright', 'scripts');
     }
 
     public function playwrightDataDirectory(): string
     {
-        $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
-
-        return join_path($home, '.config', 'docker-cli', 'playwright', 'data');
+        return join_path($this->directory(), 'playwright', 'data');
     }
 
     public function coreTasksDirectory(): string
     {
         $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
 
-        return join_path($home, '.config', 'docker-cli', 'tasks', 'core');
+        return join_path($home, '.config', 'docker-cli', 'actions', 'tasks', 'core');
     }
 
     public function init(bool $updateStatic = false, bool $migrateEditable = false): bool

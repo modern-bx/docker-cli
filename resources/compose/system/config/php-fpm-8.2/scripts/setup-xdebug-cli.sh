@@ -7,7 +7,7 @@ docker_cli_xdebug_refresh() {
         project_meta="$search_dir/.docker-cli/project.yaml"
         if [ -f "$project_meta" ]; then
             project_name="$(sed -n 's/^[[:space:]]*name:[[:space:]]*//p' "$project_meta" | head -n 1 | sed 's/["'"'"']//g')"
-            project_file="$HOME/.config/docker-cli/projects/$project_name/project.yaml"
+            project_file="$HOME/.config/docker-cli/state/projects/$project_name/project.yaml"
             project_port="$(sed -n 's/^[[:space:]]*port:[[:space:]]*//p' "$project_file" 2>/dev/null | head -n 1 | sed 's/["'"'"']//g')"
             case "$project_port" in
                 ''|*[!0-9]*) unset XDEBUG_CONFIG ;;

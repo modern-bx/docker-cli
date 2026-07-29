@@ -1,6 +1,6 @@
 # Уведомления
 
-Уведомления хранятся в `$HOME/.config/docker-cli/notifications`. Активные YAML-файлы находятся в `current`, архивные — в `archive`. Имя файла имеет формат `timestamp.counter.code.yaml`, аналогичный элементам очереди.
+Уведомления хранятся в `$HOME/.config/docker-cli/state/notifications`. Активные YAML-файлы находятся в `current`, архивные — в `archive`. Имя файла имеет формат `timestamp.counter.code.yaml`, аналогичный элементам очереди.
 
 ```yaml
 time: '2026-07-29T12:34:56.123456+00:00'

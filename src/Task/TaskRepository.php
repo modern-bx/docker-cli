@@ -25,7 +25,7 @@ final class TaskRepository
             throw new \RuntimeException('Не удалось определить домашнюю директорию (HOME).');
         }
 
-        return join_path($home, '.config', 'docker-cli', 'tasks');
+        return join_path($home, '.config', 'docker-cli', 'actions', 'tasks');
     }
 
     /** @return array{file: string, task: array<string, mixed>} */

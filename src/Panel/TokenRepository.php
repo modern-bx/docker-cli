@@ -16,7 +16,7 @@ final class TokenRepository
     {
         if ($directory === null) {
             $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
-            $directory = join_path($home, '.config', 'docker-cli', 'panel', 'sessions', 'tokens');
+            $directory = join_path($home, '.config', 'docker-cli', 'state', 'panel', 'sessions', 'tokens');
         }
         $this->directory = $directory;
     }

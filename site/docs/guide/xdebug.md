@@ -12,7 +12,7 @@ XDEBUG_TRIGGER=docker-cli
 
 Каждый зарегистрированный проект получает отдельный порт IDE. Это позволяет держать несколько проектов открытыми в PhpStorm одновременно: cookie одна и та же, а входящие debug-соединения приходят на разные порты.
 
-При `docker-cli project:up` в `~/.config/docker-cli/projects/<project>/project.yaml` сохраняется вычисленная настройка:
+При `docker-cli project:up` в `~/.config/docker-cli/state/projects/<project>/project.yaml` сохраняется вычисленная настройка:
 
 ```yaml
 data:
@@ -43,7 +43,7 @@ XDEBUG_TRIGGER=docker-cli
 
 ## Активация из консоли внутри контейнера
 
-При входе в PHP-FPM контейнер через интерактивный shell docker-cli подключает `/etc/profile.d/docker-cli-xdebug.sh`. Скрипт ищет вверх от текущей директории файл `.docker-cli/project.yaml`, по имени проекта читает `~/.config/docker-cli/projects/<project>/project.yaml` и выставляет:
+При входе в PHP-FPM контейнер через интерактивный shell docker-cli подключает `/etc/profile.d/docker-cli-xdebug.sh`. Скрипт ищет вверх от текущей директории файл `.docker-cli/project.yaml`, по имени проекта читает `~/.config/docker-cli/state/projects/<project>/project.yaml` и выставляет:
 
 ```bash
 XDEBUG_CONFIG="client_host=host.docker.internal client_port=<порт проекта> idekey=PHPSTORM"
@@ -86,7 +86,7 @@ docker exec -e XDEBUG_TRIGGER=docker-cli \
 
 1. Откройте `Settings/Preferences → PHP → Debug`.
 2. В блоке Xdebug добавьте порты всех нужных проектов в поле `Debug port`, например `9004,9005,9006`.
-3. Порт конкретного проекта смотрите в `~/.config/docker-cli/projects/<project>/project.yaml` в `data.project.xdebug.client_port`.
+3. Порт конкретного проекта смотрите в `~/.config/docker-cli/state/projects/<project>/project.yaml` в `data.project.xdebug.client_port`.
 4. Включите `Can accept external connections` / нажмите `Start Listening for PHP Debug Connections` на панели PhpStorm.
 5. Откройте `Settings/Preferences → PHP → Servers` и создайте server для каждого web-домена проекта:
    - `Name`: удобно указать домен проекта, например `web-my-project.<ваш-домен>`;
