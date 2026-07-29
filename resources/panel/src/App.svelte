@@ -108,7 +108,9 @@
     ? 'paused'
     : queueItems.some((item) => item.status === '50-error')
       ? 'error'
-      : queueItems.some((item) => item.status === '40-failure') ? 'failure' : 'healthy';
+      : queueItems.some((item) => item.status === '40-failure')
+        ? 'failure'
+        : queueItems.some((item) => item.status === '20-active') ? 'active' : 'healthy';
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
   $: if (selectedProject && selectedProject.name !== notesProjectName) {
@@ -1019,8 +1021,8 @@
                     <label>
                       <span>Статус</span>
                       <Combobox collection={logStatusCollection} value={[logStatus]} openOnClick onValueChange={(details) => changeLogStatus(details.value[0] || 'all')}>
-                        <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly />{#if logStatus !== 'all'}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); changeLogStatus('all'); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
-                        <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logStatuses as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
+                        <Combobox.Control class="font-combobox-control status-combobox-control">{#if logStatus !== 'all'}<span class={`queue-dot status-${logStatus}`} aria-hidden="true"></span>{/if}<Combobox.Input class="font-combobox-input" readonly />{#if logStatus !== 'all'}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); changeLogStatus('all'); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                        <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logStatuses as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class="log-status-option">{#if item.value !== 'all'}<span class={`queue-dot status-${item.value}`} aria-hidden="true"></span>{/if}{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                       </Combobox>
                     </label>
                     {#each [['queueItem', 'Элемент очереди', logQueueItem], ['itemCode', 'Код элемента', logItemCode], ['taskCode', 'Задача', logTaskCode]] as [field, label, value]}
@@ -1070,8 +1072,8 @@
               <label>
                 <span>Статус</span>
                 <Combobox collection={logStatusCollection} value={[logStatus]} openOnClick onValueChange={(details) => changeLogStatus(details.value[0] || 'all')}>
-                  <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly />{#if logStatus !== 'all'}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); changeLogStatus('all'); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
-                  <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logStatuses as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
+                  <Combobox.Control class="font-combobox-control status-combobox-control">{#if logStatus !== 'all'}<span class={`queue-dot status-${logStatus}`} aria-hidden="true"></span>{/if}<Combobox.Input class="font-combobox-input" readonly />{#if logStatus !== 'all'}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); changeLogStatus('all'); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                  <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logStatuses as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class="log-status-option">{#if item.value !== 'all'}<span class={`queue-dot status-${item.value}`} aria-hidden="true"></span>{/if}{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                 </Combobox>
               </label>
               {#each [['queueItem', 'Элемент очереди', logQueueItem], ['itemCode', 'Код элемента', logItemCode], ['taskCode', 'Задача', logTaskCode]] as [field, label, value]}
