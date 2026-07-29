@@ -221,6 +221,10 @@
       return;
     }
     if (segments[0] === 'settings' && ['projects', 'security'].includes(segments[1])) {
+      if (segments[1] === 'security' && segments.length !== 2) {
+        window.location.hash = '#/settings/security';
+        return;
+      }
       activeSection = 'settings';
       settingsTab = segments[1];
       selectedProjectName = '';
@@ -229,7 +233,7 @@
       return;
     }
     if (segments[0] === 'security') {
-      window.location.hash = '#/settings/security/authorization';
+      window.location.hash = '#/settings/security';
       return;
     }
     activeSection = 'projects';
@@ -1344,7 +1348,7 @@
           <section class="settings-view" aria-label="Настройки">
             <nav class="project-detail-tabs settings-tabs" aria-label="Разделы настроек">
               <a class:active={settingsTab === 'projects'} class="project-detail-tab" href="#/settings/projects" aria-current={settingsTab === 'projects' ? 'page' : undefined}>Проекты</a>
-              <a class:active={settingsTab === 'security'} class="project-detail-tab" href="#/settings/security/authorization" aria-current={settingsTab === 'security' ? 'page' : undefined}>Безопасность</a>
+              <a class:active={settingsTab === 'security'} class="project-detail-tab" href="#/settings/security" aria-current={settingsTab === 'security' ? 'page' : undefined}>Безопасность</a>
             </nav>
             {#if settingsTab === 'projects'}
             <div class="settings-scroll">
