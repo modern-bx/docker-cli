@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DockerCli\Panel;
 
 use DockerCli\Panel\Dto\AuthResponseDto;
+use DockerCli\Panel\Dto\LogoutResponseDto;
 use DockerCli\Panel\Dto\Request\LoginRequestDto;
 use DockerCli\Panel\Dto\Request\SessionRequestDto;
 use DockerCli\Panel\Http\Attribute\Route;
@@ -12,7 +13,7 @@ use DockerCli\Panel\Http\UnauthorizedException;
 
 final readonly class AuthController
 {
-    public function __construct(private UserRepository $users, private JwtTokenService $tokens)
+    public function __construct(private UserRepository $users, private JwtTokenService $tokens, private TokenRepository $tokenRepository)
     {
     }
 
@@ -35,11 +36,21 @@ final readonly class AuthController
     #[Route('GET', '/api/auth/session', SessionRequestDto::class, AuthResponseDto::class)]
     public function session(SessionRequestDto $request): AuthResponseDto
     {
-        return $this->authorized($request->login);
+        if (!$this->users->contains($request->login)) {
+            throw new UnauthorizedException('Сессия истекла.');
+        }
+        return $this->authorized($request->login, $request->sessionStartedAt);
     }
 
-    private function authorized(string $login): AuthResponseDto
+    #[Route('POST', '/api/auth/logout', SessionRequestDto::class, LogoutResponseDto::class)]
+    public function logout(SessionRequestDto $request): LogoutResponseDto
     {
-        return new AuthResponseDto($login, $this->tokens->issue($login), JwtTokenService::LIFETIME);
+        $this->tokenRepository->revoke([$request->login]);
+        return new LogoutResponseDto();
+    }
+
+    private function authorized(string $login, ?int $sessionStartedAt = null): AuthResponseDto
+    {
+        return new AuthResponseDto($login, $this->tokens->issue($login, sessionStartedAt: $sessionStartedAt), JwtTokenService::LIFETIME);
     }
 }

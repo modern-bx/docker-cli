@@ -76,3 +76,14 @@ export async function runSystemAction(request, action, service = '') {
 export async function getLogs(request, parameters) {
   return request(`/api/logs?${new URLSearchParams(parameters)}`);
 }
+
+export async function getSecuritySettings(request) {
+  return request('/api/settings/security');
+}
+
+export async function saveSecuritySettings(request, maximumSessionHours) {
+  return request('/api/settings/security', {
+    method: 'POST',
+    body: JSON.stringify({ maximumSessionHours }),
+  });
+}

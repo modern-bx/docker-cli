@@ -15,6 +15,9 @@ final class ControllerInvoker
     {
         $body = [];
         $rawBody = (string) $request->getBody();
+        if (strlen($rawBody) > 16384) {
+            throw new RequestValidationException('Размер запроса превышает допустимый предел.');
+        }
         if ($rawBody !== '') {
             try {
                 $decoded = json_decode($rawBody, true, 8, JSON_THROW_ON_ERROR);
@@ -31,7 +34,13 @@ final class ControllerInvoker
         if (!is_subclass_of($requestClass, RequestDto::class)) {
             throw new \LogicException(sprintf('%s must implement %s.', $requestClass, RequestDto::class));
         }
-        $dto = $requestClass::fromRequest(new RequestData($variables, $body, $request->getQueryParams(), $request->getAttribute(AuthMiddleware::LOGIN_ATTRIBUTE)));
+        $dto = $requestClass::fromRequest(new RequestData(
+            $variables,
+            $body,
+            $request->getQueryParams(),
+            $request->getAttribute(AuthMiddleware::LOGIN_ATTRIBUTE),
+            $request->getAttribute(AuthMiddleware::SESSION_STARTED_AT_ATTRIBUTE),
+        ));
         $response = $controller->{$method}($dto);
         if (!$response instanceof $route->response) {
             throw new \LogicException(sprintf('%s::%s() must return %s.', $controller::class, $method, $route->response));

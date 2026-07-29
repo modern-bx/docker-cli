@@ -6,6 +6,7 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\UserRepository;
+use DockerCli\Panel\TokenRepository;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -39,7 +40,9 @@ final class PanelUserDeleteCommand extends Command
             $output->writeln(sprintf('<comment>Пользователь %s не существует.</comment>', $login));
             return Command::SUCCESS;
         }
+        $revoked = (new TokenRepository())->revoke([$login]);
         $output->writeln(sprintf('<info>Пользователь %s удалён.</info>', $login));
+        $output->writeln(sprintf('<info>Отозвано токенов: %d.</info>', $revoked));
         return Command::SUCCESS;
     }
 }

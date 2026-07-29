@@ -11,9 +11,9 @@ final readonly class AuthResponseDto implements \JsonSerializable
     {
     }
 
-    /** @return array{login: string, token: string, expiresIn: int} */
+    /** @return array{login: string, expiresIn: int} */
     public function jsonSerialize(): array
     {
-        return ['login' => $this->login, 'token' => $this->token, 'expiresIn' => $this->expiresIn];
+        return ['login' => $this->login, 'expiresIn' => $this->expiresIn];
     }
 }

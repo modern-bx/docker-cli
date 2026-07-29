@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace DockerCli\Panel\Http;
 
+use DockerCli\Panel\Dto\AuthResponseDto;
 use DockerCli\Panel\Dto\ErrorResponseDto;
 use DockerCli\Panel\Dto\FileResponseDto;
+use DockerCli\Panel\Dto\LogoutResponseDto;
+use DockerCli\Panel\JwtTokenService;
 use Psr\Http\Message\ResponseInterface;
 use React\Http\Message\Response;
 
@@ -17,7 +20,18 @@ final readonly class ResponseEmitter
 
     public function emit(object $dto): ResponseInterface
     {
-        return $dto instanceof FileResponseDto ? $this->file($dto) : $this->json(200, $dto);
+        if ($dto instanceof FileResponseDto) return $this->file($dto);
+        $response = $this->json(200, $dto);
+        if ($dto instanceof AuthResponseDto) {
+            return $response->withHeader(
+                'Set-Cookie',
+                JwtTokenService::COOKIE . '=' . rawurlencode($dto->token)
+                    . '; Max-Age=' . $dto->expiresIn . '; Path=/; Secure; HttpOnly; SameSite=Strict',
+            );
+        }
+        return $dto instanceof LogoutResponseDto
+            ? $response->withHeader('Set-Cookie', JwtTokenService::COOKIE . '=; Max-Age=0; Path=/; Secure; HttpOnly; SameSite=Strict')
+            : $response;
     }
 
     public function json(int $status, \JsonSerializable $dto): ResponseInterface
