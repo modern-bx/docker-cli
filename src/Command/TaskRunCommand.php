@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace DockerCli\Command;
 
+use DockerCli\Notification\NotificationRepository;
 use DockerCli\Project\ProjectRegistry;
 use DockerCli\Task\TaskRepository;
-use DockerCli\Task\TaskExecutionContext;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,6 +19,7 @@ final class TaskRunCommand extends Command
     public function __construct(
         private readonly ?TaskRepository $repository = null,
         private readonly ?ProjectRegistry $registry = null,
+        private readonly ?NotificationRepository $notifications = null,
     ) {
         parent::__construct('task:run');
         $this->setDescription('Найти и выполнить пользовательскую задачу.');
@@ -54,7 +55,12 @@ final class TaskRunCommand extends Command
 
         $environment = getenv();
         $environment = is_array($environment) ? $environment : [];
-        $environment = TaskExecutionContext::apply($environment, $code);
+        $contextFile = tempnam('/tmp', '.docker-cli-command-context-');
+        if ($contextFile === false) {
+            $output->writeln('<error>Не удалось создать контекст выполнения команды.</error>');
+            return Command::FAILURE;
+        }
+        $environment[CommandContext::FILE_ENVIRONMENT_VARIABLE] = $contextFile;
         foreach ($values as $name => $value) {
             $environment[$this->normalizeName($name)] = (string) $value;
         }
@@ -68,6 +74,11 @@ final class TaskRunCommand extends Command
             }
 
             $exitCode = proc_close($process);
+            foreach (CommandContext::read($contextFile) as $notification) {
+                ($this->notifications ?? new NotificationRepository())->create(
+                    $notification['origin'], $notification['class'], $notification['level'], $notification['message'],
+                );
+            }
 
             return is_int($exitCode) ? $exitCode : Command::FAILURE;
         } finally {
@@ -76,6 +87,7 @@ final class TaskRunCommand extends Command
             } else {
                 @unlink($scriptFile);
             }
+            @unlink($contextFile);
         }
     }
 

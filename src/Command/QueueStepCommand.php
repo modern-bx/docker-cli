@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DockerCli\Command;
 
+use DockerCli\Notification\NotificationRepository;
 use DockerCli\Queue\QueueItemValidator;
 use DockerCli\Queue\QueueRepository;
 use DockerCli\Task\TaskRepository;
@@ -76,7 +77,7 @@ final class QueueStepCommand extends Command
                     $task['arguments'] ?? [],
                     array_keys($task['arguments'] ?? []),
                 );
-                $runner = new TaskRunCommand($tasks);
+                $runner = new TaskRunCommand($tasks, notifications: new NotificationRepository($repository->configDirectory()));
                 $runner->setApplication($this->getApplication());
                 $exitCode = $runner->run(new ArrayInput($arguments), $output);
                 $repository->trace($active, $queue, $item, sprintf('Задача %s завершилась с кодом %d.', $task['code'], $exitCode), $task['code'], $task['project'] ?? null, $exitCode);
