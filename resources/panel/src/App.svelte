@@ -52,6 +52,8 @@
   let themeOpen = false;
   let notificationsOpen = false;
   let notifications = [];
+  let notificationsInitialized = false;
+  const knownNotificationFiles = new Set();
   let theme = 'vox';
   let mode = 'system';
   let font = 'ubuntu';
@@ -474,6 +476,9 @@
     profileOpen = false;
     projectsLoading = false;
     projectsError = '';
+    notifications = [];
+    notificationsInitialized = false;
+    knownNotificationFiles.clear();
     logRequestId += 1;
     localStorage.removeItem(TOKEN_KEY);
     disconnectPanelChannel(false);
@@ -502,7 +507,9 @@
       queuePaused = data.queue.paused === true;
     }
     if (data.notifications && Array.isArray(data.notifications.notifications)) {
-      notifications = data.notifications.notifications;
+      const receivedNotifications = data.notifications.notifications;
+      notifyNewNotifications(receivedNotifications);
+      notifications = receivedNotifications;
     }
     projectsLoading = false;
     if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) navigateToProject('', 'info');
@@ -551,6 +558,40 @@
       error = cause instanceof Error ? cause.message : 'Не удалось переместить уведомление в архив.';
       errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
     }
+  }
+
+  async function archiveAllNotifications() {
+    try {
+      const data = await api('/api/notifications', { method: 'DELETE' });
+      notifications = data.notifications;
+    } catch (cause) {
+      errorTitle = 'Не удалось очистить уведомления';
+      error = cause instanceof Error ? cause.message : 'Не удалось переместить уведомления в архив.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    }
+  }
+
+  async function notifyNewNotifications(receivedNotifications) {
+    if (!notificationsInitialized) {
+      receivedNotifications.forEach((notification) => knownNotificationFiles.add(notification.file));
+      notificationsInitialized = true;
+      return;
+    }
+    const newNotifications = receivedNotifications.filter((notification) => !knownNotificationFiles.has(notification.file));
+    newNotifications.forEach((notification) => knownNotificationFiles.add(notification.file));
+    if (newNotifications.length === 0 || !('Notification' in window)) return;
+    let permission = Notification.permission;
+    if (permission === 'default') {
+      try {
+        permission = await Notification.requestPermission();
+      } catch {
+        return;
+      }
+    }
+    if (permission !== 'granted') return;
+    newNotifications.forEach((notification) => {
+      new Notification('docker-cli', { body: notification.message, tag: notification.file });
+    });
   }
 
   function renderNotificationMarkdown(message) {
@@ -852,6 +893,10 @@
           </button>
           {#if notificationsOpen}
             <div class="notification-menu card preset-filled-surface-100-900 absolute right-0 mt-2 shadow-2xl z-20" role="dialog" aria-label="Уведомления">
+              <div class="notification-menu-actions">
+                <button class="btn btn-sm preset-tonal" type="button" disabled={notifications.length === 0} onclick={archiveAllNotifications}>Очистить</button>
+              </div>
+              <div class="system-menu-divider" aria-hidden="true"></div>
               {#if notifications.length === 0}<p class="notification-empty">Уведомлений нет</p>{/if}
               {#each notifications as notification (notification.file)}
                 <article class="notification-item">

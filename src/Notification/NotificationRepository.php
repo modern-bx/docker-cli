@@ -92,6 +92,18 @@ final class NotificationRepository
         }
     }
 
+    public function archiveAll(): void
+    {
+        $this->initialize();
+        foreach (glob(join_path($this->directory('current'), '*.yaml')) ?: [] as $source) {
+            if (!is_file($source)) continue;
+            $target = join_path($this->directory('archive'), basename($source));
+            if (!rename($source, $target)) {
+                throw new \RuntimeException('Не удалось архивировать все уведомления.');
+            }
+        }
+    }
+
     private function directory(string $status): string
     {
         $root = $this->configDirectory;

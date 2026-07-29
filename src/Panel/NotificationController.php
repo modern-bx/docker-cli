@@ -34,4 +34,15 @@ final readonly class NotificationController
         }
         return $this->current(new EmptyRequestDto());
     }
+
+    #[Route('DELETE', '/api/notifications', EmptyRequestDto::class, NotificationListDto::class)]
+    public function archiveAll(EmptyRequestDto $request): NotificationListDto
+    {
+        try {
+            $this->notifications->archiveAll();
+        } catch (\RuntimeException $exception) {
+            throw new NotificationActionException($exception->getMessage());
+        }
+        return $this->current($request);
+    }
 }

@@ -228,6 +228,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .notification-badge.info { background: var(--color-success-500); }
 .notification-badge.debug { background: var(--color-surface-200); }
 .notification-menu { width: min(28rem, calc(100vw - 2rem)); max-height: min(34rem, 70vh); overflow-y: auto; padding: 0.35rem; }
+.notification-menu-actions { display: flex; align-items: center; justify-content: center; padding: 0.8rem; }
 .notification-empty { padding: 1.25rem; color: var(--color-surface-500); text-align: center; }
 .notification-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem; padding: 0.85rem; border-bottom: 1px solid var(--color-surface-200); }
 .dark .notification-item { border-color: var(--color-surface-800); }
