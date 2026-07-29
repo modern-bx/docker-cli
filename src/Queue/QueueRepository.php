@@ -77,7 +77,7 @@ final class QueueRepository
     {
         $files = glob(join_path($this->queueDirectory($queue), '10-pending', '*.yaml')) ?: [];
         $files = array_values(array_filter($files, 'is_file'));
-        sort($files, SORT_STRING);
+        $this->sortTimestampedFiles($files);
 
         return $files[0] ?? null;
     }
@@ -86,7 +86,7 @@ final class QueueRepository
     public function create(string $queue, string $code, array $item): string
     {
         $this->initialize($queue);
-        $timestamp = (int) floor(microtime(true) * 1_000_000);
+        $timestamp = (int) floor(microtime(true) * 1_000);
         $safeCode = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', $code), '.-');
         $safeCode = $safeCode !== '' ? $safeCode : 'task';
         for ($counter = 0; $counter <= 999; ++$counter) {
@@ -155,7 +155,7 @@ final class QueueRepository
         foreach ($directories as $queueCode => $directory) {
             foreach ($status === null ? self::STATUSES : [$status] as $statusCode) {
                 $files = glob(join_path($directory, $statusCode, '*.yaml')) ?: [];
-                sort($files, SORT_STRING);
+                $this->sortTimestampedFiles($files);
                 foreach (array_filter($files, 'is_file') as $file) {
                     $name = basename($file);
                     $items[] = [
@@ -185,6 +185,17 @@ final class QueueRepository
             strlen($timestamp) <= 13 => (int) $timestamp * 1_000,
             default => (int) substr($timestamp, 0, 16),
         };
+    }
+
+    /** @param list<string> $files */
+    private function sortTimestampedFiles(array &$files): void
+    {
+        usort($files, function (string $left, string $right): int {
+            $leftTimestamp = explode('.', basename($left), 2)[0];
+            $rightTimestamp = explode('.', basename($right), 2)[0];
+            return [$this->timestampMicroseconds($leftTimestamp, $left), basename($left)]
+                <=> [$this->timestampMicroseconds($rightTimestamp, $right), basename($right)];
+        });
     }
 
     public function delete(string $queue, string $file): void

@@ -31,7 +31,7 @@ final class TokenRepository
         try {
             $counter = 1;
             do {
-                $file = join_path($this->directory, sprintf('%d.%d.%s.yaml', $issuedAt, $counter++, $login));
+                $file = join_path($this->directory, sprintf('%d.%d.%s.yaml', $issuedAt * 1_000, $counter++, $login));
             } while (file_exists($file));
             $data = [
                 'meta' => ['schema' => 'token.jwt', 'version' => 0.1],

@@ -32,7 +32,7 @@ final class NotificationRepository
         }
         $this->initialize();
         $time ??= new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-        $timestamp = (int) floor(microtime(true) * 1_000_000);
+        $timestamp = (int) floor(microtime(true) * 1_000);
         $code = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', $origin), '.-') ?: 'notification';
         $data = [
             'meta' => ['schema' => 'notification', 'version' => 0.1],
