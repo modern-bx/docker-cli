@@ -14,12 +14,14 @@ use DockerCli\Panel\Enum\ProjectActionEnum;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Queue\QueueRepository;
 
 final class ProjectController
 {
     public function __construct(
         private readonly ProjectRegistry $projects,
         private readonly ?SystemCompose $compose = null,
+        private readonly ?QueueRepository $queues = null,
     )
     {
     }
@@ -44,7 +46,7 @@ final class ProjectController
             (new OpenRestyHostRenderer())->render();
             $this->reloadOpenResty();
         } elseif (ProjectActionEnum::isWipe($action)) {
-            $this->wipe($name, $project);
+            $this->enqueueWipe($name);
         } else {
             throw new ProjectActionException('Неизвестное действие.', 400);
         }
@@ -120,30 +122,21 @@ final class ProjectController
         return is_string($value) && $value !== '' ? $value : null;
     }
 
-    /** @param array<string, mixed> $project */
-    private function wipe(string $name, array $project): void
+    private function enqueueWipe(string $name): void
     {
-        $root = is_string($project['root'] ?? null) ? realpath($project['root']) : false;
-        if ($root === false || $root === DIRECTORY_SEPARATOR || !is_dir($root . '/.docker-cli')) {
-            throw new ProjectActionException(sprintf('Небезопасная или отсутствующая директория проекта "%s".', $name), 422);
+        $item = [
+            'meta' => ['schema' => 'queue-item', 'version' => '0.1'],
+            'queue-item' => ['tasks' => [[
+                'code' => 'core.project.wipe',
+                'arguments' => [],
+                'project' => $name,
+            ]]],
+        ];
+        try {
+            ($this->queues ?? new QueueRepository())->create('default', 'core.project.wipe', $item);
+        } catch (\InvalidArgumentException|\RuntimeException $exception) {
+            throw new ProjectActionException($exception->getMessage(), 500);
         }
-        foreach (scandir($root) ?: [] as $entry) {
-            if ($entry !== '.' && $entry !== '..' && $entry !== '.docker-cli') {
-                $this->removePath($root . DIRECTORY_SEPARATOR . $entry);
-            }
-        }
-    }
-
-    private function removePath(string $path): void
-    {
-        if (is_link($path) || !is_dir($path)) {
-            if (!unlink($path)) throw new ProjectActionException(sprintf('Не удалось удалить "%s".', $path));
-            return;
-        }
-        foreach (scandir($path) ?: [] as $entry) {
-            if ($entry !== '.' && $entry !== '..') $this->removePath($path . DIRECTORY_SEPARATOR . $entry);
-        }
-        if (!rmdir($path)) throw new ProjectActionException(sprintf('Не удалось удалить директорию "%s".', $path));
     }
 
     private function reloadOpenResty(): void

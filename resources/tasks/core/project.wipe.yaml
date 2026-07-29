@@ -1,0 +1,12 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Удаление файлов проекта
+  code: core.project.wipe
+  type: shell
+  context: project
+  description: |
+    Удаляет все файлы проекта, за исключением папки .docker-cli
+  action: |
+    docker-cli project:wipe --project={{ project }}

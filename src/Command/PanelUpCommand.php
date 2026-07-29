@@ -98,9 +98,10 @@ final class PanelUpCommand extends Command
         $assets = dirname(__DIR__, 2) . '/resources/panel/dist';
         $users = new UserRepository($salt);
         $tokens = new JwtTokenService($jwtSecret);
-        $projects = new ProjectController(new ProjectRegistry(), $compose);
+        $queues = new QueueRepository();
+        $projects = new ProjectController(new ProjectRegistry(), $compose, $queues);
         $system = new SystemController($compose);
-        $queue = new QueueController(new QueueRepository());
+        $queue = new QueueController($queues);
         $responses = new ResponseEmitter($assets);
         $state = new StateController($projects, $system, $queue);
         $router = new Router(

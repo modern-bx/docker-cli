@@ -229,6 +229,8 @@ final class QueueRepository
     /** @param array<string, mixed> $item */
     public function trace(string $file, string $queue, array &$item, string $message, ?string $taskCode = null, ?string $project = null, ?int $result = null): void
     {
+        $projects = $project !== null ? [$project] : $this->projectsFromItem($item, $taskCode);
+        $project = $projects !== [] ? implode(', ', $projects) : null;
         $timestamp = sprintf('%.6f', microtime(true));
         while (isset($item['trace'][$timestamp])) {
             $timestamp = sprintf('%.6f', (float) $timestamp + 0.000001);
@@ -245,6 +247,7 @@ final class QueueRepository
             'queueItem' => $name,
             'itemCode' => $parts[2] ?? pathinfo($name, PATHINFO_FILENAME),
             'project' => $project,
+            'projects' => $projects,
             'queueCode' => $queue,
             'status' => basename(dirname($file)),
             'taskCode' => $taskCode,
@@ -255,6 +258,34 @@ final class QueueRepository
         if (file_put_contents(join_path($this->configDirectory(), 'logs', 'queue', $queue . '.jsonl'), $line, FILE_APPEND | LOCK_EX) === false) {
             throw new \RuntimeException('Не удалось записать общий лог очереди.');
         }
+    }
+
+    /** @param array<string, mixed> $item @return list<string> */
+    private function projectsFromItem(array $item, ?string $taskCode): array
+    {
+        $projects = [];
+        foreach ($item['queue-item']['tasks'] ?? [] as $task) {
+            if (!is_array($task) || ($taskCode !== null && ($task['code'] ?? null) !== $taskCode)) {
+                continue;
+            }
+            $project = $task['project'] ?? null;
+            if (is_string($project) && $project !== '' && !in_array($project, $projects, true)) {
+                $projects[] = $project;
+            }
+        }
+
+        return $projects;
+    }
+
+    /** @param array<string, mixed> $record @return list<string> */
+    private function projectsFromRecord(array $record): array
+    {
+        if (is_array($record['projects'] ?? null)) {
+            return array_values(array_filter($record['projects'], static fn (mixed $project): bool => is_string($project) && $project !== ''));
+        }
+        $project = $record['project'] ?? null;
+
+        return is_string($project) && $project !== '' ? [$project] : [];
     }
 
     /** @return array{items: list<array<string, mixed>>, total: int, projects: list<string>} */
@@ -269,8 +300,9 @@ final class QueueRepository
                 try {
                     $record = json_decode($line, true, 16, JSON_THROW_ON_ERROR);
                     if (!is_array($record)) continue;
-                    if (is_string($record['project'] ?? null) && $record['project'] !== '') $projects[] = $record['project'];
-                    if ($project !== null && ($record['project'] ?? null) !== $project) continue;
+                    $recordProjects = $this->projectsFromRecord($record);
+                    array_push($projects, ...$recordProjects);
+                    if ($project !== null && !in_array($project, $recordProjects, true)) continue;
                     if ($status !== null && ($record['status'] ?? null) !== $status) continue;
                     if ($queueItem !== null && !str_contains(mb_strtolower((string) ($record['queueItem'] ?? '')), mb_strtolower($queueItem))) continue;
                     if ($itemCode !== null && !str_contains(mb_strtolower((string) ($record['itemCode'] ?? '')), mb_strtolower($itemCode))) continue;
