@@ -220,20 +220,12 @@
       loadLogs();
       return;
     }
-    if (segments[0] === 'settings' && ['projects', 'security'].includes(segments[1])) {
-      if (segments[1] === 'security' && segments.length !== 2) {
-        window.location.hash = '#/settings/security';
-        return;
-      }
+    if (segments.length === 2 && segments[0] === 'settings' && ['projects', 'security'].includes(segments[1])) {
       activeSection = 'settings';
       settingsTab = segments[1];
       selectedProjectName = '';
       if (settingsTab === 'projects') loadProjectsSettings();
       else loadSecuritySettings();
-      return;
-    }
-    if (segments[0] === 'security') {
-      window.location.hash = '#/settings/security';
       return;
     }
     activeSection = 'projects';

@@ -313,9 +313,9 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
   .project-fields { grid-template-columns: 1fr; }
 }
 .locations-card h2 { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 1rem; font-size: 1rem; font-weight: 700; }
-.location-list { display: grid; gap: 1rem; }
+.location-list { display: grid; gap: 0.4rem; }
 .location-item { display: grid; gap: 0.5rem; }
-.location-row { display: flex; align-items: center; gap: 0.5rem; }
+.location-row { display: flex; align-items: center; gap: 0.6rem; }
 .location-row > .input { min-width: 12rem; flex: 1; }
 .location-default { flex: none; cursor: pointer; }
 .location-default-help { flex: none; }
