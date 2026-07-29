@@ -6,12 +6,14 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Config\SystemCompose;
+use DockerCli\Notification\NotificationRepository;
 use DockerCli\Panel\AssetController;
 use DockerCli\Panel\AuthController;
 use DockerCli\Panel\Http\ControllerInvoker;
 use DockerCli\Panel\Http\Middleware\AuthMiddleware;
 use DockerCli\Panel\Http\ResponseEmitter;
 use DockerCli\Panel\JwtTokenService;
+use DockerCli\Panel\NotificationController;
 use DockerCli\Panel\ProjectController;
 use DockerCli\Panel\QueueController;
 use DockerCli\Panel\Router;
@@ -102,10 +104,11 @@ final class PanelUpCommand extends Command
         $projects = new ProjectController(new ProjectRegistry(), $compose, $queues);
         $system = new SystemController($compose);
         $queue = new QueueController($queues);
+        $notifications = new NotificationController(new NotificationRepository());
         $responses = new ResponseEmitter($assets);
-        $state = new StateController($projects, $system, $queue);
+        $state = new StateController($projects, $system, $queue, $notifications);
         $router = new Router(
-            [new AuthController($users, $tokens), $state, $projects, $system, $queue, new AssetController()],
+            [new AuthController($users, $tokens), $state, $projects, $system, $queue, $notifications, new AssetController()],
             new ControllerInvoker(),
             new AuthMiddleware($tokens, $responses),
             $responses,

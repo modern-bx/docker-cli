@@ -220,6 +220,21 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .login-error-actions .error-alert-button { background: var(--color-error-500); color: white; }
 
 .theme-trigger { width: auto; gap: 0.35rem; padding-inline: 0.65rem; }
+.notification-trigger { position: relative; }
+.notification-badge { position: absolute; top: -0.35rem; right: -0.45rem; display: grid; min-width: 1.15rem; height: 1.15rem; place-items: center; padding: 0 0.25rem; border: 2px solid var(--color-surface-100); border-radius: 999px; color: white; font-size: 0.62rem; font-weight: 700; line-height: 1; }
+.dark .notification-badge { border-color: var(--color-surface-900); }
+.notification-badge.error { background: var(--color-error-500); }
+.notification-badge.warn { background: #f59e0b; }
+.notification-badge.info { background: var(--color-success-500); }
+.notification-badge.debug { background: var(--color-surface-200); color: var(--color-surface-800); }
+.notification-menu { width: min(28rem, calc(100vw - 2rem)); max-height: min(34rem, 70vh); overflow-y: auto; padding: 0.35rem; }
+.notification-empty { padding: 1.25rem; color: var(--color-surface-500); text-align: center; }
+.notification-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem; padding: 0.85rem; border-bottom: 1px solid var(--color-surface-200); }
+.dark .notification-item { border-color: var(--color-surface-800); }
+.notification-item:last-child { border-bottom: 0; }
+.notification-item time { color: var(--color-surface-500); font-size: 0.7rem; }
+.notification-item p { margin-top: 0.35rem; overflow-wrap: anywhere; white-space: pre-wrap; font-size: 0.85rem; }
+.notification-delete { align-self: center; flex: none; color: var(--color-error-600); }
 .theme-trigger svg { width: 0.9rem; fill: none; stroke: currentColor; stroke-width: 2; }
 .theme-dot { width: 1.15rem; height: 1.15rem; border-radius: 999px; background: var(--color-primary-500); box-shadow: inset 0 0 0 2px color-mix(in oklab, white 70%, transparent); }
 .theme-menu { width: min(25rem, calc(100vw - 2rem)); }

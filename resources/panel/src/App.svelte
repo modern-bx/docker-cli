@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { Combobox, Dialog, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { Bell, ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { getLogs, getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
@@ -49,6 +49,8 @@
   let submitting = false;
   let profileOpen = false;
   let themeOpen = false;
+  let notificationsOpen = false;
+  let notifications = [];
   let theme = 'vox';
   let mode = 'system';
   let font = 'ubuntu';
@@ -112,6 +114,11 @@
       : queueItems.some((item) => item.status === '40-failure')
         ? 'failure'
         : queueItems.some((item) => item.status === '20-active') ? 'active' : 'healthy';
+  $: notificationBadgeLevel = notifications.some((item) => item.level === 'error')
+    ? 'error'
+    : notifications.some((item) => item.level === 'warn')
+      ? 'warn'
+      : notifications.some((item) => item.level === 'info') ? 'info' : 'debug';
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
   $: if (selectedProject && selectedProject.name !== notesProjectName) {
@@ -399,6 +406,7 @@
     projectContextMenu = null;
     if (event.target instanceof Element && event.target.closest('.header-menu')) return;
     themeOpen = false;
+    notificationsOpen = false;
     profileOpen = false;
     systemOpen = false;
     queueOpen = false;
@@ -492,6 +500,9 @@
       queueItems = data.queue.items;
       queuePaused = data.queue.paused === true;
     }
+    if (data.notifications && Array.isArray(data.notifications.notifications)) {
+      notifications = data.notifications.notifications;
+    }
     projectsLoading = false;
     if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) navigateToProject('', 'info');
   }
@@ -528,6 +539,17 @@
   function formatQueueDate(value) {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString('ru-RU');
+  }
+
+  async function archiveNotification(notification) {
+    try {
+      const data = await api(`/api/notifications/${encodeURIComponent(notification.file)}`, { method: 'DELETE' });
+      notifications = data.notifications;
+    } catch (cause) {
+      errorTitle = 'Не удалось удалить уведомление';
+      error = cause instanceof Error ? cause.message : 'Не удалось переместить уведомление в архив.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    }
   }
 
   async function deleteQueueItem(item) {
@@ -746,7 +768,7 @@
 
 <svelte:window
   onclick={closeMenus}
-  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; } }}
+  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; notificationsOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; } }}
 />
 
 <svelte:head><title>{token ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
@@ -817,8 +839,30 @@
       </div>
     {/if}
     <div class="ml-auto flex items-center gap-3">
+      {#if token}
+        <div class="relative header-menu">
+          <button class="btn-icon preset-tonal notification-trigger" type="button" aria-label="Уведомления" aria-haspopup="dialog" aria-expanded={notificationsOpen} onclick={() => { notificationsOpen = !notificationsOpen; themeOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; }}>
+            <Bell size={19} aria-hidden="true" />
+            {#if notifications.length > 0}<span class={`notification-badge ${notificationBadgeLevel}`}>{notifications.length}</span>{/if}
+          </button>
+          {#if notificationsOpen}
+            <div class="notification-menu card preset-filled-surface-100-900 absolute right-0 mt-2 shadow-2xl z-20" role="dialog" aria-label="Уведомления">
+              {#if notifications.length === 0}<p class="notification-empty">Уведомлений нет</p>{/if}
+              {#each notifications as notification (notification.file)}
+                <article class="notification-item">
+                  <div>
+                    <time datetime={notification.time}>{formatQueueDate(notification.time)}</time>
+                    <p>{notification.message}</p>
+                  </div>
+                  <button class="btn-icon preset-tonal notification-delete" type="button" aria-label="Удалить уведомление" title="Удалить" onclick={() => archiveNotification(notification)}><Trash2 size={16} aria-hidden="true" /></button>
+                </article>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
       <div class="relative header-menu">
-        <button class="btn-icon preset-tonal theme-trigger" type="button" aria-label="Настроить оформление" aria-haspopup="dialog" aria-expanded={themeOpen} onclick={() => { themeOpen = !themeOpen; profileOpen = false; }}>
+        <button class="btn-icon preset-tonal theme-trigger" type="button" aria-label="Настроить оформление" aria-haspopup="dialog" aria-expanded={themeOpen} onclick={() => { themeOpen = !themeOpen; notificationsOpen = false; profileOpen = false; }}>
           <span class="theme-dot" aria-hidden="true"></span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
         </button>
@@ -873,7 +917,7 @@
       </div>
       {#if token}
         <div class="relative header-menu">
-          <button class="btn preset-tonal" type="button" aria-expanded={profileOpen} onclick={() => { profileOpen = !profileOpen; themeOpen = false; }}>{currentLogin}</button>
+          <button class="btn preset-tonal" type="button" aria-expanded={profileOpen} onclick={() => { profileOpen = !profileOpen; themeOpen = false; notificationsOpen = false; }}>{currentLogin}</button>
           {#if profileOpen}
             <div class="card preset-filled-surface-100-900 absolute right-0 mt-2 min-w-44 p-2 shadow-xl z-10">
               <button class="btn w-full justify-start hover:preset-tonal-error" type="button" onclick={logout}>Выйти</button>
