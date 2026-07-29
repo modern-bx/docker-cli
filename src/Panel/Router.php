@@ -68,7 +68,7 @@ final readonly class Router
                 return $this->responses->json(400, new ErrorResponseDto($exception->getMessage()));
             } catch (UnauthorizedException $exception) {
                 return $this->responses->json(401, new ErrorResponseDto($exception->getMessage()));
-            } catch (ProjectActionException|QueueActionException|SystemActionException $exception) {
+            } catch (ProjectActionException|QueueActionException|SystemActionException|NotificationActionException $exception) {
                 return $this->responses->json($exception->httpStatus, new ErrorResponseDto($exception->getMessage()));
             }
         };
