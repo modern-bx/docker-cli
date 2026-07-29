@@ -191,6 +191,10 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .project-tab-content { margin-top: 1rem; padding: 1.25rem; border: 1px solid var(--color-surface-200); }
 .dark .project-tab-content { border-color: var(--color-surface-800); }
 .notes-content { display: grid; gap: 1rem; }
+.security-content { display: flex; align-items: center; gap: 0.5rem; }
+.security-option { display: inline-flex; align-items: center; gap: 0.625rem; cursor: pointer; }
+.security-help { display: inline-flex; padding: 0; border: 0; background: transparent; color: var(--color-surface-500); cursor: help; }
+.security-tooltip { z-index: 30; max-width: 22rem; padding: 0.625rem 0.75rem; font-size: 0.875rem; line-height: 1.35; }
 .notes-tags-input { display: flex; min-height: 2.65rem; height: auto; align-items: center; gap: 0.4rem; padding-block: 0.35rem; flex-wrap: wrap; }
 .notes-tags-input input { min-width: 10rem; flex: 1; border: 0; outline: 0; background: transparent; }
 .label .label-text { display: block; margin-bottom: 0.375rem; }

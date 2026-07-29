@@ -1,9 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { Combobox, Dialog, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { Bell, ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
+  import { Bell, CircleHelp, ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
-  import { getLogs, getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes } from './api.js';
+  import { getLogs, getProjects, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity } from './api.js';
 
   const TOKEN_KEY = 'docker-cli-panel-token';
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -102,6 +102,8 @@
   let noteTagInput = '';
   let noteDescription = '';
   let notesSaving = false;
+  let securitySaving = false;
+  let protectedAlert = null;
   const panelServices = ['dnsdock', 'panel-gateway', 'traefik'];
   const PANEL_CHANNEL = 'panel:system';
   let panelSocket = null;
@@ -377,6 +379,21 @@
       projectsError = cause instanceof Error ? cause.message : 'Не удалось сохранить заметки.';
     } finally {
       notesSaving = false;
+    }
+  }
+
+  async function setProjectProtected(protectedProject) {
+    if (!selectedProject || securitySaving) return;
+    const projectName = selectedProject.name;
+    securitySaving = true;
+    projectsError = '';
+    try {
+      const data = await saveProjectSecurity(api, projectName, protectedProject);
+      projects = data.projects;
+    } catch (cause) {
+      projectsError = cause instanceof Error ? cause.message : 'Не удалось сохранить настройки безопасности.';
+    } finally {
+      securitySaving = false;
     }
   }
 
@@ -679,6 +696,10 @@
   }
 
   function requestProjectAction(action, project) {
+    if (action === 'wipe' && project.protected) {
+      protectedAlert = project;
+      return;
+    }
     if (action === 'disable' || action === 'wipe') {
       projectConfirmation = { action, project };
       return;
@@ -1066,6 +1087,7 @@
               <nav class="project-detail-tabs" aria-label={`Разделы проекта ${selectedProject.name}`}>
                 <a class:active={projectDetailTab === 'info'} class="project-detail-tab" href={projectHash(selectedProject.name, 'info')} aria-current={projectDetailTab === 'info' ? 'page' : undefined}>Общее</a>
                 <a class:active={projectDetailTab === 'notes'} class="project-detail-tab" href={projectHash(selectedProject.name, 'notes')} aria-current={projectDetailTab === 'notes' ? 'page' : undefined}>Заметки</a>
+                <a class:active={projectDetailTab === 'security'} class="project-detail-tab" href={projectHash(selectedProject.name, 'security')} aria-current={projectDetailTab === 'security' ? 'page' : undefined}>Безопасность</a>
                 <a class:active={projectDetailTab === 'journal'} class="project-detail-tab" href={projectHash(selectedProject.name, 'journal')} aria-current={projectDetailTab === 'journal' ? 'page' : undefined}>Журнал</a>
               </nav>
               <div class="project-details-scroll">
@@ -1107,6 +1129,17 @@
                     <span class="label-text">Заметки</span>
                     <textarea class="textarea notes-textarea" bind:value={noteDescription} rows="8" placeholder="Произвольные заметки о проекте"></textarea>
                   </label>
+                </section>
+                {:else if projectDetailTab === 'security'}
+                <section class="project-tab-content security-content card preset-filled-surface-100-900" aria-label="Безопасность">
+                  <label class="security-option">
+                    <input class="checkbox" type="checkbox" checked={selectedProject.protected} disabled={securitySaving} onchange={(event) => setProjectProtected(event.currentTarget.checked)} />
+                    <span>Защищенный проект</span>
+                  </label>
+                  <Tooltip positioning={{ placement: 'right' }}>
+                    <Tooltip.Trigger class="security-help" aria-label="О защите проекта"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                    <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Для защищенных проектов запрещены команды, которые могут изменить их данные - и файлы, и базы данных</Tooltip.Content></Tooltip.Positioner>
+                  </Tooltip>
                 </section>
                 {:else}
                 <section class="project-log-view" aria-label={`Журнал проекта ${selectedProject.name}`}>
@@ -1252,6 +1285,17 @@
           {projectConfirmation?.action === 'wipe' ? 'Стереть' : 'Отключить'}
         </button>
       </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(protectedAlert)} role="alertdialog" onOpenChange={({ open }) => { if (!open) protectedAlert = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Проект защищен</Dialog.Title>
+      <Dialog.Description class="login-error-description">Проект «{protectedAlert?.name}» защищен. Стирание файлов и баз данных запрещено.</Dialog.Description>
+      <div class="login-error-actions"><Dialog.CloseTrigger class="btn preset-filled-primary-500" type="button">Закрыть</Dialog.CloseTrigger></div>
     </Dialog.Content>
   </Dialog.Positioner>
 </Dialog>
