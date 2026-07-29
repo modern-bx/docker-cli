@@ -11,11 +11,11 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class SessionTokenRevokeCommand extends Command
+final class PanelTokenRevokeCommand extends Command
 {
     public function __construct()
     {
-        parent::__construct('session:token-revoke');
+        parent::__construct('panel:token-revoke');
         $this->setDescription('Отозвать все токены сессий указанных пользователей панели.');
         $this->addArgument('users', InputArgument::REQUIRED, 'Логины пользователей через запятую.');
     }
