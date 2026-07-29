@@ -40,7 +40,7 @@ html[data-font='noto'] {
 }
 html, body, #app { min-height: 100%; }
 body { margin: 0; }
-body, button, input, select, textarea { font-family: var(--panel-font-family) !important; }
+body, button, input, select, textarea, h1, h2, h3, h4, h5, h6 { font-family: var(--panel-font-family) !important; }
 html[data-font='ubuntu'] input:is(:autofill, :-moz-autofill, :-moz-autofill-preview) { font-family: Ubuntu, sans-serif !important; }
 html[data-font='noto'] input:is(:autofill, :-moz-autofill, :-moz-autofill-preview) { font-family: "Noto Sans", sans-serif !important; }
 pre, code, kbd, samp { font-family: var(--panel-mono-font-family) !important; }
