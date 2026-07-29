@@ -312,3 +312,11 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
   .dark .project-sidebar { border-color: var(--color-surface-800); }
   .project-fields { grid-template-columns: 1fr; }
 }
+.locations-card h2 { margin-bottom: 1rem; font-size: 1rem; font-weight: 700; }
+.location-list { display: grid; gap: 1rem; }
+.location-item { display: grid; gap: 0.5rem; }
+.location-row { display: grid; grid-template-columns: minmax(12rem, 1fr) auto auto; align-items: center; gap: 0.5rem; }
+.location-default { display: inline-flex; width: fit-content; align-items: center; gap: 0.5rem; font-size: 0.875rem; cursor: pointer; }
+.location-delete { color: var(--color-error-600); }
+.dark .location-delete { color: var(--color-error-400); }
+@media (max-width: 700px) { .location-row { grid-template-columns: minmax(0, 1fr) auto; } .location-delete { grid-column: 2; } }

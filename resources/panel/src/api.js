@@ -87,3 +87,14 @@ export async function saveSecuritySettings(request, maximumSessionHours) {
     body: JSON.stringify({ maximumSessionHours }),
   });
 }
+
+export async function getProjectsSettings(request) {
+  return request('/api/settings/projects');
+}
+
+export async function saveProjectsSettings(request, locations) {
+  return request('/api/settings/projects', {
+    method: 'POST',
+    body: JSON.stringify({ locations }),
+  });
+}

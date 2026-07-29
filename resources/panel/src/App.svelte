@@ -1,9 +1,9 @@
 <script>
   import { onMount } from 'svelte';
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { Bell, CircleHelp, ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { Bell, CircleHelp, ExternalLink, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
-  import { getLogs, getProjects, getSecuritySettings, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveSecuritySettings } from './api.js';
+  import { getLogs, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -106,6 +106,9 @@
   let maximumSessionHours = 8;
   let settingsLoading = false;
   let settingsSaving = false;
+  let projectLocations = [{ path: '', default: true }];
+  let projectSettingsLoading = false;
+  let projectSettingsSaving = false;
   let protectedAlert = null;
   const panelServices = ['dnsdock', 'panel-gateway', 'traefik'];
   const PANEL_CHANNEL = 'panel:system';
@@ -216,6 +219,12 @@
       loadLogs();
       return;
     }
+    if (segments[0] === 'settings' && segments[1] === 'projects') {
+      activeSection = 'settings';
+      selectedProjectName = '';
+      loadProjectsSettings();
+      return;
+    }
     if (segments[0] === 'security') {
       activeSection = 'security';
       selectedProjectName = '';
@@ -282,6 +291,56 @@
       }
     } finally {
       if (requestId === logRequestId) logsLoading = false;
+    }
+  }
+
+  async function loadProjectsSettings() {
+    if (!authenticated || projectSettingsLoading) return;
+    projectSettingsLoading = true;
+    try {
+      const data = await getProjectsSettings(api);
+      projectLocations = Array.isArray(data.locations) && data.locations.length
+        ? data.locations.map((location) => ({ path: location.path, default: location.default === true }))
+        : [{ path: '', default: true }];
+    } catch (cause) {
+      errorTitle = 'Не удалось загрузить настройки';
+      error = cause instanceof Error ? cause.message : 'Не удалось загрузить расположения проектов.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      projectSettingsLoading = false;
+    }
+  }
+
+  function updateProjectLocation(index, path) {
+    projectLocations = projectLocations.map((location, itemIndex) => itemIndex === index ? { ...location, path } : location);
+  }
+
+  function addProjectLocation() {
+    projectLocations = [...projectLocations, { path: '', default: false }];
+  }
+
+  function removeProjectLocation(index) {
+    const wasDefault = projectLocations[index].default;
+    projectLocations = projectLocations.filter((_, itemIndex) => itemIndex !== index);
+    if (wasDefault && projectLocations.length) projectLocations = projectLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === 0 }));
+  }
+
+  function setDefaultProjectLocation(index) {
+    projectLocations = projectLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === index }));
+  }
+
+  async function saveProjectLocations() {
+    if (projectSettingsSaving || projectLocations.some((location) => !location.path.trim())) return;
+    projectSettingsSaving = true;
+    try {
+      const data = await saveProjectsSettings(api, projectLocations.map((location) => ({ ...location, path: location.path.trim() })));
+      projectLocations = data.locations;
+    } catch (cause) {
+      errorTitle = 'Не удалось сохранить настройки';
+      error = cause instanceof Error ? cause.message : 'Не удалось сохранить расположения проектов.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      projectSettingsSaving = false;
     }
   }
 
@@ -1068,6 +1127,7 @@
         <nav class="tabs" aria-label="Разделы панели">
           <a class:active={activeSection === 'projects'} class="tab" href="#/projects" aria-current={activeSection === 'projects' ? 'page' : undefined}>Проекты</a>
           <a class:active={activeSection === 'logs'} class="tab" href="#/journal" aria-current={activeSection === 'logs' ? 'page' : undefined}>Журнал</a>
+          <a class:active={activeSection === 'settings'} class="tab" href="#/settings/projects" aria-current={activeSection === 'settings' ? 'page' : undefined}>Настройки</a>
           <a class:active={activeSection === 'security'} class="tab" href="#/security/authorization" aria-current={activeSection === 'security' ? 'page' : undefined}>Безопасность</a>
         </nav>
         {#if activeSection === 'projects'}
@@ -1279,6 +1339,34 @@
               </div>
               <div class="log-page-size" aria-label="Количество записей на странице"><Combobox collection={pageSizeCollection} value={[String(logPageSize)]} openOnClick onValueChange={(details) => details.value[0] && changeLogPageSize(details.value[0])}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество записей на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
             </footer>
+          </section>
+        {:else if activeSection === 'settings'}
+          <section class="settings-view" aria-label="Настройки">
+            <nav class="project-detail-tabs settings-tabs" aria-label="Разделы настроек">
+              <a class="project-detail-tab active" href="#/settings/projects" aria-current="page">Проекты</a>
+            </nav>
+            <div class="settings-scroll">
+              <div class="project-toolbar">
+                <button class="btn preset-filled-primary-500" type="button" disabled={projectSettingsLoading || projectSettingsSaving || projectLocations.some((location) => !location.path.trim())} onclick={saveProjectLocations}>
+                  <Save size={16} aria-hidden="true" />{projectSettingsSaving ? 'Сохраняем…' : 'Сохранить'}
+                </button>
+              </div>
+              <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Расположение">
+                <h2>Расположение</h2>
+                <div class="location-list">
+                  {#each projectLocations as location, index}
+                    <div class="location-item">
+                      <div class="location-row">
+                        <input class="input" type="text" value={location.path} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="/путь/к/проектам" aria-label={`Расположение проектов ${index + 1}`} oninput={(event) => updateProjectLocation(index, event.currentTarget.value)} />
+                        <button class="btn preset-tonal" type="button" disabled={!location.path.trim() || projectSettingsLoading || projectSettingsSaving} onclick={addProjectLocation}><Plus size={16} aria-hidden="true" />Добавить</button>
+                        {#if projectLocations.length > 1}<button class="btn preset-tonal location-delete" type="button" disabled={projectSettingsLoading || projectSettingsSaving} onclick={() => removeProjectLocation(index)}><Trash2 size={16} aria-hidden="true" />Удалить</button>{/if}
+                      </div>
+                      <label class="location-default"><input class="radio" type="radio" name="default-project-location" checked={location.default} disabled={projectSettingsLoading || projectSettingsSaving} onchange={() => setDefaultProjectLocation(index)} />По умолчанию</label>
+                    </div>
+                  {/each}
+                </div>
+              </section>
+            </div>
           </section>
         {:else}
           <section class="settings-view" aria-label="Безопасность">
