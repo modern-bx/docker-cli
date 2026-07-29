@@ -555,7 +555,7 @@
     systemPending = true;
     projectsError = '';
     systemPendingMessage = action === 'wipe'
-      ? `Удаляем файлы проекта «${name}»…`
+      ? `Добавляем очистку проекта «${name}» в очередь…`
       : `${action === 'enable' ? 'Включаем' : 'Отключаем'} проект «${name}»…`;
     try {
       const data = await runProjectAction(api, name, action);

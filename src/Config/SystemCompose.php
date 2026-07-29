@@ -44,6 +44,13 @@ final class SystemCompose
         return join_path($home, '.config', 'docker-cli', 'playwright', 'data');
     }
 
+    public function coreTasksDirectory(): string
+    {
+        $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
+
+        return join_path($home, '.config', 'docker-cli', 'tasks', 'core');
+    }
+
     public function init(bool $updateStatic = false, bool $migrateEditable = false): bool
     {
         $directory = $this->directory();
@@ -365,6 +372,7 @@ final class SystemCompose
             join_path($this->directory(), 'config', 'php-fpm-8.2') => join_path($composeResources, 'config', 'php-fpm-8.2'),
             join_path($this->directory(), 'config', 'panel') => join_path($composeResources, 'config', 'panel'),
             $this->playwrightScriptsDirectory() => join_path($resources, 'playwright', 'scripts'),
+            $this->coreTasksDirectory() => join_path($resources, 'tasks', 'core'),
         ];
     }
 
