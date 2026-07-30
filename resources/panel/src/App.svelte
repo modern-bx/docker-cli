@@ -84,7 +84,6 @@
   let logRequestId = 0;
   let projectsLoading = false;
   let projectsError = '';
-  let projectsRequest = null;
   let projectQuery = '';
   let projectTags = [];
   let systemOpen = false;
@@ -783,27 +782,7 @@
     currentLogin = data.login;
     if (resetNavigation || window.location.hash === '#/login') navigateToProject('', 'info');
     else applyHashNavigation();
-    if (!panelSocket) loadProjectsSnapshot();
     connectPanelChannel();
-  }
-
-  async function loadProjectsSnapshot() {
-    if (!authenticated) return;
-    if (projectsRequest) return projectsRequest;
-    projectsLoading = projects.length === 0;
-    projectsRequest = getProjects(api);
-    try {
-      const data = await projectsRequest;
-      projects = data.projects;
-      projectsError = '';
-      if (selectedProjectName && !projects.some((project) => project.name === selectedProjectName)) navigateToProject('', 'info');
-    } catch (cause) {
-      if (cause instanceof Error && 'status' in cause && cause.status === 401) logout();
-      else projectsError = cause instanceof Error ? cause.message : 'Не удалось загрузить проекты.';
-    } finally {
-      projectsRequest = null;
-      projectsLoading = false;
-    }
   }
 
   function logout() {
@@ -1151,7 +1130,6 @@
     else applyHashNavigation();
     window.addEventListener('hashchange', applyHashNavigation);
     panelChannelEnabled = true;
-    loadProjectsSnapshot();
     connectPanelChannel();
     checkSession().finally(() => { loading = false; });
     const interval = setInterval(checkSession, 60_000);
