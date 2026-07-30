@@ -26,14 +26,17 @@ final class ProjectDownCommand extends Command
         parent::__construct('project:down');
         $this->setDescription('Удалить регистрацию проекта docker-cli.');
         $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
+        $this->addOption('wipe', null, InputOption::VALUE_NONE, 'Удалить файлы проекта, сохранив .docker-cli.');
+        $this->addOption('erase', null, InputOption::VALUE_NONE, 'Полностью удалить директорию проекта.');
         $this->addOption('drop', null, InputOption::VALUE_NONE, 'Удалить базы данных и пользователей проекта во всех СУБД.');
-        $this->addOption('force', 'f', InputOption::VALUE_NONE, 'Подтвердить удаление баз данных и пользователей с --drop.');
+        $this->addOption('force', 'f', InputOption::VALUE_NONE, 'Подтвердить необратимые действия --wipe, --erase или --drop.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        if ($input->getOption('drop') && !$input->getOption('force')) {
-            $output->writeln('<error>Опция --drop удаляет базы данных и пользователей проекта. Повторите команду с --force.</error>');
+        $destructive = $input->getOption('wipe') || $input->getOption('erase') || $input->getOption('drop');
+        if ($destructive && !$input->getOption('force')) {
+            $output->writeln('<error>Опции --wipe, --erase и --drop выполняют необратимые действия. Повторите команду с --force.</error>');
 
             return Command::FAILURE;
         }
@@ -61,6 +64,19 @@ final class ProjectDownCommand extends Command
 
             return Command::FAILURE;
         }
+        if ($destructive && $registry->hasProject($projectName) && $registry->isProjectProtected($projectName)) {
+            $output->writeln(sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
+            return Command::FAILURE;
+        }
+
+        if ($input->getOption('wipe') || $input->getOption('erase')) {
+            try {
+                $this->wipeProjectRoot($projectRoot);
+            } catch (\RuntimeException $exception) {
+                $output->writeln(sprintf('<error>Не удалось очистить файлы проекта "%s": %s</error>', $projectName, $exception->getMessage()));
+                return Command::FAILURE;
+            }
+        }
 
         if ($input->getOption('drop')) {
             try {
@@ -82,10 +98,18 @@ final class ProjectDownCommand extends Command
             $this->removeDirectory($projectDirectory);
         }
 
-        unlink($metaFile);
-        $metadataFiles = scandir($metadataDirectory);
-        if ($metadataFiles !== false && array_diff($metadataFiles, ['.', '..']) === []) {
-            rmdir($metadataDirectory);
+        if ($input->getOption('erase')) {
+            $this->removeDirectory($metadataDirectory);
+            if (!rmdir($projectRoot)) {
+                $output->writeln(sprintf('<error>Не удалось удалить директорию проекта "%s".</error>', $projectRoot));
+                return Command::FAILURE;
+            }
+        } else {
+            unlink($metaFile);
+            $metadataFiles = scandir($metadataDirectory);
+            if ($metadataFiles !== false && array_diff($metadataFiles, ['.', '..']) === []) {
+                rmdir($metadataDirectory);
+            }
         }
         (new OpenRestyHostRenderer())->render();
 
@@ -152,5 +176,20 @@ final class ProjectDownCommand extends Command
         }
 
         rmdir($directory);
+    }
+
+    private function wipeProjectRoot(string $projectRoot): void
+    {
+        $realRoot = realpath($projectRoot);
+        if ($realRoot === false || $realRoot === DIRECTORY_SEPARATOR || !is_dir(join_path($realRoot, '.docker-cli'))) {
+            throw new \RuntimeException('небезопасная директория проекта.');
+        }
+        foreach (scandir($realRoot) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..' || $entry === '.docker-cli') continue;
+            $path = join_path($realRoot, $entry);
+            if (is_dir($path) && !is_link($path)) $this->removeDirectory($path); elseif (!unlink($path)) {
+                throw new \RuntimeException(sprintf('не удалось удалить "%s".', $path));
+            }
+        }
     }
 }

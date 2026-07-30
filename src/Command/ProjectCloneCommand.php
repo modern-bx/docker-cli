@@ -79,6 +79,15 @@ final class ProjectCloneCommand extends Command
             return Command::FAILURE;
         }
 
+        $startedAt = new \DateTimeImmutable();
+        $started = microtime(true);
+        $output->writeln(sprintf(
+            '<info>Клонирование проекта "%s" в "%s" началось (%s).</info>',
+            $from,
+            $name,
+            $startedAt->format('H:i:s'),
+        ));
+
         $config = $sourceConfig;
         $documentRoot = $config['data']['project']['document_root'] ?? $sourceRoot;
         $relativeDocumentRoot = is_string($documentRoot) && str_starts_with($documentRoot, rtrim($sourceRoot, '/') . '/')
@@ -97,12 +106,21 @@ final class ProjectCloneCommand extends Command
         if (is_string($rawExclude)) foreach (explode(',', $rawExclude) as $pattern) if (trim($pattern) !== '') $excludes[] = ltrim(trim($pattern), './');
         $excludeArgs = implode(' ', array_map(static fn (string $pattern): string => '--exclude=' . escapeshellarg($pattern), $excludes));
         $command = sprintf('tar %s -cf - . | (cd %s && tar -xf -)', $excludeArgs, escapeshellarg($destination));
+        $filesStarted = microtime(true);
         passthru('cd ' . escapeshellarg($sourceRoot) . ' && ' . $command, $status);
+        $filesDuration = microtime(true) - $filesStarted;
         if ($status !== 0) {
             $output->writeln('<error>Копирование проекта завершилось с ошибкой.</error>');
             return Command::FAILURE;
         }
-        $output->writeln(sprintf('<info>Проект "%s" клонирован в "%s".</info>', $name, $destination));
+        $output->writeln(sprintf(
+            '<info>Проект "%s" клонирован в "%s" (%s; всего: %s; копирование файлов: %s).</info>',
+            $name,
+            $destination,
+            (new \DateTimeImmutable())->format('H:i:s'),
+            $this->formatDuration(microtime(true) - $started),
+            $this->formatDuration($filesDuration),
+        ));
         return Command::SUCCESS;
     }
 
@@ -119,6 +137,7 @@ final class ProjectCloneCommand extends Command
 
     private function absolutePath(string $path): string { return str_starts_with($path, '/') ? rtrim($path, '/') : join_path((string) getcwd(), $path); }
     private function normalizeName(string $name): string { return trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($name)) ?? '', '-'); }
+    private function formatDuration(float $seconds): string { return number_format($seconds, 3, '.', '') . ' с'; }
     private function directoryHasFiles(string $path): bool { return is_dir($path) && count(scandir($path) ?: []) > 2; }
     private function projectAtPath(string $path, ProjectRegistry $registry): ?string
     {
