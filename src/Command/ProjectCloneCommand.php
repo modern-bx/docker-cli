@@ -132,9 +132,15 @@ final class ProjectCloneCommand extends Command
             return Command::FAILURE;
         }
         $databaseDuration = 0.0;
-        if (in_array('mysql', $dbms, true)) {
+        if ($dbms !== []) {
             $databaseStarted = microtime(true);
-            $databaseCode = $this->cloneMysqlDatabase($sourceConfig, $config, $name, $output);
+            $databaseCode = $this->initializeTargetDatabases($config, $name, $output);
+            if ($databaseCode === Command::SUCCESS && in_array('mysql', $dbms, true)) {
+                $databaseCode = $this->cloneMysqlDatabase($sourceConfig, $config, $output);
+            }
+            if ($databaseCode === Command::SUCCESS && in_array('postgres', $dbms, true)) {
+                $databaseCode = $this->clonePostgresDatabase($sourceConfig, $config, $output);
+            }
             $databaseDuration = microtime(true) - $databaseStarted;
             if ($databaseCode !== Command::SUCCESS) return $databaseCode;
         }
@@ -163,34 +169,64 @@ final class ProjectCloneCommand extends Command
 
     private function absolutePath(string $path): string { return str_starts_with($path, '/') ? rtrim($path, '/') : join_path((string) getcwd(), $path); }
     private function normalizeName(string $name): string { return trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($name)) ?? '', '-'); }
-    private function formatDuration(float $seconds): string { return number_format($seconds, 3, '.', '') . ' с'; }
+    private function formatDuration(float $seconds): string
+    {
+        $remaining = max(0, (int) round($seconds));
+        $parts = [];
+        foreach ([[86400, 'день', 'дня', 'дней'], [3600, 'час', 'часа', 'часов'], [60, 'минута', 'минуты', 'минут']] as [$size, $one, $few, $many]) {
+            $value = intdiv($remaining, $size);
+            if ($value > 0) {
+                $parts[] = $value . ' ' . $this->plural($value, $one, $few, $many);
+                $remaining %= $size;
+            }
+        }
+        if ($remaining > 0 || $parts === []) $parts[] = $remaining . ' ' . $this->plural($remaining, 'секунда', 'секунды', 'секунд');
+        return implode(' ', $parts);
+    }
+
+    private function plural(int $value, string $one, string $few, string $many): string
+    {
+        $mod100 = $value % 100;
+        if ($mod100 >= 11 && $mod100 <= 14) return $many;
+        return match ($value % 10) { 1 => $one, 2, 3, 4 => $few, default => $many };
+    }
 
     /** @return list<string>|null */
     private function resolveDbms(mixed $option, bool $skip, OutputInterface $output): ?array
     {
         if ($skip) return [];
         $explicit = is_string($option);
-        $dbms = $explicit ? array_values(array_unique(array_filter(array_map('trim', explode(',', $option))))) : ['mysql'];
+        $dbms = $explicit ? array_values(array_unique(array_filter(array_map('trim', explode(',', $option))))) : ['mysql', 'postgres'];
         if ($dbms === [] || array_diff($dbms, ['mysql', 'postgres']) !== []) {
             $output->writeln('<error>Опция --dbms должна содержать mysql и/или postgres.</error>');
             return null;
         }
-        if ($explicit && in_array('postgres', $dbms, true)) {
-            $output->writeln('<error>Клонирование PostgreSQL пока не реализовано.</error>');
-            return null;
+        return $dbms;
+    }
+
+    /** @param array<string, mixed> $targetConfig */
+    private function initializeTargetDatabases(array $targetConfig, string $targetName, OutputInterface $output): int
+    {
+        $mysqlPassword = $targetConfig['data']['databases']['mysql']['password'] ?? null;
+        $postgresPassword = $targetConfig['data']['databases']['postgres']['password'] ?? null;
+        if (!is_string($mysqlPassword) || !is_string($postgresPassword)) {
+            $output->writeln('<error>В конфигурации проекта отсутствуют пароли баз данных.</error>');
+            return Command::FAILURE;
         }
-        return array_values(array_diff($dbms, ['postgres']));
+        try {
+            return ($this->dataInitializer ?? new DataInitializer())->initialize($targetName, $mysqlPassword, $postgresPassword, false, $output);
+        } catch (MissingConfigException $exception) {
+            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            return Command::FAILURE;
+        }
     }
 
     /** @param array<string, mixed> $sourceConfig @param array<string, mixed> $targetConfig */
-    private function cloneMysqlDatabase(array $sourceConfig, array $targetConfig, string $targetName, OutputInterface $output): int
+    private function cloneMysqlDatabase(array $sourceConfig, array $targetConfig, OutputInterface $output): int
     {
         $source = $sourceConfig['data']['databases']['mysql']['database'] ?? null;
         $target = $targetConfig['data']['databases']['mysql']['database'] ?? null;
-        $mysqlPassword = $targetConfig['data']['databases']['mysql']['password'] ?? null;
-        $postgresPassword = $targetConfig['data']['databases']['postgres']['password'] ?? null;
-        if (!is_string($source) || $source === '' || !is_string($target) || $target === ''
-            || !is_string($mysqlPassword) || !is_string($postgresPassword)) {
+        if (!is_string($source) || $source === '' || !is_string($target) || $target === '') {
             $output->writeln('<error>В конфигурации проекта отсутствуют параметры баз данных.</error>');
             return Command::FAILURE;
         }
@@ -204,14 +240,32 @@ final class ProjectCloneCommand extends Command
         try {
             $code = $loader->dump($source, $snapshot, 4, $output);
             if ($code !== Command::SUCCESS) return $code;
-            $code = ($this->dataInitializer ?? new DataInitializer())->initialize($targetName, $mysqlPassword, $postgresPassword, false, $output);
-            if ($code !== Command::SUCCESS) return $code;
             return $loader->load($target, $snapshot, 4, false, $output);
         } catch (MissingConfigException $exception) {
             $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
             return Command::FAILURE;
         } finally {
             if (is_dir($snapshot)) $this->remove($snapshot);
+        }
+    }
+
+    /** @param array<string, mixed> $sourceConfig @param array<string, mixed> $targetConfig */
+    private function clonePostgresDatabase(array $sourceConfig, array $targetConfig, OutputInterface $output): int
+    {
+        $source = $sourceConfig['data']['databases']['postgres']['database'] ?? null;
+        $target = $targetConfig['data']['databases']['postgres']['database'] ?? null;
+        $sourceUser = $sourceConfig['data']['databases']['postgres']['username'] ?? $source;
+        $targetUser = $targetConfig['data']['databases']['postgres']['username'] ?? $target;
+        if (!is_string($source) || $source === '' || !is_string($target) || $target === ''
+            || !is_string($sourceUser) || $sourceUser === '' || !is_string($targetUser) || $targetUser === '') {
+            $output->writeln('<error>В конфигурации проекта отсутствуют параметры PostgreSQL.</error>');
+            return Command::FAILURE;
+        }
+        try {
+            return ($this->dataInitializer ?? new DataInitializer())->clonePostgres($source, $target, $sourceUser, $targetUser, $output);
+        } catch (MissingConfigException $exception) {
+            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            return Command::FAILURE;
         }
     }
     private function directoryHasFiles(string $path): bool { return is_dir($path) && count(scandir($path) ?: []) > 2; }
