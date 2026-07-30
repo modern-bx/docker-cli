@@ -162,7 +162,9 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .status-dot, .status-value i { flex: 0 0 auto; width: 0.65rem; height: 0.65rem; border-radius: 999px; background: var(--color-error-500); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-error-500) 16%, transparent); }
 .status-dot.enabled, .status-value.enabled i { background: var(--color-success-500); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-success-500) 16%, transparent); }
 .project-summary { display: flex; min-width: 0; flex-direction: column; }
-.project-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-name { display: flex; min-width: 0; align-items: center; gap: 0.35rem; }
+.project-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-name svg { flex: 0 0 auto; color: var(--color-surface-500); }
 .project-tags { display: flex; gap: 0.35rem; margin-top: 0.3rem; flex-wrap: wrap; }
 .project-tags button { padding: 0.12rem 0.45rem; border-radius: 999px; background: var(--color-surface-200); color: var(--color-surface-600); font-size: 0.68rem; line-height: 1.1rem; }
 .dark .project-tags button { background: var(--color-surface-800); color: var(--color-surface-300); }
