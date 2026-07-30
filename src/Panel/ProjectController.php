@@ -9,6 +9,8 @@ use DockerCli\Panel\Dto\ProjectDto;
 use DockerCli\Panel\Dto\ProjectListDto;
 use DockerCli\Panel\Dto\ConceptDto;
 use DockerCli\Panel\Dto\ProjectOptionsDto;
+use DockerCli\Panel\Dto\ProjectBackupListDto;
+use DockerCli\Panel\Dto\Request\ProjectBackupListRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectCreateRequestDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectActionRequestDto;
@@ -94,6 +96,43 @@ final class ProjectController
         }
 
         return new ProjectListDto($projects);
+    }
+
+    #[Route('GET', '/api/projects/{name}/backups', ProjectBackupListRequestDto::class, ProjectBackupListDto::class)]
+    public function backups(ProjectBackupListRequestDto $request): ProjectBackupListDto
+    {
+        if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
+        $config = $this->projects->readProjectConfig($request->name);
+        $root = $config['data']['project']['root'] ?? null;
+        if (!is_string($root) || $root === '') throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
+
+        $items = [];
+        $directory = join_path($root, '.docker-cli', 'backups', 'mysql');
+        foreach (glob(join_path($directory, '*'), GLOB_ONLYDIR) ?: [] as $backup) {
+            $timestamp = filemtime($backup);
+            $metadataFile = join_path($backup, 'docker-cli.json');
+            $metadata = is_file($metadataFile) ? json_decode((string) file_get_contents($metadataFile), true) : null;
+            $createdAt = is_array($metadata) && is_string($metadata['createdAt'] ?? null) ? strtotime($metadata['createdAt']) : false;
+            $items[] = [
+                'name' => basename($backup),
+                'date' => gmdate(DATE_ATOM, $createdAt !== false ? $createdAt : ($timestamp === false ? 0 : $timestamp)),
+                'composition' => 'БД',
+                'size' => $this->directorySize($backup),
+                'database' => 'MySQL',
+            ];
+        }
+        if ($request->filter !== '') {
+            $needle = mb_strtolower($request->filter);
+            $items = array_values(array_filter($items, static fn (array $item): bool => str_contains(mb_strtolower(implode(' ', [$item['name'], $item['date'], $item['composition'], $item['database']])), $needle)));
+        }
+        usort($items, static function (array $left, array $right) use ($request): int {
+            $comparison = $left[$request->sort] <=> $right[$request->sort];
+            if ($comparison === 0) $comparison = $left['name'] <=> $right['name'];
+            return $request->direction === 'asc' ? $comparison : -$comparison;
+        });
+        $total = count($items);
+        $items = array_slice($items, ($request->page - 1) * $request->pageSize, $request->pageSize);
+        return new ProjectBackupListDto($items, $total, $request->page, $request->pageSize);
     }
 
     private const FRAMEWORK_NAMES = ['symfony' => 'Symfony', 'laravel' => 'Laravel', 'bitrix' => 'Bitrix', 'bitrix24' => 'Bitrix24'];
@@ -201,6 +240,16 @@ final class ProjectController
         if (!is_array($tags)) return [];
 
         return array_values(array_filter($tags, static fn (mixed $tag): bool => is_string($tag) && $tag !== ''));
+    }
+
+    private function directorySize(string $directory): int
+    {
+        $size = 0;
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS));
+        foreach ($iterator as $file) {
+            if ($file->isFile() && !$file->isLink()) $size += $file->getSize();
+        }
+        return $size;
     }
 
     /** @param array<string, string> $names */

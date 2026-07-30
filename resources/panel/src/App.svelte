@@ -3,7 +3,7 @@
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
-  import { createPanelUser, createProject, deletePanelUser, getLogs, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { createPanelUser, createProject, deletePanelUser, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -21,7 +21,7 @@
   const modes = [
     ['light', 'Светлая'], ['dark', 'Тёмная'], ['system', 'Системная'],
   ];
-  const projectDetailTabs = ['info', 'notes', 'security', 'journal'];
+  const projectDetailTabs = ['info', 'notes', 'security', 'backups', 'journal'];
   const fonts = [
     { value: 'ubuntu', label: 'Ubuntu Regular' },
     { value: 'noto', label: 'Noto Sans' },
@@ -107,6 +107,16 @@
   let projectLanguageCollection = useListCollection({ items: [] });
   let projectFrameworkCollection = useListCollection({ items: [] });
   let projectAdding = false;
+  let backupItems = [];
+  let backupTotal = 0;
+  let backupPage = 1;
+  let backupPageSize = 25;
+  let backupFilter = '';
+  let backupSort = 'date';
+  let backupDirection = 'desc';
+  let backupsLoading = false;
+  let backupFilterTimer = null;
+  let backupRequestId = 0;
   let notesProjectName = '';
   let noteTags = [];
   let noteTagInput = '';
@@ -275,7 +285,47 @@
       applyJournalFilters(true);
       loadLogs();
     }
+    if (tab === 'backups') loadProjectBackups();
     if (segments.length !== 3 || !projectDetailTabs.includes(segments[2])) navigateToProject(projectName, tab);
+  }
+
+  async function loadProjectBackups() {
+    if (!authenticated || !selectedProjectName) return;
+    const requestId = ++backupRequestId;
+    backupsLoading = true;
+    projectsError = '';
+    try {
+      const data = await getProjectBackups(api, selectedProjectName, { page: String(backupPage), pageSize: String(backupPageSize), filter: backupFilter, sort: backupSort, direction: backupDirection });
+      if (requestId !== backupRequestId) return;
+      backupItems = Array.isArray(data.items) ? data.items : [];
+      backupTotal = Number(data.total) || 0;
+    } catch (cause) {
+      if (requestId === backupRequestId) projectsError = cause instanceof Error ? cause.message : 'Не удалось загрузить бэкапы.';
+    } finally {
+      if (requestId === backupRequestId) backupsLoading = false;
+    }
+  }
+
+  function changeBackupFilter(value) {
+    backupFilter = value;
+    backupPage = 1;
+    clearTimeout(backupFilterTimer);
+    backupFilterTimer = setTimeout(loadProjectBackups, 250);
+  }
+
+  function sortBackups(field) {
+    backupDirection = backupSort === field && backupDirection === 'asc' ? 'desc' : 'asc';
+    backupSort = field;
+    backupPage = 1;
+    loadProjectBackups();
+  }
+
+  function formatBytes(value) {
+    const bytes = Number(value) || 0;
+    if (bytes < 1024) return `${bytes} Б`;
+    const units = ['КБ', 'МБ', 'ГБ', 'ТБ'];
+    const unit = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)) - 1, units.length - 1);
+    return `${(bytes / (1024 ** (unit + 1))).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} ${units[unit]}`;
   }
 
   async function loadLogs() {
@@ -1340,6 +1390,7 @@
                 <a class:active={projectDetailTab === 'info'} class="project-detail-tab" href={projectHash(selectedProject.name, 'info')} aria-current={projectDetailTab === 'info' ? 'page' : undefined}>Общее</a>
                 <a class:active={projectDetailTab === 'notes'} class="project-detail-tab" href={projectHash(selectedProject.name, 'notes')} aria-current={projectDetailTab === 'notes' ? 'page' : undefined}>Заметки</a>
                 <a class:active={projectDetailTab === 'security'} class="project-detail-tab" href={projectHash(selectedProject.name, 'security')} aria-current={projectDetailTab === 'security' ? 'page' : undefined}>Безопасность</a>
+                <a class:active={projectDetailTab === 'backups'} class="project-detail-tab" href={projectHash(selectedProject.name, 'backups')} aria-current={projectDetailTab === 'backups' ? 'page' : undefined}>Бэкапы</a>
                 <a class:active={projectDetailTab === 'journal'} class="project-detail-tab" href={projectHash(selectedProject.name, 'journal')} aria-current={projectDetailTab === 'journal' ? 'page' : undefined}>Журнал</a>
               </nav>
               <div class="project-details-scroll">
@@ -1395,6 +1446,27 @@
                     <Tooltip.Trigger class="security-help" aria-label="О защите проекта"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
                     <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Для защищенных проектов запрещены команды, которые могут изменить их данные - и файлы, и базы данных</Tooltip.Content></Tooltip.Positioner>
                   </Tooltip>
+                </section>
+                {:else if projectDetailTab === 'backups'}
+                <section class="project-log-view backup-view" aria-label={`Бэкапы проекта ${selectedProject.name}`}>
+                  <div class="log-toolbar card preset-filled-surface-100-900">
+                    <label><span>Фильтр</span><span class="log-text-filter"><input type="search" value={backupFilter} placeholder="Название, дата, состав или СУБД" oninput={(event) => changeBackupFilter(event.currentTarget.value)} />{#if backupFilter}<button type="button" aria-label="Сбросить фильтр" onclick={() => changeBackupFilter('')}>×</button>{/if}</span></label>
+                  </div>
+                  <div class="log-table-wrap card preset-filled-surface-100-900">
+                    <table class="table log-table backup-table">
+                      <thead><tr>{#each [['name', 'Название'], ['date', 'Дата'], ['composition', 'Состав'], ['size', 'Размер'], ['database', 'Тип СУБД']] as [field, label]}<th><button type="button" onclick={() => sortBackups(field)}>{label}<span aria-hidden="true">{backupSort === field ? (backupDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
+                      <tbody>
+                        {#if backupsLoading}<tr><td colspan="5" class="log-empty animate-pulse">Загрузка…</td></tr>
+                        {:else if backupItems.length === 0}<tr><td colspan="5" class="log-empty">Бэкапы не найдены</td></tr>
+                        {:else}{#each backupItems as item}<tr><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td></tr>{/each}{/if}
+                      </tbody>
+                    </table>
+                  </div>
+                  <footer class="log-pagination">
+                    <span>{backupTotal ? `${(backupPage - 1) * backupPageSize + 1}–${Math.min(backupPage * backupPageSize, backupTotal)} из ${backupTotal}` : '0 бэкапов'}</span>
+                    <div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={backupPage === 1 || backupsLoading} onclick={() => { backupPage -= 1; loadProjectBackups(); }}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={backupPage >= Math.ceil(backupTotal / backupPageSize) || backupsLoading} onclick={() => { backupPage += 1; loadProjectBackups(); }}>Вперёд</button></div>
+                    <div class="log-page-size" aria-label="Количество бэкапов на странице"><Combobox collection={pageSizeCollection} value={[String(backupPageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { backupPageSize = Number(details.value[0]); backupPage = 1; loadProjectBackups(); } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество бэкапов на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
+                  </footer>
                 </section>
                 {:else}
                 <section class="project-log-view" aria-label={`Журнал проекта ${selectedProject.name}`}>
