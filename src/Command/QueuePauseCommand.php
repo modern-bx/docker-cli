@@ -10,7 +10,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class QueuePauseCommand extends Command
+final class QueuePauseCommand extends AbstractCommand
 {
     public function __construct(private readonly ?QueueRepository $queues = null)
     {
@@ -25,10 +25,10 @@ final class QueuePauseCommand extends Command
         try {
             ($this->queues ?? new QueueRepository())->pause($queue);
         } catch (\InvalidArgumentException|\RuntimeException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
-        $output->writeln(sprintf('<info>Очередь "%s" приостановлена.</info>', $queue));
+        $this->writeMessage($output, sprintf('<info>Очередь "%s" приостановлена.</info>', $queue));
         return Command::SUCCESS;
     }
 }

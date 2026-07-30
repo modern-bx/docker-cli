@@ -17,7 +17,7 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use function DockerCli\Util\join_path;
 
-final class QueueStepCommand extends Command
+final class QueueStepCommand extends AbstractCommand
 {
     public function __construct(private readonly ?QueueRepository $queues = null)
     {
@@ -34,16 +34,16 @@ final class QueueStepCommand extends Command
             $repository->initialize($queue);
             $lock = fopen(join_path($repository->queueDirectory($queue), '.lock'), 'c');
             if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
-                $output->writeln(sprintf('<error>Очередь "%s" уже обрабатывается.</error>', $queue));
+                $this->writeMessage($output, sprintf('<error>Очередь "%s" уже обрабатывается.</error>', $queue));
                 return Command::FAILURE;
             }
             if ($repository->isPaused($queue)) {
-                $output->writeln(sprintf('<comment>Очередь "%s" приостановлена.</comment>', $queue));
+                $this->writeMessage($output, sprintf('<comment>Очередь "%s" приостановлена.</comment>', $queue));
                 return Command::SUCCESS;
             }
             $pending = $repository->nextPending($queue);
             if ($pending === null) {
-                $output->writeln(sprintf('<info>В очереди "%s" нет элементов для обработки.</info>', $queue));
+                $this->writeMessage($output, sprintf('<info>В очереди "%s" нет элементов для обработки.</info>', $queue));
                 return Command::SUCCESS;
             }
             $active = $repository->move($pending, $queue, '20-active');
@@ -59,14 +59,14 @@ final class QueueStepCommand extends Command
             }
             if ($errors !== []) {
                 foreach ($errors as $error) {
-                    $output->writeln('<error>' . $error . '</error>');
-                    $repository->trace($active, $queue, $item, 'Ошибка валидации: ' . $error);
+                    $this->writeMessage($output, '<error>' . $error . '</error>');
+                    $repository->trace($active, $queue, $item, 'Ошибка валидации: ' . $error, level: 'error', context: 'task');
                 }
                 $active = $repository->move($active, $queue, '50-error');
-                $repository->trace($active, $queue, $item, 'Элемент перемещен в 50-error.');
+                $repository->trace($active, $queue, $item, 'Элемент перемещен в 50-error.', level: 'error');
                 return Command::INVALID;
             }
-            foreach ($item['queue-item']['tasks'] as $task) {
+            foreach ($item['queue-item']['tasks'] as $index => $task) {
                 $repository->trace($active, $queue, $item, sprintf('Запуск задачи %s.', $task['code']), $task['code'], $task['project'] ?? null);
                 $arguments = ['task-code' => $task['code']];
                 if (isset($task['project'])) {
@@ -84,10 +84,11 @@ final class QueueStepCommand extends Command
                 $runner = new TaskRunCommand($tasks, notifications: new NotificationRepository($repository->configDirectory()));
                 $runner->setApplication($this->getApplication());
                 $exitCode = $runner->run(new ArrayInput($arguments), $output);
+                $repository->journal($active, $queue, $item, sprintf('%s-%d', $task['code'], $index + 1), $task['code'], $runner->journal());
                 $repository->trace($active, $queue, $item, sprintf('Задача %s завершилась с кодом %d.', $task['code'], $exitCode), $task['code'], $task['project'] ?? null, $exitCode);
                 if ($exitCode !== Command::SUCCESS) {
                     $active = $repository->move($active, $queue, '40-failure');
-                    $repository->trace($active, $queue, $item, 'Элемент перемещен в 40-failure; последующие задачи пропущены.');
+                    $repository->trace($active, $queue, $item, 'Элемент перемещен в 40-failure; последующие задачи пропущены.', level: 'warning');
                     return $exitCode;
                 }
             }
@@ -95,12 +96,12 @@ final class QueueStepCommand extends Command
             $repository->trace($active, $queue, $item, 'Элемент перемещен в 30-success.');
             return Command::SUCCESS;
         } catch (\Throwable $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             if (isset($active, $item) && is_string($active) && is_file($active) && is_array($item)) {
                 try {
-                    $repository->trace($active, $queue, $item, 'Ошибка обработки: ' . $exception->getMessage());
+                    $repository->trace($active, $queue, $item, 'Ошибка обработки: ' . $exception->getMessage(), level: 'error');
                     $active = $repository->move($active, $queue, '50-error');
-                    $repository->trace($active, $queue, $item, 'Элемент перемещен в 50-error.');
+                    $repository->trace($active, $queue, $item, 'Элемент перемещен в 50-error.', level: 'error');
                 } catch (\Throwable) {
                     // Preserve the original processing error.
                 }

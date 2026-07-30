@@ -33,7 +33,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelUpCommand extends Command
+final class PanelUpCommand extends AbstractCommand
 {
     public function __construct(private readonly SystemdService $systemdService = new SystemdService())
     {
@@ -50,14 +50,14 @@ final class PanelUpCommand extends Command
         if ($input->getOption('daemon')) {
             $rawPort = $input->getOption('port');
             if ($rawPort !== null && !$this->isValidPort($rawPort)) {
-                $output->writeln('<error>Порт должен быть целым числом от 1 до 65535.</error>');
+                $this->writeMessage($output, '<error>Порт должен быть целым числом от 1 до 65535.</error>');
                 return Command::INVALID;
             }
 
             return $this->installSystemdService($input, $output, $rawPort === null ? null : (int) $rawPort);
         }
         if ($input->getOption('user') !== null || $input->getOption('path') !== null) {
-            $output->writeln('<error>Опции --user и --path можно использовать только вместе с -d.</error>');
+            $this->writeMessage($output, '<error>Опции --user и --path можно использовать только вместе с -d.</error>');
             return Command::INVALID;
         }
 
@@ -65,13 +65,13 @@ final class PanelUpCommand extends Command
         try {
             $compose->assertInitialized();
         } catch (MissingConfigException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
 
         $rawPort = $input->getOption('port') ?? $compose->envValue('PANEL_PORT', '8181');
         if (!$this->isValidPort($rawPort)) {
-            $output->writeln('<error>Порт должен быть целым числом от 1 до 65535.</error>');
+            $this->writeMessage($output, '<error>Порт должен быть целым числом от 1 до 65535.</error>');
             return Command::INVALID;
         }
         $port = (int) $rawPort;
@@ -79,14 +79,14 @@ final class PanelUpCommand extends Command
         $salt = $compose->envValue('PANEL_PASSWORD_SALT');
         $jwtSecret = $compose->envValue('PANEL_JWT_SECRET');
         if ($salt === '' || $jwtSecret === '') {
-            $output->writeln('<error>Секреты панели не настроены. Выполните `docker-cli config:init`.</error>');
+            $this->writeMessage($output, '<error>Секреты панели не настроены. Выполните `docker-cli config:init`.</error>');
             return Command::FAILURE;
         }
 
         $lockPath = dirname($compose->directory()) . DIRECTORY_SEPARATOR . 'panel.lock';
         $lock = fopen($lockPath, 'c+');
         if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
-            $output->writeln('<error>Административная панель уже запущена другим бинарником.</error>');
+            $this->writeMessage($output, '<error>Административная панель уже запущена другим бинарником.</error>');
             return Command::FAILURE;
         }
 
@@ -94,7 +94,7 @@ final class PanelUpCommand extends Command
         try {
             $socket = new SocketServer('0.0.0.0:' . $port);
         } catch (\RuntimeException $exception) {
-            $output->writeln('<error>Не удалось запустить HTTP-сервер: ' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>Не удалось запустить HTTP-сервер: ' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
 
@@ -120,7 +120,7 @@ final class PanelUpCommand extends Command
         $channel = new PanelStateChannel($state, $tokens, $responses, 'https://panel.' . $compose->envValue('BASE_HOST', ''));
         $server = new HttpServer(static fn ($request) => $channel->handles($request) ? $channel->upgrade($request) : $router($request));
         $server->listen($socket);
-        $output->writeln(sprintf('<info>Панель запущена на https://panel.%s</info>', $compose->envValue('BASE_HOST', '')));
+        $this->writeMessage($output, sprintf('<info>Панель запущена на https://panel.%s</info>', $compose->envValue('BASE_HOST', '')));
         Loop::run();
 
         return Command::SUCCESS;
@@ -130,30 +130,30 @@ final class PanelUpCommand extends Command
     {
         $rawUser = $input->getOption('user');
         if ($rawUser !== null && (!is_string($rawUser) || preg_match('/^[a-zA-Z0-9_.@-]+$/D', $rawUser) !== 1)) {
-            $output->writeln('<error>Некорректное имя пользователя для systemd-сервиса.</error>');
+            $this->writeMessage($output, '<error>Некорректное имя пользователя для systemd-сервиса.</error>');
             return Command::INVALID;
         }
 
         $rawPath = $input->getOption('path');
         $binary = $this->resolveBinary(is_string($rawPath) ? $rawPath : (string) ($_SERVER['argv'][0] ?? 'docker-cli'));
         if ($rawPath !== null && (!str_starts_with($binary, DIRECTORY_SEPARATOR) || !is_file($binary) || !is_executable($binary))) {
-            $output->writeln('<error>Опция --path должна указывать на существующий исполняемый файл.</error>');
+            $this->writeMessage($output, '<error>Опция --path должна указывать на существующий исполняемый файл.</error>');
             return Command::INVALID;
         }
         try {
             $this->systemdService->install($binary, $port, is_string($rawUser) ? $rawUser : null);
         } catch (\RuntimeException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
 
-        $output->writeln(sprintf('<info>Создан systemd-сервис %s.</info>', SystemdService::NAME));
-        $output->writeln(sprintf('<info>Конфигурация записана в %s.</info>', SystemdService::UNIT_PATH));
-        $output->writeln(sprintf('<info>Сервис запускает: %s panel:up</info>', $binary));
+        $this->writeMessage($output, sprintf('<info>Создан systemd-сервис %s.</info>', SystemdService::NAME));
+        $this->writeMessage($output, sprintf('<info>Конфигурация записана в %s.</info>', SystemdService::UNIT_PATH));
+        $this->writeMessage($output, sprintf('<info>Сервис запускает: %s panel:up</info>', $binary));
         if (is_string($rawUser)) {
-            $output->writeln(sprintf('<info>Сервис работает от пользователя: %s</info>', $rawUser));
+            $this->writeMessage($output, sprintf('<info>Сервис работает от пользователя: %s</info>', $rawUser));
         }
-        $output->writeln(sprintf('<info>Сервис включён и запущен. Управление: systemctl {status|restart|stop} %s</info>', SystemdService::NAME));
+        $this->writeMessage($output, sprintf('<info>Сервис включён и запущен. Управление: systemctl {status|restart|stop} %s</info>', SystemdService::NAME));
 
         return Command::SUCCESS;
     }

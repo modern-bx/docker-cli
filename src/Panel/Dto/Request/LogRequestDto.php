@@ -15,11 +15,13 @@ final readonly class LogRequestDto implements RequestDto
         public int $pageSize,
         public string $sort,
         public string $direction,
-        public ?string $project,
-        public ?string $status,
+        public array $projects,
+        public array $statuses,
         public ?string $queueItem,
         public ?string $itemCode,
         public ?string $taskCode,
+        public array $levels,
+        public array $contexts,
     ) {
     }
 
@@ -29,19 +31,25 @@ final readonly class LogRequestDto implements RequestDto
         $pageSize = filter_var($request->query['pageSize'] ?? 25, FILTER_VALIDATE_INT);
         $sort = (string) ($request->query['sort'] ?? 'timestamp');
         $direction = (string) ($request->query['direction'] ?? 'desc');
-        $allowedSort = ['timestamp', 'queueItem', 'itemCode', 'project', 'queueCode', 'status', 'taskCode', 'result', 'message'];
+        $allowedSort = ['timestamp', 'queueItem', 'itemCode', 'project', 'queueCode', 'status', 'taskCode', 'level', 'context', 'result', 'message'];
         if ($page === false || !in_array($pageSize, [25, 50, 100], true) || !in_array($sort, $allowedSort, true) || !in_array($direction, ['asc', 'desc'], true)) {
             throw new RequestValidationException('Некорректные параметры журнала.');
         }
-        $project = isset($request->query['project']) && is_string($request->query['project']) && $request->query['project'] !== ''
-            ? $request->query['project']
-            : null;
-        $status = isset($request->query['status']) && is_string($request->query['status']) && in_array($request->query['status'], \DockerCli\Queue\QueueRepository::STATUSES, true)
-            ? $request->query['status']
-            : null;
+        $selection = static function (string $field, array $allowed) use ($request): array {
+            $value = $request->query[$field] ?? [];
+            $values = is_array($value) ? $value : explode(',', is_string($value) ? $value : '');
+            return array_values(array_unique(array_filter($values, static fn (mixed $item): bool => is_string($item) && in_array($item, $allowed, true))));
+        };
+        $projects = $selection('project', array_values(array_filter((array) ($request->query['project'] ?? []), 'is_string')));
+        if (is_string($request->query['project'] ?? null)) {
+            $projects = array_values(array_filter(explode(',', $request->query['project']), static fn (string $project): bool => $project !== ''));
+        }
+        $statuses = $selection('status', \DockerCli\Queue\QueueRepository::STATUSES);
         $text = static fn (string $field): ?string => isset($request->query[$field]) && is_string($request->query[$field]) && trim($request->query[$field]) !== ''
             ? trim($request->query[$field])
             : null;
-        return new static($page, $pageSize, $sort, $direction, $project, $status, $text('queueItem'), $text('itemCode'), $text('taskCode'));
+        $levels = $selection('level', ['debug', 'info', 'warning', 'error']);
+        $contexts = $selection('context', ['command', 'task', 'queue']);
+        return new static($page, $pageSize, $sort, $direction, $projects, $statuses, $text('queueItem'), $text('itemCode'), $text('taskCode'), $levels, $contexts);
     }
 }

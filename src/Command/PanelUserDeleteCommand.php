@@ -12,7 +12,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelUserDeleteCommand extends Command
+final class PanelUserDeleteCommand extends AbstractCommand
 {
     public function __construct()
     {
@@ -27,22 +27,22 @@ final class PanelUserDeleteCommand extends Command
         try {
             $login = UserRepository::normalizeLogin(is_string($login) ? $login : '');
         } catch (\InvalidArgumentException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::INVALID;
         }
         $salt = (new SystemCompose())->envValue('PANEL_PASSWORD_SALT');
         if ($salt === '') {
-            $output->writeln('<error>Соль паролей не настроена. Выполните `docker-cli config:init`.</error>');
+            $this->writeMessage($output, '<error>Соль паролей не настроена. Выполните `docker-cli config:init`.</error>');
             return Command::FAILURE;
         }
         $repository = new UserRepository($salt);
         if (!$repository->delete($login)) {
-            $output->writeln(sprintf('<comment>Пользователь %s не существует.</comment>', $login));
+            $this->writeMessage($output, sprintf('<comment>Пользователь %s не существует.</comment>', $login));
             return Command::SUCCESS;
         }
         $revoked = (new TokenRepository())->revoke([$login]);
-        $output->writeln(sprintf('<info>Пользователь %s удалён.</info>', $login));
-        $output->writeln(sprintf('<info>Отозвано токенов: %d.</info>', $revoked));
+        $this->writeMessage($output, sprintf('<info>Пользователь %s удалён.</info>', $login));
+        $this->writeMessage($output, sprintf('<info>Отозвано токенов: %d.</info>', $revoked));
         return Command::SUCCESS;
     }
 }

@@ -12,7 +12,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DataDropCommand extends Command
+final class DataDropCommand extends AbstractCommand
 {
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
@@ -28,28 +28,28 @@ final class DataDropCommand extends Command
         $registry = $this->registry ?? new ProjectRegistry();
         $projectName = $this->resolveProjectName($input, $registry);
         if ($projectName === null) {
-            $output->writeln('<error>Укажите код зарегистрированного проекта или запустите команду в директории зарегистрированного проекта.</error>');
+            $this->writeMessage($output, '<error>Укажите код зарегистрированного проекта или запустите команду в директории зарегистрированного проекта.</error>');
             return Command::FAILURE;
         }
 
         if (!$registry->hasProject($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
             return Command::FAILURE;
         }
         if ($registry->isProjectProtected($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
             return Command::FAILURE;
         }
 
         try {
             $code = ($this->initializer ?? new DataInitializer())->drop($projectName, $output);
         } catch (MissingConfigException $exception) {
-            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
             return Command::FAILURE;
         }
 
         if ($code === Command::SUCCESS) {
-            $output->writeln(sprintf('<info>Данные проекта "%s" удалены.</info>', $projectName));
+            $this->writeMessage($output, sprintf('<info>Данные проекта "%s" удалены.</info>', $projectName));
         }
 
         return $code;

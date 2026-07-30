@@ -10,7 +10,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class ProjectShowCommand extends Command
+final class ProjectShowCommand extends AbstractCommand
 {
     public function __construct(private readonly ?ProjectRegistry $registry = null)
     {
@@ -28,20 +28,20 @@ final class ProjectShowCommand extends Command
             : $registry->projectNameFromContext();
 
         if ($projectName === null) {
-            $output->writeln('<error>Запустите команду в директории зарегистрированного проекта или укажите проект.</error>');
+            $this->writeMessage($output, '<error>Запустите команду в директории зарегистрированного проекта или укажите проект.</error>');
 
             return Command::FAILURE;
         }
 
         if (!$registry->hasProject($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
 
             return Command::FAILURE;
         }
 
         $contents = file_get_contents($registry->projectConfigFile($projectName));
         if ($contents === false) {
-            $output->writeln(sprintf('<error>Не удалось прочитать конфигурацию проекта "%s".</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Не удалось прочитать конфигурацию проекта "%s".</error>', $projectName));
 
             return Command::FAILURE;
         }

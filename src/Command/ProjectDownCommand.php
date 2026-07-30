@@ -17,7 +17,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 use function DockerCli\Util\join_path;
 
-final class ProjectDownCommand extends Command
+final class ProjectDownCommand extends AbstractCommand
 {
     public function __construct(
         private readonly ?FrameworkDetectionService $detectionService = null,
@@ -37,7 +37,7 @@ final class ProjectDownCommand extends Command
     {
         $destructive = $input->getOption('wipe') || $input->getOption('erase') || $input->getOption('drop');
         if ($destructive && !$input->getOption('force')) {
-            $output->writeln('<error>Опции --wipe, --erase и --drop выполняют необратимые действия. Повторите команду с --force.</error>');
+            $this->writeMessage($output, '<error>Опции --wipe, --erase и --drop выполняют необратимые действия. Повторите команду с --force.</error>');
 
             return Command::FAILURE;
         }
@@ -46,7 +46,7 @@ final class ProjectDownCommand extends Command
         $registry = new ProjectRegistry();
         $projectRoot = $framework?->getProjectRoot() ?? $this->projectRootFromContext($registry);
         if ($projectRoot === null || $projectRoot === '') {
-            $output->writeln('<error>Не удалось определить директорию проекта.</error>');
+            $this->writeMessage($output, '<error>Не удалось определить директорию проекта.</error>');
 
             return Command::FAILURE;
         }
@@ -54,19 +54,19 @@ final class ProjectDownCommand extends Command
         $metadataDirectory = join_path($projectRoot, '.docker-cli');
         $metaFile = join_path($metadataDirectory, 'project.yaml');
         if (!is_file($metaFile)) {
-            $output->writeln(sprintf('<error>Файл "%s" не найден.</error>', $metaFile));
+            $this->writeMessage($output, sprintf('<error>Файл "%s" не найден.</error>', $metaFile));
 
             return Command::FAILURE;
         }
 
         $projectName = $this->readProjectName($metaFile);
         if ($projectName === null || $projectName === '') {
-            $output->writeln(sprintf('<error>В файле "%s" не найдено имя проекта.</error>', $metaFile));
+            $this->writeMessage($output, sprintf('<error>В файле "%s" не найдено имя проекта.</error>', $metaFile));
 
             return Command::FAILURE;
         }
         if ($destructive && $registry->hasProject($projectName) && $registry->isProjectProtected($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
             return Command::FAILURE;
         }
 
@@ -74,7 +74,7 @@ final class ProjectDownCommand extends Command
             try {
                 $this->wipeProjectRoot($projectRoot);
             } catch (\RuntimeException $exception) {
-                $output->writeln(sprintf('<error>Не удалось очистить файлы проекта "%s": %s</error>', $projectName, $exception->getMessage()));
+                $this->writeMessage($output, sprintf('<error>Не удалось очистить файлы проекта "%s": %s</error>', $projectName, $exception->getMessage()));
                 return Command::FAILURE;
             }
         }
@@ -83,12 +83,12 @@ final class ProjectDownCommand extends Command
             try {
                 $dropCode = ($this->dataInitializer ?? new DataInitializer())->drop($projectName, $output);
             } catch (MissingConfigException $exception) {
-                $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+                $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
 
                 return Command::FAILURE;
             }
             if ($dropCode !== Command::SUCCESS) {
-                $output->writeln(sprintf('<error>Не удалось удалить базы данных и пользователей проекта "%s". Регистрация проекта сохранена.</error>', $projectName));
+                $this->writeMessage($output, sprintf('<error>Не удалось удалить базы данных и пользователей проекта "%s". Регистрация проекта сохранена.</error>', $projectName));
 
                 return $dropCode;
             }
@@ -102,7 +102,7 @@ final class ProjectDownCommand extends Command
         if ($input->getOption('erase')) {
             $this->removeDirectory($metadataDirectory);
             if (!rmdir($projectRoot)) {
-                $output->writeln(sprintf('<error>Не удалось удалить директорию проекта "%s".</error>', $projectRoot));
+                $this->writeMessage($output, sprintf('<error>Не удалось удалить директорию проекта "%s".</error>', $projectRoot));
                 return Command::FAILURE;
             }
         }
@@ -115,12 +115,8 @@ final class ProjectDownCommand extends Command
             }
         }
 
-        $output->writeln(sprintf('<info>Регистрация проекта "%s" удалена.</info>', $projectName));
-        ($this->context ?? CommandContext::fromEnvironment())->addNotification(
-            'project.down',
-            'command',
-            'info',
-            sprintf('Проект **%s** успешно удален из контура.', $projectName),
+        ($this->context ?? CommandContext::fromEnvironment($this, $output))->addMessage(
+            new Message(sprintf('Проект **%s** успешно удален из контура.', $projectName), notify: true),
         );
 
         return Command::SUCCESS;

@@ -14,7 +14,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DataInitCommand extends Command
+final class DataInitCommand extends AbstractCommand
 {
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
@@ -31,12 +31,12 @@ final class DataInitCommand extends Command
         $registry = $this->registry ?? new ProjectRegistry();
         $projectName = $this->resolveProjectName($input, $registry);
         if ($projectName === null) {
-            $output->writeln('<error>Укажите код зарегистрированного проекта или запустите команду в директории зарегистрированного проекта.</error>');
+            $this->writeMessage($output, '<error>Укажите код зарегистрированного проекта или запустите команду в директории зарегистрированного проекта.</error>');
             return Command::FAILURE;
         }
 
         if (!$registry->hasProject($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
             return Command::FAILURE;
         }
 
@@ -52,12 +52,12 @@ final class DataInitCommand extends Command
         try {
             $code = ($this->initializer ?? new DataInitializer())->initialize($projectName, $mysqlPassword, $postgresPassword, (bool) $input->getOption('rebuild'), $output);
         } catch (MissingConfigException $exception) {
-            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
             return Command::FAILURE;
         }
 
         if ($code === Command::SUCCESS) {
-            $output->writeln(sprintf('<info>Данные проекта "%s" инициализированы.</info>', $projectName));
+            $this->writeMessage($output, sprintf('<info>Данные проекта "%s" инициализированы.</info>', $projectName));
         }
 
         return $code;

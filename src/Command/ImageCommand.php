@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use function DockerCli\Util\join_path;
 
-abstract class ImageCommand extends Command
+abstract class ImageCommand extends AbstractCommand
 {
     /** @var list<array{name: string, context: string, service: string}> */
     private const IMAGES = [
@@ -79,7 +79,7 @@ abstract class ImageCommand extends Command
      */
     protected function runDockerCommand(array $command, OutputInterface $output, bool $dryRun, array $extraEnv = []): int
     {
-        $output->writeln('<comment>' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
+        $this->writeMessage($output, '<comment>' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>', MessageLevel::Debug);
         if ($dryRun) {
             return Command::SUCCESS;
         }

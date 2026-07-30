@@ -72,7 +72,7 @@ final readonly class QueueController
     #[Route('GET', '/api/logs', LogRequestDto::class, LogListDto::class)]
     public function logs(LogRequestDto $request): LogListDto
     {
-        $data = $this->queues->logs($request->page, $request->pageSize, $request->sort, $request->direction, $request->project, $request->status, $request->queueItem, $request->itemCode, $request->taskCode);
+        $data = $this->queues->logs($request->page, $request->pageSize, $request->sort, $request->direction, $request->projects, $request->statuses, $request->queueItem, $request->itemCode, $request->taskCode, $request->levels, $request->contexts);
         return new LogListDto($data['items'], $data['total'], $data['projects']);
     }
 }

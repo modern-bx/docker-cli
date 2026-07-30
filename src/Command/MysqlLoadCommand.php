@@ -13,7 +13,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class MysqlLoadCommand extends Command
+final class MysqlLoadCommand extends AbstractCommand
 {
     public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?MysqlDumpLoader $dumpLoader = null)
     {
@@ -32,48 +32,48 @@ final class MysqlLoadCommand extends Command
         $registry = $this->registry ?? new ProjectRegistry();
         $project = $input->getOption('project') ?: $registry->projectNameFromContext();
         if (!is_string($project) || !$registry->hasProject($project)) {
-            $output->writeln('<error>Укажите зарегистрированный проект через --project или запустите команду из проекта.</error>');
+            $this->writeMessage($output, '<error>Укажите зарегистрированный проект через --project или запустите команду из проекта.</error>');
             return Command::FAILURE;
         }
         if ($registry->isProjectProtected($project)) {
-            $output->writeln(sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $project));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $project));
             return Command::FAILURE;
         }
         if (!$input->getOption('force')) {
-            $output->writeln(sprintf('<error>Загрузка полностью заменит MySQL-базу проекта "%s". Повторите с --force.</error>', $project));
+            $this->writeMessage($output, sprintf('<error>Загрузка полностью заменит MySQL-базу проекта "%s". Повторите с --force.</error>', $project));
             return Command::FAILURE;
         }
         $threads = filter_var($input->getOption('threads'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($threads === false) {
-            $output->writeln('<error>Опция --threads должна быть положительным целым числом.</error>');
+            $this->writeMessage($output, '<error>Опция --threads должна быть положительным целым числом.</error>');
             return Command::INVALID;
         }
         $database = $registry->readProjectConfig($project)['data']['databases']['mysql']['database'] ?? $project;
         if (!is_string($database) || $database === '') {
-            $output->writeln(sprintf('<error>В конфигурации проекта "%s" не задана база MySQL.</error>', $project));
+            $this->writeMessage($output, sprintf('<error>В конфигурации проекта "%s" не задана база MySQL.</error>', $project));
             return Command::FAILURE;
         }
         $path = realpath((string) $input->getArgument('path'));
         if ($path === false || !is_file($path . '/metadata')) {
-            $output->writeln('<error>Указанная директория не является дампом mydumper.</error>');
+            $this->writeMessage($output, '<error>Указанная директория не является дампом mydumper.</error>');
             return Command::FAILURE;
         }
         $metadata = json_decode((string) @file_get_contents($path . '/docker-cli.json'), true);
         if (!$input->getOption('skip-checks') && is_array($metadata) && (($metadata['project'] ?? null) !== $project || ($metadata['database'] ?? null) !== $database)) {
-            $output->writeln('<error>Дамп создан для другого проекта или базы данных.</error>');
+            $this->writeMessage($output, '<error>Дамп создан для другого проекта или базы данных.</error>');
             return Command::FAILURE;
         }
         if ($input->getOption('skip-checks')) {
-            $output->writeln(sprintf('<comment>Проверка проекта и базы дампа пропущена; данные будут загружены в "%s".</comment>', $database));
+            $this->writeMessage($output, sprintf('<comment>Проверка проекта и базы дампа пропущена; данные будут загружены в "%s".</comment>', $database));
         }
         try {
             $code = ($this->dumpLoader ?? new MysqlDumpLoader())->load($database, $path, $threads, (bool) $input->getOption('disable-redo-log'), $output);
         } catch (MissingConfigException) {
-            $output->writeln('<error>Системная конфигурация не инициализирована.</error>');
+            $this->writeMessage($output, '<error>Системная конфигурация не инициализирована.</error>');
             return Command::FAILURE;
         }
         if ($code === Command::SUCCESS) {
-            $output->writeln(sprintf('<info>База "%s" восстановлена из "%s".</info>', $database, $path));
+            $this->writeMessage($output, sprintf('<info>База "%s" восстановлена из "%s".</info>', $database, $path));
         }
         return $code;
     }

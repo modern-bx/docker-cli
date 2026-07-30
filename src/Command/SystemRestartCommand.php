@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class SystemRestartCommand extends Command
+final class SystemRestartCommand extends AbstractCommand
 {
     use DockerComposeRunner;
 

@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class QueueItemDeleteCommand extends Command
+final class QueueItemDeleteCommand extends AbstractCommand
 {
     public function __construct(private readonly ?QueueRepository $queues = null)
     {
@@ -32,11 +32,11 @@ final class QueueItemDeleteCommand extends Command
         try {
             ($this->queues ?? new QueueRepository())->delete($queue, $item);
         } catch (\InvalidArgumentException|\RuntimeException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
 
-        $output->writeln(sprintf('<info>Элемент "%s" удалён из очереди "%s".</info>', $item, $queue));
+        $this->writeMessage($output, sprintf('<info>Элемент "%s" удалён из очереди "%s".</info>', $item, $queue));
         return Command::SUCCESS;
     }
 }

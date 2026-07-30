@@ -13,7 +13,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelPasswordRotateCommand extends Command
+final class PanelPasswordRotateCommand extends AbstractCommand
 {
     public function __construct()
     {
@@ -29,16 +29,16 @@ final class PanelPasswordRotateCommand extends Command
         try {
             $logins = array_map(UserRepository::normalizeLogin(...), $logins);
         } catch (\InvalidArgumentException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::INVALID;
         }
         if ($logins === []) {
-            $output->writeln('<error>Укажите хотя бы одного пользователя.</error>');
+            $this->writeMessage($output, '<error>Укажите хотя бы одного пользователя.</error>');
             return Command::INVALID;
         }
         $salt = (new SystemCompose())->envValue('PANEL_PASSWORD_SALT');
         if ($salt === '') {
-            $output->writeln('<error>Соль паролей не настроена. Выполните `docker-cli config:init`.</error>');
+            $this->writeMessage($output, '<error>Соль паролей не настроена. Выполните `docker-cli config:init`.</error>');
             return Command::FAILURE;
         }
         $users = new UserRepository($salt);
@@ -48,12 +48,12 @@ final class PanelPasswordRotateCommand extends Command
         foreach (array_unique($logins) as $login) {
             $password = $generator->generate();
             if (!$users->rotatePassword($login, $password)) {
-                $output->writeln(sprintf('<error>Пользователь %s не существует.</error>', $login));
+                $this->writeMessage($output, sprintf('<error>Пользователь %s не существует.</error>', $login));
                 $failed = true;
                 continue;
             }
             $revoked = $tokens->revoke([$login]);
-            $output->writeln(sprintf('<info>%s: %s (отозвано токенов: %d)</info>', $login, $password, $revoked));
+            $this->writeMessage($output, sprintf('<info>%s: %s (отозвано токенов: %d)</info>', $login, $password, $revoked));
         }
         return $failed ? Command::FAILURE : Command::SUCCESS;
     }

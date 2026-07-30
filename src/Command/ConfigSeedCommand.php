@@ -14,7 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class ConfigSeedCommand extends Command
+final class ConfigSeedCommand extends AbstractCommand
 {
     private TranslatorInterface $translator;
 
@@ -33,7 +33,7 @@ final class ConfigSeedCommand extends Command
         try {
             $compose->assertInitialized();
         } catch (MissingConfigException) {
-            $output->writeln('<error>' . $this->translator->trans('config.missing', [
+            $this->writeMessage($output, '<error>' . $this->translator->trans('config.missing', [
                 '%files%' => implode(', ', $compose->missingFiles()),
                 '%directory%' => $compose->directory(),
             ]) . '</error>');
@@ -44,7 +44,7 @@ final class ConfigSeedCommand extends Command
         if (!$input->getOption('yes')) {
             $question = new ConfirmationQuestion($this->translator->trans('command.seed.confirm') . ' ', false);
             if (!$this->getHelper('question')->ask($input, $output, $question)) {
-                $output->writeln('<comment>' . $this->translator->trans('command.seed.cancelled') . '</comment>');
+                $this->writeMessage($output, '<comment>' . $this->translator->trans('command.seed.cancelled') . '</comment>');
 
                 return Command::SUCCESS;
             }
@@ -58,7 +58,7 @@ final class ConfigSeedCommand extends Command
         $this->setDefaultIfEmpty($values, 'POSTGRES_PASSWORD', $this->randomSecret());
         $this->writeEnvFile($compose->envFile(), $values);
 
-        $output->writeln('<info>' . $this->translator->trans('command.seed.completed', [
+        $this->writeMessage($output, '<info>' . $this->translator->trans('command.seed.completed', [
             '%file%' => $compose->envFile(),
             '%username%' => $values['DOCKGE_ADMIN_USERNAME'],
         ]) . '</info>');

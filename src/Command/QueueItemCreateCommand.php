@@ -13,7 +13,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class QueueItemCreateCommand extends Command
+final class QueueItemCreateCommand extends AbstractCommand
 {
     public function __construct(private readonly ?QueueRepository $queues = null, private readonly ?TaskRepository $tasks = null)
     {
@@ -57,11 +57,11 @@ final class QueueItemCreateCommand extends Command
             $queue = (string) $input->getOption('queue');
             $file = ($this->queues ?? new QueueRepository())->create($queue, $code, $item);
         } catch (\Throwable $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::INVALID;
         }
 
-        $output->writeln(sprintf('<info>Элемент очереди создан: %s</info>', $file));
+        $this->writeMessage($output, sprintf('<info>Элемент очереди создан: %s</info>', $file));
         return Command::SUCCESS;
     }
 

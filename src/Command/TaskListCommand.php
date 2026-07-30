@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class TaskListCommand extends Command
+final class TaskListCommand extends AbstractCommand
 {
     public function __construct(private readonly ?TaskRepository $repository = null)
     {
@@ -27,7 +27,7 @@ final class TaskListCommand extends Command
             $definitions = ($this->repository ?? new TaskRepository())->all();
             $definitions = $this->filterDefinitions($definitions, $input->getOption('task'));
         } catch (\Throwable $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
 
             return Command::FAILURE;
         }

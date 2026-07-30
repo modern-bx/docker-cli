@@ -10,9 +10,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class ProjectWipeCommand extends Command
+final class ProjectWipeCommand extends AbstractCommand
 {
-    public function __construct(private readonly CommandContext $context, private readonly ?ProjectRegistry $registry = null)
+    public function __construct(private readonly ?CommandContext $context = null, private readonly ?ProjectRegistry $registry = null)
     {
         parent::__construct('project:wipe');
         $this->setDescription('Удалить все файлы проекта, кроме директории .docker-cli.');
@@ -28,33 +28,33 @@ final class ProjectWipeCommand extends Command
         }
 
         if ($projectName === null) {
-            $output->writeln('<error>Укажите код проекта через --project или запустите команду в директории зарегистрированного проекта.</error>');
+            $this->writeMessage($output, '<error>Укажите код проекта через --project или запустите команду в директории зарегистрированного проекта.</error>');
             return Command::FAILURE;
         }
 
         if (!$registry->hasProject($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
             return Command::FAILURE;
         }
         if ($registry->isProjectProtected($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
             return Command::FAILURE;
         }
 
         $config = $registry->readProjectConfig($projectName);
         $projectRoot = $config['data']['project']['root'] ?? null;
         if (!is_string($projectRoot) || $projectRoot === '' || !is_dir($projectRoot)) {
-            $output->writeln(sprintf('<error>Директория проекта "%s" не найдена.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Директория проекта "%s" не найдена.</error>', $projectName));
             return Command::FAILURE;
         }
 
         $projectRoot = realpath($projectRoot);
         if ($projectRoot === false || $projectRoot === DIRECTORY_SEPARATOR) {
-            $output->writeln('<error>Отказ очистки: небезопасная директория проекта.</error>');
+            $this->writeMessage($output, '<error>Отказ очистки: небезопасная директория проекта.</error>');
             return Command::FAILURE;
         }
         if (!is_dir($projectRoot . DIRECTORY_SEPARATOR . '.docker-cli')) {
-            $output->writeln(sprintf('<error>В директории проекта "%s" не найдена директория .docker-cli.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>В директории проекта "%s" не найдена директория .docker-cli.</error>', $projectName));
             return Command::FAILURE;
         }
 
@@ -66,16 +66,12 @@ final class ProjectWipeCommand extends Command
                 $this->removePath($projectRoot . DIRECTORY_SEPARATOR . $entry);
             }
         } catch (\RuntimeException $exception) {
-            $output->writeln(sprintf('<error>Не удалось очистить проект "%s": %s</error>', $projectName, $exception->getMessage()));
+            $this->writeMessage($output, sprintf('<error>Не удалось очистить проект "%s": %s</error>', $projectName, $exception->getMessage()));
             return Command::FAILURE;
         }
 
-        $output->writeln(sprintf('<info>Файлы проекта "%s" удалены, директория .docker-cli сохранена.</info>', $projectName));
-        $this->context->addNotification(
-            'project.wipe',
-            'command',
-            'info',
-            sprintf("Файлы проекта **%s** успешно удалены. Служебная директория `.docker-cli` сохранена.", $projectName),
+        ($this->context ?? CommandContext::fromEnvironment($this, $output))->addMessage(
+            new Message(sprintf("Файлы проекта **%s** успешно удалены. Служебная директория `.docker-cli` сохранена.", $projectName), notify: true),
         );
 
         return Command::SUCCESS;

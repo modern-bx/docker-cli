@@ -17,7 +17,7 @@ trait DockerComposeRunner
         try {
             $compose->assertInitialized();
         } catch (MissingConfigException $exception) {
-            $output->writeln('<error>' . $translator->trans('config.missing', [
+            $this->writeMessage($output, '<error>' . $translator->trans('config.missing', [
                 '%files%' => implode(', ', $exception->missingFiles()),
                 '%directory%' => $exception->configDirectory(),
             ]) . '</error>');
@@ -25,12 +25,12 @@ trait DockerComposeRunner
             return Command::FAILURE;
         }
 
-        $output->writeln('<info>' . $translator->trans('config.using', ['%file%' => $compose->composeFile()]) . '</info>');
+        $this->writeMessage($output, '<info>' . $translator->trans('config.using', ['%file%' => $compose->composeFile()]) . '</info>');
 
         $fullCommand = array_merge($compose->dockerComposeCommand($operation), $arguments);
-        $output->writeln('<comment>' . $translator->trans('process.running', [
+        $this->writeMessage($output, '<comment>' . $translator->trans('process.running', [
             '%command%' => implode(' ', array_map('escapeshellarg', $fullCommand)),
-        ]) . '</comment>');
+        ]) . '</comment>', MessageLevel::Debug);
 
         $process = proc_open($fullCommand, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
         if (!is_resource($process)) {

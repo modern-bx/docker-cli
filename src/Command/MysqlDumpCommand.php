@@ -13,7 +13,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class MysqlDumpCommand extends Command
+final class MysqlDumpCommand extends AbstractCommand
 {
     public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?MysqlDumpLoader $dumpLoader = null)
     {
@@ -29,17 +29,17 @@ final class MysqlDumpCommand extends Command
         $registry = $this->registry ?? new ProjectRegistry();
         $project = $input->getOption('project') ?: $registry->projectNameFromContext();
         if (!is_string($project) || !$registry->hasProject($project)) {
-            $output->writeln('<error>Укажите зарегистрированный проект через --project или запустите команду из проекта.</error>');
+            $this->writeMessage($output, '<error>Укажите зарегистрированный проект через --project или запустите команду из проекта.</error>');
             return Command::FAILURE;
         }
         $threads = filter_var($input->getOption('threads'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($threads === false) {
-            $output->writeln('<error>Опция --threads должна быть положительным целым числом.</error>');
+            $this->writeMessage($output, '<error>Опция --threads должна быть положительным целым числом.</error>');
             return Command::INVALID;
         }
         $database = $registry->readProjectConfig($project)['data']['databases']['mysql']['database'] ?? $project;
         if (!is_string($database) || $database === '') {
-            $output->writeln(sprintf('<error>В конфигурации проекта "%s" не задана база MySQL.</error>', $project));
+            $this->writeMessage($output, sprintf('<error>В конфигурации проекта "%s" не задана база MySQL.</error>', $project));
             return Command::FAILURE;
         }
         $path = $input->getArgument('path');
@@ -48,12 +48,12 @@ final class MysqlDumpCommand extends Command
         try {
             $code = ($this->dumpLoader ?? new MysqlDumpLoader())->dump($database, $path, $threads, $output);
         } catch (MissingConfigException) {
-            $output->writeln('<error>Системная конфигурация не инициализирована.</error>');
+            $this->writeMessage($output, '<error>Системная конфигурация не инициализирована.</error>');
             return Command::FAILURE;
         }
         if ($code === Command::SUCCESS) {
             file_put_contents($path . '/docker-cli.json', json_encode(['project' => $project, 'database' => $database, 'createdAt' => date(DATE_ATOM)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
-            $output->writeln(sprintf('<info>Дамп базы "%s" записан в "%s".</info>', $database, $path));
+            $this->writeMessage($output, sprintf('<info>Дамп базы "%s" записан в "%s".</info>', $database, $path));
         }
         return $code;
     }

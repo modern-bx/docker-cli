@@ -14,8 +14,11 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use function DockerCli\Util\join_path;
 
-final class TaskRunCommand extends Command
+final class TaskRunCommand extends AbstractCommand
 {
+    /** @var array<string, array{message: string, level: string}> */
+    private array $journal = [];
+
     public function __construct(
         private readonly ?TaskRepository $repository = null,
         private readonly ?ProjectRegistry $registry = null,
@@ -48,7 +51,7 @@ final class TaskRunCommand extends Command
                 throw new \RuntimeException(sprintf('Не удалось создать временный скрипт в "%s".', $cwd));
             }
         } catch (\Throwable $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
 
             return Command::INVALID;
         }
@@ -57,12 +60,12 @@ final class TaskRunCommand extends Command
         $environment = is_array($environment) ? $environment : [];
         $contextDirectory = $this->contextDirectory();
         if (!is_dir($contextDirectory) && !mkdir($contextDirectory, 0775, true) && !is_dir($contextDirectory)) {
-            $output->writeln('<error>Не удалось создать директорию контекста выполнения команды.</error>');
+            $this->writeMessage($output, '<error>Не удалось создать директорию контекста выполнения команды.</error>');
             return Command::FAILURE;
         }
         $contextFile = tempnam($contextDirectory, 'context-');
         if ($contextFile === false) {
-            $output->writeln('<error>Не удалось создать контекст выполнения команды.</error>');
+            $this->writeMessage($output, '<error>Не удалось создать контекст выполнения команды.</error>');
             return Command::FAILURE;
         }
         $environment[CommandContext::FILE_ENVIRONMENT_VARIABLE] = $contextFile;
@@ -73,27 +76,43 @@ final class TaskRunCommand extends Command
         try {
             $process = proc_open(['bash', $scriptFile], [STDIN, STDOUT, STDERR], $pipes, $cwd, $environment);
             if (!is_resource($process)) {
-                $output->writeln('<error>Не удалось запустить bash.</error>');
+                $this->writeMessage($output, '<error>Не удалось запустить bash.</error>');
 
                 return Command::FAILURE;
             }
 
             $exitCode = proc_close($process);
-            foreach (CommandContext::read($contextFile) as $notification) {
-                ($this->notifications ?? new NotificationRepository())->create(
-                    $task['code'], 'task', $notification['level'], $notification['message'],
-                );
+            foreach (CommandContext::read($contextFile) as $message) {
+                $timestamp = $message['timestamp'];
+                while (isset($this->journal[$timestamp])) {
+                    $timestamp = sprintf('%.6f', (float) $timestamp + 0.000001);
+                }
+                $this->journal[$timestamp] = [
+                    'message' => $message['message'],
+                    'level' => $message['level'],
+                ];
+                if ($message['notify']) {
+                    ($this->notifications ?? new NotificationRepository())->create(
+                        $task['code'], 'task', $message['level'], $message['message'],
+                    );
+                }
             }
 
             return is_int($exitCode) ? $exitCode : Command::FAILURE;
         } finally {
             if ($input->getOption('no-delete')) {
-                $output->writeln(sprintf('<comment>Скомпилированный скрипт сохранен: %s</comment>', $scriptFile));
+                $this->writeMessage($output, sprintf('<comment>Скомпилированный скрипт сохранен: %s</comment>', $scriptFile), MessageLevel::Debug);
             } else {
                 @unlink($scriptFile);
             }
             @unlink($contextFile);
         }
+    }
+
+    /** @return array<string, array{message: string, level: string}> */
+    public function journal(): array
+    {
+        return $this->journal;
     }
 
     private function contextDirectory(): string

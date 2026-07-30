@@ -12,7 +12,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelUserCreateCommand extends Command
+final class PanelUserCreateCommand extends AbstractCommand
 {
     public function __construct()
     {
@@ -26,7 +26,7 @@ final class PanelUserCreateCommand extends Command
         $compose = new SystemCompose();
         $salt = $compose->envValue('PANEL_PASSWORD_SALT');
         if ($salt === '') {
-            $output->writeln('<error>Соль паролей не настроена. Выполните `docker-cli config:init`.</error>');
+            $this->writeMessage($output, '<error>Соль паролей не настроена. Выполните `docker-cli config:init`.</error>');
             return Command::FAILURE;
         }
 
@@ -34,17 +34,17 @@ final class PanelUserCreateCommand extends Command
             $value = $input->getArgument('login');
             $login = UserRepository::normalizeLogin(is_string($value) ? $value : '');
         } catch (\InvalidArgumentException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::INVALID;
         }
         $password = (new PanelPasswordGenerator())->generate();
         $repository = new UserRepository($salt);
         if (!$repository->add($login, $password)) {
-            $output->writeln(sprintf('<error>Пользователь %s уже существует.</error>', $login));
+            $this->writeMessage($output, sprintf('<error>Пользователь %s уже существует.</error>', $login));
             return Command::FAILURE;
         }
-        $output->writeln(sprintf('<info>Пользователь %s создан.</info>', $login));
-        $output->writeln(sprintf('<info>Пароль: %s</info>', $password));
+        $this->writeMessage($output, sprintf('<info>Пользователь %s создан.</info>', $login));
+        $this->writeMessage($output, sprintf('<info>Пароль: %s</info>', $password));
         return Command::SUCCESS;
     }
 }
