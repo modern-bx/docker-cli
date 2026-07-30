@@ -95,7 +95,7 @@ final class ProjectController
         return new ProjectListDto($projects);
     }
 
-    private const FRAMEWORK_NAMES = ['none' => 'Без фреймворка', 'symfony' => 'Symfony', 'laravel' => 'Laravel', 'bitrix' => 'Bitrix', 'bitrix24' => 'Bitrix24'];
+    private const FRAMEWORK_NAMES = ['symfony' => 'Symfony', 'laravel' => 'Laravel', 'bitrix' => 'Bitrix', 'bitrix24' => 'Bitrix24'];
 
     #[Route('GET', '/api/projects/options', EmptyRequestDto::class, ProjectOptionsDto::class)]
     public function options(EmptyRequestDto $request): ProjectOptionsDto
@@ -103,7 +103,7 @@ final class ProjectController
         return new ProjectOptionsDto(
             ($this->settings ?? new ProjectsSettingsRepository())->locations(),
             [new ConceptDto('php', 'PHP')],
-            ['php' => array_map(static fn (string $code, string $name) => new ConceptDto($code, $name), array_keys(self::FRAMEWORK_NAMES), self::FRAMEWORK_NAMES)],
+            ['php' => [new ConceptDto('', 'Без фреймворка'), ...array_map(static fn (string $code, string $name) => new ConceptDto($code, $name), array_keys(self::FRAMEWORK_NAMES), self::FRAMEWORK_NAMES)]],
         );
     }
 
@@ -113,17 +113,19 @@ final class ProjectController
         $options = $this->options(new EmptyRequestDto());
         $location = current(array_filter($options->locations, static fn (array $item): bool => $item['code'] === $request->location));
         if (!is_array($location)) throw new ProjectActionException('Локация не найдена.', 422);
-        if ($request->language !== 'php' || !isset($options->frameworks[$request->language]) || !in_array($request->framework, array_map(static fn (ConceptDto $item) => $item->code, $options->frameworks[$request->language]), true)) {
+        if ($request->language !== 'php' || !isset($options->frameworks[$request->language]) || !in_array($request->framework ?? '', array_map(static fn (ConceptDto $item) => $item->code, $options->frameworks[$request->language]), true)) {
             throw new ProjectActionException('Язык или фреймворк не поддерживается.', 422);
         }
         $name = $request->code ?? (new ProjectNameGenerator())->generate($this->projects->registeredProjectNames());
         if (preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $name) !== 1) throw new ProjectActionException('Код проекта должен содержать строчные латинские буквы, цифры и дефисы.', 422);
         if ($this->projects->hasProject($name) || file_exists(join_path($location['path'], $name))) throw new ProjectActionException('Проект или директория с таким кодом уже существует.', 409);
-        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
-            'code' => 'core.project.up', 'arguments' => [
+        $arguments = [
                 'location' => ['value' => $location['path']], 'name' => ['value' => $name],
-                'language' => ['value' => $request->language], 'framework' => ['value' => $request->framework],
-            ],
+                'language' => ['value' => $request->language],
+        ];
+        if ($request->framework !== null) $arguments['framework'] = ['value' => $request->framework];
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
+            'code' => 'core.project.up', 'arguments' => $arguments,
         ]]]];
         try { ($this->queues ?? new QueueRepository())->create('default', 'core.project.up', $item); }
         catch (\InvalidArgumentException|\RuntimeException $exception) { throw new ProjectActionException($exception->getMessage(), 500); }
@@ -187,7 +189,6 @@ final class ProjectController
     /** @param array<string, string> $names */
     private function concept(mixed $value, array $names): ?ConceptDto
     {
-        if ($value === false && isset($names['none'])) $value = 'none';
         if (!is_string($value) || $value === '' || !isset($names[$value])) return null;
         return new ConceptDto($value, $names[$value]);
     }

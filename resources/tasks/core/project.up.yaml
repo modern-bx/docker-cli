@@ -8,12 +8,20 @@ task:
   context: system
   description: Создает директорию и регистрирует новый проект.
   parameters:
-    location: { type: string }
-    name: { type: string }
-    language: { type: list, items: [{ value: php }] }
-    framework: { type: list, items: [{ value: none }, { value: symfony }, { value: laravel }, { value: bitrix }, { value: bitrix24 }] }
+    location: { type: string, required: true }
+    name: { type: string, required: true }
+    language: { type: list, required: true, items: [{ name: PHP, value: php }] }
+    framework:
+      type: list
+      items:
+        - { name: Symfony, value: symfony }
+        - { name: Laravel, value: laravel }
+        - { name: Bitrix, value: bitrix }
+        - { name: Bitrix24, value: bitrix24 }
   action: |
     project_root={{ location }}/{{ name }}
     mkdir "$project_root"
     cd "$project_root"
-    docker-cli project:up {{ name }} --force --language={{ language }} --framework={{ framework }}
+    options=(--language={{ language }})
+    [ -n "${framework:-}" ] && options+=(--framework="$framework")
+    docker-cli project:up {{ name }} "${options[@]}"
