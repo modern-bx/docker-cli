@@ -1,6 +1,7 @@
 <script>
   import { DatePicker, Portal } from '@skeletonlabs/skeleton-svelte';
   import { parseDate } from '@internationalized/date';
+  import { CalendarDays } from '@lucide/svelte';
 
   let { label, value = '', onchange } = $props();
 </script>
@@ -10,7 +11,7 @@
   <DatePicker locale="ru-RU" value={value ? [parseDate(value)] : []} onValueChange={(details) => onchange(details.valueAsString[0] || '')}>
     <DatePicker.Control class="backup-date-control">
       <DatePicker.Input class="backup-date-input" placeholder="дд.мм.гггг" />
-      <DatePicker.Trigger class="backup-date-trigger" aria-label={`Открыть календарь «${label}»`}>▣</DatePicker.Trigger>
+      <DatePicker.Trigger class="backup-date-trigger" aria-label={`Открыть календарь «${label}»`}><CalendarDays size={16} aria-hidden="true" /></DatePicker.Trigger>
     </DatePicker.Control>
     <Portal>
       <DatePicker.Positioner class="backup-date-positioner">
