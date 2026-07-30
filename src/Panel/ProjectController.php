@@ -13,6 +13,7 @@ use DockerCli\Panel\Dto\Request\ProjectCreateRequestDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectActionRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectNotesRequestDto;
+use DockerCli\Panel\Dto\Request\ProjectRenameRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectSecurityRequestDto;
 use DockerCli\Panel\Enum\ProjectActionEnum;
 use DockerCli\Panel\Http\Attribute\Route;
@@ -128,6 +129,22 @@ final class ProjectController
             'code' => 'core.project.up', 'arguments' => $arguments,
         ]]]];
         try { ($this->queues ?? new QueueRepository())->create('default', 'core.project.up', $item); }
+        catch (\InvalidArgumentException|\RuntimeException $exception) { throw new ProjectActionException($exception->getMessage(), 500); }
+        return $this->projects(new EmptyRequestDto());
+    }
+
+    #[Route('POST', '/api/projects/{name}/rename', ProjectRenameRequestDto::class, ProjectListDto::class)]
+    public function rename(ProjectRenameRequestDto $request): ProjectListDto
+    {
+        if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
+        if (preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $request->code) !== 1) throw new ProjectActionException('Код проекта должен содержать строчные латинские буквы, цифры и дефисы.', 422);
+        if ($request->code !== $request->name && $this->projects->hasProject($request->code)) throw new ProjectActionException('Проект с таким кодом уже существует.', 409);
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
+            'code' => 'core.project.rename',
+            'arguments' => ['code' => ['value' => $request->code]],
+            'project' => $request->name,
+        ]]]];
+        try { ($this->queues ?? new QueueRepository())->create('default', 'core.project.rename', $item); }
         catch (\InvalidArgumentException|\RuntimeException $exception) { throw new ProjectActionException($exception->getMessage(), 500); }
         return $this->projects(new EmptyRequestDto());
     }

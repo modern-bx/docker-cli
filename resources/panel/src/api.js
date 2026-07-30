@@ -42,6 +42,13 @@ export async function createProject(request, project) {
 }
 
 /** @returns {Promise<ProjectListDto>} */
+export async function renameProject(request, project, code) {
+  return /** @type {Promise<ProjectListDto>} */ (request(`/api/projects/${encodeURIComponent(project)}/rename`, {
+    method: 'POST', body: JSON.stringify({ code }),
+  }));
+}
+
+/** @returns {Promise<ProjectListDto>} */
 export async function saveProjectNotes(request, project, tags, description) {
   return /** @type {Promise<ProjectListDto>} */ (request(`/api/projects/${encodeURIComponent(project)}/notes`, {
     method: 'POST',

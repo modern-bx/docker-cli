@@ -3,7 +3,7 @@
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
-  import { createPanelUser, createProject, deletePanelUser, getLogs, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { createPanelUser, createProject, deletePanelUser, getLogs, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -100,6 +100,8 @@
   let projectConfirmation = null;
   let projectContextMenu = null;
   let projectAddDialog = null;
+  let projectRenameDialog = null;
+  let projectRenaming = false;
   let projectAddOptions = { locations: [], languages: [], frameworks: {} };
   let projectLocationCollection = useListCollection({ items: [] });
   let projectLanguageCollection = useListCollection({ items: [] });
@@ -674,6 +676,20 @@
       error = cause instanceof Error ? cause.message : 'Не удалось добавить проект.';
     }
     finally { projectAdding = false; }
+  }
+
+  async function submitProjectRename() {
+    if (!projectRenameDialog || projectRenaming) return;
+    projectRenaming = true;
+    try {
+      const data = await renameProject(api, projectRenameDialog.project, projectRenameDialog.code);
+      projects = data.projects;
+      projectRenameDialog = null;
+      notifyQueuedOperation('Переименование проекта');
+    } catch (cause) {
+      errorTitle = 'Не удалось переименовать проект';
+      error = cause instanceof Error ? cause.message : 'Не удалось переименовать проект.';
+    } finally { projectRenaming = false; }
   }
 
   async function api(path, options = {}) {
@@ -1307,7 +1323,7 @@
                       <span class="project-summary">
                         <strong>{project.name}</strong>
                         <span class="project-tags">
-                          {#each [{ code: project.language?.code || 'no-language', name: project.language?.name || 'no-language' }, { code: project.framework?.code || 'no-framework', name: project.framework?.name || 'no-framework' }, ...project.tags.map((tag) => ({ code: tag, name: tag }))] as tag}
+                          {#each [{ code: project.language?.code || 'no-language', name: project.language?.name || 'no-language' }, { code: project.framework?.code || 'no-framework', name: project.framework?.name || 'Без фреймворка' }, ...project.tags.map((tag) => ({ code: tag, name: tag }))] as tag}
                             <button type="button" onclick={(event) => { event.stopPropagation(); addProjectTag(tag.code); }}>{tag.name}</button>
                           {/each}
                         </span>
@@ -1332,7 +1348,7 @@
                   <dl class="project-fields">
                     <div><dt>Название</dt><dd>{selectedProject.name}</dd></div>
                     <div><dt>Язык</dt><dd>{selectedProject.language?.name || 'Не указан'}</dd></div>
-                    <div><dt>Фреймворк</dt><dd>{selectedProject.framework?.name || 'Не указан'}</dd></div>
+                    <div><dt>Фреймворк</dt><dd>{selectedProject.framework?.name || 'Без фреймворка'}</dd></div>
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
                     <div><dt>Основной хост</dt><dd>{#if selectedProject.url}<a class="project-host" href={selectedProject.url} target="_blank" rel="noreferrer">{selectedProject.url}<ExternalLink size={14} aria-hidden="true" /></a>{:else}Не указан{/if}</dd></div>
                   </dl>
@@ -1631,6 +1647,9 @@
       <button type="button" role="menuitem" disabled><ExternalLink size={16} aria-hidden="true" />Открыть</button>
     {/if}
     <hr />
+    <button type="button" role="menuitem" onclick={() => { projectRenameDialog = { project: projectContextMenu.project.name, code: projectContextMenu.project.name }; projectContextMenu = null; }}>
+      <Pencil size={16} aria-hidden="true" />Переименовать
+    </button>
     <button type="button" role="menuitem" onclick={() => runContextProjectAction(projectContextMenu.project.enabled ? 'disable' : 'enable')}>
       <Power size={16} aria-hidden="true" />{projectContextMenu.project.enabled ? 'Отключить' : 'Включить'}
     </button>
@@ -1642,6 +1661,21 @@
     </button>
   </div>
 {/if}
+
+<Dialog open={Boolean(projectRenameDialog)} onOpenChange={({ open }) => { if (!open && !projectRenaming) projectRenameDialog = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Переименовать проект</Dialog.Title>
+      {#if projectRenameDialog}
+        <form class="project-add-form" onsubmit={(event) => { event.preventDefault(); submitProjectRename(); }}>
+          <label class="label"><span class="label-text">Код</span><input class="input" bind:value={projectRenameDialog.code} required pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
+          <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectRenaming} onclick={() => { projectRenameDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectRenaming || !projectRenameDialog.code}>{projectRenaming ? 'Переименовываем…' : 'Переименовать'}</button></div>
+        </form>
+      {/if}
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
 
 <Dialog open={Boolean(projectAddDialog)} onOpenChange={({ open }) => { if (!open && !projectAdding) projectAddDialog = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
