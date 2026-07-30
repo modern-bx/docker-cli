@@ -45,9 +45,9 @@ final class QueueRepository
                 throw new \RuntimeException(sprintf('Не удалось создать директорию "%s".', $directory));
             }
         }
-        $logs = join_path($this->configDirectory(), 'logs', 'queue');
-        if (!is_dir($logs) && !mkdir($logs, 0775, true) && !is_dir($logs)) {
-            throw new \RuntimeException(sprintf('Не удалось создать директорию "%s".', $logs));
+        $journal = join_path($this->configDirectory(), 'journal', 'queue');
+        if (!is_dir($journal) && !mkdir($journal, 0775, true) && !is_dir($journal)) {
+            throw new \RuntimeException(sprintf('Не удалось создать директорию "%s".', $journal));
         }
     }
 
@@ -323,7 +323,7 @@ final class QueueRepository
     private function appendLog(string $queue, array $record): void
     {
         $line = json_encode($record, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
-        if (file_put_contents(join_path($this->configDirectory(), 'logs', 'queue', $queue . '.jsonl'), $line, FILE_APPEND | LOCK_EX) === false) {
+        if (file_put_contents(join_path($this->configDirectory(), 'journal', 'queue', $queue . '.jsonl'), $line, FILE_APPEND | LOCK_EX) === false) {
             throw new \RuntimeException('Не удалось записать общий лог очереди.');
         }
     }
@@ -361,7 +361,7 @@ final class QueueRepository
     {
         $items = [];
         $projects = [];
-        foreach (glob(join_path($this->configDirectory(), 'logs', 'queue', '*.jsonl')) ?: [] as $file) {
+        foreach (glob(join_path($this->configDirectory(), 'journal', 'queue', '*.jsonl')) ?: [] as $file) {
             $handle = fopen($file, 'r');
             if ($handle === false) continue;
             while (($line = fgets($handle)) !== false) {
