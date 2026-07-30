@@ -101,6 +101,9 @@
   let projectContextMenu = null;
   let projectAddDialog = null;
   let projectAddOptions = { locations: [], languages: [], frameworks: {} };
+  let projectLocationCollection = useListCollection({ items: [] });
+  let projectLanguageCollection = useListCollection({ items: [] });
+  let projectFrameworkCollection = useListCollection({ items: [] });
   let projectAdding = false;
   let notesProjectName = '';
   let noteTags = [];
@@ -141,9 +144,12 @@
         : queueItems.some((item) => item.status === '20-active') ? 'active' : 'healthy';
   $: notificationBadgeLevel = notifications.some((item) => item.level === 'error')
     ? 'error'
-    : notifications.some((item) => item.level === 'warn')
+      : notifications.some((item) => item.level === 'warn')
       ? 'warn'
       : notifications.some((item) => item.level === 'info') ? 'info' : 'debug';
+  $: projectLocationCollection = useListCollection({ items: projectAddOptions.locations.map((item) => ({ value: item.code, label: `${item.code} — ${item.path}` })) });
+  $: projectLanguageCollection = useListCollection({ items: projectAddOptions.languages.map((item) => ({ value: item.code, label: item.name })) });
+  $: projectFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectAddDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
   $: if (selectedProject && selectedProject.name !== notesProjectName) {
@@ -1643,11 +1649,11 @@
     <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
       {#if projectAddDialog}
       <Dialog.Title class="login-error-title">Добавить проект</Dialog.Title>
-      <form onsubmit={(event) => { event.preventDefault(); addProject(); }}>
+      <form class="project-add-form" onsubmit={(event) => { event.preventDefault(); addProject(); }}>
         <label class="label"><span class="label-text">Код (опционально)</span><input class="input" bind:value={projectAddDialog.code} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
-        <label class="label"><span class="label-text">Локация</span><select class="select" bind:value={projectAddDialog.location} required>{#each projectAddOptions.locations as location}<option value={location.code}>{location.code} — {location.path}</option>{/each}</select></label>
-        <label class="label"><span class="label-text">Язык</span><select class="select" bind:value={projectAddDialog.language} onchange={() => { projectAddDialog.framework = projectAddOptions.frameworks[projectAddDialog.language]?.[0]?.code || ''; }}>{#each projectAddOptions.languages as language}<option value={language.code}>{language.name}</option>{/each}</select></label>
-        <label class="label"><span class="label-text">Фреймворк</span><select class="select" bind:value={projectAddDialog.framework}>{#each projectAddOptions.frameworks[projectAddDialog.language] || [] as framework}<option value={framework.code}>{framework.name}</option>{/each}</select></label>
+        <label class="label"><span class="label-text">Локация</span><Combobox collection={projectLocationCollection} value={[projectAddDialog.location]} openOnClick onValueChange={(details) => { if (details.value[0]) projectAddDialog.location = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly required /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.locations.map((location) => ({ value: location.code, label: `${location.code} — ${location.path}` })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+        <label class="label"><span class="label-text">Язык</span><Combobox collection={projectLanguageCollection} value={[projectAddDialog.language]} openOnClick onValueChange={(details) => { if (details.value[0]) { projectAddDialog.language = details.value[0]; projectAddDialog.framework = projectAddOptions.frameworks[projectAddDialog.language]?.[0]?.code || ''; } }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languages.map((language) => ({ value: language.code, label: language.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+        <label class="label"><span class="label-text">Фреймворк</span><Combobox collection={projectFrameworkCollection} value={[projectAddDialog.framework]} openOnClick onValueChange={(details) => { projectAddDialog.framework = details.value[0] ?? ''; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each (projectAddOptions.frameworks[projectAddDialog.language] || []).map((framework) => ({ value: framework.code, label: framework.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
         <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectAdding} onclick={() => { projectAddDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectAdding || !projectAddDialog.location}>{projectAdding ? 'Добавляем…' : 'Добавить'}</button></div>
       </form>
       {/if}
