@@ -171,7 +171,12 @@ final class ProjectController
             'meta' => ['schema' => 'queue-item', 'version' => '0.1'],
             'queue-item' => ['tasks' => [[
                 'code' => 'core.project.down',
-                'arguments' => ['wipe=true', 'erase=true', 'drop=true', 'force=true'],
+                'arguments' => [
+                    'wipe' => ['value' => true],
+                    'erase' => ['value' => true],
+                    'drop' => ['value' => true],
+                    'force' => ['value' => true],
+                ],
                 'project' => $name,
             ]]],
         ];
