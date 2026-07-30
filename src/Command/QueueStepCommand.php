@@ -66,7 +66,7 @@ final class QueueStepCommand extends AbstractCommand
                 $repository->trace($active, $queue, $item, 'Элемент перемещен в 50-error.');
                 return Command::INVALID;
             }
-            foreach ($item['queue-item']['tasks'] as $task) {
+            foreach ($item['queue-item']['tasks'] as $index => $task) {
                 $repository->trace($active, $queue, $item, sprintf('Запуск задачи %s.', $task['code']), $task['code'], $task['project'] ?? null);
                 $arguments = ['task-code' => $task['code']];
                 if (isset($task['project'])) {
@@ -84,6 +84,7 @@ final class QueueStepCommand extends AbstractCommand
                 $runner = new TaskRunCommand($tasks, notifications: new NotificationRepository($repository->configDirectory()));
                 $runner->setApplication($this->getApplication());
                 $exitCode = $runner->run(new ArrayInput($arguments), $output);
+                $repository->journal($active, $item, sprintf('%s-%d', $task['code'], $index + 1), $runner->journal());
                 $repository->trace($active, $queue, $item, sprintf('Задача %s завершилась с кодом %d.', $task['code'], $exitCode), $task['code'], $task['project'] ?? null, $exitCode);
                 if ($exitCode !== Command::SUCCESS) {
                     $active = $repository->move($active, $queue, '40-failure');

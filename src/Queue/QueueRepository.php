@@ -291,6 +291,14 @@ final class QueueRepository
         }
     }
 
+    /** @param array<string, mixed> $item @param array<string, string> $messages */
+    public function journal(string $file, array &$item, string $task, array $messages): void
+    {
+        $item['journal'] ??= [];
+        $item['journal'][$task] = $messages;
+        $this->write($file, $item);
+    }
+
     /** @param array<string, mixed> $item @return list<string> */
     private function projectsFromItem(array $item, ?string $taskCode): array
     {

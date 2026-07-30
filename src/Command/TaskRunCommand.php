@@ -16,6 +16,9 @@ use function DockerCli\Util\join_path;
 
 final class TaskRunCommand extends AbstractCommand
 {
+    /** @var array<string, string> */
+    private array $journal = [];
+
     public function __construct(
         private readonly ?TaskRepository $repository = null,
         private readonly ?ProjectRegistry $registry = null,
@@ -79,10 +82,17 @@ final class TaskRunCommand extends AbstractCommand
             }
 
             $exitCode = proc_close($process);
-            foreach (CommandContext::read($contextFile) as $notification) {
-                ($this->notifications ?? new NotificationRepository())->create(
-                    $task['code'], 'task', $notification['level'], $notification['message'],
-                );
+            foreach (CommandContext::read($contextFile) as $message) {
+                $timestamp = $message['timestamp'];
+                while (isset($this->journal[$timestamp])) {
+                    $timestamp = sprintf('%.6f', (float) $timestamp + 0.000001);
+                }
+                $this->journal[$timestamp] = $message['message'];
+                if ($message['notify']) {
+                    ($this->notifications ?? new NotificationRepository())->create(
+                        $task['code'], 'task', $message['level'], $message['message'],
+                    );
+                }
             }
 
             return is_int($exitCode) ? $exitCode : Command::FAILURE;
@@ -94,6 +104,12 @@ final class TaskRunCommand extends AbstractCommand
             }
             @unlink($contextFile);
         }
+    }
+
+    /** @return array<string, string> */
+    public function journal(): array
+    {
+        return $this->journal;
     }
 
     private function contextDirectory(): string
