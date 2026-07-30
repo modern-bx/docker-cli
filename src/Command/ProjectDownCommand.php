@@ -107,7 +107,7 @@ final class ProjectDownCommand extends Command
         } else {
             unlink($metaFile);
             $metadataFiles = scandir($metadataDirectory);
-            if ($metadataFiles !== false && array_diff($metadataFiles, ['.', '..']) === []) {
+            if (!$input->getOption('wipe') && $metadataFiles !== false && array_diff($metadataFiles, ['.', '..']) === []) {
                 rmdir($metadataDirectory);
             }
         }
