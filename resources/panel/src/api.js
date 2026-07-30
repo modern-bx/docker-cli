@@ -87,3 +87,34 @@ export async function saveSecuritySettings(request, maximumSessionHours) {
     body: JSON.stringify({ maximumSessionHours }),
   });
 }
+
+export async function getProjectsSettings(request) {
+  return request('/api/settings/projects');
+}
+
+export async function saveProjectsSettings(request, locations) {
+  return request('/api/settings/projects', {
+    method: 'POST',
+    body: JSON.stringify({ locations }),
+  });
+}
+
+export async function getUsersSettings(request, page, pageSize) {
+  return request(`/api/settings/users?${new URLSearchParams({ page: String(page), pageSize: String(pageSize) })}`);
+}
+
+export async function createPanelUser(request, login, comments) {
+  return request('/api/settings/users', { method: 'POST', body: JSON.stringify({ login, comments }) });
+}
+
+export async function updatePanelUser(request, login, comments) {
+  return request(`/api/settings/users/${encodeURIComponent(login)}`, { method: 'POST', body: JSON.stringify({ comments }) });
+}
+
+export async function rotatePanelUserPassword(request, login) {
+  return request(`/api/settings/users/${encodeURIComponent(login)}/password`, { method: 'POST', body: JSON.stringify({}) });
+}
+
+export async function deletePanelUser(request, login) {
+  return request(`/api/settings/users/${encodeURIComponent(login)}`, { method: 'DELETE' });
+}

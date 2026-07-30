@@ -201,7 +201,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .settings-card { max-width: 42rem; padding: 1.25rem; border: 1px solid var(--color-surface-200); }
 .dark .settings-card { border-color: var(--color-surface-800); }
 .session-duration-field { display: grid; gap: 0.5rem; }
-.setting-label { display: flex !important; align-items: center; gap: 0.45rem; font-weight: 600; }
+.setting-label { display: flex !important; align-items: center; gap: 0.45rem; font-size: 1rem; font-weight: 700; }
 .session-duration-input { display: flex; max-width: 18rem; align-items: center; gap: 0.75rem; }
 .session-duration-input .input { width: 10rem; }
 .session-duration-input > span { color: var(--color-surface-500); }
@@ -230,7 +230,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .dark .login-error-dialog.error-alert .login-error-title { color: var(--color-error-400); }
 .login-error-description { margin-top: 0.75rem; color: var(--color-surface-600); }
 .dark .login-error-description { color: var(--color-surface-300); }
-.login-error-actions { display: flex; justify-content: flex-end; margin-top: 1.5rem; }
+.login-error-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; }
 .login-error-actions .error-alert-button { background: var(--color-error-500); color: white; }
 
 .theme-trigger { width: auto; gap: 0.35rem; padding-inline: 0.65rem; }
@@ -312,3 +312,34 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
   .dark .project-sidebar { border-color: var(--color-surface-800); }
   .project-fields { grid-template-columns: 1fr; }
 }
+.locations-card h2 { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 1rem; font-size: 1rem; font-weight: 700; }
+.location-list { display: grid; gap: 0.4rem; }
+.location-item { display: grid; gap: 0.5rem; }
+.location-row { display: flex; align-items: center; gap: 0.6rem; }
+.location-row > .input { min-width: 12rem; flex: 1; }
+.location-default { flex: none; cursor: pointer; }
+.location-default-help { flex: none; }
+.location-delete { color: var(--color-error-600); }
+.dark .location-delete { color: var(--color-error-400); }
+.users-settings-scroll { display: flex; flex-direction: column; }
+.users-table-wrap { max-width: 64rem; overflow-x: auto; border: 1px solid var(--color-surface-200); }
+.dark .users-table-wrap { border-color: var(--color-surface-800); }
+.users-table { width: 100%; }
+.users-table th { padding: 0.75rem; background: var(--color-surface-200); text-align: left; }
+.dark .users-table th { background: var(--color-surface-800); }
+.users-table td { padding: 0.7rem 0.75rem; border-top: 1px solid var(--color-surface-200); overflow-wrap: anywhere; }
+.dark .users-table td { border-color: var(--color-surface-800); }
+.users-table th:last-child, .users-table td:last-child { width: 6.5rem; text-align: right; }
+.user-actions { white-space: nowrap; }
+.user-actions .btn-icon + .btn-icon { margin-left: 0.4rem; }
+.users-pagination { max-width: 64rem; margin-top: 1rem; }
+.user-context-menu { position: fixed; }
+.user-dialog { width: min(32rem, calc(100vw - 2rem)); }
+.user-dialog-fields { display: grid; gap: 1rem; margin-top: 1rem; }
+.user-password-button { margin-top: 1rem; }
+.user-self-warning { margin-top: 1rem; padding: 0.75rem; border-radius: var(--radius-base); background: color-mix(in oklab, var(--color-warning-500) 18%, transparent); color: var(--color-warning-700); }
+.dark .user-self-warning { color: var(--color-warning-300); }
+.generated-password { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 0.75rem; padding: 0.5rem 0.5rem 0.5rem 0.75rem; border-radius: var(--radius-base); background: var(--color-surface-200); }
+.generated-password code { min-width: 0; overflow-wrap: anywhere; user-select: all; }
+.dark .generated-password { background: var(--color-surface-800); }
+@media (max-width: 700px) { .location-row { align-items: stretch; flex-wrap: wrap; } .location-row > .input { width: 100%; flex-basis: 100%; } .location-default, .location-default-help { align-self: center; } }

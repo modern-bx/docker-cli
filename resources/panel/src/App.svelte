@@ -1,9 +1,9 @@
 <script>
   import { onMount } from 'svelte';
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { Bell, CircleHelp, ExternalLink, Play, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { Bell, CircleHelp, Copy, ExternalLink, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
-  import { getLogs, getProjects, getSecuritySettings, getSystemStatus, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveSecuritySettings } from './api.js';
+  import { createPanelUser, deletePanelUser, getLogs, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -62,6 +62,7 @@
   let selectedProjectName = '';
   let projectDetailTab = 'info';
   let activeSection = 'projects';
+  let settingsTab = 'projects';
   let logItems = [];
   let logProjects = [];
   let logType = 'queue';
@@ -106,6 +107,18 @@
   let maximumSessionHours = 8;
   let settingsLoading = false;
   let settingsSaving = false;
+  let projectLocations = [{ path: '', default: true }];
+  let projectSettingsLoading = false;
+  let projectSettingsSaving = false;
+  let users = [];
+  let usersTotal = 0;
+  let usersPage = 1;
+  let usersPageSize = 25;
+  let usersLoading = false;
+  let userDialog = null;
+  let userDeleteConfirmation = null;
+  let userContextMenu = null;
+  let userPasswordAlert = null;
   let protectedAlert = null;
   const panelServices = ['dnsdock', 'panel-gateway', 'traefik'];
   const PANEL_CHANNEL = 'panel:system';
@@ -216,10 +229,13 @@
       loadLogs();
       return;
     }
-    if (segments[0] === 'security') {
-      activeSection = 'security';
+    if (segments.length === 2 && segments[0] === 'settings' && ['projects', 'users', 'security'].includes(segments[1])) {
+      activeSection = 'settings';
+      settingsTab = segments[1];
       selectedProjectName = '';
-      loadSecuritySettings();
+      if (settingsTab === 'projects') loadProjectsSettings();
+      else if (settingsTab === 'users') loadUsersSettings();
+      else loadSecuritySettings();
       return;
     }
     activeSection = 'projects';
@@ -282,6 +298,123 @@
       }
     } finally {
       if (requestId === logRequestId) logsLoading = false;
+    }
+  }
+
+  async function loadProjectsSettings() {
+    if (!authenticated || projectSettingsLoading) return;
+    projectSettingsLoading = true;
+    try {
+      const data = await getProjectsSettings(api);
+      projectLocations = Array.isArray(data.locations) && data.locations.length
+        ? data.locations.map((location) => ({ path: location.path, default: location.default === true }))
+        : [{ path: '', default: true }];
+    } catch (cause) {
+      errorTitle = 'Не удалось загрузить настройки';
+      error = cause instanceof Error ? cause.message : 'Не удалось загрузить расположения проектов.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      projectSettingsLoading = false;
+    }
+  }
+
+  async function loadUsersSettings() {
+    if (!authenticated || usersLoading) return;
+    usersLoading = true;
+    try {
+      const data = await getUsersSettings(api, usersPage, usersPageSize);
+      users = data.users;
+      usersTotal = data.total;
+      usersPage = data.page;
+    } catch (cause) {
+      errorTitle = 'Не удалось загрузить пользователей';
+      error = cause instanceof Error ? cause.message : 'Не удалось загрузить пользователей.';
+    } finally {
+      usersLoading = false;
+    }
+  }
+
+  function openUserContextMenu(event, user) {
+    if (event.ctrlKey) { userContextMenu = null; return; }
+    event.preventDefault();
+    userContextMenu = { user, x: Math.min(event.clientX, window.innerWidth - 180), y: Math.min(event.clientY, window.innerHeight - 120) };
+  }
+
+  async function saveUser() {
+    if (!userDialog) return;
+    try {
+      if (userDialog.create) {
+        const login = userDialog.login.trim().toLocaleLowerCase();
+        const data = await createPanelUser(api, userDialog.login, userDialog.comments);
+        userDialog = null;
+        userPasswordAlert = { password: data.password, login, created: true, logout: false, copied: false };
+      } else {
+        await updatePanelUser(api, userDialog.login, userDialog.comments);
+        userDialog = null;
+      }
+      await loadUsersSettings();
+    } catch (cause) { errorTitle = 'Не удалось сохранить пользователя'; error = cause instanceof Error ? cause.message : 'Не удалось сохранить пользователя.'; }
+  }
+
+  async function rotateUserPassword(user) {
+    userDialog = null;
+    try {
+      const data = await rotatePanelUserPassword(api, user.login);
+      userPasswordAlert = { password: data.password, login: user.login, created: false, logout: data.logout === true, copied: false };
+    } catch (cause) { errorTitle = 'Не удалось изменить пароль'; error = cause instanceof Error ? cause.message : 'Не удалось изменить пароль.'; }
+  }
+
+  async function copyGeneratedPassword() {
+    if (!userPasswordAlert) return;
+    try {
+      await navigator.clipboard.writeText(userPasswordAlert.password);
+      userPasswordAlert = { ...userPasswordAlert, copied: true };
+    } catch {
+      errorTitle = 'Не удалось скопировать пароль';
+      error = 'Скопируйте пароль вручную.';
+    }
+  }
+
+  async function confirmDeleteUser() {
+    const user = userDeleteConfirmation;
+    userDeleteConfirmation = null;
+    if (!user) return;
+    try {
+      const data = await deletePanelUser(api, user.login);
+      if (data.logout) logout(); else await loadUsersSettings();
+    } catch (cause) { errorTitle = 'Не удалось удалить пользователя'; error = cause instanceof Error ? cause.message : 'Не удалось удалить пользователя.'; }
+  }
+
+  function updateProjectLocation(index, path) {
+    projectLocations = projectLocations.map((location, itemIndex) => itemIndex === index ? { ...location, path } : location);
+  }
+
+  function addProjectLocation() {
+    projectLocations = [...projectLocations, { path: '', default: false }];
+  }
+
+  function removeProjectLocation(index) {
+    const wasDefault = projectLocations[index].default;
+    projectLocations = projectLocations.filter((_, itemIndex) => itemIndex !== index);
+    if (wasDefault && projectLocations.length) projectLocations = projectLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === 0 }));
+  }
+
+  function setDefaultProjectLocation(index) {
+    projectLocations = projectLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === index }));
+  }
+
+  async function saveProjectLocations() {
+    if (projectSettingsSaving || projectLocations.some((location) => !location.path.trim())) return;
+    projectSettingsSaving = true;
+    try {
+      const data = await saveProjectsSettings(api, projectLocations.map((location) => ({ ...location, path: location.path.trim() })));
+      projectLocations = data.locations;
+    } catch (cause) {
+      errorTitle = 'Не удалось сохранить настройки';
+      error = cause instanceof Error ? cause.message : 'Не удалось сохранить расположения проектов.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      projectSettingsSaving = false;
     }
   }
 
@@ -468,7 +601,9 @@
 
   function closeMenus(event) {
     if (event.target instanceof Element && event.target.closest('.project-context-menu')) return;
+    if (event.target instanceof Element && event.target.closest('.user-context-menu')) return;
     projectContextMenu = null;
+    userContextMenu = null;
     if (event.target instanceof Element && event.target.closest('.header-menu')) return;
     themeOpen = false;
     notificationsOpen = false;
@@ -1068,7 +1203,7 @@
         <nav class="tabs" aria-label="Разделы панели">
           <a class:active={activeSection === 'projects'} class="tab" href="#/projects" aria-current={activeSection === 'projects' ? 'page' : undefined}>Проекты</a>
           <a class:active={activeSection === 'logs'} class="tab" href="#/journal" aria-current={activeSection === 'logs' ? 'page' : undefined}>Журнал</a>
-          <a class:active={activeSection === 'security'} class="tab" href="#/security/authorization" aria-current={activeSection === 'security' ? 'page' : undefined}>Безопасность</a>
+          <a class:active={activeSection === 'settings'} class="tab" href="#/settings/projects" aria-current={activeSection === 'settings' ? 'page' : undefined}>Настройки</a>
         </nav>
         {#if activeSection === 'projects'}
         <div class="projects-layout">
@@ -1280,11 +1415,72 @@
               <div class="log-page-size" aria-label="Количество записей на странице"><Combobox collection={pageSizeCollection} value={[String(logPageSize)]} openOnClick onValueChange={(details) => details.value[0] && changeLogPageSize(details.value[0])}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество записей на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
             </footer>
           </section>
-        {:else}
-          <section class="settings-view" aria-label="Безопасность">
-            <nav class="project-detail-tabs settings-tabs" aria-label="Разделы безопасности">
-              <a class="project-detail-tab active" href="#/security/authorization" aria-current="page">Авторизация</a>
+        {:else if activeSection === 'settings'}
+          <section class="settings-view" aria-label="Настройки">
+            <nav class="project-detail-tabs settings-tabs" aria-label="Разделы настроек">
+              <a class:active={settingsTab === 'projects'} class="project-detail-tab" href="#/settings/projects" aria-current={settingsTab === 'projects' ? 'page' : undefined}>Проекты</a>
+              <a class:active={settingsTab === 'users'} class="project-detail-tab" href="#/settings/users" aria-current={settingsTab === 'users' ? 'page' : undefined}>Пользователи</a>
+              <a class:active={settingsTab === 'security'} class="project-detail-tab" href="#/settings/security" aria-current={settingsTab === 'security' ? 'page' : undefined}>Безопасность</a>
             </nav>
+            {#if settingsTab === 'projects'}
+            <div class="settings-scroll">
+              <div class="project-toolbar">
+                <button class="btn preset-filled-primary-500" type="button" disabled={projectSettingsLoading || projectSettingsSaving || projectLocations.some((location) => !location.path.trim())} onclick={saveProjectLocations}>
+                  <Save size={16} aria-hidden="true" />{projectSettingsSaving ? 'Сохраняем…' : 'Сохранить'}
+                </button>
+              </div>
+              <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Расположение">
+                <h2>Расположение
+                  <Tooltip positioning={{ placement: 'right' }}>
+                    <Tooltip.Trigger class="security-help" aria-label="О расположениях проектов"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                    <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Эти пути будут использоваться в скриптах автоматической развертки проектов. Пока не добавлен хотя бы один путь, функционал автоматической развертки не заработает</Tooltip.Content></Tooltip.Positioner>
+                  </Tooltip>
+                </h2>
+                <div class="location-list">
+                  {#each projectLocations as location, index}
+                    <div class="location-item">
+                      <div class="location-row">
+                        <input class="input" type="text" value={location.path} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="/путь/к/проектам" aria-label={`Расположение проектов ${index + 1}`} oninput={(event) => updateProjectLocation(index, event.currentTarget.value)} />
+                        <button class="btn preset-tonal" type="button" disabled={!location.path.trim() || projectSettingsLoading || projectSettingsSaving} onclick={addProjectLocation}><Plus size={16} aria-hidden="true" />Добавить</button>
+                        {#if projectLocations.length > 1}<button class="btn preset-tonal location-delete" type="button" disabled={projectSettingsLoading || projectSettingsSaving} onclick={() => removeProjectLocation(index)}><Trash2 size={16} aria-hidden="true" />Удалить</button>{/if}
+                        <input class="radio location-default" type="radio" name="default-project-location" checked={location.default} disabled={projectSettingsLoading || projectSettingsSaving} aria-label="Путь по умолчанию" onchange={() => setDefaultProjectLocation(index)} />
+                        <Tooltip positioning={{ placement: 'right' }}>
+                          <Tooltip.Trigger class="security-help location-default-help" aria-label="О пути по умолчанию"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                          <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Путь для автоматической развертки проектов по умолчанию</Tooltip.Content></Tooltip.Positioner>
+                        </Tooltip>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </section>
+            </div>
+            {:else if settingsTab === 'users'}
+            <div class="settings-scroll users-settings-scroll">
+              <div class="project-toolbar">
+                <button class="btn preset-filled-primary-500" type="button" onclick={() => { userDialog = { create: true, login: '', comments: '' }; }}><Plus size={16} aria-hidden="true" />Добавить</button>
+              </div>
+              <div class="users-table-wrap card preset-filled-surface-100-900">
+                <table class="table users-table">
+                  <thead><tr><th>Логин</th><th>Комментарии</th><th aria-label="Действия"></th></tr></thead>
+                  <tbody>
+                    {#if usersLoading}<tr><td colspan="3" class="log-empty animate-pulse">Загрузка…</td></tr>
+                    {:else if users.length === 0}<tr><td colspan="3" class="log-empty">Пользователей нет</td></tr>
+                    {:else}{#each users as user (user.login)}
+                      <tr oncontextmenu={(event) => openUserContextMenu(event, user)}>
+                        <td>{user.login}</td><td>{user.comments || '—'}</td>
+                        <td class="user-actions"><button class="btn-icon preset-tonal" type="button" aria-label={`Изменить пользователя ${user.login}`} title="Изменить" onclick={() => { userDialog = { create: false, ...user }; }}><Pencil size={16} aria-hidden="true" /></button><button class="btn-icon preset-tonal" type="button" aria-label={`Удалить пользователя ${user.login}`} title="Удалить" onclick={() => { userDeleteConfirmation = user; }}><Trash2 size={16} aria-hidden="true" /></button></td>
+                      </tr>
+                    {/each}{/if}
+                  </tbody>
+                </table>
+              </div>
+              <footer class="log-pagination users-pagination">
+                <span>{usersTotal ? `${(usersPage - 1) * usersPageSize + 1}–${Math.min(usersPage * usersPageSize, usersTotal)} из ${usersTotal}` : '0 пользователей'}</span>
+                <div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={usersPage === 1 || usersLoading} onclick={() => { usersPage -= 1; loadUsersSettings(); }}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={usersPage >= Math.ceil(usersTotal / usersPageSize) || usersLoading} onclick={() => { usersPage += 1; loadUsersSettings(); }}>Вперёд</button></div>
+                <div class="log-page-size"><Combobox collection={pageSizeCollection} value={[String(usersPageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { usersPageSize = Number(details.value[0]); usersPage = 1; loadUsersSettings(); } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество пользователей на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
+              </footer>
+            </div>
+            {:else}
             <div class="settings-scroll">
               <div class="project-toolbar">
                 <button class="btn preset-filled-primary-500" type="button" disabled={settingsLoading || settingsSaving} onclick={saveAuthorizationSettings}>
@@ -1304,6 +1500,7 @@
                 </label>
               </section>
             </div>
+            {/if}
           </section>
         {/if}
         {#if projectsError}<p class="projects-error" role="status">{projectsError}</p>{/if}
@@ -1311,6 +1508,52 @@
     {/if}
   </main>
 </div>
+
+{#if userContextMenu}
+  <div class="user-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${userContextMenu.x}px;top:${userContextMenu.y}px`} role="menu">
+    <button type="button" role="menuitem" onclick={() => { userDialog = { create: false, ...userContextMenu.user }; userContextMenu = null; }}>Изменить</button>
+    <button class="danger" type="button" role="menuitem" onclick={() => { userDeleteConfirmation = userContextMenu.user; userContextMenu = null; }}>Удалить</button>
+  </div>
+{/if}
+
+<Dialog open={Boolean(userDialog)} onOpenChange={({ open }) => { if (!open) userDialog = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog user-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">{userDialog?.create ? 'Добавить пользователя' : 'Изменить пользователя'}</Dialog.Title>
+      <div class="user-dialog-fields">
+        <label class="label"><span class="label-text">Email</span><input class="input" type="email" value={userDialog?.login || ''} disabled={!userDialog?.create} oninput={(event) => { if (userDialog) userDialog = { ...userDialog, login: event.currentTarget.value }; }} required /></label>
+        <label class="label"><span class="label-text">Комментарии</span><textarea class="textarea" rows="5" value={userDialog?.comments || ''} oninput={(event) => { if (userDialog) userDialog = { ...userDialog, comments: event.currentTarget.value }; }}></textarea></label>
+      </div>
+      {#if !userDialog?.create}<button class="btn preset-tonal user-password-button" type="button" onclick={() => rotateUserPassword(userDialog)}>Изменить пароль</button>{/if}
+      <div class="login-error-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger><button class="btn preset-filled-primary-500" type="button" disabled={!userDialog?.login.trim()} onclick={saveUser}>Сохранить</button></div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(userDeleteConfirmation)} onOpenChange={({ open }) => { if (!open) userDeleteConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Удалить пользователя?</Dialog.Title>
+      <Dialog.Description class="login-error-description">Пользователь {userDeleteConfirmation?.login} будет удалён, а все его сессии завершены.</Dialog.Description>
+      {#if userDeleteConfirmation?.login === currentLogin}<p class="user-self-warning">Вы удаляете текущего пользователя. После удаления потребуется авторизоваться под другой учётной записью.</p>{/if}
+      <div class="login-error-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger><button class="btn preset-filled-error-500" type="button" onclick={confirmDeleteUser}>Удалить</button></div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(userPasswordAlert)} closeOnEscape={false} closeOnInteractOutside={false}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">{userPasswordAlert?.created ? `Пользователь ${userPasswordAlert?.login} добавлен` : `Пароль пользователя ${userPasswordAlert?.login} изменён`}</Dialog.Title>
+      <Dialog.Description class="login-error-description">Скопируйте и сохраните пароль — он показывается только один раз.</Dialog.Description>
+      <div class="generated-password"><code>{userPasswordAlert?.password}</code><button class="btn-icon preset-tonal" type="button" aria-label="Скопировать пароль" title={userPasswordAlert?.copied ? 'Скопировано' : 'Скопировать'} onclick={copyGeneratedPassword}><Copy size={16} aria-hidden="true" /></button></div>
+      <div class="login-error-actions"><button class="btn preset-filled-primary-500" type="button" onclick={() => { const shouldLogout = userPasswordAlert?.logout; userPasswordAlert = null; if (shouldLogout) logout(); }}>Закрыть</button></div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
 
 {#if projectContextMenu}
   <div
