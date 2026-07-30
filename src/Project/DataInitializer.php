@@ -89,7 +89,7 @@ SH,
             return $code;
         }
 
-        [$postgresDropRoleSql, $postgresTerminateSql] = $this->postgresDropSql($projectName);
+        [$postgresTerminateSql] = $this->postgresDropSql($projectName);
         return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
             '-T',
             'postgres',
@@ -100,16 +100,19 @@ set -eu
 export PGPASSWORD="${POSTGRES_PASSWORD:?}"
 root_user="${POSTGRES_USER:-system}"
 database="$1"
-drop_role_sql="$2"
-terminate_sql="$3"
+terminate_sql="$2"
 
 psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres -c "$terminate_sql"
 dropdb -U "$root_user" --if-exists "$database"
-psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres -c "$drop_role_sql"
+if psql -v ON_ERROR_STOP=1 -At -U "$root_user" -d postgres -v role="$database" \
+  -c "SELECT 1 FROM pg_roles WHERE rolname = :'role'" | grep -qx 1; then
+  psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres \
+    -v role="$database" -v new_owner="$root_user" \
+    -c 'REASSIGN OWNED BY :"role" TO :"new_owner"; DROP OWNED BY :"role"; DROP ROLE :"role";'
+fi
 SH,
             'sh',
             $projectName,
-            $postgresDropRoleSql,
             $postgresTerminateSql,
         ]), $compose, $output);
     }
@@ -155,7 +158,7 @@ SH,
             "CREATE DATABASE {$targetIdentifier} WITH TEMPLATE {$sourceIdentifier} STRATEGY = FILE_COPY;",
             "ALTER DATABASE {$targetIdentifier} OWNER TO {$targetUserIdentifier}; GRANT ALL PRIVILEGES ON DATABASE {$targetIdentifier} TO {$targetUserIdentifier};",
             $targetDatabase,
-            "REASSIGN OWNED BY {$sourceUserIdentifier} TO {$targetUserIdentifier};",
+            "REASSIGN OWNED BY {$sourceUserIdentifier} TO {$targetUserIdentifier}; ALTER DATABASE {$sourceIdentifier} OWNER TO {$sourceUserIdentifier};",
         ]), $compose, $output);
     }
 
@@ -296,14 +299,12 @@ SH,
         ];
     }
 
-    /** @return array{string, string} */
+    /** @return array{string} */
     private function postgresDropSql(string $name): array
     {
         $literalName = str_replace("'", "''", $name);
-        $quotedIdentifier = '"' . str_replace('"', '""', $name) . '"';
 
         return [
-            "DROP ROLE IF EXISTS {$quotedIdentifier};",
             "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{$literalName}' AND pid <> pg_backend_pid();",
         ];
     }
