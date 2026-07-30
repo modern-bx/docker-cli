@@ -104,12 +104,6 @@ final class ProjectDownCommand extends Command
                 $output->writeln(sprintf('<error>Не удалось удалить директорию проекта "%s".</error>', $projectRoot));
                 return Command::FAILURE;
             }
-        } else {
-            unlink($metaFile);
-            $metadataFiles = scandir($metadataDirectory);
-            if (!$input->getOption('wipe') && $metadataFiles !== false && array_diff($metadataFiles, ['.', '..']) === []) {
-                rmdir($metadataDirectory);
-            }
         }
         (new OpenRestyHostRenderer())->render();
 
