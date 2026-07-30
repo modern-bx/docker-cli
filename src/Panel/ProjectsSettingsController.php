@@ -26,10 +26,10 @@ final readonly class ProjectsSettingsController
     public function save(ProjectsSettingsRequestDto $request): ProjectsSettingsDto
     {
         try {
-            $this->settings->save($request->locations);
+            $locations = $this->settings->save($request->locations);
         } catch (\InvalidArgumentException $exception) {
             throw new RequestValidationException($exception->getMessage());
         }
-        return new ProjectsSettingsDto($request->locations);
+        return new ProjectsSettingsDto($locations);
     }
 }

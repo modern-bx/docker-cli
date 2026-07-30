@@ -114,6 +114,51 @@ SH,
         ]), $compose, $output);
     }
 
+    public function clonePostgres(string $sourceDatabase, string $targetDatabase, string $sourceUser, string $targetUser, OutputInterface $output): int
+    {
+        $compose = $this->compose ?? new SystemCompose();
+        $compose->assertInitialized();
+        $sourceIdentifier = '"' . str_replace('"', '""', $sourceDatabase) . '"';
+        $targetIdentifier = '"' . str_replace('"', '""', $targetDatabase) . '"';
+        $sourceLiteral = str_replace("'", "''", $sourceDatabase);
+        $targetLiteral = str_replace("'", "''", $targetDatabase);
+        $sourceUserIdentifier = '"' . str_replace('"', '""', $sourceUser) . '"';
+        $targetUserIdentifier = '"' . str_replace('"', '""', $targetUser) . '"';
+
+        return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
+            '-T', 'postgres', 'sh', '-ec', <<<'SH'
+set -eu
+export PGPASSWORD="${POSTGRES_PASSWORD:?}"
+root_user="${POSTGRES_USER:-system}"
+enable_source="$1"
+psql_cmd() { psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres -c "$1"; }
+trap 'psql_cmd "$enable_source" >/dev/null 2>&1 || true' EXIT
+psql_cmd "$2"
+psql_cmd 'SELECT pg_reload_conf();'
+psql_cmd "$3"
+psql_cmd "$4"
+psql_cmd "$5"
+psql_cmd "$6"
+psql_cmd "$7"
+psql_cmd "$enable_source"
+trap - EXIT
+psql_cmd "$8"
+psql -v ON_ERROR_STOP=1 -U "$root_user" -d "$9" -c "${10}"
+SH,
+            'sh',
+            "ALTER DATABASE {$sourceIdentifier} WITH ALLOW_CONNECTIONS true;",
+            "ALTER SYSTEM SET file_copy_method = 'clone';",
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{$targetLiteral}' AND pid <> pg_backend_pid();",
+            "DROP DATABASE IF EXISTS {$targetIdentifier};",
+            "ALTER DATABASE {$sourceIdentifier} WITH ALLOW_CONNECTIONS false;",
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{$sourceLiteral}' AND pid <> pg_backend_pid();",
+            "CREATE DATABASE {$targetIdentifier} WITH TEMPLATE {$sourceIdentifier} STRATEGY = FILE_COPY;",
+            "ALTER DATABASE {$targetIdentifier} OWNER TO {$targetUserIdentifier}; GRANT ALL PRIVILEGES ON DATABASE {$targetIdentifier} TO {$targetUserIdentifier};",
+            $targetDatabase,
+            "REASSIGN OWNED BY {$sourceUserIdentifier} TO {$targetUserIdentifier};",
+        ]), $compose, $output);
+    }
+
     public function wipe(string $mysqlDatabase, string $postgresDatabase, OutputInterface $output): int
     {
         $compose = $this->compose ?? new SystemCompose();

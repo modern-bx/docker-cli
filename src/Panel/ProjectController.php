@@ -51,6 +51,11 @@ final class ProjectController
                 throw new ProjectActionException('Проект защищен.', 409);
             }
             $this->enqueueWipe($name);
+        } elseif (ProjectActionEnum::isDelete($action)) {
+            if (($project['protected'] ?? false) === true) {
+                throw new ProjectActionException('Проект защищен.', 409);
+            }
+            $this->enqueueDelete($name);
         } else {
             throw new ProjectActionException('Неизвестное действие.', 400);
         }
@@ -155,6 +160,28 @@ final class ProjectController
         ];
         try {
             ($this->queues ?? new QueueRepository())->create('default', 'core.project.wipe', $item);
+        } catch (\InvalidArgumentException|\RuntimeException $exception) {
+            throw new ProjectActionException($exception->getMessage(), 500);
+        }
+    }
+
+    private function enqueueDelete(string $name): void
+    {
+        $item = [
+            'meta' => ['schema' => 'queue-item', 'version' => '0.1'],
+            'queue-item' => ['tasks' => [[
+                'code' => 'core.project.down',
+                'arguments' => [
+                    'wipe' => ['value' => true],
+                    'erase' => ['value' => true],
+                    'drop' => ['value' => true],
+                    'force' => ['value' => true],
+                ],
+                'project' => $name,
+            ]]],
+        ];
+        try {
+            ($this->queues ?? new QueueRepository())->create('default', 'core.project.down', $item);
         } catch (\InvalidArgumentException|\RuntimeException $exception) {
             throw new ProjectActionException($exception->getMessage(), 500);
         }

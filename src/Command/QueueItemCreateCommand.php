@@ -65,7 +65,7 @@ final class QueueItemCreateCommand extends Command
         return Command::SUCCESS;
     }
 
-    /** @param array<string, mixed> $parameters @param list<mixed> $arguments @return array<string, array{value: string|int}> */
+    /** @param array<string, mixed> $parameters @param list<mixed> $arguments @return array<string, array{value: string|int|bool}> */
     private function mapArguments(array $parameters, array $arguments): array
     {
         $named = [];
@@ -97,6 +97,9 @@ final class QueueItemCreateCommand extends Command
             }
             if (($spec['type'] ?? null) === 'integer' && filter_var($value, FILTER_VALIDATE_INT) !== false) {
                 $value = (int) $value;
+            } elseif (($spec['type'] ?? null) === 'boolean') {
+                $boolean = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($boolean !== null) $value = $boolean;
             }
             $result[$name] = ['value' => $value];
         }

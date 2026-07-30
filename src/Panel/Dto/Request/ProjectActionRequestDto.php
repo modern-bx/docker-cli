@@ -9,7 +9,7 @@ use DockerCli\Panel\Http\RequestData;
 use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
-/** Route request for a project enable, disable, or wipe action. */
+/** Route request for a project enable, disable, wipe, or delete action. */
 final readonly class ProjectActionRequestDto implements RequestDto
 {
     public function __construct(public string $name, public ProjectActionEnum $action)

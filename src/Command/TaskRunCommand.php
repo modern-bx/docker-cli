@@ -152,7 +152,7 @@ final class TaskRunCommand extends Command
 
     private function validateParameter(string $name, mixed $spec, bool $return = false): void
     {
-        if (!is_array($spec) || !in_array($spec['type'] ?? null, ['string', 'integer', 'list'], true)) {
+        if (!is_array($spec) || !in_array($spec['type'] ?? null, ['string', 'integer', 'boolean', 'list'], true)) {
             throw new \RuntimeException(sprintf('Параметр "%s" имеет неподдерживаемый тип.', $name));
         }
         if ($return && $spec['type'] === 'list') {
@@ -204,6 +204,12 @@ final class TaskRunCommand extends Command
                     throw new \RuntimeException(sprintf('Параметр "%s" находится вне допустимого диапазона.', $name));
                 }
                 $value = $validated;
+            } elseif (($spec['type'] ?? null) === 'boolean') {
+                $validated = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($validated === null) {
+                    throw new \RuntimeException(sprintf('Параметр "%s" должен быть логическим значением true или false.', $name));
+                }
+                $value = $validated ? 'true' : 'false';
             } elseif (($spec['type'] ?? null) === 'list') {
                 $allowed = is_array($spec['items'] ?? null) ? array_column($spec['items'], 'value') : [];
                 if ($allowed !== [] && !in_array($value, array_map('strval', $allowed), true)) {

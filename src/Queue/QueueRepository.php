@@ -9,7 +9,7 @@ use function DockerCli\Util\join_path;
 
 final class QueueRepository
 {
-    public const STATUSES = ['10-pending', '20-active', '30-success', '40-failure', '50-error'];
+    public const STATUSES = ['10-pending', '20-active', '30-success', '40-failure', '50-error', '90-archive'];
 
     public function __construct(private readonly ?string $configDirectory = null)
     {
@@ -214,6 +214,26 @@ final class QueueRepository
             }
         }
         throw new \RuntimeException('Элемент очереди не найден.');
+    }
+
+    public function archive(string $queue, string $file): void
+    {
+        if (basename($file) !== $file || preg_match('/^[A-Za-z0-9._-]+\.yaml$/D', $file) !== 1) {
+            throw new \InvalidArgumentException('Некорректное имя элемента очереди.');
+        }
+        if (is_file(join_path($this->queueDirectory($queue), '20-active', $file))) {
+            throw new \RuntimeException('Нельзя архивировать выполняющийся элемент очереди.');
+        }
+        foreach (array_diff(self::STATUSES, ['20-active', '90-archive']) as $status) {
+            $path = join_path($this->queueDirectory($queue), $status, $file);
+            if (!is_file($path)) continue;
+            $item = Yaml::parseFile($path);
+            if (!is_array($item)) throw new \RuntimeException('Некорректный элемент очереди.');
+            $archived = $this->move($path, $queue, '90-archive');
+            $this->trace($archived, $queue, $item, sprintf('Элемент перемещен из %s в 90-archive.', $status));
+            return;
+        }
+        throw new \RuntimeException('Элемент очереди не найден или уже архивирован.');
     }
 
     public function move(string $file, string $queue, string $status): string

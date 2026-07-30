@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DockerCli\Panel;
 
 use Symfony\Component\Yaml\Yaml;
+use DockerCli\Project\ProjectNameGenerator;
 
 use function DockerCli\Util\join_path;
 
@@ -21,23 +22,42 @@ final class ProjectsSettingsRepository
         $this->file = $file;
     }
 
-    /** @return list<array{path: string, default: bool}> */
+    /** @return list<array{path: string, code: string, default: bool}> */
     public function locations(): array
     {
-        if (!is_file($this->file)) return [];
-        $data = Yaml::parseFile($this->file);
-        $locations = is_array($data)
-            && ($data['meta']['schema'] ?? null) === 'settings.projects'
-            && ($data['meta']['version'] ?? null) === 0.1
-            && is_array($data['settings.projects']['locations'] ?? null)
-            ? $data['settings.projects']['locations'] : [];
-        return array_values(array_filter($locations, static fn ($item): bool => is_array($item)
-            && is_string($item['path'] ?? null) && is_bool($item['default'] ?? null)));
+        $valid = $this->storedLocations();
+        $used = [];
+        foreach ($valid as &$location) {
+            $code = $location['code'] ?? '';
+            if (!is_string($code) || $code === '' || isset($used[$code])) {
+                $code = (new ProjectNameGenerator())->generate(array_keys($used));
+            }
+            $location['code'] = $code;
+            $used[$code] = true;
+        }
+        return $valid;
     }
 
-    /** @param list<array{path: string, default: bool}> $locations */
-    public function save(array $locations): void
+    /** @param list<array{path: string, code: string, default: bool}> $locations */
+    public function save(array $locations): array
     {
+        // Use the values actually persisted in the file to distinguish an
+        // existing location from a newly added one. Existing location codes may
+        // be changed, but must never be saved empty.
+        $previous = $this->storedLocations();
+        $previousByPath = array_column($previous, null, 'path');
+        $used = [];
+        foreach ($locations as $index => &$location) {
+            $isExisting = isset($previousByPath[$location['path']]) || array_key_exists($index, $previous);
+            if ($isExisting && $location['code'] === '') {
+                throw new \InvalidArgumentException('Код существующего расположения не может быть пустым.');
+            }
+            if ($location['code'] === '') {
+                $location['code'] = (new ProjectNameGenerator())->generate(array_keys($used));
+            }
+            if (isset($used[$location['code']])) throw new \InvalidArgumentException('Коды расположений должны быть уникальными.');
+            $used[$location['code']] = true;
+        }
         foreach ($locations as $location) {
             $path = $location['path'];
             if (!is_dir($path)) {
@@ -59,5 +79,21 @@ final class ProjectsSettingsRepository
             throw new \RuntimeException(sprintf('Unable to write projects settings "%s".', $this->file));
         }
         chmod($this->file, 0600);
+        return $locations;
+    }
+
+    /** @return list<array{path: string, code?: mixed, default: bool}> */
+    private function storedLocations(): array
+    {
+        if (!is_file($this->file)) return [];
+        $data = Yaml::parseFile($this->file);
+        $locations = is_array($data)
+            && ($data['meta']['schema'] ?? null) === 'settings.projects'
+            && ($data['meta']['version'] ?? null) === 0.1
+            && is_array($data['settings.projects']['locations'] ?? null)
+            ? $data['settings.projects']['locations'] : [];
+
+        return array_values(array_filter($locations, static fn ($item): bool => is_array($item)
+            && is_string($item['path'] ?? null) && is_bool($item['default'] ?? null)));
     }
 }

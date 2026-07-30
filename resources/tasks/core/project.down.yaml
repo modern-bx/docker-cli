@@ -1,0 +1,24 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Удаление проекта
+  code: core.project.down
+  type: shell
+  context: project
+  description: |
+    Удаляет регистрацию проекта и по запросу его файлы, директорию и базы данных.
+  parameters:
+    wipe: { type: boolean }
+    erase: { type: boolean }
+    drop: { type: boolean }
+    force: { type: boolean }
+    no-restart: { type: boolean }
+  action: |
+    options=()
+    [ "${wipe:-false}" = true ] && options+=(--wipe)
+    [ "${erase:-false}" = true ] && options+=(--erase)
+    [ "${drop:-false}" = true ] && options+=(--drop)
+    [ "${force:-false}" = true ] && options+=(--force)
+    [ "${no_restart:-false}" = true ] && options+=(--no-restart)
+    docker-cli project:down "${options[@]}"

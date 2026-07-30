@@ -73,7 +73,11 @@ final class QueueStepCommand extends Command
                     $arguments['--project'] = $task['project'];
                 }
                 $arguments['task-args'] = array_map(
-                    static fn (mixed $value, string $name): string => $name . '=' . (is_scalar($value['value'] ?? null) ? (string) $value['value'] : json_encode($value['value'] ?? null)),
+                    static function (mixed $value, string $name): string {
+                        $argument = $value['value'] ?? null;
+                        if (is_bool($argument)) $argument = $argument ? 'true' : 'false';
+                        return $name . '=' . (is_scalar($argument) ? (string) $argument : json_encode($argument));
+                    },
                     $task['arguments'] ?? [],
                     array_keys($task['arguments'] ?? []),
                 );

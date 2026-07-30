@@ -69,6 +69,8 @@ final class QueueItemValidator
                 } elseif ($type === 'integer' && ((isset($spec['parameters'][$name]['min']) && $value < $spec['parameters'][$name]['min'])
                     || (isset($spec['parameters'][$name]['max']) && $value > $spec['parameters'][$name]['max']))) {
                     $errors[] = sprintf('%s.arguments.%s.value находится вне допустимого диапазона.', $prefix, $name);
+                } elseif ($type === 'boolean' && !is_bool($value)) {
+                    $errors[] = sprintf('%s.arguments.%s.value должен быть логическим значением.', $prefix, $name);
                 } elseif ($type === 'list' && !is_scalar($value)) {
                     $errors[] = sprintf('%s.arguments.%s.value должен быть скалярным значением списка.', $prefix, $name);
                 } elseif ($type === 'list') {

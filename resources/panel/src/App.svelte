@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { Bell, CircleHelp, Copy, ExternalLink, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { Archive, Bell, CircleHelp, Copy, ExternalLink, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import { createPanelUser, deletePanelUser, getLogs, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
@@ -36,6 +36,7 @@
     { value: '30-success', label: 'Успешно (30)' },
     { value: '40-failure', label: 'Не выполнено (40)' },
     { value: '50-error', label: 'Ошибка (50)' },
+    { value: '90-archive', label: 'Архив (90)' },
   ];
   const logStatusCollection = useListCollection({ items: logStatuses });
   const pageSizeCollection = useListCollection({ items: [25, 50, 100].map((value) => ({ value: String(value), label: String(value) })) });
@@ -307,8 +308,8 @@
     try {
       const data = await getProjectsSettings(api);
       projectLocations = Array.isArray(data.locations) && data.locations.length
-        ? data.locations.map((location) => ({ path: location.path, default: location.default === true }))
-        : [{ path: '', default: true }];
+        ? data.locations.map((location) => ({ path: location.path, code: location.code || '', default: location.default === true }))
+        : [{ path: '', code: '', default: true }];
     } catch (cause) {
       errorTitle = 'Не удалось загрузить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить расположения проектов.';
@@ -389,8 +390,12 @@
     projectLocations = projectLocations.map((location, itemIndex) => itemIndex === index ? { ...location, path } : location);
   }
 
+  function updateProjectLocationCode(index, code) {
+    projectLocations = projectLocations.map((location, itemIndex) => itemIndex === index ? { ...location, code } : location);
+  }
+
   function addProjectLocation() {
-    projectLocations = [...projectLocations, { path: '', default: false }];
+    projectLocations = [...projectLocations, { path: '', code: '', default: false }];
   }
 
   function removeProjectLocation(index) {
@@ -805,6 +810,17 @@
     }
   }
 
+  async function archiveQueueItem(item) {
+    try {
+      const data = await api(`/api/queue/default/${encodeURIComponent(item.file)}/archive`, { method: 'POST' });
+      queueItems = data.items;
+    } catch (cause) {
+      errorTitle = 'Не удалось архивировать элемент очереди';
+      error = cause instanceof Error ? cause.message : 'Не удалось архивировать элемент очереди.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    }
+  }
+
   async function toggleQueue() {
     if (queueActionPending) return;
     queueActionPending = true;
@@ -829,19 +845,20 @@
   async function projectAction(action, name) {
     systemPending = true;
     projectsError = '';
-    systemPendingMessage = action === 'wipe'
-      ? `Добавляем очистку проекта «${name}» в очередь…`
+    systemPendingMessage = action === 'wipe' || action === 'delete'
+      ? `Добавляем ${action === 'delete' ? 'удаление' : 'очистку'} проекта «${name}» в очередь…`
       : `${action === 'enable' ? 'Включаем' : 'Отключаем'} проект «${name}»…`;
     try {
       const data = await runProjectAction(api, name, action);
       projects = data.projects;
       if (action === 'wipe') notifyQueuedOperation(`Очистка проекта «${name}»`);
-      if (action !== 'wipe' && !projectHasState(data.projects, action, name) && !(await waitForProjectAction(action, name))) {
+      if (action === 'delete') notifyQueuedOperation(`Удаление проекта «${name}»`);
+      if (action !== 'wipe' && action !== 'delete' && !projectHasState(data.projects, action, name) && !(await waitForProjectAction(action, name))) {
         throw Object.assign(new Error('Не удалось дождаться подтверждения статуса проекта.'), { status: 504 });
       }
     } catch (cause) {
       let reconciled = false;
-      if (action !== 'wipe' && !(cause instanceof Error && 'status' in cause)) {
+      if (action !== 'wipe' && action !== 'delete' && !(cause instanceof Error && 'status' in cause)) {
         reconciled = await waitForProjectAction(action, name);
       }
       if (!reconciled) {
@@ -874,11 +891,11 @@
   }
 
   function requestProjectAction(action, project) {
-    if (action === 'wipe' && project.protected) {
+    if ((action === 'wipe' || action === 'delete') && project.protected) {
       protectedAlert = project;
       return;
     }
-    if (action === 'disable' || action === 'wipe') {
+    if (action === 'disable' || action === 'wipe' || action === 'delete') {
       projectConfirmation = { action, project };
       return;
     }
@@ -1044,7 +1061,10 @@
                   <time datetime={item.queuedAt}>{formatQueueDate(item.queuedAt)}</time>
                   <button class="queue-item-code queue-item-link" type="button" title={`Открыть журнал элемента ${item.code}`} onclick={() => openQueueItemJournal(item)}>{item.code}</button>
                   {#if item.status !== '20-active'}
-                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => { queueOpen = false; queueConfirmation = item; }}><Trash2 size={14} aria-hidden="true" />Удалить</button>
+                    <div class="queue-item-actions">
+                      <button class="btn btn-sm preset-tonal" type="button" onclick={() => archiveQueueItem(item)}><Archive size={14} aria-hidden="true" />Архивировать</button>
+                      <button class="btn-icon preset-tonal" type="button" aria-label="Удалить элемент очереди" title="Удалить" onclick={() => { queueOpen = false; queueConfirmation = item; }}><Trash2 size={14} aria-hidden="true" /></button>
+                    </div>
                   {/if}
                 </div>
               {/each}
@@ -1286,6 +1306,9 @@
                     <button class="btn preset-filled-error-500" type="button" onclick={() => requestProjectAction('wipe', selectedProject)}>
                       <Trash2 size={16} aria-hidden="true" />Стереть
                     </button>
+                    <button class="btn preset-filled-error-500" type="button" onclick={() => requestProjectAction('delete', selectedProject)}>
+                      <Trash2 size={16} aria-hidden="true" />Удалить
+                    </button>
                   </div>
                 </section>
                 {:else if projectDetailTab === 'notes'}
@@ -1440,9 +1463,10 @@
                   {#each projectLocations as location, index}
                     <div class="location-item">
                       <div class="location-row">
-                        <input class="input" type="text" value={location.path} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="/путь/к/проектам" aria-label={`Расположение проектов ${index + 1}`} oninput={(event) => updateProjectLocation(index, event.currentTarget.value)} />
-                        <button class="btn preset-tonal" type="button" disabled={!location.path.trim() || projectSettingsLoading || projectSettingsSaving} onclick={addProjectLocation}><Plus size={16} aria-hidden="true" />Добавить</button>
-                        {#if projectLocations.length > 1}<button class="btn preset-tonal location-delete" type="button" disabled={projectSettingsLoading || projectSettingsSaving} onclick={() => removeProjectLocation(index)}><Trash2 size={16} aria-hidden="true" />Удалить</button>{/if}
+                        <input class="input location-path" type="text" value={location.path} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="/путь/к/проектам" aria-label={`Расположение проектов ${index + 1}`} oninput={(event) => updateProjectLocation(index, event.currentTarget.value)} />
+                        <input class="input location-code" type="text" value={location.code} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="код (автоматически)" aria-label={`Код расположения ${index + 1}`} oninput={(event) => updateProjectLocationCode(index, event.currentTarget.value)} />
+                        <button class="btn preset-tonal" type="button" title="Добавить расположение" aria-label="Добавить расположение" disabled={!location.path.trim() || projectSettingsLoading || projectSettingsSaving} onclick={addProjectLocation}><Plus size={16} aria-hidden="true" /></button>
+                        {#if projectLocations.length > 1}<button class="btn preset-tonal location-delete" type="button" title="Удалить расположение" aria-label="Удалить расположение" disabled={projectSettingsLoading || projectSettingsSaving} onclick={() => removeProjectLocation(index)}><Trash2 size={16} aria-hidden="true" /></button>{/if}
                         <input class="radio location-default" type="radio" name="default-project-location" checked={location.default} disabled={projectSettingsLoading || projectSettingsSaving} aria-label="Путь по умолчанию" onchange={() => setDefaultProjectLocation(index)} />
                         <Tooltip positioning={{ placement: 'right' }}>
                           <Tooltip.Trigger class="security-help location-default-help" aria-label="О пути по умолчанию"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
@@ -1582,19 +1606,21 @@
 <Dialog open={Boolean(projectConfirmation)} onOpenChange={({ open }) => { if (!open) projectConfirmation = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
-    <Dialog.Content class={`login-error-dialog card preset-filled-surface-100-900 shadow-2xl${projectConfirmation?.action === 'wipe' ? ' error-alert' : ''}`}>
-      <Dialog.Title class="login-error-title">{projectConfirmation?.action === 'wipe' ? 'Стереть проект?' : 'Отключить проект?'}</Dialog.Title>
+    <Dialog.Content class={`login-error-dialog card preset-filled-surface-100-900 shadow-2xl${projectConfirmation?.action === 'wipe' || projectConfirmation?.action === 'delete' ? ' error-alert' : ''}`}>
+      <Dialog.Title class="login-error-title">{projectConfirmation?.action === 'delete' ? 'Удалить проект?' : projectConfirmation?.action === 'wipe' ? 'Стереть проект?' : 'Отключить проект?'}</Dialog.Title>
       <Dialog.Description class="login-error-description">
         {#if projectConfirmation?.action === 'wipe'}
           Все файлы из директории проекта «{projectConfirmation?.project.name}», кроме служебной директории .docker-cli, будут безвозвратно удалены.
+        {:else if projectConfirmation?.action === 'delete'}
+          Проект «{projectConfirmation?.project.name}» будет полностью удалён вместе с директорией, служебными файлами, базами данных и пользователями СУБД. Это действие необратимо.
         {:else}
           Проект «{projectConfirmation?.project.name}» станет недоступен через веб-сервер. Его можно будет включить снова.
         {/if}
       </Dialog.Description>
       <div class="login-error-actions system-confirm-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
-        <button class={`btn ${projectConfirmation?.action === 'wipe' ? 'preset-filled-error-500' : 'preset-filled-primary-500'}`} type="button" onclick={() => { const confirmation = projectConfirmation; projectConfirmation = null; if (confirmation) projectAction(confirmation.action, confirmation.project.name); }}>
-          {projectConfirmation?.action === 'wipe' ? 'Стереть' : 'Отключить'}
+        <button class={`btn ${projectConfirmation?.action === 'wipe' || projectConfirmation?.action === 'delete' ? 'preset-filled-error-500' : 'preset-filled-primary-500'}`} type="button" onclick={() => { const confirmation = projectConfirmation; projectConfirmation = null; if (confirmation) projectAction(confirmation.action, confirmation.project.name); }}>
+          {projectConfirmation?.action === 'delete' ? 'Удалить' : projectConfirmation?.action === 'wipe' ? 'Стереть' : 'Отключить'}
         </button>
       </div>
     </Dialog.Content>

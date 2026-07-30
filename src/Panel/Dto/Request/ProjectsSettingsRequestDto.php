@@ -10,7 +10,7 @@ use DockerCli\Panel\Http\RequestValidationException;
 
 final readonly class ProjectsSettingsRequestDto implements RequestDto
 {
-    /** @param list<array{path: string, default: bool}> $locations */
+    /** @param list<array{path: string, code: string, default: bool}> $locations */
     public function __construct(public array $locations)
     {
     }
@@ -25,9 +25,9 @@ final readonly class ProjectsSettingsRequestDto implements RequestDto
         $validated = [];
         $defaults = 0;
         foreach ($locations as $location) {
-            if (!is_array($location) || array_keys($location) !== ['path', 'default']
+            if (!is_array($location) || array_keys($location) !== ['path', 'code', 'default']
                 || !is_string($location['path']) || trim($location['path']) === ''
-                || strlen($location['path']) > 4096 || !is_bool($location['default'])) {
+                || strlen($location['path']) > 4096 || !is_string($location['code']) || !is_bool($location['default'])) {
                 throw new RequestValidationException('Некорректное расположение проектов.');
             }
             $path = trim($location['path']);
@@ -35,7 +35,14 @@ final readonly class ProjectsSettingsRequestDto implements RequestDto
                 throw new RequestValidationException(sprintf('Путь «%s» указан несколько раз.', $path));
             }
             $defaults += $location['default'] ? 1 : 0;
-            $validated[] = ['path' => $path, 'default' => $location['default']];
+            $code = trim($location['code']);
+            if ($code !== '' && preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $code) !== 1) {
+                throw new RequestValidationException('Некорректное кодовое имя расположения.');
+            }
+            if ($code !== '' && in_array($code, array_column($validated, 'code'), true)) {
+                throw new RequestValidationException(sprintf('Код «%s» указан несколько раз.', $code));
+            }
+            $validated[] = ['path' => $path, 'code' => $code, 'default' => $location['default']];
         }
         if ($defaults !== 1) {
             throw new RequestValidationException('Выберите одно расположение по умолчанию.');
