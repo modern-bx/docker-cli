@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace DockerCli\Command;
 
+use DockerCli\Config\MissingConfigException;
 use DockerCli\Panel\ProjectsSettingsRepository;
+use DockerCli\Project\DataInitializer;
+use DockerCli\Project\MysqlDumpLoader;
+use DockerCli\Project\ProjectDatabaseConfig;
 use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
@@ -17,7 +21,12 @@ use function DockerCli\Util\join_path;
 
 final class ProjectCloneCommand extends Command
 {
-    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?ProjectsSettingsRepository $settings = null)
+    public function __construct(
+        private readonly ?ProjectRegistry $registry = null,
+        private readonly ?ProjectsSettingsRepository $settings = null,
+        private readonly ?MysqlDumpLoader $mysqlDumpLoader = null,
+        private readonly ?DataInitializer $dataInitializer = null,
+    )
     {
         parent::__construct('project:clone');
         $this->setDescription('Полностью клонировать зарегистрированный проект.');
@@ -27,6 +36,8 @@ final class ProjectCloneCommand extends Command
         $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код расположения проектов.');
         $this->addOption('here', null, InputOption::VALUE_NONE, 'Создать проект рядом с исходным.');
         $this->addOption('exclude', null, InputOption::VALUE_REQUIRED, 'Список glob-шаблонов через запятую.');
+        $this->addOption('skip-db', null, InputOption::VALUE_NONE, 'Не клонировать базы данных.');
+        $this->addOption('dbms', null, InputOption::VALUE_REQUIRED, 'Список СУБД для клонирования через запятую.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -35,6 +46,12 @@ final class ProjectCloneCommand extends Command
             $output->writeln('<error>Опции --here и --location нельзя использовать одновременно.</error>');
             return Command::FAILURE;
         }
+        if ($input->getOption('skip-db') && $input->getOption('dbms') !== null) {
+            $output->writeln('<error>Опции --skip-db и --dbms нельзя использовать одновременно.</error>');
+            return Command::FAILURE;
+        }
+        $dbms = $this->resolveDbms($input->getOption('dbms'), (bool) $input->getOption('skip-db'), $output);
+        if ($dbms === null) return Command::FAILURE;
         $registry = $this->registry ?? new ProjectRegistry();
         $from = $input->getOption('from');
         $from = is_string($from) && $from !== '' ? $from : $registry->projectNameFromContext();
@@ -95,6 +112,7 @@ final class ProjectCloneCommand extends Command
         $config['data']['project']['name'] = $name;
         $config['data']['project']['root'] = $destination;
         $config['data']['project']['document_root'] = $relativeDocumentRoot === '' ? $destination : join_path($destination, $relativeDocumentRoot);
+        $config = (new ProjectDatabaseConfig())->ensure($config);
         if (!is_dir($registry->projectDirectory($name))) mkdir($registry->projectDirectory($name), 0775, true);
         $registry->writeProjectConfig($name, $config);
         $metadata = join_path($destination, '.docker-cli');
@@ -113,13 +131,21 @@ final class ProjectCloneCommand extends Command
             $output->writeln('<error>Копирование проекта завершилось с ошибкой.</error>');
             return Command::FAILURE;
         }
+        $databaseDuration = 0.0;
+        if (in_array('mysql', $dbms, true)) {
+            $databaseStarted = microtime(true);
+            $databaseCode = $this->cloneMysqlDatabase($sourceConfig, $config, $name, $output);
+            $databaseDuration = microtime(true) - $databaseStarted;
+            if ($databaseCode !== Command::SUCCESS) return $databaseCode;
+        }
         $output->writeln(sprintf(
-            '<info>Проект "%s" клонирован в "%s" (%s; всего: %s; копирование файлов: %s).</info>',
+            '<info>Проект "%s" клонирован в "%s" (%s; всего: %s; копирование файлов: %s%s).</info>',
             $name,
             $destination,
             (new \DateTimeImmutable())->format('H:i:s'),
             $this->formatDuration(microtime(true) - $started),
             $this->formatDuration($filesDuration),
+            $databaseDuration > 0 ? '; копирование БД: ' . $this->formatDuration($databaseDuration) : '',
         ));
         return Command::SUCCESS;
     }
@@ -138,6 +164,56 @@ final class ProjectCloneCommand extends Command
     private function absolutePath(string $path): string { return str_starts_with($path, '/') ? rtrim($path, '/') : join_path((string) getcwd(), $path); }
     private function normalizeName(string $name): string { return trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($name)) ?? '', '-'); }
     private function formatDuration(float $seconds): string { return number_format($seconds, 3, '.', '') . ' с'; }
+
+    /** @return list<string>|null */
+    private function resolveDbms(mixed $option, bool $skip, OutputInterface $output): ?array
+    {
+        if ($skip) return [];
+        $explicit = is_string($option);
+        $dbms = $explicit ? array_values(array_unique(array_filter(array_map('trim', explode(',', $option))))) : ['mysql'];
+        if ($dbms === [] || array_diff($dbms, ['mysql', 'postgres']) !== []) {
+            $output->writeln('<error>Опция --dbms должна содержать mysql и/или postgres.</error>');
+            return null;
+        }
+        if ($explicit && in_array('postgres', $dbms, true)) {
+            $output->writeln('<error>Клонирование PostgreSQL пока не реализовано.</error>');
+            return null;
+        }
+        return array_values(array_diff($dbms, ['postgres']));
+    }
+
+    /** @param array<string, mixed> $sourceConfig @param array<string, mixed> $targetConfig */
+    private function cloneMysqlDatabase(array $sourceConfig, array $targetConfig, string $targetName, OutputInterface $output): int
+    {
+        $source = $sourceConfig['data']['databases']['mysql']['database'] ?? null;
+        $target = $targetConfig['data']['databases']['mysql']['database'] ?? null;
+        $mysqlPassword = $targetConfig['data']['databases']['mysql']['password'] ?? null;
+        $postgresPassword = $targetConfig['data']['databases']['postgres']['password'] ?? null;
+        if (!is_string($source) || $source === '' || !is_string($target) || $target === ''
+            || !is_string($mysqlPassword) || !is_string($postgresPassword)) {
+            $output->writeln('<error>В конфигурации проекта отсутствуют параметры баз данных.</error>');
+            return Command::FAILURE;
+        }
+        $home = getenv('HOME');
+        if (!is_string($home) || $home === '') {
+            $output->writeln('<error>Не удалось определить домашнюю директорию для временного снимка БД.</error>');
+            return Command::FAILURE;
+        }
+        $snapshot = join_path($home, '.config', 'docker-cli', 'cache', 'project-clone', bin2hex(random_bytes(8)));
+        $loader = $this->mysqlDumpLoader ?? new MysqlDumpLoader();
+        try {
+            $code = $loader->dump($source, $snapshot, 4, $output);
+            if ($code !== Command::SUCCESS) return $code;
+            $code = ($this->dataInitializer ?? new DataInitializer())->initialize($targetName, $mysqlPassword, $postgresPassword, false, $output);
+            if ($code !== Command::SUCCESS) return $code;
+            return $loader->load($target, $snapshot, 4, false, $output);
+        } catch (MissingConfigException $exception) {
+            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            return Command::FAILURE;
+        } finally {
+            if (is_dir($snapshot)) $this->remove($snapshot);
+        }
+    }
     private function directoryHasFiles(string $path): bool { return is_dir($path) && count(scandir($path) ?: []) > 2; }
     private function projectAtPath(string $path, ProjectRegistry $registry): ?string
     {
