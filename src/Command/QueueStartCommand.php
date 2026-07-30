@@ -40,7 +40,7 @@ final class QueueStartCommand extends AbstractCommand
             return $this->installSystemdService($input, $output, $queue);
         }
         if ($input->getOption('user') !== null || $input->getOption('path') !== null) {
-            $output->writeln('<error>Опции --user и --path можно использовать только вместе с -d.</error>');
+            $this->writeMessage($output, '<error>Опции --user и --path можно использовать только вместе с -d.</error>');
             return Command::INVALID;
         }
 
@@ -61,32 +61,32 @@ final class QueueStartCommand extends AbstractCommand
     {
         $rawUser = $input->getOption('user');
         if ($rawUser !== null && (!is_string($rawUser) || preg_match('/^[a-zA-Z0-9_.@-]+$/D', $rawUser) !== 1)) {
-            $output->writeln('<error>Некорректное имя пользователя для systemd-сервиса.</error>');
+            $this->writeMessage($output, '<error>Некорректное имя пользователя для systemd-сервиса.</error>');
             return Command::INVALID;
         }
 
         $rawPath = $input->getOption('path');
         $binary = $this->resolveBinary(is_string($rawPath) ? $rawPath : (string) ($_SERVER['argv'][0] ?? 'docker-cli'));
         if ($rawPath !== null && (!str_starts_with($binary, DIRECTORY_SEPARATOR) || !is_file($binary) || !is_executable($binary))) {
-            $output->writeln('<error>Опция --path должна указывать на существующий исполняемый файл.</error>');
+            $this->writeMessage($output, '<error>Опция --path должна указывать на существующий исполняемый файл.</error>');
             return Command::INVALID;
         }
 
         try {
             $this->systemdService->install($queue, $binary, is_string($rawUser) ? $rawUser : null);
         } catch (\RuntimeException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
 
         $name = $this->systemdService->name($queue);
-        $output->writeln(sprintf('<info>Создан systemd-сервис %s.</info>', $name));
-        $output->writeln(sprintf('<info>Конфигурация записана в %s.</info>', $this->systemdService->unitPath($queue)));
-        $output->writeln(sprintf('<info>Сервис запускает: %s queue:start --queue=%s</info>', $binary, $queue));
+        $this->writeMessage($output, sprintf('<info>Создан systemd-сервис %s.</info>', $name));
+        $this->writeMessage($output, sprintf('<info>Конфигурация записана в %s.</info>', $this->systemdService->unitPath($queue)));
+        $this->writeMessage($output, sprintf('<info>Сервис запускает: %s queue:start --queue=%s</info>', $binary, $queue));
         if (is_string($rawUser)) {
-            $output->writeln(sprintf('<info>Сервис работает от пользователя: %s</info>', $rawUser));
+            $this->writeMessage($output, sprintf('<info>Сервис работает от пользователя: %s</info>', $rawUser));
         }
-        $output->writeln(sprintf('<info>Сервис включён и запущен. Управление: systemctl {status|restart|stop} %s</info>', $name));
+        $this->writeMessage($output, sprintf('<info>Сервис включён и запущен. Управление: systemctl {status|restart|stop} %s</info>', $name));
 
         return Command::SUCCESS;
     }

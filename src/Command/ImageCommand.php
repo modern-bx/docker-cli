@@ -79,7 +79,7 @@ abstract class ImageCommand extends AbstractCommand
      */
     protected function runDockerCommand(array $command, OutputInterface $output, bool $dryRun, array $extraEnv = []): int
     {
-        $output->writeln('<comment>' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
+        $this->writeMessage($output, '<comment>' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
         if ($dryRun) {
             return Command::SUCCESS;
         }

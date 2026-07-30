@@ -41,7 +41,7 @@ final class ConfigInitCommand extends AbstractCommand
         if ($update && !$force) {
             $question = new ConfirmationQuestion($this->translator->trans('command.init.update_confirm') . ' ', false);
             if (!$this->getHelper('question')->ask($input, $output, $question)) {
-                $output->writeln('<comment>' . $this->translator->trans('command.init.cancelled') . '</comment>');
+                $this->writeMessage($output, '<comment>' . $this->translator->trans('command.init.cancelled') . '</comment>');
 
                 return Command::SUCCESS;
             }
@@ -54,14 +54,14 @@ final class ConfigInitCommand extends AbstractCommand
         }
         $message = $created ? 'config.created' : 'config.exists';
 
-        $output->writeln('<info>' . $this->translator->trans($message, [
+        $this->writeMessage($output, '<info>' . $this->translator->trans($message, [
             '%directory%' => $compose->directory(),
         ]) . '</info>');
 
         if ($rebuild) {
             (new XdebugPortManager())->rebuildProjectPorts($this->projectsDirectory());
             (new OpenRestyHostRenderer())->render();
-            $output->writeln('<info>' . $this->translator->trans('config.rebuilt') . '</info>');
+            $this->writeMessage($output, '<info>' . $this->translator->trans('config.rebuilt') . '</info>');
         }
 
         return Command::SUCCESS;

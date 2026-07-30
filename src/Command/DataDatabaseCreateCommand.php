@@ -17,8 +17,8 @@ final class DataDatabaseCreateCommand extends AbstractCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $dbms = $this->selectedDbms($input->getOption('dbms')); $database = trim((string) $input->getArgument('database'));
-        if ($dbms === null || $database === '') { $output->writeln('<error>Укажите непустое имя базы и поддерживаемую СУБД: mysql или postgres.</error>'); return Command::INVALID; }
+        if ($dbms === null || $database === '') { $this->writeMessage($output, '<error>Укажите непустое имя базы и поддерживаемую СУБД: mysql или postgres.</error>'); return Command::INVALID; }
         try { return ($this->manager ?? new DatabaseManager())->createDatabases($dbms, $database, $this->commaList($input->getOption('user')), $output); }
-        catch (MissingConfigException $e) { $output->writeln('<error>Системная конфигурация не инициализирована.</error>'); return Command::FAILURE; }
+        catch (MissingConfigException $e) { $this->writeMessage($output, '<error>Системная конфигурация не инициализирована.</error>'); return Command::FAILURE; }
     }
 }

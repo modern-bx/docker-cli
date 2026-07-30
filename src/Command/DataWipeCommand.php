@@ -28,16 +28,16 @@ final class DataWipeCommand extends AbstractCommand
         $registry = $this->registry ?? new ProjectRegistry();
         $projectName = $this->resolveProjectName($input, $registry);
         if ($projectName === null) {
-            $output->writeln('<error>Укажите код зарегистрированного проекта или запустите команду в директории зарегистрированного проекта.</error>');
+            $this->writeMessage($output, '<error>Укажите код зарегистрированного проекта или запустите команду в директории зарегистрированного проекта.</error>');
             return Command::FAILURE;
         }
 
         if (!$registry->hasProject($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
             return Command::FAILURE;
         }
         if ($registry->isProjectProtected($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
             return Command::FAILURE;
         }
 
@@ -45,19 +45,19 @@ final class DataWipeCommand extends AbstractCommand
         $mysqlDatabase = $config['data']['databases']['mysql']['database'] ?? $projectName;
         $postgresDatabase = $config['data']['databases']['postgres']['database'] ?? $projectName;
         if (!is_string($mysqlDatabase) || $mysqlDatabase === '' || !is_string($postgresDatabase) || $postgresDatabase === '') {
-            $output->writeln(sprintf('<error>В конфигурации проекта "%s" не заданы БД MySQL или PostgreSQL.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>В конфигурации проекта "%s" не заданы БД MySQL или PostgreSQL.</error>', $projectName));
             return Command::FAILURE;
         }
 
         try {
             $code = ($this->initializer ?? new DataInitializer())->wipe($mysqlDatabase, $postgresDatabase, $output);
         } catch (MissingConfigException $exception) {
-            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
             return Command::FAILURE;
         }
 
         if ($code === Command::SUCCESS) {
-            $output->writeln(sprintf('<info>Все таблицы в БД проекта "%s" удалены.</info>', $projectName));
+            $this->writeMessage($output, sprintf('<info>Все таблицы в БД проекта "%s" удалены.</info>', $projectName));
         }
 
         return $code;

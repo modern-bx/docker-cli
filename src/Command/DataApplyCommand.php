@@ -34,23 +34,23 @@ final class DataApplyCommand extends AbstractCommand
     {
         $dbms = $input->getOption('dbms');
         if (!is_string($dbms) || !in_array($dbms, self::DBMS, true)) {
-            $output->writeln('<error>Укажите поддерживаемую СУБД через --dbms: mysql или postgres.</error>');
+            $this->writeMessage($output, '<error>Укажите поддерживаемую СУБД через --dbms: mysql или postgres.</error>');
             return Command::FAILURE;
         }
 
         $registry = $this->registry ?? new ProjectRegistry();
         $projectName = $this->resolveProjectName($input, $registry);
         if ($projectName === null) {
-            $output->writeln('<error>Укажите код зарегистрированного проекта через --project или запустите команду в директории зарегистрированного проекта.</error>');
+            $this->writeMessage($output, '<error>Укажите код зарегистрированного проекта через --project или запустите команду в директории зарегистрированного проекта.</error>');
             return Command::FAILURE;
         }
 
         if (!$registry->hasProject($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
             return Command::FAILURE;
         }
         if ($registry->isProjectProtected($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
             return Command::FAILURE;
         }
 
@@ -69,24 +69,24 @@ final class DataApplyCommand extends AbstractCommand
             $config = $registry->readProjectConfig($projectName);
             $database = $config['data']['databases'][$dbms]['database'] ?? $projectName;
             if (!is_string($database) || $database === '') {
-                $output->writeln(sprintf('<error>В конфигурации проекта "%s" не задана БД для %s.</error>', $projectName, $dbms));
+                $this->writeMessage($output, sprintf('<error>В конфигурации проекта "%s" не задана БД для %s.</error>', $projectName, $dbms));
                 return Command::FAILURE;
             }
 
             try {
                 $code = ($this->initializer ?? new DataInitializer())->apply($dbms, $database, $files, $output);
             } catch (MissingConfigException $exception) {
-                $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+                $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
                 return Command::FAILURE;
             }
 
             if ($code === Command::SUCCESS) {
-                $output->writeln(sprintf('<info>SQL-файлы применены к БД "%s" проекта "%s".</info>', $database, $projectName));
+                $this->writeMessage($output, sprintf('<info>SQL-файлы применены к БД "%s" проекта "%s".</info>', $database, $projectName));
             }
 
             return $code;
         } catch (RuntimeException $exception) {
-            $output->writeln(sprintf('<error>%s</error>', $exception->getMessage()));
+            $this->writeMessage($output, sprintf('<error>%s</error>', $exception->getMessage()));
             return Command::FAILURE;
         } finally {
             foreach ($temporaryDirectories as $directory) {
@@ -143,7 +143,7 @@ final class DataApplyCommand extends AbstractCommand
 
             $matches = array_values(array_filter(glob($path) ?: [], static fn (string $file): bool => is_file($file)));
             if ($matches === []) {
-                $output->writeln(sprintf('<error>Путь "%s" не найден.</error>', $path));
+                $this->writeMessage($output, sprintf('<error>Путь "%s" не найден.</error>', $path));
                 return [];
             }
 
@@ -170,7 +170,7 @@ final class DataApplyCommand extends AbstractCommand
             return true;
         }
         if ($extension !== 'zip') {
-            $output->writeln(sprintf('<error>Файл "%s" не является sql-файлом или zip-архивом.</error>', $file));
+            $this->writeMessage($output, sprintf('<error>Файл "%s" не является sql-файлом или zip-архивом.</error>', $file));
             return false;
         }
 

@@ -43,11 +43,11 @@ final class ProjectCloneCommand extends AbstractCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         if ($input->getOption('here') && $input->getOption('location') !== null) {
-            $output->writeln('<error>Опции --here и --location нельзя использовать одновременно.</error>');
+            $this->writeMessage($output, '<error>Опции --here и --location нельзя использовать одновременно.</error>');
             return Command::FAILURE;
         }
         if ($input->getOption('skip-db') && $input->getOption('dbms') !== null) {
-            $output->writeln('<error>Опции --skip-db и --dbms нельзя использовать одновременно.</error>');
+            $this->writeMessage($output, '<error>Опции --skip-db и --dbms нельзя использовать одновременно.</error>');
             return Command::FAILURE;
         }
         $dbms = $this->resolveDbms($input->getOption('dbms'), (bool) $input->getOption('skip-db'), $output);
@@ -56,13 +56,13 @@ final class ProjectCloneCommand extends AbstractCommand
         $from = $input->getOption('from');
         $from = is_string($from) && $from !== '' ? $from : $registry->projectNameFromContext();
         if ($from === null || !$registry->hasProject($from)) {
-            $output->writeln('<error>Исходный проект не найден. Укажите его код через --from.</error>');
+            $this->writeMessage($output, '<error>Исходный проект не найден. Укажите его код через --from.</error>');
             return Command::FAILURE;
         }
         $sourceConfig = $registry->readProjectConfig($from);
         $sourceRoot = $sourceConfig['data']['project']['root'] ?? null;
         if (!is_string($sourceRoot) || !is_dir($sourceRoot)) {
-            $output->writeln('<error>Директория исходного проекта не найдена.</error>');
+            $this->writeMessage($output, '<error>Директория исходного проекта не найдена.</error>');
             return Command::FAILURE;
         }
 
@@ -75,30 +75,30 @@ final class ProjectCloneCommand extends AbstractCommand
             $name = (new ProjectNameGenerator())->generate($names);
         }
         if (preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $name) !== 1) {
-            $output->writeln('<error>Некорректное кодовое имя целевого проекта.</error>');
+            $this->writeMessage($output, '<error>Некорректное кодовое имя целевого проекта.</error>');
             return Command::FAILURE;
         }
 
         try {
             $destination = $isPath ? $this->absolutePath((string) $to) : $this->destinationForName($name, $sourceRoot, $input);
         } catch (\InvalidArgumentException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
         $existingName = $this->projectAtPath($destination, $registry);
         if (($existingName !== null || $registry->hasProject($name) || $this->directoryHasFiles($destination)) && !$input->getOption('force')) {
-            $output->writeln('<error>Целевой проект или директория уже существует. Используйте --force для очистки.</error>');
+            $this->writeMessage($output, '<error>Целевой проект или директория уже существует. Используйте --force для очистки.</error>');
             return Command::FAILURE;
         }
         if ($input->getOption('force') && is_dir($destination)) $this->wipe($destination);
         if (!is_dir($destination) && !mkdir($destination, 0775, true) && !is_dir($destination)) {
-            $output->writeln('<error>Не удалось создать целевую директорию.</error>');
+            $this->writeMessage($output, '<error>Не удалось создать целевую директорию.</error>');
             return Command::FAILURE;
         }
 
         $startedAt = new \DateTimeImmutable();
         $started = microtime(true);
-        $output->writeln(sprintf(
+        $this->writeMessage($output, sprintf(
             '<info>Клонирование проекта "%s" в "%s" началось (%s).</info>',
             $from,
             $name,
@@ -128,7 +128,7 @@ final class ProjectCloneCommand extends AbstractCommand
         passthru('cd ' . escapeshellarg($sourceRoot) . ' && ' . $command, $status);
         $filesDuration = microtime(true) - $filesStarted;
         if ($status !== 0) {
-            $output->writeln('<error>Копирование проекта завершилось с ошибкой.</error>');
+            $this->writeMessage($output, '<error>Копирование проекта завершилось с ошибкой.</error>');
             return Command::FAILURE;
         }
         $databaseDuration = 0.0;
@@ -144,7 +144,7 @@ final class ProjectCloneCommand extends AbstractCommand
             $databaseDuration = microtime(true) - $databaseStarted;
             if ($databaseCode !== Command::SUCCESS) return $databaseCode;
         }
-        $output->writeln(sprintf(
+        $this->writeMessage($output, sprintf(
             '<info>Проект "%s" клонирован в "%s" (%s; всего: %s; копирование файлов: %s%s).</info>',
             $name,
             $destination,
@@ -198,7 +198,7 @@ final class ProjectCloneCommand extends AbstractCommand
         $explicit = is_string($option);
         $dbms = $explicit ? array_values(array_unique(array_filter(array_map('trim', explode(',', $option))))) : ['mysql', 'postgres'];
         if ($dbms === [] || array_diff($dbms, ['mysql', 'postgres']) !== []) {
-            $output->writeln('<error>Опция --dbms должна содержать mysql и/или postgres.</error>');
+            $this->writeMessage($output, '<error>Опция --dbms должна содержать mysql и/или postgres.</error>');
             return null;
         }
         return $dbms;
@@ -210,13 +210,13 @@ final class ProjectCloneCommand extends AbstractCommand
         $mysqlPassword = $targetConfig['data']['databases']['mysql']['password'] ?? null;
         $postgresPassword = $targetConfig['data']['databases']['postgres']['password'] ?? null;
         if (!is_string($mysqlPassword) || !is_string($postgresPassword)) {
-            $output->writeln('<error>В конфигурации проекта отсутствуют пароли баз данных.</error>');
+            $this->writeMessage($output, '<error>В конфигурации проекта отсутствуют пароли баз данных.</error>');
             return Command::FAILURE;
         }
         try {
             return ($this->dataInitializer ?? new DataInitializer())->initialize($targetName, $mysqlPassword, $postgresPassword, false, $output);
         } catch (MissingConfigException $exception) {
-            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
             return Command::FAILURE;
         }
     }
@@ -227,12 +227,12 @@ final class ProjectCloneCommand extends AbstractCommand
         $source = $sourceConfig['data']['databases']['mysql']['database'] ?? null;
         $target = $targetConfig['data']['databases']['mysql']['database'] ?? null;
         if (!is_string($source) || $source === '' || !is_string($target) || $target === '') {
-            $output->writeln('<error>В конфигурации проекта отсутствуют параметры баз данных.</error>');
+            $this->writeMessage($output, '<error>В конфигурации проекта отсутствуют параметры баз данных.</error>');
             return Command::FAILURE;
         }
         $home = getenv('HOME');
         if (!is_string($home) || $home === '') {
-            $output->writeln('<error>Не удалось определить домашнюю директорию для временного снимка БД.</error>');
+            $this->writeMessage($output, '<error>Не удалось определить домашнюю директорию для временного снимка БД.</error>');
             return Command::FAILURE;
         }
         $snapshot = join_path($home, '.config', 'docker-cli', 'cache', 'project-clone', bin2hex(random_bytes(8)));
@@ -242,7 +242,7 @@ final class ProjectCloneCommand extends AbstractCommand
             if ($code !== Command::SUCCESS) return $code;
             return $loader->load($target, $snapshot, 4, false, $output);
         } catch (MissingConfigException $exception) {
-            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
             return Command::FAILURE;
         } finally {
             if (is_dir($snapshot)) $this->remove($snapshot);
@@ -258,13 +258,13 @@ final class ProjectCloneCommand extends AbstractCommand
         $targetUser = $targetConfig['data']['databases']['postgres']['username'] ?? $target;
         if (!is_string($source) || $source === '' || !is_string($target) || $target === ''
             || !is_string($sourceUser) || $sourceUser === '' || !is_string($targetUser) || $targetUser === '') {
-            $output->writeln('<error>В конфигурации проекта отсутствуют параметры PostgreSQL.</error>');
+            $this->writeMessage($output, '<error>В конфигурации проекта отсутствуют параметры PostgreSQL.</error>');
             return Command::FAILURE;
         }
         try {
             return ($this->dataInitializer ?? new DataInitializer())->clonePostgres($source, $target, $sourceUser, $targetUser, $output);
         } catch (MissingConfigException $exception) {
-            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
             return Command::FAILURE;
         }
     }

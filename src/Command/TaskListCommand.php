@@ -27,7 +27,7 @@ final class TaskListCommand extends AbstractCommand
             $definitions = ($this->repository ?? new TaskRepository())->all();
             $definitions = $this->filterDefinitions($definitions, $input->getOption('task'));
         } catch (\Throwable $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
 
             return Command::FAILURE;
         }

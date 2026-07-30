@@ -25,10 +25,10 @@ final class QueueResumeCommand extends AbstractCommand
         try {
             ($this->queues ?? new QueueRepository())->resume($queue);
         } catch (\InvalidArgumentException|\RuntimeException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
-        $output->writeln(sprintf('<info>Очередь "%s" возобновлена.</info>', $queue));
+        $this->writeMessage($output, sprintf('<info>Очередь "%s" возобновлена.</info>', $queue));
         return Command::SUCCESS;
     }
 }

@@ -30,13 +30,13 @@ final class QueueStopCommand extends AbstractCommand
         try {
             $this->service->remove($queue);
         } catch (\RuntimeException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
 
-        $output->writeln(sprintf('<info>Сервис %s остановлен и отключён.</info>', $this->service->name($queue)));
-        $output->writeln(sprintf('<info>Файл конфигурации %s удалён.</info>', $this->service->unitPath($queue)));
-        $output->writeln('<info>Конфигурация systemd перечитана.</info>');
+        $this->writeMessage($output, sprintf('<info>Сервис %s остановлен и отключён.</info>', $this->service->name($queue)));
+        $this->writeMessage($output, sprintf('<info>Файл конфигурации %s удалён.</info>', $this->service->unitPath($queue)));
+        $this->writeMessage($output, '<info>Конфигурация systemd перечитана.</info>');
 
         return Command::SUCCESS;
     }

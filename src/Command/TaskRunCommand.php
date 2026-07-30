@@ -48,7 +48,7 @@ final class TaskRunCommand extends AbstractCommand
                 throw new \RuntimeException(sprintf('Не удалось создать временный скрипт в "%s".', $cwd));
             }
         } catch (\Throwable $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
 
             return Command::INVALID;
         }
@@ -57,12 +57,12 @@ final class TaskRunCommand extends AbstractCommand
         $environment = is_array($environment) ? $environment : [];
         $contextDirectory = $this->contextDirectory();
         if (!is_dir($contextDirectory) && !mkdir($contextDirectory, 0775, true) && !is_dir($contextDirectory)) {
-            $output->writeln('<error>Не удалось создать директорию контекста выполнения команды.</error>');
+            $this->writeMessage($output, '<error>Не удалось создать директорию контекста выполнения команды.</error>');
             return Command::FAILURE;
         }
         $contextFile = tempnam($contextDirectory, 'context-');
         if ($contextFile === false) {
-            $output->writeln('<error>Не удалось создать контекст выполнения команды.</error>');
+            $this->writeMessage($output, '<error>Не удалось создать контекст выполнения команды.</error>');
             return Command::FAILURE;
         }
         $environment[CommandContext::FILE_ENVIRONMENT_VARIABLE] = $contextFile;
@@ -73,7 +73,7 @@ final class TaskRunCommand extends AbstractCommand
         try {
             $process = proc_open(['bash', $scriptFile], [STDIN, STDOUT, STDERR], $pipes, $cwd, $environment);
             if (!is_resource($process)) {
-                $output->writeln('<error>Не удалось запустить bash.</error>');
+                $this->writeMessage($output, '<error>Не удалось запустить bash.</error>');
 
                 return Command::FAILURE;
             }
@@ -88,7 +88,7 @@ final class TaskRunCommand extends AbstractCommand
             return is_int($exitCode) ? $exitCode : Command::FAILURE;
         } finally {
             if ($input->getOption('no-delete')) {
-                $output->writeln(sprintf('<comment>Скомпилированный скрипт сохранен: %s</comment>', $scriptFile));
+                $this->writeMessage($output, sprintf('<comment>Скомпилированный скрипт сохранен: %s</comment>', $scriptFile));
             } else {
                 @unlink($scriptFile);
             }

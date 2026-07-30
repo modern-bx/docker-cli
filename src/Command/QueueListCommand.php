@@ -43,7 +43,7 @@ final class QueueListCommand extends AbstractCommand
             $status = $this->status($input->getOption('status'));
             $items = $repository->listItems(is_string($queue) ? $queue : null, $status);
         } catch (\Throwable $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
 

@@ -32,17 +32,17 @@ abstract class ProjectStateCommand extends AbstractCommand
             : $registry->projectNameFromContext();
 
         if ($projectName === null) {
-            $output->writeln('<error>Запустите команду в директории зарегистрированного проекта или укажите проект.</error>');
+            $this->writeMessage($output, '<error>Запустите команду в директории зарегистрированного проекта или укажите проект.</error>');
             return Command::FAILURE;
         }
         if (!$registry->hasProject($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
             return Command::FAILURE;
         }
 
         $config = $registry->readProjectConfig($projectName);
         if (!is_array($config['data']['project'] ?? null)) {
-            $output->writeln(sprintf('<error>Конфигурация проекта "%s" повреждена.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Конфигурация проекта "%s" повреждена.</error>', $projectName));
             return Command::FAILURE;
         }
 
@@ -54,7 +54,7 @@ abstract class ProjectStateCommand extends AbstractCommand
             return $restartCode;
         }
 
-        $output->writeln(sprintf(
+        $this->writeMessage($output, sprintf(
             '<info>Проект "%s" %s.</info>',
             $projectName,
             $this->enabled ? 'включен' : 'отключен',

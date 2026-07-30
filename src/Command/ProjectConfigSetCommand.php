@@ -25,19 +25,19 @@ final class ProjectConfigSetCommand extends AbstractCommand
         $registry = $this->registry ?? new ProjectRegistry();
         $projectName = $registry->projectNameFromContext();
         if ($projectName === null || !$registry->hasProject($projectName)) {
-            $output->writeln('<error>Запустите команду в директории зарегистрированного проекта.</error>');
+            $this->writeMessage($output, '<error>Запустите команду в директории зарегистрированного проекта.</error>');
             return Command::FAILURE;
         }
 
         $path = $input->getArgument('path');
         if (!is_string($path) || !$this->isValidPath($path)) {
-            $output->writeln('<error>Путь должен содержать непустые сегменты, разделенные точками.</error>');
+            $this->writeMessage($output, '<error>Путь должен содержать непустые сегменты, разделенные точками.</error>');
             return Command::FAILURE;
         }
 
         $value = $input->getArgument('value');
         if (!is_string($value)) {
-            $output->writeln('<error>Значение должно быть строкой.</error>');
+            $this->writeMessage($output, '<error>Значение должно быть строкой.</error>');
             return Command::FAILURE;
         }
 
@@ -48,7 +48,7 @@ final class ProjectConfigSetCommand extends AbstractCommand
 
         $this->setPath($config['data'], explode('.', $path), $value);
         $registry->writeProjectConfig($projectName, $config);
-        $output->writeln(sprintf('<info>Значение "%s" записано в конфигурацию проекта "%s".</info>', $path, $projectName));
+        $this->writeMessage($output, sprintf('<info>Значение "%s" записано в конфигурацию проекта "%s".</info>', $path, $projectName));
 
         return Command::SUCCESS;
     }

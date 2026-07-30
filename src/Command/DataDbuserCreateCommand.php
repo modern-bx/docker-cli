@@ -16,7 +16,7 @@ final class DataDbuserCreateCommand extends AbstractCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $dbms = $this->selectedDbms($input->getOption('dbms')); $user = trim((string) $input->getArgument('user'));
-        if ($dbms === null || $user === '') { $output->writeln('<error>Укажите пользователя и поддерживаемую СУБД: mysql или postgres.</error>'); return Command::INVALID; }
+        if ($dbms === null || $user === '') { $this->writeMessage($output, '<error>Укажите пользователя и поддерживаемую СУБД: mysql или postgres.</error>'); return Command::INVALID; }
         return ($this->manager ?? new DatabaseManager())->createUser($dbms, $user, $this->commaList($input->getOption('database')), $output);
     }
 }

@@ -57,11 +57,11 @@ final class QueueItemCreateCommand extends AbstractCommand
             $queue = (string) $input->getOption('queue');
             $file = ($this->queues ?? new QueueRepository())->create($queue, $code, $item);
         } catch (\Throwable $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::INVALID;
         }
 
-        $output->writeln(sprintf('<info>Элемент очереди создан: %s</info>', $file));
+        $this->writeMessage($output, sprintf('<info>Элемент очереди создан: %s</info>', $file));
         return Command::SUCCESS;
     }
 

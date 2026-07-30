@@ -25,22 +25,22 @@ final class ProjectRenameCommand extends AbstractCommand
     {
         $code = (string) $input->getArgument('code');
         if (preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $code) !== 1) {
-            $output->writeln('<error>Код проекта должен содержать строчные латинские буквы, цифры и дефисы.</error>');
+            $this->writeMessage($output, '<error>Код проекта должен содержать строчные латинские буквы, цифры и дефисы.</error>');
             return Command::FAILURE;
         }
 
         $registry = $this->registry ?? new ProjectRegistry();
         $oldCode = $registry->projectNameFromContext();
         if ($oldCode === null || !$registry->hasProject($oldCode)) {
-            $output->writeln('<error>Запустите команду в директории зарегистрированного проекта.</error>');
+            $this->writeMessage($output, '<error>Запустите команду в директории зарегистрированного проекта.</error>');
             return Command::FAILURE;
         }
         if ($oldCode === $code) {
-            $output->writeln('<info>Код проекта не изменился.</info>');
+            $this->writeMessage($output, '<info>Код проекта не изменился.</info>');
             return Command::SUCCESS;
         }
         if ($registry->hasProject($code) || file_exists($registry->projectDirectory($code))) {
-            $output->writeln(sprintf('<error>Проект "%s" уже зарегистрирован.</error>', $code));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" уже зарегистрирован.</error>', $code));
             return Command::FAILURE;
         }
 
@@ -49,12 +49,12 @@ final class ProjectRenameCommand extends AbstractCommand
         $root = is_array($project) ? ($project['root'] ?? null) : null;
         $localFile = is_string($root) ? join_path($root, '.docker-cli', 'project.yaml') : '';
         if (!is_array($project) || !is_string($root) || $root === '' || !is_file($localFile)) {
-            $output->writeln('<error>Конфигурация проекта повреждена.</error>');
+            $this->writeMessage($output, '<error>Конфигурация проекта повреждена.</error>');
             return Command::FAILURE;
         }
         $localConfig = Yaml::parseFile($localFile);
         if (!is_array($localConfig) || !is_array($localConfig['data']['project'] ?? null)) {
-            $output->writeln('<error>Локальная конфигурация проекта повреждена.</error>');
+            $this->writeMessage($output, '<error>Локальная конфигурация проекта повреждена.</error>');
             return Command::FAILURE;
         }
 
@@ -69,11 +69,11 @@ final class ProjectRenameCommand extends AbstractCommand
             $localConfig['data']['project']['name'] = $oldCode;
             $registry->writeProjectConfig($oldCode, $config);
             file_put_contents($localFile, Yaml::dump($localConfig, 6, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
-            $output->writeln('<error>Не удалось переименовать директорию проекта в реестре.</error>');
+            $this->writeMessage($output, '<error>Не удалось переименовать директорию проекта в реестре.</error>');
             return Command::FAILURE;
         }
 
-        ($this->context ?? CommandContext::fromEnvironment($this))->addMessage(
+        ($this->context ?? CommandContext::fromEnvironment($this, $output))->addMessage(
             new Message(sprintf('Проект **%s** переименован в **%s**.', $oldCode, $code), notify: true),
         );
         return Command::SUCCESS;

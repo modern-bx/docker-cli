@@ -28,33 +28,33 @@ final class ProjectWipeCommand extends AbstractCommand
         }
 
         if ($projectName === null) {
-            $output->writeln('<error>Укажите код проекта через --project или запустите команду в директории зарегистрированного проекта.</error>');
+            $this->writeMessage($output, '<error>Укажите код проекта через --project или запустите команду в директории зарегистрированного проекта.</error>');
             return Command::FAILURE;
         }
 
         if (!$registry->hasProject($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" не зарегистрирован.</error>', $projectName));
             return Command::FAILURE;
         }
         if ($registry->isProjectProtected($projectName)) {
-            $output->writeln(sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
             return Command::FAILURE;
         }
 
         $config = $registry->readProjectConfig($projectName);
         $projectRoot = $config['data']['project']['root'] ?? null;
         if (!is_string($projectRoot) || $projectRoot === '' || !is_dir($projectRoot)) {
-            $output->writeln(sprintf('<error>Директория проекта "%s" не найдена.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Директория проекта "%s" не найдена.</error>', $projectName));
             return Command::FAILURE;
         }
 
         $projectRoot = realpath($projectRoot);
         if ($projectRoot === false || $projectRoot === DIRECTORY_SEPARATOR) {
-            $output->writeln('<error>Отказ очистки: небезопасная директория проекта.</error>');
+            $this->writeMessage($output, '<error>Отказ очистки: небезопасная директория проекта.</error>');
             return Command::FAILURE;
         }
         if (!is_dir($projectRoot . DIRECTORY_SEPARATOR . '.docker-cli')) {
-            $output->writeln(sprintf('<error>В директории проекта "%s" не найдена директория .docker-cli.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>В директории проекта "%s" не найдена директория .docker-cli.</error>', $projectName));
             return Command::FAILURE;
         }
 
@@ -66,11 +66,11 @@ final class ProjectWipeCommand extends AbstractCommand
                 $this->removePath($projectRoot . DIRECTORY_SEPARATOR . $entry);
             }
         } catch (\RuntimeException $exception) {
-            $output->writeln(sprintf('<error>Не удалось очистить проект "%s": %s</error>', $projectName, $exception->getMessage()));
+            $this->writeMessage($output, sprintf('<error>Не удалось очистить проект "%s": %s</error>', $projectName, $exception->getMessage()));
             return Command::FAILURE;
         }
 
-        ($this->context ?? CommandContext::fromEnvironment($this))->addMessage(
+        ($this->context ?? CommandContext::fromEnvironment($this, $output))->addMessage(
             new Message(sprintf("Файлы проекта **%s** успешно удалены. Служебная директория `.docker-cli` сохранена.", $projectName), notify: true),
         );
 

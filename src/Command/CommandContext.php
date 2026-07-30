@@ -22,11 +22,11 @@ final class CommandContext
     {
     }
 
-    public static function fromEnvironment(ContextUser $contextUser): self
+    public static function fromEnvironment(ContextUser $contextUser, ?OutputInterface $output = null): self
     {
         $file = getenv(self::FILE_ENVIRONMENT_VARIABLE);
 
-        return new self(is_string($file) && $file !== '' ? $file : null, $contextUser, new ConsoleOutput());
+        return new self(is_string($file) && $file !== '' ? $file : null, $contextUser, $output ?? new ConsoleOutput());
     }
 
     public function addMessage(Message $message): void

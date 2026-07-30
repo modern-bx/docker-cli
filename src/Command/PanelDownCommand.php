@@ -22,13 +22,13 @@ final class PanelDownCommand extends AbstractCommand
         try {
             $this->service->remove();
         } catch (\RuntimeException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
 
-        $output->writeln(sprintf('<info>Сервис %s остановлен и отключён.</info>', SystemdService::NAME));
-        $output->writeln(sprintf('<info>Файл конфигурации %s удалён.</info>', SystemdService::UNIT_PATH));
-        $output->writeln('<info>Конфигурация systemd перечитана.</info>');
+        $this->writeMessage($output, sprintf('<info>Сервис %s остановлен и отключён.</info>', SystemdService::NAME));
+        $this->writeMessage($output, sprintf('<info>Файл конфигурации %s удалён.</info>', SystemdService::UNIT_PATH));
+        $this->writeMessage($output, '<info>Конфигурация systemd перечитана.</info>');
 
         return Command::SUCCESS;
     }

@@ -51,7 +51,7 @@ final class BitrixGetInstallerCommand extends AbstractCommand
         $path = $this->stringOption($input, 'path');
 
         if (!isset(self::EDITIONS[$product])) {
-            $output->writeln(sprintf('<error>Неизвестный продукт "%s". Доступно: %s.</error>', $product, implode(', ', array_keys(self::EDITIONS))));
+            $this->writeMessage($output, sprintf('<error>Неизвестный продукт "%s". Доступно: %s.</error>', $product, implode(', ', array_keys(self::EDITIONS))));
             return Command::INVALID;
         }
 
@@ -60,7 +60,7 @@ final class BitrixGetInstallerCommand extends AbstractCommand
         }
 
         if (!isset(self::EDITIONS[$product][$edition])) {
-            $output->writeln(sprintf('<error>Неизвестная редакция "%s" для продукта "%s". Доступно: %s.</error>', $edition, $product, implode(', ', array_keys(self::EDITIONS[$product]))));
+            $this->writeMessage($output, sprintf('<error>Неизвестная редакция "%s" для продукта "%s". Доступно: %s.</error>', $edition, $product, implode(', ', array_keys(self::EDITIONS[$product]))));
             return Command::INVALID;
         }
 
@@ -69,33 +69,33 @@ final class BitrixGetInstallerCommand extends AbstractCommand
         $target = $this->resolveTargetPath($path, basename($remotePath));
 
         if (file_exists($target)) {
-            $output->writeln(sprintf('<error>Файл уже существует: %s</error>', $target));
+            $this->writeMessage($output, sprintf('<error>Файл уже существует: %s</error>', $target));
             return Command::FAILURE;
         }
 
         $directory = dirname($target);
         if (!is_dir($directory)) {
-            $output->writeln(sprintf('<error>Директория не найдена: %s</error>', $directory));
+            $this->writeMessage($output, sprintf('<error>Директория не найдена: %s</error>', $directory));
             return Command::FAILURE;
         }
 
         $cache = $this->cachePath($remotePath);
         $contentLength = $this->remoteContentLength($url);
         if ($contentLength !== null && is_file($cache) && filesize($cache) === $contentLength) {
-            $output->writeln(sprintf('<info>Использую кешированный дистрибутив: %s</info>', $cache));
+            $this->writeMessage($output, sprintf('<info>Использую кешированный дистрибутив: %s</info>', $cache));
         } else {
-            $output->writeln(sprintf('<info>Скачиваю %s/%s: %s</info>', $product, $edition, $url));
+            $this->writeMessage($output, sprintf('<info>Скачиваю %s/%s: %s</info>', $product, $edition, $url));
             $this->download($url, $cache);
-            $output->writeln(sprintf('<info>Кеш обновлен: %s</info>', $cache));
+            $this->writeMessage($output, sprintf('<info>Кеш обновлен: %s</info>', $cache));
         }
 
         $this->copyFromCache($cache, $target);
-        $output->writeln(sprintf('<info>Архив сохранен: %s</info>', $target));
+        $this->writeMessage($output, sprintf('<info>Архив сохранен: %s</info>', $target));
 
         if ((bool) $input->getOption('extract')) {
             $this->extract($target, $directory);
             unlink($target);
-            $output->writeln(sprintf('<info>Архив распакован в %s и удален.</info>', $directory));
+            $this->writeMessage($output, sprintf('<info>Архив распакован в %s и удален.</info>', $directory));
         }
 
         return Command::SUCCESS;

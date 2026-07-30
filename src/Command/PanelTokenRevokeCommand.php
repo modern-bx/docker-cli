@@ -25,17 +25,17 @@ final class PanelTokenRevokeCommand extends AbstractCommand
         $value = $input->getArgument('users');
         $users = array_values(array_filter(array_map('trim', explode(',', is_string($value) ? $value : ''))));
         if ($users === []) {
-            $output->writeln('<error>Укажите хотя бы одного пользователя.</error>');
+            $this->writeMessage($output, '<error>Укажите хотя бы одного пользователя.</error>');
             return Command::INVALID;
         }
         try {
             $users = array_map(UserRepository::normalizeLogin(...), $users);
         } catch (\InvalidArgumentException $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::INVALID;
         }
         $count = (new TokenRepository())->revoke($users);
-        $output->writeln(sprintf('<info>Отозвано токенов: %d.</info>', $count));
+        $this->writeMessage($output, sprintf('<info>Отозвано токенов: %d.</info>', $count));
         return Command::SUCCESS;
     }
 }

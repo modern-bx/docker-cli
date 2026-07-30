@@ -31,14 +31,14 @@ final class PlayRunCommand extends AbstractCommand
         $registry = new ProjectRegistry();
         $projectName = $registry->projectNameFromContext();
         if ($projectName === null) {
-            $output->writeln('<error>Команда play:run выполняется только из директории зарегистрированного проекта.</error>');
+            $this->writeMessage($output, '<error>Команда play:run выполняется только из директории зарегистрированного проекта.</error>');
 
             return Command::FAILURE;
         }
 
         $script = $this->normalizeScriptName((string) $input->getArgument('script'));
         if ($script === null) {
-            $output->writeln('<error>Некорректное имя сценария: используйте относительный путь внутри playwright/scripts.</error>');
+            $this->writeMessage($output, '<error>Некорректное имя сценария: используйте относительный путь внутри playwright/scripts.</error>');
 
             return Command::FAILURE;
         }
@@ -47,14 +47,14 @@ final class PlayRunCommand extends AbstractCommand
         try {
             $compose->assertInitialized();
         } catch (MissingConfigException $exception) {
-            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
 
             return Command::FAILURE;
         }
 
         $scriptPath = join_path($compose->playwrightScriptsDirectory(), $script);
         if (!is_file($scriptPath)) {
-            $output->writeln(sprintf('<error>Сценарий "%s" не найден в "%s".</error>', $script, $compose->playwrightScriptsDirectory()));
+            $this->writeMessage($output, sprintf('<error>Сценарий "%s" не найден в "%s".</error>', $script, $compose->playwrightScriptsDirectory()));
 
             return Command::FAILURE;
         }
@@ -73,7 +73,7 @@ final class PlayRunCommand extends AbstractCommand
         $show = (bool) $input->getOption('show');
         $browser = $input->getOption('browser');
         if ($browser !== null && !in_array($browser, ['chromium', 'firefox', 'webkit'], true)) {
-            $output->writeln('<error>Некорректный браузер. Допустимые значения: chromium, firefox, webkit.</error>');
+            $this->writeMessage($output, '<error>Некорректный браузер. Допустимые значения: chromium, firefox, webkit.</error>');
 
             return Command::INVALID;
         }
@@ -86,7 +86,7 @@ final class PlayRunCommand extends AbstractCommand
                 join_path($compose->playwrightDataDirectory(), substr($script, 0, -3)),
             );
         } catch (\JsonException|\RuntimeException $exception) {
-            $output->writeln(sprintf('<error>Не удалось подготовить данные Playwright: %s</error>', $exception->getMessage()));
+            $this->writeMessage($output, sprintf('<error>Не удалось подготовить данные Playwright: %s</error>', $exception->getMessage()));
 
             return Command::FAILURE;
         }
@@ -135,24 +135,24 @@ final class PlayRunCommand extends AbstractCommand
             join_path('/docker-cli/playwright/scripts', $script),
         ]);
 
-        $output->writeln('<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
+        $this->writeMessage($output, '<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
         if (!is_resource($process)) {
             unlink($contextFile);
-            $output->writeln('<error>Не удалось запустить Docker Compose.</error>');
+            $this->writeMessage($output, '<error>Не удалось запустить Docker Compose.</error>');
 
             return Command::FAILURE;
         }
 
         if ($show) {
             $viewerUrl = sprintf('http://127.0.0.1:%d/vnc.html?autoconnect=true&resize=scale', $viewerPort);
-            $output->writeln(sprintf('<info>Окно браузера доступно по адресу: %s</info>', $viewerUrl));
+            $this->writeMessage($output, sprintf('<info>Окно браузера доступно по адресу: %s</info>', $viewerUrl));
             $this->openViewerWhenReady($viewerUrl, $viewerPort);
         }
 
         $exitCode = proc_close($process);
         unlink($contextFile);
-        $output->writeln(sprintf('<info>Playwright logs directory: %s</info>', $hostLogDirectory));
+        $this->writeMessage($output, sprintf('<info>Playwright logs directory: %s</info>', $hostLogDirectory));
 
         return is_int($exitCode) ? $exitCode : Command::FAILURE;
     }

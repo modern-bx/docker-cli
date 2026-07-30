@@ -42,14 +42,14 @@ final class ProjectUpCommand extends AbstractCommand
         $frameworkCode = $input->getOption('framework');
         $languageCode = $input->getOption('language');
         if ($languageCode !== null && $languageCode !== 'php' || $frameworkCode !== null && !in_array($frameworkCode, ['symfony', 'laravel', 'bitrix', 'bitrix24'], true)) {
-            $output->writeln('<error>Указан неподдерживаемый язык или фреймворк.</error>'); return Command::FAILURE;
+            $this->writeMessage($output, '<error>Указан неподдерживаемый язык или фреймворк.</error>'); return Command::FAILURE;
         }
         $registry = new ProjectRegistry();
         $projectsDirectory = $registry->projectsDirectory();
         $projectRoot = (string) getcwd();
         $projectName = $this->resolveProjectName($input, $output, $projectRoot, $projectsDirectory);
         if (!$this->isValidProjectName($projectName)) {
-            $output->writeln(sprintf('<error>Имя проекта "%s" не соответствует конвенции: используйте строчные латинские буквы, цифры и дефисы; имя должно начинаться и заканчиваться буквой или цифрой.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Имя проекта "%s" не соответствует конвенции: используйте строчные латинские буквы, цифры и дефисы; имя должно начинаться и заканчиваться буквой или цифрой.</error>', $projectName));
 
             return Command::FAILURE;
         }
@@ -57,19 +57,19 @@ final class ProjectUpCommand extends AbstractCommand
         $projectDirectory = join_path($projectsDirectory, $projectName);
 
         if (is_dir($projectDirectory)) {
-            $output->writeln(sprintf('<error>Проект "%s" уже зарегистрирован.</error>', $projectName));
+            $this->writeMessage($output, sprintf('<error>Проект "%s" уже зарегистрирован.</error>', $projectName));
 
             return Command::FAILURE;
         }
 
         if (!is_dir($projectsDirectory) && !mkdir($projectsDirectory, 0775, true) && !is_dir($projectsDirectory)) {
-            $output->writeln(sprintf('<error>Не удалось создать директорию "%s".</error>', $projectsDirectory));
+            $this->writeMessage($output, sprintf('<error>Не удалось создать директорию "%s".</error>', $projectsDirectory));
 
             return Command::FAILURE;
         }
 
         if (!mkdir($projectDirectory, 0775) && !is_dir($projectDirectory)) {
-            $output->writeln(sprintf('<error>Не удалось создать директорию проекта "%s".</error>', $projectDirectory));
+            $this->writeMessage($output, sprintf('<error>Не удалось создать директорию проекта "%s".</error>', $projectDirectory));
 
             return Command::FAILURE;
         }
@@ -77,7 +77,7 @@ final class ProjectUpCommand extends AbstractCommand
         $documentRoot = $frameworkCode !== null && in_array($frameworkCode, ['symfony', 'laravel'], true) ? join_path($projectRoot, 'public') : $projectRoot;
 
         if ($frameworkCode === null) {
-            $output->writeln('<comment>Фреймворк проекта не определен; проект будет зарегистрирован с базовой веб-конфигурацией.</comment>');
+            $this->writeMessage($output, '<comment>Фреймворк проекта не определен; проект будет зарегистрирован с базовой веб-конфигурацией.</comment>');
         }
 
         $projectConfig = (new ProjectDatabaseConfig())->ensure([
@@ -104,14 +104,14 @@ final class ProjectUpCommand extends AbstractCommand
 
         $projectMetadataDirectory = join_path($projectRoot, '.docker-cli');
         if (!is_dir($projectMetadataDirectory) && !mkdir($projectMetadataDirectory, 0775, true) && !is_dir($projectMetadataDirectory)) {
-            $output->writeln(sprintf('<error>Не удалось создать директорию "%s".</error>', $projectMetadataDirectory));
+            $this->writeMessage($output, sprintf('<error>Не удалось создать директорию "%s".</error>', $projectMetadataDirectory));
 
             return Command::FAILURE;
         }
 
         $projectDataDirectory = join_path($projectMetadataDirectory, 'data');
         if (!is_dir($projectDataDirectory) && !mkdir($projectDataDirectory, 0775, true) && !is_dir($projectDataDirectory)) {
-            $output->writeln(sprintf('<error>Не удалось создать директорию "%s".</error>', $projectDataDirectory));
+            $this->writeMessage($output, sprintf('<error>Не удалось создать директорию "%s".</error>', $projectDataDirectory));
 
             return Command::FAILURE;
         }
@@ -138,7 +138,7 @@ final class ProjectUpCommand extends AbstractCommand
         try {
             $dataInitCode = (new DataInitializer())->initialize($projectName, $mysqlPassword, $postgresPassword, false, $output);
         } catch (MissingConfigException $exception) {
-            $output->writeln(sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
 
             return Command::FAILURE;
         }
@@ -155,7 +155,7 @@ final class ProjectUpCommand extends AbstractCommand
             }
         }
 
-        ($this->context ?? CommandContext::fromEnvironment($this))->addMessage(
+        ($this->context ?? CommandContext::fromEnvironment($this, $output))->addMessage(
             new Message(sprintf('Проект **%s** успешно добавлен в контур.', $projectName), notify: true),
         );
 
@@ -219,13 +219,13 @@ final class ProjectUpCommand extends AbstractCommand
 
         $generatedName = (new ProjectNameGenerator())->generate($registeredNames);
         if ($directoryName === '') {
-            $output->writeln(sprintf(
+            $this->writeMessage($output, sprintf(
                 '<comment>Не удалось сформировать имя проекта из имени директории "%s"; используется сгенерированное имя "%s".</comment>',
                 basename($projectRoot),
                 $generatedName,
             ));
         } else {
-            $output->writeln(sprintf(
+            $this->writeMessage($output, sprintf(
                 '<comment>Проект "%s" уже зарегистрирован; используется сгенерированное имя "%s".</comment>',
                 $directoryName,
                 $generatedName,
