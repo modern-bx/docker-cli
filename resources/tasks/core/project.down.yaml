@@ -9,16 +9,16 @@ task:
   description: |
     Удаляет регистрацию проекта и по запросу его файлы, директорию и базы данных.
   parameters:
-    wipe: { type: integer, min: 0, max: 1 }
-    erase: { type: integer, min: 0, max: 1 }
-    drop: { type: integer, min: 0, max: 1 }
-    force: { type: integer, min: 0, max: 1 }
-    no-restart: { type: integer, min: 0, max: 1 }
+    wipe: { type: boolean }
+    erase: { type: boolean }
+    drop: { type: boolean }
+    force: { type: boolean }
+    no-restart: { type: boolean }
   action: |
     options=()
-    [ "${wipe:-0}" = 1 ] && options+=(--wipe)
-    [ "${erase:-0}" = 1 ] && options+=(--erase)
-    [ "${drop:-0}" = 1 ] && options+=(--drop)
-    [ "${force:-0}" = 1 ] && options+=(--force)
-    [ "${no_restart:-0}" = 1 ] && options+=(--no-restart)
+    [ "${wipe:-false}" = true ] && options+=(--wipe)
+    [ "${erase:-false}" = true ] && options+=(--erase)
+    [ "${drop:-false}" = true ] && options+=(--drop)
+    [ "${force:-false}" = true ] && options+=(--force)
+    [ "${no_restart:-false}" = true ] && options+=(--no-restart)
     docker-cli project:down "${options[@]}"
