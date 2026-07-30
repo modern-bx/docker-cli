@@ -60,10 +60,10 @@ final class QueueStepCommand extends AbstractCommand
             if ($errors !== []) {
                 foreach ($errors as $error) {
                     $this->writeMessage($output, '<error>' . $error . '</error>');
-                    $repository->trace($active, $queue, $item, 'Ошибка валидации: ' . $error);
+                    $repository->trace($active, $queue, $item, 'Ошибка валидации: ' . $error, level: 'error', context: 'task');
                 }
                 $active = $repository->move($active, $queue, '50-error');
-                $repository->trace($active, $queue, $item, 'Элемент перемещен в 50-error.');
+                $repository->trace($active, $queue, $item, 'Элемент перемещен в 50-error.', level: 'error');
                 return Command::INVALID;
             }
             foreach ($item['queue-item']['tasks'] as $index => $task) {
@@ -84,11 +84,11 @@ final class QueueStepCommand extends AbstractCommand
                 $runner = new TaskRunCommand($tasks, notifications: new NotificationRepository($repository->configDirectory()));
                 $runner->setApplication($this->getApplication());
                 $exitCode = $runner->run(new ArrayInput($arguments), $output);
-                $repository->journal($active, $item, sprintf('%s-%d', $task['code'], $index + 1), $runner->journal());
+                $repository->journal($active, $queue, $item, sprintf('%s-%d', $task['code'], $index + 1), $task['code'], $runner->journal());
                 $repository->trace($active, $queue, $item, sprintf('Задача %s завершилась с кодом %d.', $task['code'], $exitCode), $task['code'], $task['project'] ?? null, $exitCode);
                 if ($exitCode !== Command::SUCCESS) {
                     $active = $repository->move($active, $queue, '40-failure');
-                    $repository->trace($active, $queue, $item, 'Элемент перемещен в 40-failure; последующие задачи пропущены.');
+                    $repository->trace($active, $queue, $item, 'Элемент перемещен в 40-failure; последующие задачи пропущены.', level: 'warning');
                     return $exitCode;
                 }
             }
@@ -99,9 +99,9 @@ final class QueueStepCommand extends AbstractCommand
             $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             if (isset($active, $item) && is_string($active) && is_file($active) && is_array($item)) {
                 try {
-                    $repository->trace($active, $queue, $item, 'Ошибка обработки: ' . $exception->getMessage());
+                    $repository->trace($active, $queue, $item, 'Ошибка обработки: ' . $exception->getMessage(), level: 'error');
                     $active = $repository->move($active, $queue, '50-error');
-                    $repository->trace($active, $queue, $item, 'Элемент перемещен в 50-error.');
+                    $repository->trace($active, $queue, $item, 'Элемент перемещен в 50-error.', level: 'error');
                 } catch (\Throwable) {
                     // Preserve the original processing error.
                 }

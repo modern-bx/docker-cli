@@ -258,7 +258,7 @@ final class QueueRepository
     }
 
     /** @param array<string, mixed> $item */
-    public function trace(string $file, string $queue, array &$item, string $message, ?string $taskCode = null, ?string $project = null, ?int $result = null): void
+    public function trace(string $file, string $queue, array &$item, string $message, ?string $taskCode = null, ?string $project = null, ?int $result = null, string $level = 'info', string $context = 'queue'): void
     {
         $projects = $project !== null ? [$project] : $this->projectsFromItem($item, $taskCode);
         $project = $projects !== [] ? implode(', ', $projects) : null;
@@ -274,6 +274,8 @@ final class QueueRepository
         [$seconds, $fraction] = array_pad(explode('.', $timestamp, 2), 2, '0');
         $record = [
             'type' => 'queue',
+            'level' => $level,
+            'context' => $context,
             'timestamp' => sprintf('%s.%sZ', gmdate('Y-m-d\TH:i:s', (int) $seconds), str_pad(substr($fraction, 0, 6), 6, '0')),
             'queueItem' => $name,
             'itemCode' => $parts[2] ?? pathinfo($name, PATHINFO_FILENAME),
@@ -285,18 +287,45 @@ final class QueueRepository
             'result' => $result,
             'message' => $message,
         ];
+        $this->appendLog($queue, $record);
+    }
+
+    /** @param array<string, mixed> $item @param array<string, array{message: string, level: string}> $messages */
+    public function journal(string $file, string $queue, array &$item, string $journalKey, string $taskCode, array $messages): void
+    {
+        $item['journal'] ??= [];
+        $item['journal'][$journalKey] = array_map(static fn (array $record): string => $record['message'], $messages);
+        $this->write($file, $item);
+        $projects = $this->projectsFromItem($item, $taskCode);
+        $name = basename($file);
+        $parts = explode('.', substr($name, 0, -5), 3);
+        foreach ($messages as $timestamp => $message) {
+            [$seconds, $fraction] = array_pad(explode('.', $timestamp, 2), 2, '0');
+            $this->appendLog($queue, [
+                'type' => 'queue',
+                'level' => $message['level'],
+                'context' => 'command',
+                'timestamp' => sprintf('%s.%sZ', gmdate('Y-m-d\TH:i:s', (int) $seconds), str_pad(substr($fraction, 0, 6), 6, '0')),
+                'queueItem' => $name,
+                'itemCode' => $parts[2] ?? pathinfo($name, PATHINFO_FILENAME),
+                'project' => $projects !== [] ? implode(', ', $projects) : null,
+                'projects' => $projects,
+                'queueCode' => $queue,
+                'status' => basename(dirname($file)),
+                'taskCode' => $taskCode,
+                'result' => null,
+                'message' => $message['message'],
+            ]);
+        }
+    }
+
+    /** @param array<string, mixed> $record */
+    private function appendLog(string $queue, array $record): void
+    {
         $line = json_encode($record, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
         if (file_put_contents(join_path($this->configDirectory(), 'logs', 'queue', $queue . '.jsonl'), $line, FILE_APPEND | LOCK_EX) === false) {
             throw new \RuntimeException('Не удалось записать общий лог очереди.');
         }
-    }
-
-    /** @param array<string, mixed> $item @param array<string, string> $messages */
-    public function journal(string $file, array &$item, string $task, array $messages): void
-    {
-        $item['journal'] ??= [];
-        $item['journal'][$task] = $messages;
-        $this->write($file, $item);
     }
 
     /** @param array<string, mixed> $item @return list<string> */
@@ -328,7 +357,7 @@ final class QueueRepository
     }
 
     /** @return array{items: list<array<string, mixed>>, total: int, projects: list<string>} */
-    public function logs(int $page, int $pageSize, string $sort, string $direction, ?string $project, ?string $status = null, ?string $queueItem = null, ?string $itemCode = null, ?string $taskCode = null): array
+    public function logs(int $page, int $pageSize, string $sort, string $direction, ?string $project, ?string $status = null, ?string $queueItem = null, ?string $itemCode = null, ?string $taskCode = null, ?string $level = null, ?string $context = null): array
     {
         $items = [];
         $projects = [];
@@ -346,6 +375,8 @@ final class QueueRepository
                     if ($queueItem !== null && !str_contains(mb_strtolower((string) ($record['queueItem'] ?? '')), mb_strtolower($queueItem))) continue;
                     if ($itemCode !== null && !str_contains(mb_strtolower((string) ($record['itemCode'] ?? '')), mb_strtolower($itemCode))) continue;
                     if ($taskCode !== null && !str_contains(mb_strtolower((string) ($record['taskCode'] ?? '')), mb_strtolower($taskCode))) continue;
+                    if ($level !== null && ($record['level'] ?? null) !== $level) continue;
+                    if ($context !== null && ($record['context'] ?? null) !== $context) continue;
                     $items[] = $record;
                 } catch (\JsonException) {
                     // A partially written line must not make the complete log unavailable.

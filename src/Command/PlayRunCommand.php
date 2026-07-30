@@ -135,7 +135,7 @@ final class PlayRunCommand extends AbstractCommand
             join_path('/docker-cli/playwright/scripts', $script),
         ]);
 
-        $this->writeMessage($output, '<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
+        $this->writeMessage($output, '<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>', MessageLevel::Debug);
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
         if (!is_resource($process)) {
             unlink($contextFile);

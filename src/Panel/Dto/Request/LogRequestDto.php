@@ -20,6 +20,8 @@ final readonly class LogRequestDto implements RequestDto
         public ?string $queueItem,
         public ?string $itemCode,
         public ?string $taskCode,
+        public ?string $level,
+        public ?string $context,
     ) {
     }
 
@@ -29,7 +31,7 @@ final readonly class LogRequestDto implements RequestDto
         $pageSize = filter_var($request->query['pageSize'] ?? 25, FILTER_VALIDATE_INT);
         $sort = (string) ($request->query['sort'] ?? 'timestamp');
         $direction = (string) ($request->query['direction'] ?? 'desc');
-        $allowedSort = ['timestamp', 'queueItem', 'itemCode', 'project', 'queueCode', 'status', 'taskCode', 'result', 'message'];
+        $allowedSort = ['timestamp', 'queueItem', 'itemCode', 'project', 'queueCode', 'status', 'taskCode', 'level', 'context', 'result', 'message'];
         if ($page === false || !in_array($pageSize, [25, 50, 100], true) || !in_array($sort, $allowedSort, true) || !in_array($direction, ['asc', 'desc'], true)) {
             throw new RequestValidationException('Некорректные параметры журнала.');
         }
@@ -42,6 +44,8 @@ final readonly class LogRequestDto implements RequestDto
         $text = static fn (string $field): ?string => isset($request->query[$field]) && is_string($request->query[$field]) && trim($request->query[$field]) !== ''
             ? trim($request->query[$field])
             : null;
-        return new static($page, $pageSize, $sort, $direction, $project, $status, $text('queueItem'), $text('itemCode'), $text('taskCode'));
+        $level = isset($request->query['level']) && is_string($request->query['level']) && in_array($request->query['level'], ['debug', 'info', 'warning', 'error'], true) ? $request->query['level'] : null;
+        $context = isset($request->query['context']) && is_string($request->query['context']) && in_array($request->query['context'], ['command', 'task', 'queue'], true) ? $request->query['context'] : null;
+        return new static($page, $pageSize, $sort, $direction, $project, $status, $text('queueItem'), $text('itemCode'), $text('taskCode'), $level, $context);
     }
 }

@@ -16,7 +16,7 @@ use function DockerCli\Util\join_path;
 
 final class TaskRunCommand extends AbstractCommand
 {
-    /** @var array<string, string> */
+    /** @var array<string, array{message: string, level: string}> */
     private array $journal = [];
 
     public function __construct(
@@ -87,7 +87,10 @@ final class TaskRunCommand extends AbstractCommand
                 while (isset($this->journal[$timestamp])) {
                     $timestamp = sprintf('%.6f', (float) $timestamp + 0.000001);
                 }
-                $this->journal[$timestamp] = $message['message'];
+                $this->journal[$timestamp] = [
+                    'message' => $message['message'],
+                    'level' => $message['level'],
+                ];
                 if ($message['notify']) {
                     ($this->notifications ?? new NotificationRepository())->create(
                         $task['code'], 'task', $message['level'], $message['message'],
@@ -98,7 +101,7 @@ final class TaskRunCommand extends AbstractCommand
             return is_int($exitCode) ? $exitCode : Command::FAILURE;
         } finally {
             if ($input->getOption('no-delete')) {
-                $this->writeMessage($output, sprintf('<comment>Скомпилированный скрипт сохранен: %s</comment>', $scriptFile));
+                $this->writeMessage($output, sprintf('<comment>Скомпилированный скрипт сохранен: %s</comment>', $scriptFile), MessageLevel::Debug);
             } else {
                 @unlink($scriptFile);
             }
@@ -106,7 +109,7 @@ final class TaskRunCommand extends AbstractCommand
         }
     }
 
-    /** @return array<string, string> */
+    /** @return array<string, array{message: string, level: string}> */
     public function journal(): array
     {
         return $this->journal;

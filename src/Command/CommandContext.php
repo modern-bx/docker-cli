@@ -33,7 +33,8 @@ final class CommandContext
     {
         $level = $message->getLevel()->value;
         if ($message->getConsole()) {
-            $this->output?->writeln(sprintf('<%1$s>%2$s</%1$s>', $level, $message->getMessage()));
+            $consoleLevel = in_array($message->getLevel(), [MessageLevel::Debug, MessageLevel::Warning], true) ? MessageLevel::Comment->value : $level;
+            $this->output?->writeln(sprintf('<%1$s>%2$s</%1$s>', $consoleLevel, $message->getMessage()));
         }
         $origin = $message->getOrigin() ?? $this->contextUser?->getOrigin() ?? 'unknown';
         $class = $message->getClass() ?? $this->contextUser?->getClass() ?? 'unknown';

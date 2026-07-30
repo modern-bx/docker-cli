@@ -30,7 +30,7 @@ trait DockerComposeRunner
         $fullCommand = array_merge($compose->dockerComposeCommand($operation), $arguments);
         $this->writeMessage($output, '<comment>' . $translator->trans('process.running', [
             '%command%' => implode(' ', array_map('escapeshellarg', $fullCommand)),
-        ]) . '</comment>');
+        ]) . '</comment>', MessageLevel::Debug);
 
         $process = proc_open($fullCommand, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
         if (!is_resource($process)) {
