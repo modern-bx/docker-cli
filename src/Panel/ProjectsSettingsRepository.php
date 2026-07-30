@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DockerCli\Panel;
 
 use Symfony\Component\Yaml\Yaml;
+use DockerCli\Project\ProjectNameGenerator;
 
 use function DockerCli\Util\join_path;
 
@@ -21,7 +22,7 @@ final class ProjectsSettingsRepository
         $this->file = $file;
     }
 
-    /** @return list<array{path: string, default: bool}> */
+    /** @return list<array{path: string, code: string, default: bool}> */
     public function locations(): array
     {
         if (!is_file($this->file)) return [];
@@ -31,13 +32,37 @@ final class ProjectsSettingsRepository
             && ($data['meta']['version'] ?? null) === 0.1
             && is_array($data['settings.projects']['locations'] ?? null)
             ? $data['settings.projects']['locations'] : [];
-        return array_values(array_filter($locations, static fn ($item): bool => is_array($item)
+        $valid = array_values(array_filter($locations, static fn ($item): bool => is_array($item)
             && is_string($item['path'] ?? null) && is_bool($item['default'] ?? null)));
+        $used = [];
+        foreach ($valid as &$location) {
+            $code = $location['code'] ?? '';
+            if (!is_string($code) || $code === '' || isset($used[$code])) {
+                $code = (new ProjectNameGenerator())->generate(array_keys($used));
+            }
+            $location['code'] = $code;
+            $used[$code] = true;
+        }
+        return $valid;
     }
 
-    /** @param list<array{path: string, default: bool}> $locations */
-    public function save(array $locations): void
+    /** @param list<array{path: string, code: string, default: bool}> $locations */
+    public function save(array $locations): array
     {
+        $previousByPath = array_column($this->locations(), null, 'path');
+        $used = [];
+        foreach ($locations as &$location) {
+            if (isset($previousByPath[$location['path']])) {
+                if ($location['code'] === '') $location['code'] = $previousByPath[$location['path']]['code'];
+                if ($location['code'] !== $previousByPath[$location['path']]['code']) {
+                    throw new \InvalidArgumentException('Код существующего расположения изменять нельзя.');
+                }
+            } elseif ($location['code'] === '') {
+                $location['code'] = (new ProjectNameGenerator())->generate(array_keys($used));
+            }
+            if (isset($used[$location['code']])) throw new \InvalidArgumentException('Коды расположений должны быть уникальными.');
+            $used[$location['code']] = true;
+        }
         foreach ($locations as $location) {
             $path = $location['path'];
             if (!is_dir($path)) {
@@ -59,5 +84,6 @@ final class ProjectsSettingsRepository
             throw new \RuntimeException(sprintf('Unable to write projects settings "%s".', $this->file));
         }
         chmod($this->file, 0600);
+        return $locations;
     }
 }

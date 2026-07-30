@@ -307,8 +307,8 @@
     try {
       const data = await getProjectsSettings(api);
       projectLocations = Array.isArray(data.locations) && data.locations.length
-        ? data.locations.map((location) => ({ path: location.path, default: location.default === true }))
-        : [{ path: '', default: true }];
+        ? data.locations.map((location) => ({ path: location.path, code: location.code || '', default: location.default === true }))
+        : [{ path: '', code: '', default: true }];
     } catch (cause) {
       errorTitle = 'Не удалось загрузить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить расположения проектов.';
@@ -389,8 +389,12 @@
     projectLocations = projectLocations.map((location, itemIndex) => itemIndex === index ? { ...location, path } : location);
   }
 
+  function updateProjectLocationCode(index, code) {
+    projectLocations = projectLocations.map((location, itemIndex) => itemIndex === index ? { ...location, code } : location);
+  }
+
   function addProjectLocation() {
-    projectLocations = [...projectLocations, { path: '', default: false }];
+    projectLocations = [...projectLocations, { path: '', code: '', default: false }];
   }
 
   function removeProjectLocation(index) {
@@ -1440,7 +1444,8 @@
                   {#each projectLocations as location, index}
                     <div class="location-item">
                       <div class="location-row">
-                        <input class="input" type="text" value={location.path} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="/путь/к/проектам" aria-label={`Расположение проектов ${index + 1}`} oninput={(event) => updateProjectLocation(index, event.currentTarget.value)} />
+                        <input class="input location-path" type="text" value={location.path} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="/путь/к/проектам" aria-label={`Расположение проектов ${index + 1}`} oninput={(event) => updateProjectLocation(index, event.currentTarget.value)} />
+                        <input class="input location-code" type="text" value={location.code} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="код (автоматически)" aria-label={`Код расположения ${index + 1}`} oninput={(event) => updateProjectLocationCode(index, event.currentTarget.value)} />
                         <button class="btn preset-tonal" type="button" disabled={!location.path.trim() || projectSettingsLoading || projectSettingsSaving} onclick={addProjectLocation}><Plus size={16} aria-hidden="true" />Добавить</button>
                         {#if projectLocations.length > 1}<button class="btn preset-tonal location-delete" type="button" disabled={projectSettingsLoading || projectSettingsSaving} onclick={() => removeProjectLocation(index)}><Trash2 size={16} aria-hidden="true" />Удалить</button>{/if}
                         <input class="radio location-default" type="radio" name="default-project-location" checked={location.default} disabled={projectSettingsLoading || projectSettingsSaving} aria-label="Путь по умолчанию" onchange={() => setDefaultProjectLocation(index)} />
