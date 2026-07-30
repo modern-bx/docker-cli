@@ -25,15 +25,7 @@ final class ProjectsSettingsRepository
     /** @return list<array{path: string, code: string, default: bool}> */
     public function locations(): array
     {
-        if (!is_file($this->file)) return [];
-        $data = Yaml::parseFile($this->file);
-        $locations = is_array($data)
-            && ($data['meta']['schema'] ?? null) === 'settings.projects'
-            && ($data['meta']['version'] ?? null) === 0.1
-            && is_array($data['settings.projects']['locations'] ?? null)
-            ? $data['settings.projects']['locations'] : [];
-        $valid = array_values(array_filter($locations, static fn ($item): bool => is_array($item)
-            && is_string($item['path'] ?? null) && is_bool($item['default'] ?? null)));
+        $valid = $this->storedLocations();
         $used = [];
         foreach ($valid as &$location) {
             $code = $location['code'] ?? '';
@@ -49,15 +41,22 @@ final class ProjectsSettingsRepository
     /** @param list<array{path: string, code: string, default: bool}> $locations */
     public function save(array $locations): array
     {
-        $previousByPath = array_column($this->locations(), null, 'path');
+        // Use the values actually persisted in the file here. Calling locations()
+        // would generate a fresh random code for legacy entries on every read,
+        // making the generated code returned to the UI look like an illegal edit.
+        $previousByPath = array_column($this->storedLocations(), null, 'path');
         $used = [];
         foreach ($locations as &$location) {
             if (isset($previousByPath[$location['path']])) {
-                if ($location['code'] === '') $location['code'] = $previousByPath[$location['path']]['code'];
-                if ($location['code'] !== $previousByPath[$location['path']]['code']) {
+                $previousCode = $previousByPath[$location['path']]['code'] ?? null;
+                if (is_string($previousCode) && $previousCode !== '' && $location['code'] === '') {
+                    $location['code'] = $previousCode;
+                }
+                if (is_string($previousCode) && $previousCode !== '' && $location['code'] !== $previousCode) {
                     throw new \InvalidArgumentException('Код существующего расположения изменять нельзя.');
                 }
-            } elseif ($location['code'] === '') {
+            }
+            if ($location['code'] === '') {
                 $location['code'] = (new ProjectNameGenerator())->generate(array_keys($used));
             }
             if (isset($used[$location['code']])) throw new \InvalidArgumentException('Коды расположений должны быть уникальными.');
@@ -85,5 +84,20 @@ final class ProjectsSettingsRepository
         }
         chmod($this->file, 0600);
         return $locations;
+    }
+
+    /** @return list<array{path: string, code?: mixed, default: bool}> */
+    private function storedLocations(): array
+    {
+        if (!is_file($this->file)) return [];
+        $data = Yaml::parseFile($this->file);
+        $locations = is_array($data)
+            && ($data['meta']['schema'] ?? null) === 'settings.projects'
+            && ($data['meta']['version'] ?? null) === 0.1
+            && is_array($data['settings.projects']['locations'] ?? null)
+            ? $data['settings.projects']['locations'] : [];
+
+        return array_values(array_filter($locations, static fn ($item): bool => is_array($item)
+            && is_string($item['path'] ?? null) && is_bool($item['default'] ?? null)));
     }
 }
