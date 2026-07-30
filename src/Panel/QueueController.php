@@ -58,6 +58,17 @@ final readonly class QueueController
         return $this->state(new EmptyRequestDto());
     }
 
+    #[Route('POST', '/api/queue/default/{file}/archive', QueueItemRequestDto::class, QueueStateDto::class)]
+    public function archive(QueueItemRequestDto $request): QueueStateDto
+    {
+        try {
+            $this->queues->archive(self::QUEUE, $request->file);
+        } catch (\InvalidArgumentException|\RuntimeException $exception) {
+            throw new QueueActionException($exception->getMessage());
+        }
+        return $this->state(new EmptyRequestDto());
+    }
+
     #[Route('GET', '/api/logs', LogRequestDto::class, LogListDto::class)]
     public function logs(LogRequestDto $request): LogListDto
     {

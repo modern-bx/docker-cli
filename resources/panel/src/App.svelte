@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { Bell, CircleHelp, Copy, ExternalLink, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { Archive, Bell, CircleHelp, Copy, ExternalLink, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import { createPanelUser, deletePanelUser, getLogs, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
@@ -36,6 +36,7 @@
     { value: '30-success', label: 'Успешно (30)' },
     { value: '40-failure', label: 'Не выполнено (40)' },
     { value: '50-error', label: 'Ошибка (50)' },
+    { value: '90-archive', label: 'Архив (90)' },
   ];
   const logStatusCollection = useListCollection({ items: logStatuses });
   const pageSizeCollection = useListCollection({ items: [25, 50, 100].map((value) => ({ value: String(value), label: String(value) })) });
@@ -809,6 +810,17 @@
     }
   }
 
+  async function archiveQueueItem(item) {
+    try {
+      const data = await api(`/api/queue/default/${encodeURIComponent(item.file)}/archive`, { method: 'POST' });
+      queueItems = data.items;
+    } catch (cause) {
+      errorTitle = 'Не удалось архивировать элемент очереди';
+      error = cause instanceof Error ? cause.message : 'Не удалось архивировать элемент очереди.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    }
+  }
+
   async function toggleQueue() {
     if (queueActionPending) return;
     queueActionPending = true;
@@ -1049,7 +1061,10 @@
                   <time datetime={item.queuedAt}>{formatQueueDate(item.queuedAt)}</time>
                   <button class="queue-item-code queue-item-link" type="button" title={`Открыть журнал элемента ${item.code}`} onclick={() => openQueueItemJournal(item)}>{item.code}</button>
                   {#if item.status !== '20-active'}
-                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => { queueOpen = false; queueConfirmation = item; }}><Trash2 size={14} aria-hidden="true" />Удалить</button>
+                    <div class="queue-item-actions">
+                      <button class="btn btn-sm preset-tonal" type="button" onclick={() => archiveQueueItem(item)}><Archive size={14} aria-hidden="true" />Архивировать</button>
+                      <button class="btn-icon preset-tonal" type="button" aria-label="Удалить элемент очереди" title="Удалить" onclick={() => { queueOpen = false; queueConfirmation = item; }}><Trash2 size={14} aria-hidden="true" /></button>
+                    </div>
                   {/if}
                 </div>
               {/each}
