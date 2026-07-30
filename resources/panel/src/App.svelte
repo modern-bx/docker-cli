@@ -72,11 +72,11 @@
   let settingsTab = 'projects';
   let logItems = [];
   let logProjects = [];
-  let logType = 'queue';
-  let logProject = 'all';
-  let logStatus = 'all';
-  let logLevel = 'all';
-  let logContext = 'all';
+  let logType = ['queue'];
+  let logProject = ['all'];
+  let logStatus = ['all'];
+  let logLevel = ['all'];
+  let logContext = ['all'];
   let logQueueItem = '';
   let logItemCode = '';
   let logTaskCode = '';
@@ -214,18 +214,33 @@
     }
   }
 
+  function specificSelections(values) {
+    return values.filter((value) => value !== 'all');
+  }
+
+  function normalizeFilterSelection(previous, next) {
+    if (next.includes('all')) {
+      return previous.includes('all') ? next.filter((value) => value !== 'all') : ['all'];
+    }
+    return next;
+  }
+
+  function appendFilterValues(parameters, name, selected) {
+    for (const value of specificSelections(selected)) parameters.append(name, value);
+  }
+
   function journalFilterHash(projectJournal = false) {
     const path = projectJournal ? projectHash(selectedProjectName, 'journal') : '#/journal';
     const parameters = new URLSearchParams();
-    if (logType !== 'queue') parameters.set('type', logType);
-    if (!projectJournal && logProject !== 'all') parameters.set('project', logProject);
-    if (logStatus !== 'all') parameters.set('status', logStatus);
-    if (logLevel !== 'all') parameters.set('level', logLevel);
-    if (logContext !== 'all') parameters.set('context', logContext);
+    appendFilterValues(parameters, 'type', logType);
+    if (!projectJournal) appendFilterValues(parameters, 'project', logProject);
+    appendFilterValues(parameters, 'status', logStatus);
+    appendFilterValues(parameters, 'level', logLevel);
+    appendFilterValues(parameters, 'context', logContext);
     if (logQueueItem) parameters.set('queue_item', logQueueItem);
     if (logItemCode) parameters.set('item_code', logItemCode);
     if (logTaskCode) parameters.set('task_code', logTaskCode);
-    const query = parameters.toString().replaceAll('%2C', ',');
+    const query = parameters.toString();
     return query ? `${path}?${query}` : path;
   }
 
@@ -241,20 +256,20 @@
     const values = (name) => parameters.getAll(name);
     const scalar = (name) => values(name).length === 1 ? values(name)[0] : '';
     const validText = (value) => value.length <= 500 && !/[\u0000-\u001f\u007f]/.test(value);
-    const type = scalar('type');
-    const project = scalar('project');
-    const status = scalar('status');
-    const level = scalar('level');
-    const context = scalar('context');
+    const validSelections = (name, items, fallback = ['all']) => {
+      const allowed = new Set(items.map((item) => item.value));
+      const selected = values(name).filter((value) => allowed.has(value) && value !== 'all');
+      return selected.length ? [...new Set(selected)] : fallback;
+    };
     const queueItem = scalar('queue_item');
     const itemCode = scalar('item_code');
     const taskCode = scalar('task_code');
 
-    logType = logTypes.some((item) => item.value === type) ? type : 'queue';
-    logProject = !projectJournal && project && (!projects.length || projects.some((item) => item.name === project)) ? project : 'all';
-    logStatus = logStatuses.some((item) => item.value === status) ? status : 'all';
-    logLevel = logLevels.some((item) => item.value === level) ? level : 'all';
-    logContext = logContexts.some((item) => item.value === context) ? context : 'all';
+    logType = validSelections('type', logTypes, ['queue']);
+    logProject = projectJournal ? ['all'] : validSelections('project', [{ value: 'all' }, ...projects.map((item) => ({ value: item.name }))]);
+    logStatus = validSelections('status', logStatuses);
+    logLevel = validSelections('level', logLevels);
+    logContext = validSelections('context', logContexts);
     logQueueItem = queueItem && validText(queueItem) ? queueItem : '';
     logItemCode = itemCode && validText(itemCode) ? itemCode : '';
     logTaskCode = taskCode && validText(taskCode) ? taskCode : '';
@@ -363,10 +378,10 @@
       const projectJournal = activeSection === 'projects' && projectDetailTab === 'journal';
       const data = await getLogs(api, {
         page: String(logPage), pageSize: String(logPageSize), sort: logSort, direction: logDirection,
-        ...(projectJournal ? { project: selectedProjectName } : logProject !== 'all' ? { project: logProject } : {}),
-        ...(logStatus !== 'all' ? { status: logStatus } : {}),
-        ...(logLevel !== 'all' ? { level: logLevel } : {}),
-        ...(logContext !== 'all' ? { context: logContext } : {}),
+        ...(projectJournal ? { project: selectedProjectName } : specificSelections(logProject).length ? { project: specificSelections(logProject).join(',') } : {}),
+        ...(specificSelections(logStatus).length ? { status: specificSelections(logStatus).join(',') } : {}),
+        ...(specificSelections(logLevel).length ? { level: specificSelections(logLevel).join(',') } : {}),
+        ...(specificSelections(logContext).length ? { context: specificSelections(logContext).join(',') } : {}),
         ...(logQueueItem ? { queueItem: logQueueItem } : {}),
         ...(logItemCode ? { itemCode: logItemCode } : {}),
         ...(logTaskCode ? { taskCode: logTaskCode } : {}),
@@ -376,8 +391,8 @@
       logTotal = Number(data.total) || 0;
       logProjects = Array.isArray(data.projects) ? data.projects : [];
       logProjectCollection = useListCollection({ items: [{ value: 'all', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] });
-      if (!projectJournal && logProject !== 'all' && !logProjects.includes(logProject)) {
-        logProject = 'all';
+      if (!projectJournal && specificSelections(logProject).some((project) => !logProjects.includes(project))) {
+        logProject = specificSelections(logProject).filter((project) => logProjects.includes(project));
         syncJournalFilters(false);
         void loadLogs();
         return;
@@ -548,18 +563,23 @@
     }
   }
 
-  function changeLogProject(value) {
-    logProject = value || 'all';
+  function applyLogSelection(field, next) {
+    if (field === 'project') logProject = normalizeFilterSelection(logProject, next);
+    else if (field === 'status') logStatus = normalizeFilterSelection(logStatus, next);
+    else if (field === 'level') logLevel = normalizeFilterSelection(logLevel, next);
+    else if (field === 'context') logContext = normalizeFilterSelection(logContext, next);
+    else logType = normalizeFilterSelection(logType, next);
     logPage = 1;
     syncJournalFilters();
     loadLogs();
   }
 
+  function changeLogProject(value) {
+    applyLogSelection('project', [value]);
+  }
+
   function changeLogStatus(value) {
-    logStatus = value || 'all';
-    logPage = 1;
-    syncJournalFilters();
-    loadLogs();
+    applyLogSelection('status', [value]);
   }
 
   function logStatusLabel(value) {
@@ -567,11 +587,7 @@
   }
 
   function changeLogCategory(field, value) {
-    if (field === 'level') logLevel = value || 'all';
-    else logContext = value || 'all';
-    logPage = 1;
-    syncJournalFilters();
-    loadLogs();
+    applyLogSelection(field, [value]);
   }
 
   function logCategoryLabel(items, value) {
@@ -1517,20 +1533,20 @@
                   <div class="log-toolbar card preset-filled-surface-100-900">
                     <label>
                       <span>Тип записи</span>
-                      <Combobox collection={logTypeCollection} value={[logType]} openOnClick>
+                      <Combobox collection={logTypeCollection} value={logType} multiple openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
                         <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                         <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logTypes as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                       </Combobox>
                     </label>
                     <label>
                       <span>Статус</span>
-                      <Combobox collection={logStatusCollection} value={[logStatus]} openOnClick onValueChange={(details) => changeLogStatus(details.value[0] || 'all')}>
-                        <Combobox.Control class="font-combobox-control status-combobox-control">{#if logStatus !== 'all'}<span class={`queue-dot status-${logStatus}`} aria-hidden="true"></span>{/if}<Combobox.Input class="font-combobox-input" readonly />{#if logStatus !== 'all'}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); changeLogStatus('all'); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                      <Combobox collection={logStatusCollection} value={logStatus} multiple openOnClick onValueChange={(details) => applyLogSelection('status', details.value)}>
+                        <Combobox.Control class="font-combobox-control status-combobox-control">{#if specificSelections(logStatus).length === 1}<span class={`queue-dot status-${specificSelections(logStatus)[0]}`} aria-hidden="true"></span>{/if}<Combobox.Input class="font-combobox-input" readonly />{#if specificSelections(logStatus).length}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); applyLogSelection('status', ['all']); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                         <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logStatuses as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class="log-status-option">{#if item.value !== 'all'}<span class={`queue-dot status-${item.value}`} aria-hidden="true"></span>{/if}{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                       </Combobox>
                     </label>
                     {#each logCategoryFilters as filter}
-                      <label><span>{filter.label}</span><Combobox collection={filter.collection} value={[filter.field === 'level' ? logLevel : logContext]} openOnClick onValueChange={(details) => changeLogCategory(filter.field, details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each filter.items as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class={filter.field === 'level' && item.value !== 'all' ? `log-level level-${item.value}` : ''}>{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                      <label><span>{filter.label}</span><Combobox collection={filter.collection} value={filter.field === 'level' ? logLevel : logContext} multiple openOnClick onValueChange={(details) => applyLogSelection(filter.field, details.value)}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each filter.items as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class={filter.field === 'level' && item.value !== 'all' ? `log-level level-${item.value}` : ''}>{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
                     {/each}
                     {#each [['queueItem', 'Элемент очереди', logQueueItem], ['itemCode', 'Код элемента', logItemCode], ['taskCode', 'Задача', logTaskCode]] as [field, label, value]}
                       <label><span>{label}</span><span class="log-text-filter"><input value={value} oninput={(event) => changeTextLogFilter(field, event.currentTarget.value)} />{#if value}<button type="button" aria-label={`Сбросить фильтр «${label}»`} onclick={() => changeTextLogFilter(field, '')}>×</button>{/if}</span></label>
@@ -1564,27 +1580,27 @@
             <div class="log-toolbar card preset-filled-surface-100-900">
               <label>
                 <span>Тип записи</span>
-                <Combobox collection={logTypeCollection} value={[logType]} openOnClick>
+                <Combobox collection={logTypeCollection} value={logType} multiple openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
                   <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                   <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logTypes as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                 </Combobox>
               </label>
               <label>
                 <span>Проект</span>
-                <Combobox collection={logProjectCollection} value={[logProject]} openOnClick onValueChange={(details) => changeLogProject(details.value[0] || 'all')}>
-                  <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly />{#if logProject !== 'all'}<button class="log-filter-clear" type="button" aria-label="Сбросить проект" onclick={(event) => { event.stopPropagation(); changeLogProject('all'); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                <Combobox collection={logProjectCollection} value={logProject} multiple openOnClick onValueChange={(details) => applyLogSelection('project', details.value)}>
+                  <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly />{#if specificSelections(logProject).length}<button class="log-filter-clear" type="button" aria-label="Сбросить проект" onclick={(event) => { event.stopPropagation(); applyLogSelection('project', ['all']); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                   <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: 'all', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                 </Combobox>
               </label>
               <label>
                 <span>Статус</span>
-                <Combobox collection={logStatusCollection} value={[logStatus]} openOnClick onValueChange={(details) => changeLogStatus(details.value[0] || 'all')}>
-                  <Combobox.Control class="font-combobox-control status-combobox-control">{#if logStatus !== 'all'}<span class={`queue-dot status-${logStatus}`} aria-hidden="true"></span>{/if}<Combobox.Input class="font-combobox-input" readonly />{#if logStatus !== 'all'}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); changeLogStatus('all'); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
+                <Combobox collection={logStatusCollection} value={logStatus} multiple openOnClick onValueChange={(details) => applyLogSelection('status', details.value)}>
+                  <Combobox.Control class="font-combobox-control status-combobox-control">{#if specificSelections(logStatus).length === 1}<span class={`queue-dot status-${specificSelections(logStatus)[0]}`} aria-hidden="true"></span>{/if}<Combobox.Input class="font-combobox-input" readonly />{#if specificSelections(logStatus).length}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); applyLogSelection('status', ['all']); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                   <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logStatuses as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class="log-status-option">{#if item.value !== 'all'}<span class={`queue-dot status-${item.value}`} aria-hidden="true"></span>{/if}{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                 </Combobox>
               </label>
               {#each logCategoryFilters as filter}
-                      <label><span>{filter.label}</span><Combobox collection={filter.collection} value={[filter.field === 'level' ? logLevel : logContext]} openOnClick onValueChange={(details) => changeLogCategory(filter.field, details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each filter.items as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class={filter.field === 'level' && item.value !== 'all' ? `log-level level-${item.value}` : ''}>{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                      <label><span>{filter.label}</span><Combobox collection={filter.collection} value={filter.field === 'level' ? logLevel : logContext} multiple openOnClick onValueChange={(details) => applyLogSelection(filter.field, details.value)}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each filter.items as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class={filter.field === 'level' && item.value !== 'all' ? `log-level level-${item.value}` : ''}>{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
                     {/each}
                     {#each [['queueItem', 'Элемент очереди', logQueueItem], ['itemCode', 'Код элемента', logItemCode], ['taskCode', 'Задача', logTaskCode]] as [field, label, value]}
                 <label><span>{label}</span><span class="log-text-filter"><input value={value} oninput={(event) => changeTextLogFilter(field, event.currentTarget.value)} />{#if value}<button type="button" aria-label={`Сбросить фильтр «${label}»`} onclick={() => changeTextLogFilter(field, '')}>×</button>{/if}</span></label>

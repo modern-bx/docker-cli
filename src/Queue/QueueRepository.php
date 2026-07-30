@@ -357,7 +357,7 @@ final class QueueRepository
     }
 
     /** @return array{items: list<array<string, mixed>>, total: int, projects: list<string>} */
-    public function logs(int $page, int $pageSize, string $sort, string $direction, ?string $project, ?string $status = null, ?string $queueItem = null, ?string $itemCode = null, ?string $taskCode = null, ?string $level = null, ?string $context = null): array
+    public function logs(int $page, int $pageSize, string $sort, string $direction, array $projectsFilter = [], array $statuses = [], ?string $queueItem = null, ?string $itemCode = null, ?string $taskCode = null, array $levels = [], array $contexts = []): array
     {
         $items = [];
         $projects = [];
@@ -370,13 +370,13 @@ final class QueueRepository
                     if (!is_array($record)) continue;
                     $recordProjects = $this->projectsFromRecord($record);
                     array_push($projects, ...$recordProjects);
-                    if ($project !== null && !in_array($project, $recordProjects, true)) continue;
-                    if ($status !== null && ($record['status'] ?? null) !== $status) continue;
+                    if ($projectsFilter !== [] && array_intersect($projectsFilter, $recordProjects) === []) continue;
+                    if ($statuses !== [] && !in_array($record['status'] ?? null, $statuses, true)) continue;
                     if ($queueItem !== null && !str_contains(mb_strtolower((string) ($record['queueItem'] ?? '')), mb_strtolower($queueItem))) continue;
                     if ($itemCode !== null && !str_contains(mb_strtolower((string) ($record['itemCode'] ?? '')), mb_strtolower($itemCode))) continue;
                     if ($taskCode !== null && !str_contains(mb_strtolower((string) ($record['taskCode'] ?? '')), mb_strtolower($taskCode))) continue;
-                    if ($level !== null && ($record['level'] ?? null) !== $level) continue;
-                    if ($context !== null && ($record['context'] ?? null) !== $context) continue;
+                    if ($levels !== [] && !in_array($record['level'] ?? null, $levels, true)) continue;
+                    if ($contexts !== [] && !in_array($record['context'] ?? null, $contexts, true)) continue;
                     $items[] = $record;
                 } catch (\JsonException) {
                     // A partially written line must not make the complete log unavailable.
