@@ -314,7 +314,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .font-combobox-control { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; width: 100%; border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); background: var(--color-surface-50); color: var(--color-surface-950); }
 .dark .font-combobox-control { border-color: var(--color-surface-700); background: var(--color-surface-950); color: var(--color-surface-50); }
 .font-combobox-control, .font-combobox-input, .font-combobox-trigger { cursor: default; }
-.font-combobox-input { min-width: 0; caret-color: transparent; padding: 0.55rem 0.7rem; outline: none; background: transparent; }
+.font-combobox-input { min-width: 0; caret-color: transparent; padding: 0.55rem 2rem 0.55rem 0.7rem; outline: none; background: transparent; }
 .font-combobox-input[readonly] { pointer-events: none; user-select: none; }
 .font-combobox-trigger { position: absolute; inset: 0; display: flex; width: 100%; align-items: center; justify-content: flex-end; padding-right: 0.6rem; }
 .font-combobox-trigger svg { width: 1rem; }
