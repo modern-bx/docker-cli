@@ -106,6 +106,23 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .project-log-view { display: flex; min-height: calc(100% - 1rem); flex-direction: column; gap: 1rem; margin-top: 1rem; }
 .project-log-view .log-table-wrap { flex: 1; }
 .backup-table { min-width: 48rem; }
+.backup-view .log-text-filter, .backup-view .font-combobox-control { height: 2.45rem; }
+.backup-date-filter { display: grid; min-width: 13rem; gap: 0.35rem; }
+.backup-date-filter > span { color: var(--color-surface-500); font-size: 0.75rem; font-weight: 600; }
+.backup-date-control { display: grid; height: 2.45rem; grid-template-columns: minmax(0, 1fr) auto; border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); background: var(--color-surface-50); color: var(--color-surface-950); }
+.dark .backup-date-control { border-color: var(--color-surface-700); background: var(--color-surface-950); color: var(--color-surface-50); }
+.backup-date-input { min-width: 0; padding: 0.55rem 0.7rem; outline: none; background: transparent; }
+.backup-date-trigger { width: 2.5rem; color: var(--color-surface-500); }
+.backup-date-positioner { z-index: 60; }
+.backup-date-content { width: 18rem; border: 1px solid var(--color-surface-200); padding: 0.75rem; }
+.dark .backup-date-content { border-color: var(--color-surface-800); }
+.backup-date-selects, .backup-date-view-control { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
+.backup-date-selects select { min-width: 0; flex: 1; padding: 0.35rem; border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); background: transparent; }
+.backup-date-view-control button { width: 2rem; height: 2rem; border-radius: var(--radius-base); font-size: 1.25rem; }
+.backup-date-table { width: 100%; table-layout: fixed; text-align: center; }
+.backup-date-table th { padding: 0.25rem; color: var(--color-surface-500); font-size: 0.72rem; }
+.backup-date-table td button { width: 2rem; height: 2rem; border-radius: var(--radius-base); }
+.backup-date-table td button:hover, .backup-date-table td button[data-selected] { background: var(--color-primary-500); color: white; }
 .log-toolbar { position: relative; z-index: 5; display: flex; flex: none; flex-wrap: wrap; gap: 1rem; padding: 1rem; }
 .log-toolbar label { display: grid; min-width: 13rem; gap: 0.35rem; }
 .log-toolbar .font-combobox-control { grid-template-columns: minmax(0, 1fr) auto auto; }

@@ -121,10 +121,14 @@ final class ProjectController
                 'database' => 'MySQL',
             ];
         }
-        if ($request->filter !== '') {
-            $needle = mb_strtolower($request->filter);
-            $items = array_values(array_filter($items, static fn (array $item): bool => str_contains(mb_strtolower(implode(' ', [$item['name'], $item['date'], $item['composition'], $item['database']])), $needle)));
-        }
+        $items = array_values(array_filter($items, static function (array $item) use ($request): bool {
+            $date = substr($item['date'], 0, 10);
+            return ($request->backupName === '' || str_contains(mb_strtolower($item['name']), mb_strtolower($request->backupName)))
+                && ($request->composition === 'all' || $request->composition === 'database')
+                && ($request->database === 'all' || $request->database === 'mysql')
+                && ($request->dateFrom === null || $date >= $request->dateFrom)
+                && ($request->dateTo === null || $date <= $request->dateTo);
+        }));
         usort($items, static function (array $left, array $right) use ($request): int {
             $comparison = $left[$request->sort] <=> $right[$request->sort];
             if ($comparison === 0) $comparison = $left['name'] <=> $right['name'];

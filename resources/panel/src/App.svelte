@@ -3,6 +3,7 @@
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
+  import BackupDateFilter from './BackupDateFilter.svelte';
   import { createPanelUser, createProject, deletePanelUser, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -111,12 +112,20 @@
   let backupTotal = 0;
   let backupPage = 1;
   let backupPageSize = 25;
-  let backupFilter = '';
+  let backupName = '';
+  let backupComposition = 'all';
+  let backupDatabase = 'all';
+  let backupDateFrom = '';
+  let backupDateTo = '';
   let backupSort = 'date';
   let backupDirection = 'desc';
   let backupsLoading = false;
   let backupFilterTimer = null;
   let backupRequestId = 0;
+  const backupCompositionOptions = [{ value: 'all', label: 'Любой состав' }, { value: 'database', label: 'БД' }, { value: 'files', label: 'Файлы' }, { value: 'database-files', label: 'БД и файлы' }];
+  const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }];
+  const backupCompositionCollection = useListCollection({ items: backupCompositionOptions });
+  const backupDatabaseCollection = useListCollection({ items: backupDatabaseOptions });
   let notesProjectName = '';
   let noteTags = [];
   let noteTagInput = '';
@@ -295,7 +304,7 @@
     backupsLoading = true;
     projectsError = '';
     try {
-      const data = await getProjectBackups(api, selectedProjectName, { page: String(backupPage), pageSize: String(backupPageSize), filter: backupFilter, sort: backupSort, direction: backupDirection });
+      const data = await getProjectBackups(api, selectedProjectName, { page: String(backupPage), pageSize: String(backupPageSize), name: backupName, composition: backupComposition, database: backupDatabase, dateFrom: backupDateFrom, dateTo: backupDateTo, sort: backupSort, direction: backupDirection });
       if (requestId !== backupRequestId) return;
       backupItems = Array.isArray(data.items) ? data.items : [];
       backupTotal = Number(data.total) || 0;
@@ -306,8 +315,12 @@
     }
   }
 
-  function changeBackupFilter(value) {
-    backupFilter = value;
+  function changeBackupFilter(field, value) {
+    if (field === 'name') backupName = value;
+    else if (field === 'composition') backupComposition = value;
+    else if (field === 'database') backupDatabase = value;
+    else if (field === 'dateFrom') backupDateFrom = value;
+    else backupDateTo = value;
     backupPage = 1;
     clearTimeout(backupFilterTimer);
     backupFilterTimer = setTimeout(loadProjectBackups, 250);
@@ -1450,7 +1463,11 @@
                 {:else if projectDetailTab === 'backups'}
                 <section class="project-log-view backup-view" aria-label={`Бэкапы проекта ${selectedProject.name}`}>
                   <div class="log-toolbar card preset-filled-surface-100-900">
-                    <label><span>Фильтр</span><span class="log-text-filter"><input type="search" value={backupFilter} placeholder="Название, дата, состав или СУБД" oninput={(event) => changeBackupFilter(event.currentTarget.value)} />{#if backupFilter}<button type="button" aria-label="Сбросить фильтр" onclick={() => changeBackupFilter('')}>×</button>{/if}</span></label>
+                    <label><span>Название</span><span class="log-text-filter"><input type="search" value={backupName} oninput={(event) => changeBackupFilter('name', event.currentTarget.value)} />{#if backupName}<button type="button" aria-label="Сбросить название" onclick={() => changeBackupFilter('name', '')}>×</button>{/if}</span></label>
+                    <label><span>Состав</span><Combobox collection={backupCompositionCollection} value={[backupComposition]} openOnClick onValueChange={(details) => changeBackupFilter('composition', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCompositionOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                    <label><span>Тип СУБД</span><Combobox collection={backupDatabaseCollection} value={[backupDatabase]} openOnClick onValueChange={(details) => changeBackupFilter('database', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupDatabaseOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                    <BackupDateFilter label="Дата от" value={backupDateFrom} onchange={(value) => changeBackupFilter('dateFrom', value)} />
+                    <BackupDateFilter label="Дата до" value={backupDateTo} onchange={(value) => changeBackupFilter('dateTo', value)} />
                   </div>
                   <div class="log-table-wrap card preset-filled-surface-100-900">
                     <table class="table log-table backup-table">
