@@ -145,6 +145,15 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .log-filter-link { color: var(--color-primary-700); text-align: left; text-decoration: underline; text-underline-offset: 0.15rem; }
 .log-status-link { display: inline-flex; align-items: center; gap: 0.55rem; }
 .dark .log-filter-link { color: var(--color-primary-300); }
+.log-level { font-weight: 700; }
+.log-level.level-debug { color: #7c3aed; }
+.log-level.level-info { color: #2563eb; }
+.log-level.level-warning { color: #ea580c; }
+.log-level.level-error { color: #e11d48; }
+.dark .log-level.level-debug { color: #c4b5fd; }
+.dark .log-level.level-info { color: #93c5fd; }
+.dark .log-level.level-warning { color: #fdba74; }
+.dark .log-level.level-error { color: #fda4af; }
 .dark .log-table td { border-color: var(--color-surface-800); }
 .log-empty { color: var(--color-surface-500); text-align: center; }
 .log-pagination { position: relative; z-index: 5; display: grid; flex: none; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 1rem; }
