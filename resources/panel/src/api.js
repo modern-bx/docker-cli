@@ -1,8 +1,8 @@
 /**
  * @typedef {object} ProjectDto
  * @property {string} name Stable project name from its configuration.
- * @property {string|null} language Project programming language, when configured.
- * @property {string|null} framework Project framework, when configured.
+ * @property {{code: string, name: string}|null} language Project programming language, when configured.
+ * @property {{code: string, name: string}|null} framework Project framework, when configured.
  * @property {boolean} enabled Whether the project is enabled.
  * @property {boolean} protected Whether destructive changes are forbidden.
  * @property {string|null} url HTTPS URL of the project's primary host.
@@ -31,6 +31,14 @@ export async function getProjects(request) {
 /** @returns {Promise<ProjectListDto>} */
 export async function runProjectAction(request, project, action) {
   return /** @type {Promise<ProjectListDto>} */ (request(`/api/projects/${encodeURIComponent(project)}/${action}`, { method: 'POST' }));
+}
+
+export async function getProjectOptions(request) {
+  return request('/api/projects/options');
+}
+
+export async function createProject(request, project) {
+  return request('/api/projects', { method: 'POST', body: JSON.stringify(project) });
 }
 
 /** @returns {Promise<ProjectListDto>} */

@@ -7,6 +7,9 @@ namespace DockerCli\Panel;
 use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\Dto\ProjectDto;
 use DockerCli\Panel\Dto\ProjectListDto;
+use DockerCli\Panel\Dto\ConceptDto;
+use DockerCli\Panel\Dto\ProjectOptionsDto;
+use DockerCli\Panel\Dto\Request\ProjectCreateRequestDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectActionRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectNotesRequestDto;
@@ -15,7 +18,9 @@ use DockerCli\Panel\Enum\ProjectActionEnum;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Queue\QueueRepository;
+use function DockerCli\Util\join_path;
 
 final class ProjectController
 {
@@ -23,6 +28,7 @@ final class ProjectController
         private readonly ProjectRegistry $projects,
         private readonly ?SystemCompose $compose = null,
         private readonly ?QueueRepository $queues = null,
+        private readonly ?ProjectsSettingsRepository $settings = null,
     )
     {
     }
@@ -74,8 +80,8 @@ final class ProjectController
             $projectName = is_string($project['name'] ?? null) && $project['name'] !== '' ? $project['name'] : $name;
             $projects[] = new ProjectDto(
                 name: $projectName,
-                language: $this->nullableString($project['language'] ?? null),
-                framework: $this->nullableString($project['framework'] ?? null),
+                language: $this->concept($project['language'] ?? null, ['php' => 'PHP']),
+                framework: $this->concept($project['framework'] ?? null, self::FRAMEWORK_NAMES),
                 // Older project configs predate this flag and are enabled by default,
                 // just like OpenRestyHostRenderer treats them.
                 enabled: ($project['enabled'] ?? true) !== false,
@@ -87,6 +93,43 @@ final class ProjectController
         }
 
         return new ProjectListDto($projects);
+    }
+
+    private const FRAMEWORK_NAMES = ['symfony' => 'Symfony', 'laravel' => 'Laravel', 'bitrix' => 'Bitrix', 'bitrix24' => 'Bitrix24'];
+
+    #[Route('GET', '/api/projects/options', EmptyRequestDto::class, ProjectOptionsDto::class)]
+    public function options(EmptyRequestDto $request): ProjectOptionsDto
+    {
+        return new ProjectOptionsDto(
+            ($this->settings ?? new ProjectsSettingsRepository())->locations(),
+            [new ConceptDto('php', 'PHP')],
+            ['php' => [new ConceptDto('', 'Без фреймворка'), ...array_map(static fn (string $code, string $name) => new ConceptDto($code, $name), array_keys(self::FRAMEWORK_NAMES), self::FRAMEWORK_NAMES)]],
+        );
+    }
+
+    #[Route('POST', '/api/projects', ProjectCreateRequestDto::class, ProjectListDto::class)]
+    public function create(ProjectCreateRequestDto $request): ProjectListDto
+    {
+        $options = $this->options(new EmptyRequestDto());
+        $location = current(array_filter($options->locations, static fn (array $item): bool => $item['code'] === $request->location));
+        if (!is_array($location)) throw new ProjectActionException('Локация не найдена.', 422);
+        if ($request->language !== 'php' || !isset($options->frameworks[$request->language]) || !in_array($request->framework ?? '', array_map(static fn (ConceptDto $item) => $item->code, $options->frameworks[$request->language]), true)) {
+            throw new ProjectActionException('Язык или фреймворк не поддерживается.', 422);
+        }
+        $name = $request->code ?? (new ProjectNameGenerator())->generate($this->projects->registeredProjectNames());
+        if (preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $name) !== 1) throw new ProjectActionException('Код проекта должен содержать строчные латинские буквы, цифры и дефисы.', 422);
+        if ($this->projects->hasProject($name) || file_exists(join_path($location['path'], $name))) throw new ProjectActionException('Проект или директория с таким кодом уже существует.', 409);
+        $arguments = [
+                'location' => ['value' => $location['path']], 'name' => ['value' => $name],
+                'language' => ['value' => $request->language],
+        ];
+        if ($request->framework !== null) $arguments['framework'] = ['value' => $request->framework];
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
+            'code' => 'core.project.up', 'arguments' => $arguments,
+        ]]]];
+        try { ($this->queues ?? new QueueRepository())->create('default', 'core.project.up', $item); }
+        catch (\InvalidArgumentException|\RuntimeException $exception) { throw new ProjectActionException($exception->getMessage(), 500); }
+        return $this->projects(new EmptyRequestDto());
     }
 
     #[Route('POST', '/api/projects/{name}/security', ProjectSecurityRequestDto::class, ProjectListDto::class)]
@@ -143,9 +186,11 @@ final class ProjectController
         return array_values(array_filter($tags, static fn (mixed $tag): bool => is_string($tag) && $tag !== ''));
     }
 
-    private function nullableString(mixed $value): ?string
+    /** @param array<string, string> $names */
+    private function concept(mixed $value, array $names): ?ConceptDto
     {
-        return is_string($value) && $value !== '' ? $value : null;
+        if (!is_string($value) || $value === '' || !isset($names[$value])) return null;
+        return new ConceptDto($value, $names[$value]);
     }
 
     private function enqueueWipe(string $name): void

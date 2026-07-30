@@ -92,7 +92,7 @@ final class OpenRestyHostRenderer
             $name = $project['name'] ?? null;
             $framework = $project['framework'] ?? null;
             $documentRoot = $project['document_root'] ?? null;
-            if (is_string($name) && $framework === false && is_string($documentRoot)) {
+            if (is_string($name) && $framework === null && is_string($documentRoot)) {
                 $framework = 'generic';
             }
 

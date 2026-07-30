@@ -15,6 +15,7 @@ use DockerCli\Panel\Http\ResponseEmitter;
 use DockerCli\Panel\JwtTokenService;
 use DockerCli\Panel\NotificationController;
 use DockerCli\Panel\ProjectController;
+use DockerCli\Panel\ProjectsSettingsRepository;
 use DockerCli\Panel\QueueController;
 use DockerCli\Panel\Router;
 use DockerCli\Panel\StateController;
@@ -104,7 +105,7 @@ final class PanelUpCommand extends Command
         $projectsSettings = new \DockerCli\Panel\ProjectsSettingsRepository();
         $tokens = new JwtTokenService($jwtSecret, $tokenRepository, $securitySettings);
         $queues = new QueueRepository();
-        $projects = new ProjectController(new ProjectRegistry(), $compose, $queues);
+        $projects = new ProjectController(new ProjectRegistry(), $compose, $queues, new ProjectsSettingsRepository());
         $system = new SystemController($compose);
         $queue = new QueueController($queues);
         $notifications = new NotificationController(new NotificationRepository());

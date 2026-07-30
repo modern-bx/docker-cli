@@ -1,0 +1,27 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Добавление проекта
+  code: core.project.up
+  type: shell
+  context: system
+  description: Создает директорию и регистрирует новый проект.
+  parameters:
+    location: { type: string, required: true }
+    name: { type: string, required: true }
+    language: { type: list, required: true, items: [{ name: PHP, value: php }] }
+    framework:
+      type: list
+      items:
+        - { name: Symfony, value: symfony }
+        - { name: Laravel, value: laravel }
+        - { name: Bitrix, value: bitrix }
+        - { name: Bitrix24, value: bitrix24 }
+  action: |
+    project_root={{ location }}/{{ name }}
+    mkdir "$project_root"
+    cd "$project_root"
+    options=(--language={{ language }})
+    [ -n "${framework:-}" ] && options+=(--framework="$framework")
+    docker-cli project:up {{ name }} "${options[@]}"
