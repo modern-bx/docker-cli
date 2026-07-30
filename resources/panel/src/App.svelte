@@ -1406,7 +1406,7 @@
                 <a class:active={projectDetailTab === 'backups'} class="project-detail-tab" href={projectHash(selectedProject.name, 'backups')} aria-current={projectDetailTab === 'backups' ? 'page' : undefined}>Бэкапы</a>
                 <a class:active={projectDetailTab === 'journal'} class="project-detail-tab" href={projectHash(selectedProject.name, 'journal')} aria-current={projectDetailTab === 'journal' ? 'page' : undefined}>Журнал</a>
               </nav>
-              <div class="project-details-scroll">
+              <div class="project-details-scroll" class:table-tab={projectDetailTab === 'journal' || projectDetailTab === 'backups'}>
                 {#if projectDetailTab === 'info'}
                 <section class="project-tab-content card preset-filled-surface-100-900" aria-label="Общее">
                   <dl class="project-fields">

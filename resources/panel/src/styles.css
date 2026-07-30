@@ -112,7 +112,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .backup-date-control { display: grid; height: 2.45rem; grid-template-columns: minmax(0, 1fr) auto; border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); background: var(--color-surface-50); color: var(--color-surface-950); }
 .dark .backup-date-control { border-color: var(--color-surface-700); background: var(--color-surface-950); color: var(--color-surface-50); }
 .backup-date-input { min-width: 0; padding: 0.55rem 0.7rem; outline: none; background: transparent; }
-.backup-date-trigger { width: 2.5rem; color: var(--color-surface-500); }
+.backup-date-trigger { width: 1.6rem; color: var(--color-surface-500); }
 .backup-date-positioner { z-index: 100 !important; }
 .backup-date-content { position: relative; z-index: 100; width: 18rem; border: 1px solid var(--color-surface-200); padding: 0.75rem; }
 .dark .backup-date-content { border-color: var(--color-surface-800); }
@@ -203,6 +203,8 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .project-details { display: flex; min-width: 0; min-height: 0; overflow: hidden; flex-direction: column; padding: 0 clamp(1.25rem, 1vw, 2.5rem); background: var(--color-surface-100); }
 .dark .project-details { background: var(--color-surface-900); }
 .project-details-scroll { min-height: 0; overflow-y: auto; padding-right: 0.5rem; padding-bottom: clamp(1.25rem, 3vw, 2.5rem); flex: 1; }
+.project-details-scroll.table-tab { display: flex; overflow: hidden; flex-direction: column; }
+.project-details-scroll.table-tab .project-log-view { min-height: 0; flex: 1; }
 .select-project { display: grid; min-height: 100%; place-items: center; color: var(--color-surface-500); font-size: 1.1rem; }
 .project-detail-tabs { display: flex; height: 3.25rem; flex: none; align-items: end; border-bottom: 1px solid var(--color-surface-200); }
 .dark .project-detail-tabs { border-color: var(--color-surface-800); }
