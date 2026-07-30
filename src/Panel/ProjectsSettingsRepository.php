@@ -41,20 +41,16 @@ final class ProjectsSettingsRepository
     /** @param list<array{path: string, code: string, default: bool}> $locations */
     public function save(array $locations): array
     {
-        // Use the values actually persisted in the file here. Calling locations()
-        // would generate a fresh random code for legacy entries on every read,
-        // making the generated code returned to the UI look like an illegal edit.
-        $previousByPath = array_column($this->storedLocations(), null, 'path');
+        // Use the values actually persisted in the file to distinguish an
+        // existing location from a newly added one. Existing location codes may
+        // be changed, but must never be saved empty.
+        $previous = $this->storedLocations();
+        $previousByPath = array_column($previous, null, 'path');
         $used = [];
-        foreach ($locations as &$location) {
-            if (isset($previousByPath[$location['path']])) {
-                $previousCode = $previousByPath[$location['path']]['code'] ?? null;
-                if (is_string($previousCode) && $previousCode !== '' && $location['code'] === '') {
-                    $location['code'] = $previousCode;
-                }
-                if (is_string($previousCode) && $previousCode !== '' && $location['code'] !== $previousCode) {
-                    throw new \InvalidArgumentException('Код существующего расположения изменять нельзя.');
-                }
+        foreach ($locations as $index => &$location) {
+            $isExisting = isset($previousByPath[$location['path']]) || array_key_exists($index, $previous);
+            if ($isExisting && $location['code'] === '') {
+                throw new \InvalidArgumentException('Код существующего расположения не может быть пустым.');
             }
             if ($location['code'] === '') {
                 $location['code'] = (new ProjectNameGenerator())->generate(array_keys($used));
