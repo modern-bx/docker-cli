@@ -105,6 +105,24 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .log-view { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 1rem; padding: 1.25rem 1.5rem; overflow: hidden; }
 .project-log-view { display: flex; min-height: calc(100% - 1rem); flex-direction: column; gap: 1rem; margin-top: 1rem; }
 .project-log-view .log-table-wrap { flex: 1; }
+.backup-table { min-width: 48rem; }
+.backup-view .log-text-filter, .backup-view .font-combobox-control { height: 2.45rem; }
+.backup-date-filter { display: grid; min-width: 13rem; gap: 0.35rem; }
+.backup-date-filter > span { color: var(--color-surface-500); font-size: 0.75rem; font-weight: 600; }
+.backup-date-control { display: grid; height: 2.45rem; grid-template-columns: minmax(0, 1fr) auto; border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); background: var(--color-surface-50); color: var(--color-surface-950); }
+.dark .backup-date-control { border-color: var(--color-surface-700); background: var(--color-surface-950); color: var(--color-surface-50); }
+.backup-date-input { min-width: 0; padding: 0.55rem 0.7rem; outline: none; background: transparent; }
+.backup-date-trigger { width: 1.6rem; color: var(--color-surface-500); }
+.backup-date-positioner { z-index: 100 !important; }
+.backup-date-content { position: relative; z-index: 100; width: 18rem; border: 1px solid var(--color-surface-200); padding: 0.75rem; }
+.dark .backup-date-content { border-color: var(--color-surface-800); }
+.backup-date-selects, .backup-date-view-control { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
+.backup-date-selects select { min-width: 0; flex: 1; padding: 0.35rem; border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); background: transparent; }
+.backup-date-view-control button { width: 2rem; height: 2rem; border-radius: var(--radius-base); font-size: 1.25rem; }
+.backup-date-table { width: 100%; table-layout: fixed; text-align: center; }
+.backup-date-table th { padding: 0.25rem; color: var(--color-surface-500); font-size: 0.72rem; }
+.backup-date-table td button { width: 2rem; height: 2rem; border-radius: var(--radius-base); }
+.backup-date-table td button:hover, .backup-date-table td button[data-selected] { background: var(--color-primary-500); color: white; }
 .log-toolbar { position: relative; z-index: 5; display: flex; flex: none; flex-wrap: wrap; gap: 1rem; padding: 1rem; }
 .log-toolbar label { display: grid; min-width: 13rem; gap: 0.35rem; }
 .log-toolbar .font-combobox-control { grid-template-columns: minmax(0, 1fr) auto auto; }
@@ -162,7 +180,9 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .status-dot, .status-value i { flex: 0 0 auto; width: 0.65rem; height: 0.65rem; border-radius: 999px; background: var(--color-error-500); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-error-500) 16%, transparent); }
 .status-dot.enabled, .status-value.enabled i { background: var(--color-success-500); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-success-500) 16%, transparent); }
 .project-summary { display: flex; min-width: 0; flex-direction: column; }
-.project-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-name { display: flex; min-width: 0; align-items: center; gap: 0.35rem; }
+.project-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-name svg { flex: 0 0 auto; color: var(--color-surface-500); }
 .project-tags { display: flex; gap: 0.35rem; margin-top: 0.3rem; flex-wrap: wrap; }
 .project-tags button { padding: 0.12rem 0.45rem; border-radius: 999px; background: var(--color-surface-200); color: var(--color-surface-600); font-size: 0.68rem; line-height: 1.1rem; }
 .dark .project-tags button { background: var(--color-surface-800); color: var(--color-surface-300); }
@@ -183,6 +203,8 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .project-details { display: flex; min-width: 0; min-height: 0; overflow: hidden; flex-direction: column; padding: 0 clamp(1.25rem, 1vw, 2.5rem); background: var(--color-surface-100); }
 .dark .project-details { background: var(--color-surface-900); }
 .project-details-scroll { min-height: 0; overflow-y: auto; padding-right: 0.5rem; padding-bottom: clamp(1.25rem, 3vw, 2.5rem); flex: 1; }
+.project-details-scroll.table-tab { display: flex; overflow: hidden; flex-direction: column; }
+.project-details-scroll.table-tab .project-log-view { min-height: 0; flex: 1; }
 .select-project { display: grid; min-height: 100%; place-items: center; color: var(--color-surface-500); font-size: 1.1rem; }
 .project-detail-tabs { display: flex; height: 3.25rem; flex: none; align-items: end; border-bottom: 1px solid var(--color-surface-200); }
 .dark .project-detail-tabs { border-color: var(--color-surface-800); }

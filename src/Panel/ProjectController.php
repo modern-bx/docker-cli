@@ -9,10 +9,13 @@ use DockerCli\Panel\Dto\ProjectDto;
 use DockerCli\Panel\Dto\ProjectListDto;
 use DockerCli\Panel\Dto\ConceptDto;
 use DockerCli\Panel\Dto\ProjectOptionsDto;
+use DockerCli\Panel\Dto\ProjectBackupListDto;
+use DockerCli\Panel\Dto\Request\ProjectBackupListRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectCreateRequestDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectActionRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectNotesRequestDto;
+use DockerCli\Panel\Dto\Request\ProjectRenameRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectSecurityRequestDto;
 use DockerCli\Panel\Enum\ProjectActionEnum;
 use DockerCli\Panel\Http\Attribute\Route;
@@ -95,6 +98,47 @@ final class ProjectController
         return new ProjectListDto($projects);
     }
 
+    #[Route('GET', '/api/projects/{name}/backups', ProjectBackupListRequestDto::class, ProjectBackupListDto::class)]
+    public function backups(ProjectBackupListRequestDto $request): ProjectBackupListDto
+    {
+        if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
+        $config = $this->projects->readProjectConfig($request->name);
+        $root = $config['data']['project']['root'] ?? null;
+        if (!is_string($root) || $root === '') throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
+
+        $items = [];
+        $directory = join_path($root, '.docker-cli', 'backups', 'mysql');
+        foreach (glob(join_path($directory, '*'), GLOB_ONLYDIR) ?: [] as $backup) {
+            $timestamp = filemtime($backup);
+            $metadataFile = join_path($backup, 'docker-cli.json');
+            $metadata = is_file($metadataFile) ? json_decode((string) file_get_contents($metadataFile), true) : null;
+            $createdAt = is_array($metadata) && is_string($metadata['createdAt'] ?? null) ? strtotime($metadata['createdAt']) : false;
+            $items[] = [
+                'name' => basename($backup),
+                'date' => gmdate(DATE_ATOM, $createdAt !== false ? $createdAt : ($timestamp === false ? 0 : $timestamp)),
+                'composition' => 'БД',
+                'size' => $this->directorySize($backup),
+                'database' => 'MySQL',
+            ];
+        }
+        $items = array_values(array_filter($items, static function (array $item) use ($request): bool {
+            $date = substr($item['date'], 0, 10);
+            return ($request->backupName === '' || str_contains(mb_strtolower($item['name']), mb_strtolower($request->backupName)))
+                && ($request->composition === 'all' || $request->composition === 'database')
+                && ($request->database === 'all' || $request->database === 'mysql')
+                && ($request->dateFrom === null || $date >= $request->dateFrom)
+                && ($request->dateTo === null || $date <= $request->dateTo);
+        }));
+        usort($items, static function (array $left, array $right) use ($request): int {
+            $comparison = $left[$request->sort] <=> $right[$request->sort];
+            if ($comparison === 0) $comparison = $left['name'] <=> $right['name'];
+            return $request->direction === 'asc' ? $comparison : -$comparison;
+        });
+        $total = count($items);
+        $items = array_slice($items, ($request->page - 1) * $request->pageSize, $request->pageSize);
+        return new ProjectBackupListDto($items, $total, $request->page, $request->pageSize);
+    }
+
     private const FRAMEWORK_NAMES = ['symfony' => 'Symfony', 'laravel' => 'Laravel', 'bitrix' => 'Bitrix', 'bitrix24' => 'Bitrix24'];
 
     #[Route('GET', '/api/projects/options', EmptyRequestDto::class, ProjectOptionsDto::class)]
@@ -125,9 +169,25 @@ final class ProjectController
         ];
         if ($request->framework !== null) $arguments['framework'] = ['value' => $request->framework];
         $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
-            'code' => 'core.project.up', 'arguments' => $arguments,
+            'code' => 'core.project.up', 'arguments' => $arguments, 'project' => $name,
         ]]]];
         try { ($this->queues ?? new QueueRepository())->create('default', 'core.project.up', $item); }
+        catch (\InvalidArgumentException|\RuntimeException $exception) { throw new ProjectActionException($exception->getMessage(), 500); }
+        return $this->projects(new EmptyRequestDto());
+    }
+
+    #[Route('POST', '/api/projects/{name}/rename', ProjectRenameRequestDto::class, ProjectListDto::class)]
+    public function rename(ProjectRenameRequestDto $request): ProjectListDto
+    {
+        if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
+        if (preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $request->code) !== 1) throw new ProjectActionException('Код проекта должен содержать строчные латинские буквы, цифры и дефисы.', 422);
+        if ($request->code !== $request->name && $this->projects->hasProject($request->code)) throw new ProjectActionException('Проект с таким кодом уже существует.', 409);
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
+            'code' => 'core.project.rename',
+            'arguments' => ['code' => ['value' => $request->code]],
+            'project' => $request->name,
+        ]]]];
+        try { ($this->queues ?? new QueueRepository())->create('default', 'core.project.rename', $item); }
         catch (\InvalidArgumentException|\RuntimeException $exception) { throw new ProjectActionException($exception->getMessage(), 500); }
         return $this->projects(new EmptyRequestDto());
     }
@@ -184,6 +244,16 @@ final class ProjectController
         if (!is_array($tags)) return [];
 
         return array_values(array_filter($tags, static fn (mixed $tag): bool => is_string($tag) && $tag !== ''));
+    }
+
+    private function directorySize(string $directory): int
+    {
+        $size = 0;
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS));
+        foreach ($iterator as $file) {
+            if ($file->isFile() && !$file->isLink()) $size += $file->getSize();
+        }
+        return $size;
     }
 
     /** @param array<string, string> $names */

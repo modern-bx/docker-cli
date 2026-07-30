@@ -1,9 +1,10 @@
 <script>
   import { onMount } from 'svelte';
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { Archive, Bell, CircleHelp, Copy, ExternalLink, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
-  import { createPanelUser, createProject, deletePanelUser, getLogs, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import BackupDateFilter from './BackupDateFilter.svelte';
+  import { createPanelUser, createProject, deletePanelUser, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -21,7 +22,7 @@
   const modes = [
     ['light', 'Светлая'], ['dark', 'Тёмная'], ['system', 'Системная'],
   ];
-  const projectDetailTabs = ['info', 'notes', 'security', 'journal'];
+  const projectDetailTabs = ['info', 'notes', 'security', 'backups', 'journal'];
   const fonts = [
     { value: 'ubuntu', label: 'Ubuntu Regular' },
     { value: 'noto', label: 'Noto Sans' },
@@ -100,11 +101,31 @@
   let projectConfirmation = null;
   let projectContextMenu = null;
   let projectAddDialog = null;
+  let projectRenameDialog = null;
+  let projectRenaming = false;
   let projectAddOptions = { locations: [], languages: [], frameworks: {} };
   let projectLocationCollection = useListCollection({ items: [] });
   let projectLanguageCollection = useListCollection({ items: [] });
   let projectFrameworkCollection = useListCollection({ items: [] });
   let projectAdding = false;
+  let backupItems = [];
+  let backupTotal = 0;
+  let backupPage = 1;
+  let backupPageSize = 25;
+  let backupName = '';
+  let backupComposition = 'all';
+  let backupDatabase = 'all';
+  let backupDateFrom = '';
+  let backupDateTo = '';
+  let backupSort = 'date';
+  let backupDirection = 'desc';
+  let backupsLoading = false;
+  let backupFilterTimer = null;
+  let backupRequestId = 0;
+  const backupCompositionOptions = [{ value: 'all', label: 'Любой состав' }, { value: 'database', label: 'БД' }, { value: 'files', label: 'Файлы' }, { value: 'database-files', label: 'БД и файлы' }];
+  const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }];
+  const backupCompositionCollection = useListCollection({ items: backupCompositionOptions });
+  const backupDatabaseCollection = useListCollection({ items: backupDatabaseOptions });
   let notesProjectName = '';
   let noteTags = [];
   let noteTagInput = '';
@@ -273,7 +294,51 @@
       applyJournalFilters(true);
       loadLogs();
     }
+    if (tab === 'backups') loadProjectBackups();
     if (segments.length !== 3 || !projectDetailTabs.includes(segments[2])) navigateToProject(projectName, tab);
+  }
+
+  async function loadProjectBackups() {
+    if (!authenticated || !selectedProjectName) return;
+    const requestId = ++backupRequestId;
+    backupsLoading = true;
+    projectsError = '';
+    try {
+      const data = await getProjectBackups(api, selectedProjectName, { page: String(backupPage), pageSize: String(backupPageSize), name: backupName, composition: backupComposition, database: backupDatabase, dateFrom: backupDateFrom, dateTo: backupDateTo, sort: backupSort, direction: backupDirection });
+      if (requestId !== backupRequestId) return;
+      backupItems = Array.isArray(data.items) ? data.items : [];
+      backupTotal = Number(data.total) || 0;
+    } catch (cause) {
+      if (requestId === backupRequestId) projectsError = cause instanceof Error ? cause.message : 'Не удалось загрузить бэкапы.';
+    } finally {
+      if (requestId === backupRequestId) backupsLoading = false;
+    }
+  }
+
+  function changeBackupFilter(field, value) {
+    if (field === 'name') backupName = value;
+    else if (field === 'composition') backupComposition = value;
+    else if (field === 'database') backupDatabase = value;
+    else if (field === 'dateFrom') backupDateFrom = value;
+    else backupDateTo = value;
+    backupPage = 1;
+    clearTimeout(backupFilterTimer);
+    backupFilterTimer = setTimeout(loadProjectBackups, 250);
+  }
+
+  function sortBackups(field) {
+    backupDirection = backupSort === field && backupDirection === 'asc' ? 'desc' : 'asc';
+    backupSort = field;
+    backupPage = 1;
+    loadProjectBackups();
+  }
+
+  function formatBytes(value) {
+    const bytes = Number(value) || 0;
+    if (bytes < 1024) return `${bytes} Б`;
+    const units = ['КБ', 'МБ', 'ГБ', 'ТБ'];
+    const unit = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)) - 1, units.length - 1);
+    return `${(bytes / (1024 ** (unit + 1))).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} ${units[unit]}`;
   }
 
   async function loadLogs() {
@@ -674,6 +739,20 @@
       error = cause instanceof Error ? cause.message : 'Не удалось добавить проект.';
     }
     finally { projectAdding = false; }
+  }
+
+  async function submitProjectRename() {
+    if (!projectRenameDialog || projectRenaming) return;
+    projectRenaming = true;
+    try {
+      const data = await renameProject(api, projectRenameDialog.project, projectRenameDialog.code);
+      projects = data.projects;
+      projectRenameDialog = null;
+      notifyQueuedOperation('Переименование проекта');
+    } catch (cause) {
+      errorTitle = 'Не удалось переименовать проект';
+      error = cause instanceof Error ? cause.message : 'Не удалось переименовать проект.';
+    } finally { projectRenaming = false; }
   }
 
   async function api(path, options = {}) {
@@ -1305,9 +1384,9 @@
                     >
                       <span class:enabled={project.enabled} class="status-dot" title={project.enabled ? 'Включен' : 'Выключен'}></span>
                       <span class="project-summary">
-                        <strong>{project.name}</strong>
+                        <span class="project-name"><strong>{project.name}</strong>{#if project.protected}<Lock size={14} aria-label="Защищённый проект" />{/if}</span>
                         <span class="project-tags">
-                          {#each [{ code: project.language?.code || 'no-language', name: project.language?.name || 'no-language' }, { code: project.framework?.code || 'no-framework', name: project.framework?.name || 'no-framework' }, ...project.tags.map((tag) => ({ code: tag, name: tag }))] as tag}
+                          {#each [{ code: project.language?.code || 'no-language', name: project.language?.name || 'no-language' }, { code: project.framework?.code || 'no-framework', name: project.framework?.name || 'Без фреймворка' }, ...project.tags.map((tag) => ({ code: tag, name: tag }))] as tag}
                             <button type="button" onclick={(event) => { event.stopPropagation(); addProjectTag(tag.code); }}>{tag.name}</button>
                           {/each}
                         </span>
@@ -1324,15 +1403,16 @@
                 <a class:active={projectDetailTab === 'info'} class="project-detail-tab" href={projectHash(selectedProject.name, 'info')} aria-current={projectDetailTab === 'info' ? 'page' : undefined}>Общее</a>
                 <a class:active={projectDetailTab === 'notes'} class="project-detail-tab" href={projectHash(selectedProject.name, 'notes')} aria-current={projectDetailTab === 'notes' ? 'page' : undefined}>Заметки</a>
                 <a class:active={projectDetailTab === 'security'} class="project-detail-tab" href={projectHash(selectedProject.name, 'security')} aria-current={projectDetailTab === 'security' ? 'page' : undefined}>Безопасность</a>
+                <a class:active={projectDetailTab === 'backups'} class="project-detail-tab" href={projectHash(selectedProject.name, 'backups')} aria-current={projectDetailTab === 'backups' ? 'page' : undefined}>Бэкапы</a>
                 <a class:active={projectDetailTab === 'journal'} class="project-detail-tab" href={projectHash(selectedProject.name, 'journal')} aria-current={projectDetailTab === 'journal' ? 'page' : undefined}>Журнал</a>
               </nav>
-              <div class="project-details-scroll">
+              <div class="project-details-scroll" class:table-tab={projectDetailTab === 'journal' || projectDetailTab === 'backups'}>
                 {#if projectDetailTab === 'info'}
                 <section class="project-tab-content card preset-filled-surface-100-900" aria-label="Общее">
                   <dl class="project-fields">
                     <div><dt>Название</dt><dd>{selectedProject.name}</dd></div>
                     <div><dt>Язык</dt><dd>{selectedProject.language?.name || 'Не указан'}</dd></div>
-                    <div><dt>Фреймворк</dt><dd>{selectedProject.framework?.name || 'Не указан'}</dd></div>
+                    <div><dt>Фреймворк</dt><dd>{selectedProject.framework?.name || 'Без фреймворка'}</dd></div>
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
                     <div><dt>Основной хост</dt><dd>{#if selectedProject.url}<a class="project-host" href={selectedProject.url} target="_blank" rel="noreferrer">{selectedProject.url}<ExternalLink size={14} aria-hidden="true" /></a>{:else}Не указан{/if}</dd></div>
                   </dl>
@@ -1379,6 +1459,31 @@
                     <Tooltip.Trigger class="security-help" aria-label="О защите проекта"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
                     <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Для защищенных проектов запрещены команды, которые могут изменить их данные - и файлы, и базы данных</Tooltip.Content></Tooltip.Positioner>
                   </Tooltip>
+                </section>
+                {:else if projectDetailTab === 'backups'}
+                <section class="project-log-view backup-view" aria-label={`Бэкапы проекта ${selectedProject.name}`}>
+                  <div class="log-toolbar card preset-filled-surface-100-900">
+                    <label><span>Название</span><span class="log-text-filter"><input type="search" value={backupName} oninput={(event) => changeBackupFilter('name', event.currentTarget.value)} />{#if backupName}<button type="button" aria-label="Сбросить название" onclick={() => changeBackupFilter('name', '')}>×</button>{/if}</span></label>
+                    <label><span>Состав</span><Combobox collection={backupCompositionCollection} value={[backupComposition]} openOnClick onValueChange={(details) => changeBackupFilter('composition', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCompositionOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                    <label><span>Тип СУБД</span><Combobox collection={backupDatabaseCollection} value={[backupDatabase]} openOnClick onValueChange={(details) => changeBackupFilter('database', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupDatabaseOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                    <BackupDateFilter label="Дата от" value={backupDateFrom} onchange={(value) => changeBackupFilter('dateFrom', value)} />
+                    <BackupDateFilter label="Дата до" value={backupDateTo} onchange={(value) => changeBackupFilter('dateTo', value)} />
+                  </div>
+                  <div class="log-table-wrap card preset-filled-surface-100-900">
+                    <table class="table log-table backup-table">
+                      <thead><tr>{#each [['name', 'Название'], ['date', 'Дата'], ['composition', 'Состав'], ['size', 'Размер'], ['database', 'Тип СУБД']] as [field, label]}<th><button type="button" onclick={() => sortBackups(field)}>{label}<span aria-hidden="true">{backupSort === field ? (backupDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
+                      <tbody>
+                        {#if backupsLoading}<tr><td colspan="5" class="log-empty animate-pulse">Загрузка…</td></tr>
+                        {:else if backupItems.length === 0}<tr><td colspan="5" class="log-empty">Бэкапы не найдены</td></tr>
+                        {:else}{#each backupItems as item}<tr><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td></tr>{/each}{/if}
+                      </tbody>
+                    </table>
+                  </div>
+                  <footer class="log-pagination">
+                    <span>{backupTotal ? `${(backupPage - 1) * backupPageSize + 1}–${Math.min(backupPage * backupPageSize, backupTotal)} из ${backupTotal}` : '0 бэкапов'}</span>
+                    <div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={backupPage === 1 || backupsLoading} onclick={() => { backupPage -= 1; loadProjectBackups(); }}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={backupPage >= Math.ceil(backupTotal / backupPageSize) || backupsLoading} onclick={() => { backupPage += 1; loadProjectBackups(); }}>Вперёд</button></div>
+                    <div class="log-page-size" aria-label="Количество бэкапов на странице"><Combobox collection={pageSizeCollection} value={[String(backupPageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { backupPageSize = Number(details.value[0]); backupPage = 1; loadProjectBackups(); } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество бэкапов на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
+                  </footer>
                 </section>
                 {:else}
                 <section class="project-log-view" aria-label={`Журнал проекта ${selectedProject.name}`}>
@@ -1631,6 +1736,9 @@
       <button type="button" role="menuitem" disabled><ExternalLink size={16} aria-hidden="true" />Открыть</button>
     {/if}
     <hr />
+    <button type="button" role="menuitem" onclick={() => { projectRenameDialog = { project: projectContextMenu.project.name, code: projectContextMenu.project.name }; projectContextMenu = null; }}>
+      <Pencil size={16} aria-hidden="true" />Переименовать
+    </button>
     <button type="button" role="menuitem" onclick={() => runContextProjectAction(projectContextMenu.project.enabled ? 'disable' : 'enable')}>
       <Power size={16} aria-hidden="true" />{projectContextMenu.project.enabled ? 'Отключить' : 'Включить'}
     </button>
@@ -1642,6 +1750,21 @@
     </button>
   </div>
 {/if}
+
+<Dialog open={Boolean(projectRenameDialog)} onOpenChange={({ open }) => { if (!open && !projectRenaming) projectRenameDialog = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Переименовать проект</Dialog.Title>
+      {#if projectRenameDialog}
+        <form class="project-add-form" onsubmit={(event) => { event.preventDefault(); submitProjectRename(); }}>
+          <label class="label"><span class="label-text">Код</span><input class="input" bind:value={projectRenameDialog.code} required pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
+          <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectRenaming} onclick={() => { projectRenameDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectRenaming || !projectRenameDialog.code}>{projectRenaming ? 'Переименовываем…' : 'Переименовать'}</button></div>
+        </form>
+      {/if}
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
 
 <Dialog open={Boolean(projectAddDialog)} onOpenChange={({ open }) => { if (!open && !projectAdding) projectAddDialog = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
