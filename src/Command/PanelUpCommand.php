@@ -111,7 +111,7 @@ final class PanelUpCommand extends Command
         $responses = new ResponseEmitter($assets);
         $state = new StateController($projects, $system, $queue, $notifications);
         $router = new Router(
-            [new AuthController($users, $tokens, $tokenRepository), new \DockerCli\Panel\SecuritySettingsController($securitySettings), new \DockerCli\Panel\ProjectsSettingsController($projectsSettings), $state, $projects, $system, $queue, $notifications, new AssetController()],
+            [new AuthController($users, $tokens, $tokenRepository), new \DockerCli\Panel\SecuritySettingsController($securitySettings), new \DockerCli\Panel\ProjectsSettingsController($projectsSettings), new \DockerCli\Panel\UsersSettingsController($users, $tokenRepository, new \DockerCli\Panel\PanelPasswordGenerator()), $state, $projects, $system, $queue, $notifications, new AssetController()],
             new ControllerInvoker(),
             new AuthMiddleware($tokens, $responses),
             $responses,

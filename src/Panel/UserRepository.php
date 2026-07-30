@@ -20,22 +20,32 @@ final class UserRepository
         }
         if ($file === null) {
             $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
-            $file = join_path($home, '.config', 'docker-cli', 'state', 'panel', 'users.yaml');
+            $file = join_path($home, '.config', 'docker-cli', 'state', 'panel', 'settings', 'users.yaml');
+            $legacyFile = join_path($home, '.config', 'docker-cli', 'state', 'panel', 'users.yaml');
+            if (!is_file($file) && is_file($legacyFile)) {
+                $directory = dirname($file);
+                if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
+                    throw new \RuntimeException(sprintf('Unable to create settings directory "%s".', $directory));
+                }
+                if (!rename($legacyFile, $file)) {
+                    throw new \RuntimeException(sprintf('Unable to move users file to "%s".', $file));
+                }
+            }
         }
         $this->file = $file;
         $this->dummyPasswordHash = $this->hashPassword(bin2hex(random_bytes(16)));
     }
 
-    public function add(string $login, string $password): bool
+    public function add(string $login, string $password, string $comments = ''): bool
     {
         $login = self::normalizeLogin($login);
         $this->validatePassword($password);
 
-        return $this->update(function (array &$users) use ($login, $password): bool {
+        return $this->update(function (array &$users) use ($login, $password, $comments): bool {
             if (isset($users[$login])) {
                 return false;
             }
-            $users[$login] = ['password' => $this->hashPassword($password)];
+            $users[$login] = ['password' => $this->hashPassword($password), 'comments' => $comments];
             return true;
         });
     }
@@ -46,9 +56,29 @@ final class UserRepository
         $this->validatePassword($password);
         return $this->update(function (array &$users) use ($login, $password): bool {
             if (!isset($users[$login])) return false;
-            $users[$login] = ['password' => $this->hashPassword($password)];
+            $users[$login]['password'] = $this->hashPassword($password);
             return true;
         });
+    }
+
+    public function updateComments(string $login, string $comments): bool
+    {
+        $login = self::normalizeLogin($login);
+        return $this->update(static function (array &$users) use ($login, $comments): bool {
+            if (!isset($users[$login])) return false;
+            $users[$login]['comments'] = $comments;
+            return true;
+        });
+    }
+
+    /** @return list<array{login: string, comments: string}> */
+    public function users(): array
+    {
+        $result = [];
+        foreach ($this->read() as $login => $user) {
+            $result[] = ['login' => $login, 'comments' => is_string($user['comments'] ?? null) ? $user['comments'] : ''];
+        }
+        return $result;
     }
 
     public function delete(string $login): bool
@@ -105,7 +135,7 @@ final class UserRepository
         return $hash;
     }
 
-    /** @return array<string, array{password: string}> */
+    /** @return array<string, array{password: string, comments?: string}> */
     private function read(): array
     {
         if (!is_file($this->file)) {
@@ -120,7 +150,7 @@ final class UserRepository
         return is_array($users) ? $users : [];
     }
 
-    /** @param callable(array<string, array{password: string}> &): bool $callback */
+    /** @param callable(array<string, array{password: string, comments?: string}> &): bool $callback */
     private function update(callable $callback): bool
     {
         $directory = dirname($this->file);

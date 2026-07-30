@@ -321,4 +321,23 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .location-default-help { flex: none; }
 .location-delete { color: var(--color-error-600); }
 .dark .location-delete { color: var(--color-error-400); }
+.users-settings-scroll { display: flex; flex-direction: column; }
+.users-table-wrap { max-width: 64rem; overflow-x: auto; border: 1px solid var(--color-surface-200); }
+.dark .users-table-wrap { border-color: var(--color-surface-800); }
+.users-table { width: 100%; }
+.users-table th { padding: 0.75rem; background: var(--color-surface-200); text-align: left; }
+.dark .users-table th { background: var(--color-surface-800); }
+.users-table td { padding: 0.7rem 0.75rem; border-top: 1px solid var(--color-surface-200); overflow-wrap: anywhere; }
+.dark .users-table td { border-color: var(--color-surface-800); }
+.users-table th:last-child, .users-table td:last-child { width: 3.5rem; text-align: right; }
+.user-actions { white-space: nowrap; }
+.users-pagination { max-width: 64rem; margin-top: 1rem; }
+.user-context-menu { position: fixed; }
+.user-dialog { width: min(32rem, calc(100vw - 2rem)); }
+.user-dialog-fields { display: grid; gap: 1rem; margin-top: 1rem; }
+.user-password-button { margin-top: 1rem; }
+.user-self-warning { margin-top: 1rem; padding: 0.75rem; border-radius: var(--radius-base); background: color-mix(in oklab, var(--color-warning-500) 18%, transparent); color: var(--color-warning-700); }
+.dark .user-self-warning { color: var(--color-warning-300); }
+.generated-password { display: block; margin-top: 0.75rem; padding: 0.75rem; border-radius: var(--radius-base); background: var(--color-surface-200); overflow-wrap: anywhere; user-select: all; }
+.dark .generated-password { background: var(--color-surface-800); }
 @media (max-width: 700px) { .location-row { align-items: stretch; flex-wrap: wrap; } .location-row > .input { width: 100%; flex-basis: 100%; } .location-default, .location-default-help { align-self: center; } }
