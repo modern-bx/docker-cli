@@ -169,7 +169,7 @@ final class ProjectController
         ];
         if ($request->framework !== null) $arguments['framework'] = ['value' => $request->framework];
         $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
-            'code' => 'core.project.up', 'arguments' => $arguments,
+            'code' => 'core.project.up', 'arguments' => $arguments, 'project' => $name,
         ]]]];
         try { ($this->queues ?? new QueueRepository())->create('default', 'core.project.up', $item); }
         catch (\InvalidArgumentException|\RuntimeException $exception) { throw new ProjectActionException($exception->getMessage(), 500); }
