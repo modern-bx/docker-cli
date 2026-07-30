@@ -3,7 +3,7 @@
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
-  import { createPanelUser, deletePanelUser, getLogs, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { createPanelUser, createProject, deletePanelUser, getLogs, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -99,6 +99,9 @@
   let systemConfirmation = null;
   let projectConfirmation = null;
   let projectContextMenu = null;
+  let projectAddDialog = null;
+  let projectAddOptions = { locations: [], languages: [], frameworks: {} };
+  let projectAdding = false;
   let notesProjectName = '';
   let noteTags = [];
   let noteTagInput = '';
@@ -151,7 +154,7 @@
   }
   $: filteredProjects = projects.filter((project) => {
     const matchesName = project.name.toLocaleLowerCase().includes(projectQuery.trim().toLocaleLowerCase());
-    const tags = [project.language || 'no-language', project.framework || 'no-framework', ...project.tags];
+    const tags = [project.language?.code || 'no-language', project.framework?.code || 'no-framework', ...project.tags];
     return matchesName && projectTags.every((tag) => tags.includes(tag));
   });
 
@@ -638,6 +641,33 @@
     const project = projectContextMenu?.project;
     projectContextMenu = null;
     if (project) requestProjectAction(action, project);
+  }
+
+  async function openProjectAddDialog() {
+    try {
+      projectAddOptions = await getProjectOptions(api);
+      const location = projectAddOptions.locations.find((item) => item.default) || projectAddOptions.locations[0];
+      const language = projectAddOptions.languages[0];
+      projectAddDialog = { code: '', location: location?.code || '', language: language?.code || '', framework: projectAddOptions.frameworks[language?.code]?.[0]?.code || '' };
+    } catch (cause) {
+      errorTitle = 'Не удалось открыть добавление проекта';
+      error = cause instanceof Error ? cause.message : 'Не удалось загрузить параметры проекта.';
+    }
+  }
+
+  async function addProject() {
+    if (!projectAddDialog) return;
+    projectAdding = true;
+    try {
+      await createProject(api, projectAddDialog);
+      projectAddDialog = null;
+      queuedOperationNotice = 'Добавление проекта поставлено в очередь.';
+      await loadProjects();
+    } catch (cause) {
+      errorTitle = 'Не удалось добавить проект';
+      error = cause instanceof Error ? cause.message : 'Не удалось добавить проект.';
+    }
+    finally { projectAdding = false; }
   }
 
   async function api(path, options = {}) {
@@ -1232,6 +1262,7 @@
               <h1>Проекты</h1>
               <span>{projects.length}</span>
             </div>
+            <button class="btn preset-filled-primary-500 project-add-button" type="button" onclick={openProjectAddDialog}><Plus size={16} aria-hidden="true" />Добавить</button>
             <label class="project-search" aria-label="Поиск проектов">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg>
               {#each projectTags as tag (tag)}
@@ -1270,8 +1301,8 @@
                       <span class="project-summary">
                         <strong>{project.name}</strong>
                         <span class="project-tags">
-                          {#each [project.language || 'no-language', project.framework || 'no-framework', ...project.tags] as tag}
-                            <button type="button" onclick={(event) => { event.stopPropagation(); addProjectTag(tag); }}>{tag}</button>
+                          {#each [{ code: project.language?.code || 'no-language', name: project.language?.name || 'no-language' }, { code: project.framework?.code || 'no-framework', name: project.framework?.name || 'no-framework' }, ...project.tags.map((tag) => ({ code: tag, name: tag }))] as tag}
+                            <button type="button" onclick={(event) => { event.stopPropagation(); addProjectTag(tag.code); }}>{tag.name}</button>
                           {/each}
                         </span>
                       </span>
@@ -1294,8 +1325,8 @@
                 <section class="project-tab-content card preset-filled-surface-100-900" aria-label="Общее">
                   <dl class="project-fields">
                     <div><dt>Название</dt><dd>{selectedProject.name}</dd></div>
-                    <div><dt>Язык</dt><dd>{selectedProject.language || 'Не указан'}</dd></div>
-                    <div><dt>Фреймворк</dt><dd>{selectedProject.framework || 'Не указан'}</dd></div>
+                    <div><dt>Язык</dt><dd>{selectedProject.language?.name || 'Не указан'}</dd></div>
+                    <div><dt>Фреймворк</dt><dd>{selectedProject.framework?.name || 'Не указан'}</dd></div>
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
                     <div><dt>Основной хост</dt><dd>{#if selectedProject.url}<a class="project-host" href={selectedProject.url} target="_blank" rel="noreferrer">{selectedProject.url}<ExternalLink size={14} aria-hidden="true" /></a>{:else}Не указан{/if}</dd></div>
                   </dl>
@@ -1600,8 +1631,27 @@
     <button class="danger" type="button" role="menuitem" onclick={() => runContextProjectAction('wipe')}>
       <Trash2 size={16} aria-hidden="true" />Стереть
     </button>
+    <button class="danger" type="button" role="menuitem" onclick={() => runContextProjectAction('delete')}>
+      <Trash2 size={16} aria-hidden="true" />Удалить
+    </button>
   </div>
 {/if}
+
+<Dialog open={Boolean(projectAddDialog)} onOpenChange={({ open }) => { if (!open && !projectAdding) projectAddDialog = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Добавить проект</Dialog.Title>
+      <form onsubmit={(event) => { event.preventDefault(); addProject(); }}>
+        <label class="label"><span class="label-text">Код (опционально)</span><input class="input" bind:value={projectAddDialog.code} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
+        <label class="label"><span class="label-text">Локация</span><select class="select" bind:value={projectAddDialog.location} required>{#each projectAddOptions.locations as location}<option value={location.code}>{location.code} — {location.path}</option>{/each}</select></label>
+        <label class="label"><span class="label-text">Язык</span><select class="select" bind:value={projectAddDialog.language} onchange={() => { projectAddDialog.framework = projectAddOptions.frameworks[projectAddDialog.language]?.[0]?.code || ''; }}>{#each projectAddOptions.languages as language}<option value={language.code}>{language.name}</option>{/each}</select></label>
+        <label class="label"><span class="label-text">Фреймворк</span><select class="select" bind:value={projectAddDialog.framework}>{#each projectAddOptions.frameworks[projectAddDialog.language] || [] as framework}<option value={framework.code}>{framework.name}</option>{/each}</select></label>
+        <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectAdding} onclick={() => { projectAddDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectAdding || !projectAddDialog.location}>{projectAdding ? 'Добавляем…' : 'Добавить'}</button></div>
+      </form>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
 
 <Dialog open={Boolean(projectConfirmation)} onOpenChange={({ open }) => { if (!open) projectConfirmation = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />

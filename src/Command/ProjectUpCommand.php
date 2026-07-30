@@ -31,17 +31,25 @@ final class ProjectUpCommand extends Command
     public function __construct(
         private readonly ?FrameworkDetectionService $detectionService = null,
         private readonly ?FrameworkDescriptionService $descriptionService = null,
+        private readonly ?CommandContext $context = null,
     ) {
         parent::__construct('project:up');
         $this->setDescription('Зарегистрировать проект docker-cli.');
         $this->addArgument('project-name', InputArgument::OPTIONAL, 'Имя проекта. По умолчанию используется нормализованное имя директории проекта.');
         $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
         $this->addOption('force', null, InputOption::VALUE_NONE, 'Зарегистрировать проект, даже если фреймворк не удалось определить.');
+        $this->addOption('language', null, InputOption::VALUE_REQUIRED, 'Код языка проекта.');
+        $this->addOption('framework', null, InputOption::VALUE_REQUIRED, 'Код фреймворка или none.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $framework = ($this->detectionService ?? FrameworkDetectionService::createDefault())->detect();
+        $frameworkCode = $input->getOption('framework');
+        $languageCode = $input->getOption('language');
+        if ($languageCode !== null && $languageCode !== 'php' || $frameworkCode !== null && !in_array($frameworkCode, ['none', 'symfony', 'laravel', 'bitrix', 'bitrix24'], true)) {
+            $output->writeln('<error>Указан неподдерживаемый язык или фреймворк.</error>'); return Command::FAILURE;
+        }
+        $framework = $frameworkCode === null ? ($this->detectionService ?? FrameworkDetectionService::createDefault())->detect() : null;
         $force = (bool) $input->getOption('force');
         if ($framework === null && !$force) {
             $output->writeln('<error>Не удалось определить фреймворк проекта. Используйте --force, чтобы зарегистрировать проект без определения фреймворка.</error>');
@@ -80,7 +88,7 @@ final class ProjectUpCommand extends Command
         }
 
         $description = $framework === null ? null : ($this->descriptionService ?? new FrameworkDescriptionService())->describe($framework);
-        $documentRoot = $framework === null ? $projectRoot : $framework->getDocumentRoot();
+        $documentRoot = $framework === null ? ($frameworkCode !== null && in_array($frameworkCode, ['symfony', 'laravel'], true) ? join_path($projectRoot, 'public') : $projectRoot) : $framework->getDocumentRoot();
 
         if ($framework === null) {
             $output->writeln('<comment>Фреймворк проекта не определен; проект будет зарегистрирован с базовой веб-конфигурацией.</comment>');
@@ -95,8 +103,8 @@ final class ProjectUpCommand extends Command
                 'project' => [
                     'name' => $projectName,
                     'enabled' => true,
-                    'framework' => $description?->getCodeName()->value ?? false,
-                    'language' => 'php',
+                    'framework' => $frameworkCode !== null ? ($frameworkCode === 'none' ? false : $frameworkCode) : ($description?->getCodeName()->value ?? false),
+                    'language' => $languageCode ?? 'php',
                     ...$this->languageVersionConfig($projectRoot),
                     'root' => $projectRoot,
                     'document_root' => $documentRoot,
@@ -162,6 +170,7 @@ final class ProjectUpCommand extends Command
         }
 
         $output->writeln(sprintf('<info>Проект "%s" зарегистрирован.</info>', $projectName));
+        ($this->context ?? CommandContext::fromEnvironment())->addNotification('project.up', 'command', 'info', sprintf('Проект **%s** успешно добавлен в контур.', $projectName));
 
         return Command::SUCCESS;
     }
