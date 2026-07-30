@@ -665,10 +665,10 @@
     if (!projectAddDialog) return;
     projectAdding = true;
     try {
-      await createProject(api, projectAddDialog);
+      const data = await createProject(api, projectAddDialog);
+      projects = data.projects;
       projectAddDialog = null;
-      queuedOperationNotice = 'Добавление проекта поставлено в очередь.';
-      await loadProjects();
+      notifyQueuedOperation('Добавление проекта');
     } catch (cause) {
       errorTitle = 'Не удалось добавить проект';
       error = cause instanceof Error ? cause.message : 'Не удалось добавить проект.';
