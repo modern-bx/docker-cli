@@ -103,8 +103,8 @@ export async function getUsersSettings(request, page, pageSize) {
   return request(`/api/settings/users?${new URLSearchParams({ page: String(page), pageSize: String(pageSize) })}`);
 }
 
-export async function createPanelUser(request, login) {
-  return request('/api/settings/users', { method: 'POST', body: JSON.stringify({ login, comments: '' }) });
+export async function createPanelUser(request, login, comments) {
+  return request('/api/settings/users', { method: 'POST', body: JSON.stringify({ login, comments }) });
 }
 
 export async function updatePanelUser(request, login, comments) {

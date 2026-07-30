@@ -18,7 +18,7 @@ final readonly class UsersSettingsRequestDto implements RequestDto
     public static function fromRequest(RequestData $request): static
     {
         try {
-            $login = UserRepository::normalizeLogin((string) ($request->route['login'] ?? $request->body['login'] ?? ''));
+            $login = UserRepository::normalizeLogin(rawurldecode((string) ($request->route['login'] ?? $request->body['login'] ?? '')));
         } catch (\InvalidArgumentException $exception) {
             throw new RequestValidationException($exception->getMessage());
         }

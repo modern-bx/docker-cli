@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { Bell, CircleHelp, ExternalLink, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { Bell, CircleHelp, Copy, ExternalLink, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import { createPanelUser, deletePanelUser, getLogs, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
@@ -344,9 +344,10 @@
     if (!userDialog) return;
     try {
       if (userDialog.create) {
-        const data = await createPanelUser(api, userDialog.login);
+        const login = userDialog.login.trim().toLocaleLowerCase();
+        const data = await createPanelUser(api, userDialog.login, userDialog.comments);
         userDialog = null;
-        userPasswordAlert = { password: data.password, logout: false };
+        userPasswordAlert = { password: data.password, login, created: true, logout: false, copied: false };
       } else {
         await updatePanelUser(api, userDialog.login, userDialog.comments);
         userDialog = null;
@@ -359,8 +360,19 @@
     userDialog = null;
     try {
       const data = await rotatePanelUserPassword(api, user.login);
-      userPasswordAlert = { password: data.password, logout: data.logout === true };
+      userPasswordAlert = { password: data.password, login: user.login, created: false, logout: data.logout === true, copied: false };
     } catch (cause) { errorTitle = 'Не удалось изменить пароль'; error = cause instanceof Error ? cause.message : 'Не удалось изменить пароль.'; }
+  }
+
+  async function copyGeneratedPassword() {
+    if (!userPasswordAlert) return;
+    try {
+      await navigator.clipboard.writeText(userPasswordAlert.password);
+      userPasswordAlert = { ...userPasswordAlert, copied: true };
+    } catch {
+      errorTitle = 'Не удалось скопировать пароль';
+      error = 'Скопируйте пароль вручную.';
+    }
   }
 
   async function confirmDeleteUser() {
@@ -1456,7 +1468,7 @@
                     {:else}{#each users as user (user.login)}
                       <tr oncontextmenu={(event) => openUserContextMenu(event, user)}>
                         <td>{user.login}</td><td>{user.comments || '—'}</td>
-                        <td class="user-actions"><button class="btn-icon preset-tonal" type="button" aria-label={`Удалить пользователя ${user.login}`} title="Удалить" onclick={() => { userDeleteConfirmation = user; }}><Trash2 size={16} aria-hidden="true" /></button></td>
+                        <td class="user-actions"><button class="btn-icon preset-tonal" type="button" aria-label={`Изменить пользователя ${user.login}`} title="Изменить" onclick={() => { userDialog = { create: false, ...user }; }}><Pencil size={16} aria-hidden="true" /></button><button class="btn-icon preset-tonal" type="button" aria-label={`Удалить пользователя ${user.login}`} title="Удалить" onclick={() => { userDeleteConfirmation = user; }}><Trash2 size={16} aria-hidden="true" /></button></td>
                       </tr>
                     {/each}{/if}
                   </tbody>
@@ -1511,7 +1523,7 @@
       <Dialog.Title class="login-error-title">{userDialog?.create ? 'Добавить пользователя' : 'Изменить пользователя'}</Dialog.Title>
       <div class="user-dialog-fields">
         <label class="label"><span class="label-text">Email</span><input class="input" type="email" value={userDialog?.login || ''} disabled={!userDialog?.create} oninput={(event) => { if (userDialog) userDialog = { ...userDialog, login: event.currentTarget.value }; }} required /></label>
-        {#if !userDialog?.create}<label class="label"><span class="label-text">Комментарии</span><textarea class="textarea" rows="5" value={userDialog?.comments || ''} oninput={(event) => { if (userDialog) userDialog = { ...userDialog, comments: event.currentTarget.value }; }}></textarea></label>{/if}
+        <label class="label"><span class="label-text">Комментарии</span><textarea class="textarea" rows="5" value={userDialog?.comments || ''} oninput={(event) => { if (userDialog) userDialog = { ...userDialog, comments: event.currentTarget.value }; }}></textarea></label>
       </div>
       {#if !userDialog?.create}<button class="btn preset-tonal user-password-button" type="button" onclick={() => rotateUserPassword(userDialog)}>Изменить пароль</button>{/if}
       <div class="login-error-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger><button class="btn preset-filled-primary-500" type="button" disabled={!userDialog?.login.trim()} onclick={saveUser}>Сохранить</button></div>
@@ -1535,8 +1547,9 @@
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
     <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
-      <Dialog.Title class="login-error-title">Новый пароль</Dialog.Title>
-      <Dialog.Description class="login-error-description">Скопируйте пароль: <code class="generated-password">{userPasswordAlert?.password}</code></Dialog.Description>
+      <Dialog.Title class="login-error-title">{userPasswordAlert?.created ? `Пользователь ${userPasswordAlert?.login} добавлен` : `Пароль пользователя ${userPasswordAlert?.login} изменён`}</Dialog.Title>
+      <Dialog.Description class="login-error-description">Скопируйте и сохраните пароль — он показывается только один раз.</Dialog.Description>
+      <div class="generated-password"><code>{userPasswordAlert?.password}</code><button class="btn-icon preset-tonal" type="button" aria-label="Скопировать пароль" title={userPasswordAlert?.copied ? 'Скопировано' : 'Скопировать'} onclick={copyGeneratedPassword}><Copy size={16} aria-hidden="true" /></button></div>
       <div class="login-error-actions"><button class="btn preset-filled-primary-500" type="button" onclick={() => { const shouldLogout = userPasswordAlert?.logout; userPasswordAlert = null; if (shouldLogout) logout(); }}>Закрыть</button></div>
     </Dialog.Content>
   </Dialog.Positioner>
