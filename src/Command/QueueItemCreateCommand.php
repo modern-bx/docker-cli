@@ -13,7 +13,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class QueueItemCreateCommand extends Command
+final class QueueItemCreateCommand extends AbstractCommand
 {
     public function __construct(private readonly ?QueueRepository $queues = null, private readonly ?TaskRepository $tasks = null)
     {

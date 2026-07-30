@@ -13,7 +13,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class QueueStartCommand extends Command
+final class QueueStartCommand extends AbstractCommand
 {
     private const POLL_INTERVAL_MICROSECONDS = 1_000_000;
 

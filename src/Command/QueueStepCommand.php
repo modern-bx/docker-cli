@@ -17,7 +17,7 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use function DockerCli\Util\join_path;
 
-final class QueueStepCommand extends Command
+final class QueueStepCommand extends AbstractCommand
 {
     public function __construct(private readonly ?QueueRepository $queues = null)
     {

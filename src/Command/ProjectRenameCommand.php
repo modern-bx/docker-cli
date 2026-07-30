@@ -12,7 +12,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 use function DockerCli\Util\join_path;
 
-final class ProjectRenameCommand extends Command
+final class ProjectRenameCommand extends AbstractCommand
 {
     public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?CommandContext $context = null)
     {

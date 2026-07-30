@@ -10,7 +10,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 
-final class DataDbuserDeleteCommand extends Command
+final class DataDbuserDeleteCommand extends AbstractCommand
 {
     use DatabaseCommandInput;
     public function __construct(private readonly ?DatabaseManager $manager = null) { parent::__construct('data:dbuser-delete'); $this->setDescription('Удалить пользователей БД.'); $this->addArgument('users', InputArgument::REQUIRED, 'Имена через запятую.'); $this->addOption('force', 'f', InputOption::VALUE_NONE); $this->addOption('dbms', null, InputOption::VALUE_REQUIRED, 'mysql или postgres.'); }

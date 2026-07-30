@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
-final class ProjectConfigGetCommand extends Command
+final class ProjectConfigGetCommand extends AbstractCommand
 {
     public function __construct(private readonly ?ProjectRegistry $registry = null)
     {

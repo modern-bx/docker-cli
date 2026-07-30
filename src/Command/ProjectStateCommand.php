@@ -12,7 +12,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-abstract class ProjectStateCommand extends Command
+abstract class ProjectStateCommand extends AbstractCommand
 {
     public function __construct(
         string $name,

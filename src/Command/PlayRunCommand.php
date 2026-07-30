@@ -15,7 +15,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 use function DockerCli\Util\join_path;
 
-final class PlayRunCommand extends Command
+final class PlayRunCommand extends AbstractCommand
 {
     public function __construct()
     {

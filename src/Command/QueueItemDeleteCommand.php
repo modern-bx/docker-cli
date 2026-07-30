@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class QueueItemDeleteCommand extends Command
+final class QueueItemDeleteCommand extends AbstractCommand
 {
     public function __construct(private readonly ?QueueRepository $queues = null)
     {

@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class QueueStopCommand extends Command
+final class QueueStopCommand extends AbstractCommand
 {
     public function __construct(
         private readonly SystemdService $service = new SystemdService(),

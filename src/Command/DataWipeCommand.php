@@ -12,7 +12,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DataWipeCommand extends Command
+final class DataWipeCommand extends AbstractCommand
 {
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,

@@ -10,7 +10,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class ProjectShowCommand extends Command
+final class ProjectShowCommand extends AbstractCommand
 {
     public function __construct(private readonly ?ProjectRegistry $registry = null)
     {

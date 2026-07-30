@@ -33,7 +33,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelUpCommand extends Command
+final class PanelUpCommand extends AbstractCommand
 {
     public function __construct(private readonly SystemdService $systemdService = new SystemdService())
     {

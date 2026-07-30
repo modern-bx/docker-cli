@@ -10,7 +10,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DataDatabaseCreateCommand extends Command
+final class DataDatabaseCreateCommand extends AbstractCommand
 {
     use DatabaseCommandInput;
     public function __construct(private readonly ?DatabaseManager $manager = null) { parent::__construct('data:database-create'); $this->setDescription('Создать базу данных и выдать пользователям права.'); $this->addArgument('database', InputArgument::REQUIRED); $this->addOption('user', null, InputOption::VALUE_REQUIRED, 'Пользователи через запятую.'); $this->addOption('dbms', null, InputOption::VALUE_REQUIRED, 'mysql или postgres.'); }

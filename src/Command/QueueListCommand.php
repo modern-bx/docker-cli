@@ -12,7 +12,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
-final class QueueListCommand extends Command
+final class QueueListCommand extends AbstractCommand
 {
     /** @var array<string, string> */
     private const STATUS_ALIASES = [

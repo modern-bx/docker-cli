@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelTokenRevokeCommand extends Command
+final class PanelTokenRevokeCommand extends AbstractCommand
 {
     public function __construct()
     {

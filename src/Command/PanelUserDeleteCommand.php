@@ -12,7 +12,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelUserDeleteCommand extends Command
+final class PanelUserDeleteCommand extends AbstractCommand
 {
     public function __construct()
     {

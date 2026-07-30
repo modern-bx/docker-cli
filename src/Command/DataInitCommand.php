@@ -14,7 +14,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DataInitCommand extends Command
+final class DataInitCommand extends AbstractCommand
 {
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,

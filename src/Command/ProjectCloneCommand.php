@@ -19,7 +19,7 @@ use Symfony\Component\Yaml\Yaml;
 
 use function DockerCli\Util\join_path;
 
-final class ProjectCloneCommand extends Command
+final class ProjectCloneCommand extends AbstractCommand
 {
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,

@@ -22,7 +22,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 use function DockerCli\Util\join_path;
 
-final class ProjectUpCommand extends Command
+final class ProjectUpCommand extends AbstractCommand
 {
     use DockerComposeRunner;
 

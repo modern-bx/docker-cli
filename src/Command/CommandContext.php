@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace DockerCli\Command;
 
-use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\ConsoleOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -17,17 +16,17 @@ final class CommandContext
 
     public function __construct(
         private readonly ?string $transportFile = null,
-        private readonly ?Command $command = null,
+        private readonly ?ContextUser $contextUser = null,
         private readonly ?OutputInterface $output = null,
     )
     {
     }
 
-    public static function fromEnvironment(Command $command): self
+    public static function fromEnvironment(ContextUser $contextUser): self
     {
         $file = getenv(self::FILE_ENVIRONMENT_VARIABLE);
 
-        return new self(is_string($file) && $file !== '' ? $file : null, $command, new ConsoleOutput());
+        return new self(is_string($file) && $file !== '' ? $file : null, $contextUser, new ConsoleOutput());
     }
 
     public function addMessage(Message $message): void
@@ -40,8 +39,8 @@ final class CommandContext
             return;
         }
 
-        $origin = $message->getOrigin() ?? str_replace(':', '.', $this->command?->getName() ?? 'unknown');
-        $class = $message->getClass() ?? 'command';
+        $origin = $message->getOrigin() ?? $this->contextUser?->getOrigin() ?? 'unknown';
+        $class = $message->getClass() ?? $this->contextUser?->getClass() ?? 'unknown';
         $message->setOrigin($origin)->setClass($class);
         $message = $message->getMessage();
         $notification = compact('origin', 'class', 'level', 'message');

@@ -9,7 +9,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DataDbuserCreateCommand extends Command
+final class DataDbuserCreateCommand extends AbstractCommand
 {
     use DatabaseCommandInput;
     public function __construct(private readonly ?DatabaseManager $manager = null) { parent::__construct('data:dbuser-create'); $this->setDescription('Создать пользователя БД и выдать права.'); $this->addArgument('user', InputArgument::REQUIRED); $this->addOption('database', null, InputOption::VALUE_REQUIRED, 'Базы через запятую.'); $this->addOption('dbms', null, InputOption::VALUE_REQUIRED, 'mysql или postgres.'); }

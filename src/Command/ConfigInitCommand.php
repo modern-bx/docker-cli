@@ -16,7 +16,7 @@ use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Component\Yaml\Yaml;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class ConfigInitCommand extends Command
+final class ConfigInitCommand extends AbstractCommand
 {
     private TranslatorInterface $translator;
 

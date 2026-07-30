@@ -15,7 +15,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DataDumpCommand extends Command
+final class DataDumpCommand extends AbstractCommand
 {
     private const DBMS = ['mysql', 'postgres'];
 

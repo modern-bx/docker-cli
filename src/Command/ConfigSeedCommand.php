@@ -14,7 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class ConfigSeedCommand extends Command
+final class ConfigSeedCommand extends AbstractCommand
 {
     private TranslatorInterface $translator;
 

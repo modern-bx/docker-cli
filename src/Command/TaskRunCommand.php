@@ -14,7 +14,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use function DockerCli\Util\join_path;
 
-final class TaskRunCommand extends Command
+final class TaskRunCommand extends AbstractCommand
 {
     public function __construct(
         private readonly ?TaskRepository $repository = null,

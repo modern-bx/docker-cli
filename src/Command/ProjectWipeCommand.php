@@ -10,7 +10,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class ProjectWipeCommand extends Command
+final class ProjectWipeCommand extends AbstractCommand
 {
     public function __construct(private readonly ?CommandContext $context = null, private readonly ?ProjectRegistry $registry = null)
     {

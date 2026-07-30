@@ -9,7 +9,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class BitrixGetInstallerCommand extends Command
+final class BitrixGetInstallerCommand extends AbstractCommand
 {
     private const BASE_URL = 'https://www.1c-bitrix.ru/download/';
     private const CACHE_RELATIVE_PATH = '.config/docker-cli/cache/bitrix-get-installer/distro';

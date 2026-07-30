@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use function DockerCli\Util\join_path;
 
-abstract class ImageCommand extends Command
+abstract class ImageCommand extends AbstractCommand
 {
     /** @var list<array{name: string, context: string, service: string}> */
     private const IMAGES = [
