@@ -155,8 +155,9 @@ final class ProjectUpCommand extends Command
             }
         }
 
-        $output->writeln(sprintf('<info>Проект "%s" зарегистрирован.</info>', $projectName));
-        ($this->context ?? CommandContext::fromEnvironment())->addNotification('project.up', 'command', 'info', sprintf('Проект **%s** успешно добавлен в контур.', $projectName));
+        ($this->context ?? CommandContext::fromEnvironment($this))->addMessage(
+            new Message(sprintf('Проект **%s** успешно добавлен в контур.', $projectName), notify: true),
+        );
 
         return Command::SUCCESS;
     }

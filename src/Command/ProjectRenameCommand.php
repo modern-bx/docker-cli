@@ -73,8 +73,9 @@ final class ProjectRenameCommand extends Command
             return Command::FAILURE;
         }
 
-        $output->writeln(sprintf('<info>Проект "%s" переименован в "%s".</info>', $oldCode, $code));
-        ($this->context ?? CommandContext::fromEnvironment())->addNotification('project.rename', 'command', 'info', sprintf('Проект **%s** переименован в **%s**.', $oldCode, $code));
+        ($this->context ?? CommandContext::fromEnvironment($this))->addMessage(
+            new Message(sprintf('Проект **%s** переименован в **%s**.', $oldCode, $code), notify: true),
+        );
         return Command::SUCCESS;
     }
 }

@@ -48,13 +48,11 @@ use DockerCli\Command\QueueResumeCommand;
 use DockerCli\Command\QueueItemCreateCommand;
 use DockerCli\Command\QueueListCommand;
 use DockerCli\Command\QueueItemDeleteCommand;
-use DockerCli\Command\CommandContext;
 use Symfony\Component\Console\Application;
 
 require __DIR__ . '/../vendor/autoload.php';
 
 $application = new Application('docker-cli', '0.1.0');
-$commandContext = CommandContext::fromEnvironment();
 $application->add(new ConfigInitCommand());
 $application->add(new ProjectUpCommand());
 $application->add(new ProjectCloneCommand());
@@ -77,9 +75,9 @@ $application->add(new ProjectConfigSetCommand());
 $application->add(new SystemRestartCommand());
 $application->add(new ProjectDownCommand());
 $application->add(new ProjectListCommand());
-$application->add(new ProjectRenameCommand(context: $commandContext));
+$application->add(new ProjectRenameCommand());
 $application->add(new ProjectShowCommand());
-$application->add(new ProjectWipeCommand($commandContext));
+$application->add(new ProjectWipeCommand());
 $application->add(new ImageBuildCommand());
 $application->add(new ImagePublishCommand());
 $application->add(new PlayRunCommand());

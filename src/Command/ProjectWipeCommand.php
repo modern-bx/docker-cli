@@ -12,7 +12,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class ProjectWipeCommand extends Command
 {
-    public function __construct(private readonly CommandContext $context, private readonly ?ProjectRegistry $registry = null)
+    public function __construct(private readonly ?CommandContext $context = null, private readonly ?ProjectRegistry $registry = null)
     {
         parent::__construct('project:wipe');
         $this->setDescription('Удалить все файлы проекта, кроме директории .docker-cli.');
@@ -70,12 +70,8 @@ final class ProjectWipeCommand extends Command
             return Command::FAILURE;
         }
 
-        $output->writeln(sprintf('<info>Файлы проекта "%s" удалены, директория .docker-cli сохранена.</info>', $projectName));
-        $this->context->addNotification(
-            'project.wipe',
-            'command',
-            'info',
-            sprintf("Файлы проекта **%s** успешно удалены. Служебная директория `.docker-cli` сохранена.", $projectName),
+        ($this->context ?? CommandContext::fromEnvironment($this))->addMessage(
+            new Message(sprintf("Файлы проекта **%s** успешно удалены. Служебная директория `.docker-cli` сохранена.", $projectName), notify: true),
         );
 
         return Command::SUCCESS;

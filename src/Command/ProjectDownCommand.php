@@ -115,12 +115,8 @@ final class ProjectDownCommand extends Command
             }
         }
 
-        $output->writeln(sprintf('<info>Регистрация проекта "%s" удалена.</info>', $projectName));
-        ($this->context ?? CommandContext::fromEnvironment())->addNotification(
-            'project.down',
-            'command',
-            'info',
-            sprintf('Проект **%s** успешно удален из контура.', $projectName),
+        ($this->context ?? CommandContext::fromEnvironment($this))->addMessage(
+            new Message(sprintf('Проект **%s** успешно удален из контура.', $projectName), notify: true),
         );
 
         return Command::SUCCESS;
