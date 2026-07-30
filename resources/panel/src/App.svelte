@@ -1641,6 +1641,7 @@
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
     <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      {#if projectAddDialog}
       <Dialog.Title class="login-error-title">Добавить проект</Dialog.Title>
       <form onsubmit={(event) => { event.preventDefault(); addProject(); }}>
         <label class="label"><span class="label-text">Код (опционально)</span><input class="input" bind:value={projectAddDialog.code} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
@@ -1649,6 +1650,7 @@
         <label class="label"><span class="label-text">Фреймворк</span><select class="select" bind:value={projectAddDialog.framework}>{#each projectAddOptions.frameworks[projectAddDialog.language] || [] as framework}<option value={framework.code}>{framework.name}</option>{/each}</select></label>
         <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectAdding} onclick={() => { projectAddDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectAdding || !projectAddDialog.location}>{projectAdding ? 'Добавляем…' : 'Добавить'}</button></div>
       </form>
+      {/if}
     </Dialog.Content>
   </Dialog.Positioner>
 </Dialog>
