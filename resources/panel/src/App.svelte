@@ -833,19 +833,20 @@
   async function projectAction(action, name) {
     systemPending = true;
     projectsError = '';
-    systemPendingMessage = action === 'wipe'
-      ? `Добавляем очистку проекта «${name}» в очередь…`
+    systemPendingMessage = action === 'wipe' || action === 'delete'
+      ? `Добавляем ${action === 'delete' ? 'удаление' : 'очистку'} проекта «${name}» в очередь…`
       : `${action === 'enable' ? 'Включаем' : 'Отключаем'} проект «${name}»…`;
     try {
       const data = await runProjectAction(api, name, action);
       projects = data.projects;
       if (action === 'wipe') notifyQueuedOperation(`Очистка проекта «${name}»`);
-      if (action !== 'wipe' && !projectHasState(data.projects, action, name) && !(await waitForProjectAction(action, name))) {
+      if (action === 'delete') notifyQueuedOperation(`Удаление проекта «${name}»`);
+      if (action !== 'wipe' && action !== 'delete' && !projectHasState(data.projects, action, name) && !(await waitForProjectAction(action, name))) {
         throw Object.assign(new Error('Не удалось дождаться подтверждения статуса проекта.'), { status: 504 });
       }
     } catch (cause) {
       let reconciled = false;
-      if (action !== 'wipe' && !(cause instanceof Error && 'status' in cause)) {
+      if (action !== 'wipe' && action !== 'delete' && !(cause instanceof Error && 'status' in cause)) {
         reconciled = await waitForProjectAction(action, name);
       }
       if (!reconciled) {
@@ -878,11 +879,11 @@
   }
 
   function requestProjectAction(action, project) {
-    if (action === 'wipe' && project.protected) {
+    if ((action === 'wipe' || action === 'delete') && project.protected) {
       protectedAlert = project;
       return;
     }
-    if (action === 'disable' || action === 'wipe') {
+    if (action === 'disable' || action === 'wipe' || action === 'delete') {
       projectConfirmation = { action, project };
       return;
     }
@@ -1290,6 +1291,9 @@
                     <button class="btn preset-filled-error-500" type="button" onclick={() => requestProjectAction('wipe', selectedProject)}>
                       <Trash2 size={16} aria-hidden="true" />Стереть
                     </button>
+                    <button class="btn preset-filled-error-500" type="button" onclick={() => requestProjectAction('delete', selectedProject)}>
+                      <Trash2 size={16} aria-hidden="true" />Удалить
+                    </button>
                   </div>
                 </section>
                 {:else if projectDetailTab === 'notes'}
@@ -1587,19 +1591,21 @@
 <Dialog open={Boolean(projectConfirmation)} onOpenChange={({ open }) => { if (!open) projectConfirmation = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
-    <Dialog.Content class={`login-error-dialog card preset-filled-surface-100-900 shadow-2xl${projectConfirmation?.action === 'wipe' ? ' error-alert' : ''}`}>
-      <Dialog.Title class="login-error-title">{projectConfirmation?.action === 'wipe' ? 'Стереть проект?' : 'Отключить проект?'}</Dialog.Title>
+    <Dialog.Content class={`login-error-dialog card preset-filled-surface-100-900 shadow-2xl${projectConfirmation?.action === 'wipe' || projectConfirmation?.action === 'delete' ? ' error-alert' : ''}`}>
+      <Dialog.Title class="login-error-title">{projectConfirmation?.action === 'delete' ? 'Удалить проект?' : projectConfirmation?.action === 'wipe' ? 'Стереть проект?' : 'Отключить проект?'}</Dialog.Title>
       <Dialog.Description class="login-error-description">
         {#if projectConfirmation?.action === 'wipe'}
           Все файлы из директории проекта «{projectConfirmation?.project.name}», кроме служебной директории .docker-cli, будут безвозвратно удалены.
+        {:else if projectConfirmation?.action === 'delete'}
+          Проект «{projectConfirmation?.project.name}» будет полностью удалён вместе с директорией, служебными файлами, базами данных и пользователями СУБД. Это действие необратимо.
         {:else}
           Проект «{projectConfirmation?.project.name}» станет недоступен через веб-сервер. Его можно будет включить снова.
         {/if}
       </Dialog.Description>
       <div class="login-error-actions system-confirm-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
-        <button class={`btn ${projectConfirmation?.action === 'wipe' ? 'preset-filled-error-500' : 'preset-filled-primary-500'}`} type="button" onclick={() => { const confirmation = projectConfirmation; projectConfirmation = null; if (confirmation) projectAction(confirmation.action, confirmation.project.name); }}>
-          {projectConfirmation?.action === 'wipe' ? 'Стереть' : 'Отключить'}
+        <button class={`btn ${projectConfirmation?.action === 'wipe' || projectConfirmation?.action === 'delete' ? 'preset-filled-error-500' : 'preset-filled-primary-500'}`} type="button" onclick={() => { const confirmation = projectConfirmation; projectConfirmation = null; if (confirmation) projectAction(confirmation.action, confirmation.project.name); }}>
+          {projectConfirmation?.action === 'delete' ? 'Удалить' : projectConfirmation?.action === 'wipe' ? 'Стереть' : 'Отключить'}
         </button>
       </div>
     </Dialog.Content>

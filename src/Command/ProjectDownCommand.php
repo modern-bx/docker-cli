@@ -22,6 +22,7 @@ final class ProjectDownCommand extends Command
     public function __construct(
         private readonly ?FrameworkDetectionService $detectionService = null,
         private readonly ?DataInitializer $dataInitializer = null,
+        private readonly ?CommandContext $context = null,
     ) {
         parent::__construct('project:down');
         $this->setDescription('Удалить регистрацию проекта docker-cli.');
@@ -115,6 +116,12 @@ final class ProjectDownCommand extends Command
         }
 
         $output->writeln(sprintf('<info>Регистрация проекта "%s" удалена.</info>', $projectName));
+        ($this->context ?? CommandContext::fromEnvironment())->addNotification(
+            'project.down',
+            'command',
+            'info',
+            sprintf('Проект **%s** успешно удален из контура.', $projectName),
+        );
 
         return Command::SUCCESS;
     }
