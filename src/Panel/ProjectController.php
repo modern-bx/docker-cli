@@ -8,6 +8,7 @@ use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\Dto\ProjectDto;
 use DockerCli\Panel\Dto\ProjectListDto;
 use DockerCli\Panel\Dto\ConceptDto;
+use DockerCli\Panel\Dto\DeploymentScriptDto;
 use DockerCli\Panel\Dto\ProjectOptionsDto;
 use DockerCli\Panel\Dto\ProjectBackupListDto;
 use DockerCli\Panel\Dto\QueuedOperationDto;
@@ -26,6 +27,8 @@ use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
 use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Queue\QueueRepository;
+use DockerCli\Queue\QueueItemValidator;
+use DockerCli\Task\TaskRepository;
 use function DockerCli\Util\join_path;
 
 final class ProjectController
@@ -35,6 +38,7 @@ final class ProjectController
         private readonly ?SystemCompose $compose = null,
         private readonly ?QueueRepository $queues = null,
         private readonly ?ProjectsSettingsRepository $settings = null,
+        private readonly ?TaskRepository $tasks = null,
     )
     {
     }
@@ -215,10 +219,21 @@ final class ProjectController
     #[Route('GET', '/api/projects/options', EmptyRequestDto::class, ProjectOptionsDto::class)]
     public function options(EmptyRequestDto $request): ProjectOptionsDto
     {
+        $deploymentScripts = [];
+        foreach (($this->tasks ?? new TaskRepository())->all() as $definition) {
+            $task = $definition['task'];
+            if (($task['context'] ?? null) !== 'project' || !in_array('project:init', $task['tags'] ?? [], true)) continue;
+            $deploymentScripts[] = new DeploymentScriptDto(
+                (string) $task['code'],
+                is_string($task['name'] ?? null) ? $task['name'] : (string) $task['code'],
+                is_array($task['parameters'] ?? null) ? $task['parameters'] : [],
+            );
+        }
         return new ProjectOptionsDto(
             ($this->settings ?? new ProjectsSettingsRepository())->locations(),
             [new ConceptDto('php', 'PHP')],
             ['php' => [new ConceptDto('', 'Без фреймворка'), ...array_map(static fn (string $code, string $name) => new ConceptDto($code, $name), array_keys(self::FRAMEWORK_NAMES), self::FRAMEWORK_NAMES)]],
+            $deploymentScripts,
         );
     }
 
@@ -239,9 +254,25 @@ final class ProjectController
                 'language' => ['value' => $request->language],
         ];
         if ($request->framework !== null) $arguments['framework'] = ['value' => $request->framework];
-        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
+        $queuedTasks = [[
             'code' => 'core.project.up', 'arguments' => $arguments, 'project' => $name,
-        ]]]];
+        ]];
+        if ($request->deploymentScript !== null) {
+            $script = current(array_filter($options->deploymentScripts, static fn (DeploymentScriptDto $item): bool => $item->code === $request->deploymentScript));
+            if (!$script instanceof DeploymentScriptDto) throw new ProjectActionException('Скрипт развертки не найден.', 422);
+            $scriptArguments = [];
+            foreach ($request->deploymentArguments as $argumentName => $value) {
+                if (!is_string($argumentName)) throw new ProjectActionException('Некорректные аргументы скрипта развертки.', 422);
+                if ($value === '' && isset($script->parameters[$argumentName]) && ($script->parameters[$argumentName]['required'] ?? false) !== true) continue;
+                $scriptArguments[$argumentName] = ['value' => $value];
+            }
+            $queuedTasks[] = ['code' => $script->code, 'arguments' => $scriptArguments, 'project' => $name];
+        } elseif ($request->deploymentArguments !== []) {
+            throw new ProjectActionException('Аргументы переданы без скрипта развертки.', 422);
+        }
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => $queuedTasks]];
+        $validationErrors = (new QueueItemValidator($this->tasks ?? new TaskRepository()))->validate($item);
+        if ($validationErrors !== []) throw new ProjectActionException(implode("\n", $validationErrors), 422);
         try { ($this->queues ?? new QueueRepository())->create('default', 'core.project.up', $item); }
         catch (\InvalidArgumentException|\RuntimeException $exception) { throw new ProjectActionException($exception->getMessage(), 500); }
         return $this->projects(new EmptyRequestDto());

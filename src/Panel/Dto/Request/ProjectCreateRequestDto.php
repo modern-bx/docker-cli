@@ -10,7 +10,8 @@ use DockerCli\Panel\Http\RequestValidationException;
 
 final readonly class ProjectCreateRequestDto implements RequestDto
 {
-    public function __construct(public ?string $code, public string $location, public string $language, public ?string $framework)
+    /** @param array<string, mixed> $deploymentArguments */
+    public function __construct(public ?string $code, public string $location, public string $language, public ?string $framework, public ?string $deploymentScript, public array $deploymentArguments)
     {
     }
 
@@ -20,10 +21,14 @@ final readonly class ProjectCreateRequestDto implements RequestDto
         $location = $request->body['location'] ?? null;
         $language = $request->body['language'] ?? null;
         $framework = $request->body['framework'] ?? null;
-        if (($code !== null && !is_string($code)) || !is_string($location) || !is_string($language) || ($framework !== null && !is_string($framework))) {
+        $deploymentScript = $request->body['deploymentScript'] ?? null;
+        $deploymentArguments = $request->body['deploymentArguments'] ?? [];
+        if (($code !== null && !is_string($code)) || !is_string($location) || !is_string($language) || ($framework !== null && !is_string($framework))
+            || ($deploymentScript !== null && !is_string($deploymentScript)) || !is_array($deploymentArguments) || (array_is_list($deploymentArguments) && $deploymentArguments !== [])) {
             throw new RequestValidationException('Некорректные данные проекта.');
         }
         $code = is_string($code) && trim($code) !== '' ? trim($code) : null;
-        return new static($code, $location, $language, is_string($framework) && $framework !== '' ? $framework : null);
+        $deploymentScript = is_string($deploymentScript) && $deploymentScript !== '' ? $deploymentScript : null;
+        return new static($code, $location, $language, is_string($framework) && $framework !== '' ? $framework : null, $deploymentScript, $deploymentArguments);
     }
 }
