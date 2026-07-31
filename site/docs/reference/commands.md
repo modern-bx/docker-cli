@@ -102,6 +102,47 @@ bin/docker-cli project:up my-project --no-restart
 bin/docker-cli project:list
 ```
 
+### `bin/docker-cli project:clone`
+
+Копирует файлы зарегистрированного проекта, регистрирует целевой проект и по
+умолчанию клонирует его MySQL- и PostgreSQL-базы. Исходный проект задаётся через
+`--from` или определяется по текущей директории. `--to` принимает код проекта либо
+явный путь; без явного пути каталог создаётся в расположении из настроек панели.
+
+```bash
+bin/docker-cli project:clone --from=my-project --to=my-project-copy
+bin/docker-cli project:clone --to=/home/user/projects/my-project-copy
+bin/docker-cli project:clone --to=my-project-copy --location=work
+bin/docker-cli project:clone --to=my-project-copy --here
+```
+
+`--exclude` принимает разделённые запятыми glob-шаблоны файлов, которые не нужно
+копировать. `--skip-db` отключает клонирование баз, а `--dbms=mysql,postgres`
+ограничивает список клонируемых СУБД. Опции `--here` и `--location`, как и
+`--skip-db` и `--dbms`, взаимоисключающие. `--force` очищает уже существующую
+целевую директорию, поэтому его следует использовать только после проверки пути.
+
+### `bin/docker-cli project:rename <code>`
+
+Меняет код проекта в глобальном реестре и локальном `.docker-cli/project.yaml`.
+Команду нужно запускать из директории переименовываемого проекта; сама директория
+с файлами проекта не переименовывается.
+
+```bash
+bin/docker-cli project:rename new-project-code
+```
+
+### `bin/docker-cli project:disable [project]` / `bin/docker-cli project:enable [project]`
+
+Отключает или включает web-конфигурацию зарегистрированного проекта, после чего
+пересобирает конфигурацию OpenResty и перезапускает связанные системные сервисы.
+Проект можно указать явно или определить по текущей директории.
+
+```bash
+bin/docker-cli project:disable my-project
+bin/docker-cli project:enable my-project
+```
+
 ### `bin/docker-cli project:down`
 
 Удаляет регистрацию текущего проекта.
@@ -304,6 +345,39 @@ bin/docker-cli mysql:load --force --skip-checks /mnt/fast/backups/another-projec
 использовать только когда параллельная работа с другими базами остановлена; при
 аварии MySQL во время загрузки может потребоваться пересоздание экземпляра.
 
+## Быстрые параллельные дампы PostgreSQL
+
+### `bin/docker-cli postgres:dump`
+
+Создаёт directory-бэкап PostgreSQL-базы выбранного проекта с помощью параллельного
+`pg_dump`. Проект выбирается через `--project` или по текущей директории. По
+умолчанию новый каталог создаётся в `.docker-cli/backups/postgres` и получает имя
+`<проект>-<дата>`.
+
+```bash
+bin/docker-cli postgres:dump
+bin/docker-cli postgres:dump --project=my-project --jobs=8 --path=/mnt/fast/backups
+```
+
+`--jobs` (`-j`, по умолчанию `4`) задаёт число параллельных процессов, а `--path` —
+родительскую директорию для нового бэкапа. В бэкап записывается `docker-cli.json` с
+кодом проекта и именем базы для проверки при восстановлении.
+
+### `bin/docker-cli postgres:load <path>`
+
+Удаляет и заново создаёт PostgreSQL-базу выбранного проекта, затем параллельно
+восстанавливает её из directory-бэкапа `postgres:dump`. Команда необратимо заменяет
+текущие данные и не выполняется для защищённого проекта.
+
+```bash
+bin/docker-cli postgres:load .docker-cli/backups/postgres/my-project-20260731-120000
+bin/docker-cli postgres:load --project=my-project --jobs=8 /mnt/fast/backups/my-project-20260731-120000
+```
+
+`--jobs` (`-j`, по умолчанию `4`) управляет параллелизмом `pg_restore`. Перед
+загрузкой команда проверяет наличие `toc.dat`, а при наличии `docker-cli.json` —
+соответствие проекта и базы данных.
+
 ## Пользовательские задачи
 
 Полная спецификация YAML и описание выполнения приведены в разделе [«Пользовательские задачи»](/guide/tasks).
@@ -456,6 +530,24 @@ bin/docker-cli panel:user-create
 
 ```bash
 bin/docker-cli panel:user-delete admin@example.com
+```
+
+### `bin/docker-cli panel:password-rotate <логины>`
+
+Генерирует и выводит новые пароли для перечисленных через запятую пользователей.
+После смены пароля активные токены соответствующего пользователя отзываются.
+
+```bash
+bin/docker-cli panel:password-rotate admin@example.com,developer@example.com
+```
+
+### `bin/docker-cli panel:token-revoke <логины>`
+
+Отзывает все активные токены сессий перечисленных через запятую пользователей, не
+меняя их пароли.
+
+```bash
+bin/docker-cli panel:token-revoke admin@example.com,developer@example.com
 ```
 
 Случайная соль `PANEL_PASSWORD_SALT` создаётся в системном `.env` командой `config:init`.

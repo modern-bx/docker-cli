@@ -35,7 +35,7 @@ services:
       - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
     environment:
       CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
-      DNSDOCK_ALIAS: ${BASE_HOST},dockhand.${BASE_HOST},adminer.${BASE_HOST},panel.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
+      DNSDOCK_ALIAS: ${BASE_HOST},dockhand.${BASE_HOST},adminer.${BASE_HOST},mailpit.${BASE_HOST},panel.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
     ports:
       - "${TRAEFIK_HTTP_PORT:-80}:80"
       - "${TRAEFIK_HTTPS_PORT:-443}:443"
@@ -48,6 +48,7 @@ services:
           - traefik.${BASE_HOST}
           - dockhand.${BASE_HOST}
           - adminer.${BASE_HOST}
+          - mailpit.${BASE_HOST}
           - panel.${BASE_HOST}
     restart: unless-stopped
 
@@ -128,6 +129,29 @@ services:
         aliases:
           - php-fpm-8.2
           - php-fpm-8.2.${BASE_HOST}
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: docker-cli-mailpit
+    environment:
+      DNSDOCK_NAME: mailpit
+      DNSDOCK_IMAGE: system
+      MP_DATABASE: /data/mailpit.db
+    volumes:
+      - ./data/mailpit:/data
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.mailpit.rule: Host(`mailpit.${BASE_HOST}`)
+      traefik.http.routers.mailpit.entrypoints: websecure
+      traefik.http.routers.mailpit.tls: "true"
+      traefik.http.routers.mailpit.tls.certresolver: cloudflare
+      traefik.http.services.mailpit.loadbalancer.server.port: "8025"
+    networks:
+      docker-cli:
+        aliases:
+          - mailpit
+          - mailpit.${BASE_HOST}
     restart: unless-stopped
 
   openresty:
@@ -215,7 +239,7 @@ services:
       DNSDOCK_IMAGE: system
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - dockhand-data:/app/data
+      - ./data/dockhand:/app/data
     labels:
       traefik.enable: "true"
       traefik.http.routers.dockhand.rule: Host(`dockhand.${BASE_HOST}`)
@@ -258,6 +282,5 @@ networks:
     driver: bridge
 
 volumes:
-  dockhand-data:
   traefik-letsencrypt:
   playwright-node-modules:

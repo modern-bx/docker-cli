@@ -9,11 +9,12 @@
 - `mydumper` на образе `mydumper/mydumper:v1.0.3-1` (профиль `tools`, запускается только командами дампа и загрузки);
 - `postgres` на образе `postgres:18`, актуальной стабильной ветке PostgreSQL на 12 июля 2026 года;
 - `adminer` как HTTPS web-интерфейс для работы с базами данных;
+- `mailpit` как локальный SMTP-сервер и web-интерфейс для просмотра писем;
 - `openresty` для отдачи статики зарегистрированных проектов через проектные хосты вида `web-<project-name>.${BASE_HOST}`.
 
 ## Dockhand
 
-После настройки `BASE_HOST` Dockhand доступен по адресу `https://dockhand.<ваш-домен>`. При первом открытии интерфейс предложит создать локального администратора. Данные Dockhand хранятся в именованном Docker volume `dockhand-data`.
+После настройки `BASE_HOST` Dockhand доступен по адресу `https://dockhand.<ваш-домен>`. При первом открытии интерфейс предложит создать локального администратора. Все данные Dockhand, включая настройки окружений, хранятся на хосте в `~/.config/docker-cli/compose/system/data/dockhand` и монтируются в контейнер как `/app/data`.
 
 ## MySQL, PostgreSQL и Adminer
 
@@ -25,6 +26,12 @@ MySQL и PostgreSQL не публикуют порты на хост: они д�
 - для PostgreSQL — `data/postgres/data` и `data/postgres/logs`.
 
 Adminer публикуется только через Traefik с TLS и доступен по адресу `https://adminer.<ваш-домен>`.
+
+## Mailpit
+
+Mailpit принимает почту внутри сети `docker-cli` по адресу `mailpit:1025`. PHP-FPM настроен на этот SMTP-сервер через `msmtp`, поэтому письма, отправленные стандартной функцией PHP `mail()`, автоматически попадают в Mailpit. Web-интерфейс доступен через Traefik по адресу `https://mailpit.<ваш-домен>`.
+
+База данных Mailpit со всеми письмами хранится на хосте в `~/.config/docker-cli/compose/system/data/mailpit` и монтируется в контейнер как `/data`. Благодаря этому письма сохраняются после пересоздания контейнера.
 
 ## OpenResty и проектные хосты
 
