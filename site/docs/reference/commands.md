@@ -58,13 +58,14 @@ bin/docker-cli bash --project=my-project
 `shell:bash`.
 
 ```bash
-bin/docker-cli shell:run -- php -v
-bin/docker-cli run --project=my-project composer install
-bin/docker-cli run -- ls -la
+bin/docker-cli shell:run 'php -v'
+bin/docker-cli run --project=my-project 'composer install'
+bin/docker-cli run 'echo "$USER" && ls -la | head'
 ```
 
-Разделитель `--` нужен, если у выполняемой команды есть опции, которые могут быть
-восприняты как опции `docker-cli`.
+Команда выполняется через Bash, поэтому поддерживает переменные окружения, пайпы,
+перенаправления и цепочки команд. Чтобы внешний shell не обработал выражение раньше
+контейнера, всю команду рекомендуется передавать одним аргументом в одинарных кавычках.
 
 ### `bin/docker-cli project:up [name]`
 

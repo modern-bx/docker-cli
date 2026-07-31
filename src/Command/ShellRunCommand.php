@@ -24,6 +24,6 @@ final class ShellRunCommand extends AbstractShellCommand
         /** @var list<string> $arguments */
         $arguments = $input->getArgument('args');
 
-        return $this->runInPhpFpm($input, $output, $arguments);
+        return $this->runInPhpFpm($input, $output, ['bash', '-c', implode(' ', $arguments)]);
     }
 }
