@@ -21,7 +21,7 @@ bin/docker-cli config:init --update --force --migrate --rebuild
 
 ### `bin/docker-cli config:seed`
 
-Заполняет пустые сидируемые значения в `.env`: администратора Dockge и пароли MySQL/PostgreSQL.
+Заполняет пустые сидируемые значения в `.env`: пароли MySQL/PostgreSQL.
 
 ```bash
 bin/docker-cli config:seed
