@@ -43,10 +43,28 @@ bin/docker-cli config:seed --yes
 ```bash
 bin/docker-cli shell:bash
 bin/docker-cli bash
+bin/docker-cli bash --project=my-project
 ```
 
 При запуске из зарегистрированного проекта рабочей директорией становится корень
-проекта. При запуске вне проекта оболочка открывается в `/home/docker-cli`.
+проекта. Опция `--project` позволяет явно выбрать зарегистрированный проект при
+запуске из другой директории. При запуске вне проекта и без `--project` оболочка
+открывается в `/home/docker-cli`.
+
+### `bin/docker-cli shell:run [--project=project] <args>...`
+
+Выполняет команду в контейнере `php-fpm-8.2` от имени пользователя `docker-cli`.
+Короткий алиас — `run`. Рабочая директория выбирается по тем же правилам, что и у
+`shell:bash`.
+
+```bash
+bin/docker-cli shell:run -- php -v
+bin/docker-cli run --project=my-project composer install
+bin/docker-cli run -- ls -la
+```
+
+Разделитель `--` нужен, если у выполняемой команды есть опции, которые могут быть
+восприняты как опции `docker-cli`.
 
 ### `bin/docker-cli project:up [name]`
 
