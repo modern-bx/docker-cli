@@ -51,8 +51,6 @@ final class ConfigSeedCommand extends AbstractCommand
         }
 
         $values = $this->readEnvFile($compose->envFile());
-        $this->setDefaultIfEmpty($values, 'DOCKGE_ADMIN_USERNAME', 'admin');
-        $this->setDefaultIfEmpty($values, 'DOCKGE_ADMIN_PASSWORD', $this->randomSecret());
         $this->setDefaultIfEmpty($values, 'MYSQL_ROOT_PASSWORD', $this->randomSecret());
         $this->setDefaultIfEmpty($values, 'MYSQL_PASSWORD', $this->randomSecret());
         $this->setDefaultIfEmpty($values, 'POSTGRES_PASSWORD', $this->randomSecret());
@@ -60,7 +58,6 @@ final class ConfigSeedCommand extends AbstractCommand
 
         $this->writeMessage($output, '<info>' . $this->translator->trans('command.seed.completed', [
             '%file%' => $compose->envFile(),
-            '%username%' => $values['DOCKGE_ADMIN_USERNAME'],
         ]) . '</info>');
 
         return Command::SUCCESS;
@@ -135,8 +132,6 @@ final class ConfigSeedCommand extends AbstractCommand
             'SOURCE_IMAGE_DOCKER_BUILDKIT',
             'CLOUDFLARE_DNS_API_TOKEN',
             'ACME_EMAIL',
-            'DOCKGE_ADMIN_USERNAME',
-            'DOCKGE_ADMIN_PASSWORD',
             'MYSQL_ROOT_PASSWORD',
             'MYSQL_DATABASE',
             'MYSQL_USER',

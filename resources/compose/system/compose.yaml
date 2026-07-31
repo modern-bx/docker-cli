@@ -35,7 +35,7 @@ services:
       - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
     environment:
       CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
-      DNSDOCK_ALIAS: ${BASE_HOST},dockge.${BASE_HOST},adminer.${BASE_HOST},panel.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
+      DNSDOCK_ALIAS: ${BASE_HOST},dockhand.${BASE_HOST},adminer.${BASE_HOST},panel.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
     ports:
       - "${TRAEFIK_HTTP_PORT:-80}:80"
       - "${TRAEFIK_HTTPS_PORT:-443}:443"
@@ -46,81 +46,10 @@ services:
       docker-cli:
         aliases:
           - traefik.${BASE_HOST}
-          - dockge.${BASE_HOST}
+          - dockhand.${BASE_HOST}
           - adminer.${BASE_HOST}
           - panel.${BASE_HOST}
     restart: unless-stopped
-
-  dockge-seed:
-    image: node:22-alpine
-    container_name: docker-cli-dockge-seed
-    depends_on:
-      - dockge
-    environment:
-      DOCKGE_ADMIN_USERNAME: ${DOCKGE_ADMIN_USERNAME:-admin}
-      DOCKGE_ADMIN_PASSWORD: ${DOCKGE_ADMIN_PASSWORD}
-    command:
-      - sh
-      - -ec
-      - |
-        if [ -z "$${DOCKGE_ADMIN_PASSWORD}" ]; then
-          echo "DOCKGE_ADMIN_PASSWORD is empty. Run docker-cli config:seed before start." >&2
-          exit 1
-        fi
-
-        cd /tmp
-        npm --silent --no-update-notifier --no-fund install socket.io-client@4
-        node <<'NODE'
-        const { io } = require("socket.io-client");
-
-        const username = process.env.DOCKGE_ADMIN_USERNAME || "admin";
-        const password = process.env.DOCKGE_ADMIN_PASSWORD;
-        const socket = io("http://dockge:5001", {
-          reconnectionAttempts: 30,
-          reconnectionDelay: 1000,
-          timeout: 5000,
-          transports: ["websocket", "polling"],
-        });
-
-        const finish = (code, message) => {
-          if (message) {
-            console.log(message);
-          }
-          socket.close();
-          process.exit(code);
-        };
-
-        socket.on("connect", () => {
-          socket.timeout(10000).emit("setup", username, password, (error, response) => {
-            if (error) {
-              finish(1, `Dockge setup request failed: $${error.message || error}`);
-              return;
-            }
-
-            if (response && response.ok) {
-              finish(0, `Dockge admin user '$${username}' has been created.`);
-              return;
-            }
-
-            const message = String((response && (response.msg || response.error)) || "");
-            if (message.toLowerCase().includes("initialized")) {
-              finish(0, "Dockge has already been initialized; seed skipped.");
-              return;
-            }
-
-            finish(1, `Dockge setup failed: $${message || JSON.stringify(response)}`);
-          });
-        });
-
-        socket.on("connect_error", (error) => {
-          console.log(`Waiting for Dockge: $${error.message}`);
-        });
-
-        setTimeout(() => finish(1, "Dockge setup timed out."), 45000);
-        NODE
-    networks:
-      docker-cli:
-    restart: "no"
 
   mysql:
     image: mysql:8.0
@@ -278,23 +207,21 @@ services:
       docker-cli:
     restart: unless-stopped
 
-  dockge:
-    image: louislam/dockge:1
-    container_name: docker-cli-dockge
+  dockhand:
+    image: fnsys/dockhand:latest
+    container_name: docker-cli-dockhand
     environment:
-      DOCKGE_STACKS_DIR: /opt/stacks
-      DNSDOCK_NAME: dockge-app
+      DNSDOCK_NAME: dockhand-app
       DNSDOCK_IMAGE: system
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - dockge-data:/app/data
-      - ./stacks:/opt/stacks
+      - dockhand-data:/app/data
     labels:
       traefik.enable: "true"
-      traefik.http.routers.dockge.rule: Host(`dockge.${BASE_HOST}`)
-      traefik.http.routers.dockge.entrypoints: websecure
-      traefik.http.routers.dockge.tls.certresolver: cloudflare
-      traefik.http.services.dockge.loadbalancer.server.port: "5001"
+      traefik.http.routers.dockhand.rule: Host(`dockhand.${BASE_HOST}`)
+      traefik.http.routers.dockhand.entrypoints: websecure
+      traefik.http.routers.dockhand.tls.certresolver: cloudflare
+      traefik.http.services.dockhand.loadbalancer.server.port: "3000"
     networks:
       docker-cli:
     restart: unless-stopped
@@ -331,6 +258,6 @@ networks:
     driver: bridge
 
 volumes:
-  dockge-data:
+  dockhand-data:
   traefik-letsencrypt:
   playwright-node-modules:

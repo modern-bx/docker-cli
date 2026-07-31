@@ -27,8 +27,6 @@ bin/docker-cli config:seed
 
 Команда спросит подтверждение и заполнит только пустые сидируемые значения в `.env`. Сейчас она заполняет:
 
-- `DOCKGE_ADMIN_USERNAME=admin`;
-- случайный `DOCKGE_ADMIN_PASSWORD`;
 - случайные пароли `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` и `POSTGRES_PASSWORD`.
 
 Уже заполненные значения не меняются. Имена баз и пользователей MySQL/PostgreSQL предзаполнены в `.env` значением `system`, их можно поменять вручную до первого запуска.

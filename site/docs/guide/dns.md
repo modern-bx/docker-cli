@@ -28,22 +28,22 @@ sudo resolvectl flush-caches
 
 ```bash
 resolvectl status
-resolvectl query dockge.dev.example.com
+resolvectl query dockhand.dev.example.com
 ```
 
-Ожидаемо `resolvectl query dockge.dev.example.com` должен вернуть IP контейнера `traefik`, а не публичный wildcard-адрес из Cloudflare.
+Ожидаемо `resolvectl query dockhand.dev.example.com` должен вернуть IP контейнера `traefik`, а не публичный wildcard-адрес из Cloudflare.
 
 Для прямой проверки dnsdock используйте:
 
 ```bash
-dig @172.17.0.1 dockge.dev.example.com
+dig @172.17.0.1 dockhand.dev.example.com
 ```
 
 Во всех примерах замените `dev.example.com` на своё значение `BASE_HOST`. Если домен ещё не подготовлен, начните с раздела [Настройка домена в Cloudflare](./cloudflare.md).
 
 ## Firefox
 
-Если `resolvectl query dockge.dev.example.com` возвращает IP Traefik, но Firefox открывает другой хост или публичный IP, проверьте:
+Если `resolvectl query dockhand.dev.example.com` возвращает IP Traefik, но Firefox открывает другой хост или публичный IP, проверьте:
 
 - расширения VPN/proxy, например FoxyProxy, SwitchyOmega, корпоративные VPN-расширения и похожие инструменты;
 - настройки `Settings → General → Network Settings`: для диагностики выберите `No proxy`;
@@ -56,9 +56,9 @@ dig @172.17.0.1 dockge.dev.example.com
 Если Firefox установлен как snap, сравните резолв внутри и снаружи snap:
 
 ```bash
-getent hosts dockge.dev.example.com
+getent hosts dockhand.dev.example.com
 snap run --shell firefox
-getent hosts dockge.dev.example.com
+getent hosts dockhand.dev.example.com
 cat /etc/resolv.conf
 ```
 
@@ -77,8 +77,8 @@ cat /etc/resolv.conf
 Для Chromium в snap выполните аналогичную проверку snap-окружения:
 
 ```bash
-getent hosts dockge.dev.example.com
+getent hosts dockhand.dev.example.com
 snap run --shell chromium
-getent hosts dockge.dev.example.com
+getent hosts dockhand.dev.example.com
 cat /etc/resolv.conf
 ```
