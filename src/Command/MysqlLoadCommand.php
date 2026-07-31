@@ -73,7 +73,11 @@ final class MysqlLoadCommand extends AbstractCommand
             return Command::FAILURE;
         }
         if ($code === Command::SUCCESS) {
-            $this->writeMessage($output, sprintf('<info>База "%s" восстановлена из "%s".</info>', $database, $path));
+            CommandContext::fromEnvironment($this, $output)->addMessage(new Message(
+                sprintf('База "%s" проекта "%s" восстановлена из бэкапа "%s".', $database, $project, basename($path)),
+                MessageLevel::Info,
+                notify: true,
+            ));
         }
         return $code;
     }

@@ -1,10 +1,10 @@
 <script>
   import { onMount } from 'svelte';
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
-  import { createPanelUser, createProject, deletePanelUser, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { createPanelUser, createProject, deletePanelUser, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -129,6 +129,9 @@
   let backupsLoading = false;
   let backupFilterTimer = null;
   let backupRequestId = 0;
+  let backupContextMenu = null;
+  let backupRestoreConfirmation = null;
+  let backupRestorePending = false;
   const backupCompositionOptions = [{ value: 'all', label: 'Любой состав' }, { value: 'database', label: 'БД' }, { value: 'files', label: 'Файлы' }, { value: 'database-files', label: 'БД и файлы' }];
   const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }];
   const backupCompositionCollection = useListCollection({ items: backupCompositionOptions });
@@ -364,6 +367,37 @@
     backupSort = field;
     backupPage = 1;
     loadProjectBackups();
+  }
+
+  function openBackupContextMenu(event, backup) {
+    if (event.ctrlKey) { backupContextMenu = null; return; }
+    event.preventDefault();
+    event.stopPropagation();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
+    const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.bottom;
+    backupContextMenu = {
+      backup,
+      x: Math.max(8, Math.min(x, window.innerWidth - 184)),
+      y: Math.max(8, Math.min(y, window.innerHeight - 64)),
+    };
+  }
+
+  async function restoreBackup() {
+    if (!backupRestoreConfirmation || !selectedProjectName) return;
+    const backup = backupRestoreConfirmation;
+    backupRestoreConfirmation = null;
+    backupRestorePending = true;
+    try {
+      await restoreProjectBackup(api, selectedProjectName, backup.name);
+      notifyQueuedOperation(`Восстановление бэкапа «${backup.name}»`);
+    } catch (cause) {
+      errorTitle = 'Не удалось восстановить бэкап';
+      error = cause instanceof Error ? cause.message : 'Не удалось поставить восстановление бэкапа в очередь.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      backupRestorePending = false;
+    }
   }
 
   function formatBytes(value) {
@@ -729,8 +763,10 @@
   function closeMenus(event) {
     if (event.target instanceof Element && event.target.closest('.project-context-menu')) return;
     if (event.target instanceof Element && event.target.closest('.user-context-menu')) return;
+    if (event.target instanceof Element && event.target.closest('.backup-context-menu')) return;
     projectContextMenu = null;
     userContextMenu = null;
+    backupContextMenu = null;
     if (event.target instanceof Element && event.target.closest('.header-menu')) return;
     themeOpen = false;
     notificationsOpen = false;
@@ -1193,7 +1229,7 @@
 
 <svelte:window
   onclick={closeMenus}
-  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; notificationsOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; } }}
+  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; notificationsOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; backupContextMenu = null; } }}
 />
 
 <svelte:head><title>{authenticated ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
@@ -1518,12 +1554,12 @@
                     <BackupDateFilter label="Дата до" value={backupDateTo} onchange={(value) => changeBackupFilter('dateTo', value)} />
                   </div>
                   <div class="log-table-wrap card preset-filled-surface-100-900">
-                    <table class="table log-table backup-table">
-                      <thead><tr>{#each [['name', 'Название'], ['date', 'Дата'], ['composition', 'Состав'], ['size', 'Размер'], ['database', 'Тип СУБД']] as [field, label]}<th><button type="button" onclick={() => sortBackups(field)}>{label}<span aria-hidden="true">{backupSort === field ? (backupDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
+                    <table class="table table-zebra log-table backup-table">
+                      <thead><tr><th class="backup-menu-column"><span class="sr-only">Действия</span></th>{#each [['name', 'Название'], ['date', 'Дата'], ['composition', 'Состав'], ['size', 'Размер'], ['database', 'Тип СУБД']] as [field, label]}<th><button type="button" onclick={() => sortBackups(field)}>{label}<span aria-hidden="true">{backupSort === field ? (backupDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
                       <tbody>
-                        {#if backupsLoading}<tr><td colspan="5" class="log-empty animate-pulse">Загрузка…</td></tr>
-                        {:else if backupItems.length === 0}<tr><td colspan="5" class="log-empty">Бэкапы не найдены</td></tr>
-                        {:else}{#each backupItems as item}<tr><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td></tr>{/each}{/if}
+                        {#if backupsLoading}<tr><td colspan="6" class="log-empty animate-pulse">Загрузка…</td></tr>
+                        {:else if backupItems.length === 0}<tr><td colspan="6" class="log-empty">Бэкапы не найдены</td></tr>
+                        {:else}{#each backupItems as item}<tr oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td></tr>{/each}{/if}
                       </tbody>
                     </table>
                   </div>
@@ -1558,7 +1594,7 @@
                     {/each}
                   </div>
                   <div class="log-table-wrap card preset-filled-surface-100-900">
-                    <table class="table log-table project-log-table">
+                    <table class="table table-zebra log-table project-log-table">
                       <thead><tr>{#each [['timestamp', 'Время'], ['queueItem', 'Элемент очереди'], ['itemCode', 'Код элемента'], ['queueCode', 'Очередь'], ['status', 'Статус'], ['taskCode', 'Задача'], ['level', 'Уровень'], ['context', 'Контекст'], ['result', 'Результат'], ['message', 'Сообщение']] as [field, label]}<th><button type="button" onclick={() => sortLogs(field)}>{label}<span aria-hidden="true">{logSort === field ? (logDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
                       <tbody>
                         {#if logsLoading}<tr><td colspan="10" class="log-empty animate-pulse">Загрузка…</td></tr>
@@ -1612,7 +1648,7 @@
               {/each}
             </div>
             <div class="log-table-wrap card preset-filled-surface-100-900">
-              <table class="table log-table">
+              <table class="table table-zebra log-table">
                 <thead><tr>
                   {#each [['timestamp', 'Время'], ['queueItem', 'Элемент очереди'], ['itemCode', 'Код элемента'], ['project', 'Проект'], ['queueCode', 'Очередь'], ['status', 'Статус'], ['taskCode', 'Задача'], ['level', 'Уровень'], ['context', 'Контекст'], ['result', 'Результат'], ['message', 'Сообщение']] as [field, label]}
                     <th><button type="button" onclick={() => sortLogs(field)}>{label}<span aria-hidden="true">{logSort === field ? (logDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>
@@ -1680,7 +1716,7 @@
                 <button class="btn preset-filled-primary-500" type="button" onclick={() => { userDialog = { create: true, login: '', comments: '' }; }}><Plus size={16} aria-hidden="true" />Добавить</button>
               </div>
               <div class="users-table-wrap card preset-filled-surface-100-900">
-                <table class="table users-table">
+                <table class="table table-zebra users-table">
                   <thead><tr><th>Логин</th><th>Комментарии</th><th aria-label="Действия"></th></tr></thead>
                   <tbody>
                     {#if usersLoading}<tr><td colspan="3" class="log-empty animate-pulse">Загрузка…</td></tr>
@@ -1733,6 +1769,12 @@
   <div class="user-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${userContextMenu.x}px;top:${userContextMenu.y}px`} role="menu">
     <button type="button" role="menuitem" onclick={() => { userDialog = { create: false, ...userContextMenu.user }; userContextMenu = null; }}>Изменить</button>
     <button class="danger" type="button" role="menuitem" onclick={() => { userDeleteConfirmation = userContextMenu.user; userContextMenu = null; }}>Удалить</button>
+  </div>
+{/if}
+
+{#if backupContextMenu}
+  <div class="backup-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${backupContextMenu.x}px;top:${backupContextMenu.y}px`} role="menu" aria-label={`Действия с бэкапом ${backupContextMenu.backup.name}`}>
+    <button type="button" role="menuitem" onclick={() => { backupRestoreConfirmation = backupContextMenu.backup; backupContextMenu = null; }}><Undo2 size={16} aria-hidden="true" />Восстановить</button>
   </div>
 {/if}
 
@@ -1881,6 +1923,22 @@
       <Dialog.Description class="login-error-description">{queuedOperationNotice}</Dialog.Description>
       <div class="login-error-actions">
         <Dialog.CloseTrigger class="btn preset-filled-primary-500" type="button">ОК</Dialog.CloseTrigger>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(backupRestoreConfirmation)} onOpenChange={({ open }) => { if (!open && !backupRestorePending) backupRestoreConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Восстановить бэкап?</Dialog.Title>
+      <Dialog.Description class="login-error-description">
+        Текущая MySQL-база проекта «{selectedProjectName}» будет полностью заменена данными из бэкапа «{backupRestoreConfirmation?.name}».
+      </Dialog.Description>
+      <div class="login-error-actions system-confirm-actions">
+        <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
+        <button class="btn preset-filled-error-500" type="button" disabled={backupRestorePending} onclick={restoreBackup}>Восстановить</button>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>

@@ -41,6 +41,10 @@ export async function getProjectBackups(request, project, parameters) {
   return request(`/api/projects/${encodeURIComponent(project)}/backups?${new URLSearchParams(parameters)}`);
 }
 
+export async function restoreProjectBackup(request, project, backup) {
+  return request(`/api/projects/${encodeURIComponent(project)}/backups/${encodeURIComponent(backup)}/restore`, { method: 'POST' });
+}
+
 export async function createProject(request, project) {
   return request('/api/projects', { method: 'POST', body: JSON.stringify(project) });
 }

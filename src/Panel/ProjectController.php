@@ -10,7 +10,9 @@ use DockerCli\Panel\Dto\ProjectListDto;
 use DockerCli\Panel\Dto\ConceptDto;
 use DockerCli\Panel\Dto\ProjectOptionsDto;
 use DockerCli\Panel\Dto\ProjectBackupListDto;
+use DockerCli\Panel\Dto\QueuedOperationDto;
 use DockerCli\Panel\Dto\Request\ProjectBackupListRequestDto;
+use DockerCli\Panel\Dto\Request\ProjectBackupRestoreRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectCreateRequestDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectActionRequestDto;
@@ -137,6 +139,34 @@ final class ProjectController
         $total = count($items);
         $items = array_slice($items, ($request->page - 1) * $request->pageSize, $request->pageSize);
         return new ProjectBackupListDto($items, $total, $request->page, $request->pageSize);
+    }
+
+    #[Route('POST', '/api/projects/{name}/backups/{backup}/restore', ProjectBackupRestoreRequestDto::class, QueuedOperationDto::class)]
+    public function restoreBackup(ProjectBackupRestoreRequestDto $request): QueuedOperationDto
+    {
+        if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
+        if ($this->projects->isProjectProtected($request->name)) throw new ProjectActionException('Проект защищен.', 409);
+        $config = $this->projects->readProjectConfig($request->name);
+        $root = $config['data']['project']['root'] ?? null;
+        if (!is_string($root) || $root === '') throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
+
+        $backupRoot = realpath(join_path($root, '.docker-cli', 'backups', 'mysql'));
+        $backup = $backupRoot === false ? false : realpath(join_path($backupRoot, $request->backup));
+        if ($backup === false || !is_dir($backup) || !str_starts_with($backup . DIRECTORY_SEPARATOR, $backupRoot . DIRECTORY_SEPARATOR)) {
+            throw new ProjectActionException('Бэкап не найден.', 404);
+        }
+
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
+            'code' => 'core.mysql.load',
+            'arguments' => ['path' => ['value' => $backup]],
+            'project' => $request->name,
+        ]]]];
+        try {
+            $file = ($this->queues ?? new QueueRepository())->create('default', 'core.mysql.load', $item);
+        } catch (\InvalidArgumentException|\RuntimeException $exception) {
+            throw new ProjectActionException($exception->getMessage(), 500);
+        }
+        return new QueuedOperationDto($file);
     }
 
     private const FRAMEWORK_NAMES = ['symfony' => 'Symfony', 'laravel' => 'Laravel', 'bitrix' => 'Bitrix', 'bitrix24' => 'Bitrix24'];
