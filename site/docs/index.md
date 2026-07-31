@@ -7,7 +7,7 @@
 - Инициализация системной конфигурации в `~/.config/docker-cli/compose/system`.
 - Seed секретов и параметров окружения.
 - Регистрация Laravel, Symfony, Bitrix и Bitrix24 проектов.
-- Системный compose-стек с Traefik, dnsdock, Dockhand, MySQL, PostgreSQL, Adminer и OpenResty.
+- Системный compose-стек с Traefik, dnsdock, Dockhand, MySQL, PostgreSQL, Adminer, Mailpit и OpenResty.
 - Сборка и публикация кастомных образов.
 - Настройка Xdebug с отдельным IDE-портом на каждый проект.
 
