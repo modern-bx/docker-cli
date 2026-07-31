@@ -27,6 +27,7 @@ final class SystemdService
         if ($user !== null) {
             $service[] = 'User=' . $user;
         }
+        $service[] = 'Environment=' . $this->escapeArgument('PATH=' . $this->servicePath($binary));
         $service[] = 'ExecStart=' . implode(' ', array_map($this->escapeArgument(...), [
             $binary,
             'queue:start',
@@ -113,5 +114,17 @@ final class SystemdService
     private function escapeArgument(string $argument): string
     {
         return '"' . str_replace(['\\', '"', '%'], ['\\\\', '\\"', '%%'], $argument) . '"';
+    }
+
+    private function servicePath(string $binary): string
+    {
+        $path = getenv('PATH');
+        $directories = is_string($path) ? explode(PATH_SEPARATOR, $path) : [];
+        array_unshift($directories, dirname($binary));
+
+        return implode(PATH_SEPARATOR, array_values(array_unique(array_filter(
+            $directories,
+            static fn (string $directory): bool => $directory !== '',
+        ))));
     }
 }

@@ -366,6 +366,8 @@ sudo bin/docker-cli queue:start -d --queue=notifications --user=www-data --path=
 systemctl status docker-cli.queue.notifications
 ```
 
+Каталог бинарника из `--path` добавляется в `PATH` сервиса, чтобы задачи могли запускать команду `docker-cli` по имени.
+
 ### `bin/docker-cli queue:stop [--queue=<queue-code>]`
 
 Останавливает и отключает systemd-сервис выбранной очереди, удаляет unit-файл и обновляет конфигурацию systemd. По умолчанию используется очередь `default`. Если сервис не установлен, команда завершается с ошибкой.
