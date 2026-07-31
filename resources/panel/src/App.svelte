@@ -1596,7 +1596,7 @@
                   </div>
                   <div class="log-table-wrap card preset-filled-surface-100-900">
                     <table class="table table-zebra log-table backup-table">
-                      <thead><tr><th class="backup-menu-column"><span class="sr-only">Действия</span></th>{#each [['name', 'Название'], ['date', 'Дата'], ['composition', 'Состав'], ['size', 'Размер'], ['database', 'Тип СУБД']] as [field, label]}<th><button type="button" onclick={() => sortBackups(field)}>{label}<span aria-hidden="true">{backupSort === field ? (backupDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
+                      <thead><tr><th class="backup-menu-column"><button class="backup-refresh-trigger" type="button" disabled={backupsLoading} aria-label="Обновить список бэкапов" title="Обновить" onclick={loadProjectBackups}><RotateCw size={17} class={backupsLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th>{#each [['name', 'Название'], ['date', 'Дата'], ['composition', 'Состав'], ['size', 'Размер'], ['database', 'Тип СУБД']] as [field, label]}<th><button type="button" onclick={() => sortBackups(field)}>{label}<span aria-hidden="true">{backupSort === field ? (backupDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
                       <tbody>
                         {#if backupsLoading}<tr><td colspan="6" class="log-empty animate-pulse">Загрузка…</td></tr>
                         {:else if backupItems.length === 0}<tr><td colspan="6" class="log-empty">Бэкапы не найдены</td></tr>
