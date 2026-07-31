@@ -6,6 +6,8 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Config\SystemCompose;
+use DockerCli\Framework\Description\FrameworkDescriptionService;
+use DockerCli\Framework\FrameworkDetectionService;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\DataInitializer;
@@ -26,15 +28,18 @@ final class ProjectUpCommand extends AbstractCommand
 {
     use DockerComposeRunner;
 
-    public function __construct(private readonly ?CommandContext $context = null)
-    {
+    public function __construct(
+        private readonly ?FrameworkDetectionService $detectionService = null,
+        private readonly ?FrameworkDescriptionService $descriptionService = null,
+        private readonly ?CommandContext $context = null,
+    ) {
         parent::__construct('project:up');
         $this->setDescription('Зарегистрировать проект docker-cli.');
         $this->addArgument('project-name', InputArgument::OPTIONAL, 'Имя проекта. По умолчанию используется нормализованное имя директории проекта.');
         $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
         $this->addOption('force', null, InputOption::VALUE_NONE, 'Зарегистрировать проект, даже если фреймворк не удалось определить.');
         $this->addOption('language', null, InputOption::VALUE_REQUIRED, 'Код языка проекта.');
-        $this->addOption('framework', null, InputOption::VALUE_REQUIRED, 'Код фреймворка. Если не указан, проект регистрируется без фреймворка.');
+        $this->addOption('framework', null, InputOption::VALUE_REQUIRED, 'Код фреймворка. Если не указан, фреймворк определяется автоматически.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -44,9 +49,12 @@ final class ProjectUpCommand extends AbstractCommand
         if ($languageCode !== null && $languageCode !== 'php' || $frameworkCode !== null && !in_array($frameworkCode, ['symfony', 'laravel', 'bitrix', 'bitrix24'], true)) {
             $this->writeMessage($output, '<error>Указан неподдерживаемый язык или фреймворк.</error>'); return Command::FAILURE;
         }
+        $framework = $frameworkCode === null
+            ? ($this->detectionService ?? FrameworkDetectionService::createDefault())->detect()
+            : null;
         $registry = new ProjectRegistry();
         $projectsDirectory = $registry->projectsDirectory();
-        $projectRoot = (string) getcwd();
+        $projectRoot = $framework?->getProjectRoot() ?? (string) getcwd();
         $projectName = $this->resolveProjectName($input, $output, $projectRoot, $projectsDirectory);
         if (!$this->isValidProjectName($projectName)) {
             $this->writeMessage($output, sprintf('<error>Имя проекта "%s" не соответствует конвенции: используйте строчные латинские буквы, цифры и дефисы; имя должно начинаться и заканчиваться буквой или цифрой.</error>', $projectName));
@@ -74,7 +82,12 @@ final class ProjectUpCommand extends AbstractCommand
             return Command::FAILURE;
         }
 
-        $documentRoot = $frameworkCode !== null && in_array($frameworkCode, ['symfony', 'laravel'], true) ? join_path($projectRoot, 'public') : $projectRoot;
+        $description = $framework === null
+            ? null
+            : ($this->descriptionService ?? new FrameworkDescriptionService())->describe($framework);
+        $frameworkCode ??= $description?->getCodeName()->value;
+        $documentRoot = $framework?->getDocumentRoot()
+            ?? (in_array($frameworkCode, ['symfony', 'laravel'], true) ? join_path($projectRoot, 'public') : $projectRoot);
 
         if ($frameworkCode === null) {
             $this->writeMessage($output, '<comment>Фреймворк проекта не определен; проект будет зарегистрирован с базовой веб-конфигурацией.</comment>');
