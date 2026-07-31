@@ -187,7 +187,8 @@ services:
     volumes:
       - ./config/php-fpm-8.2/php/conf.d:/docker-cli/php/conf.d:ro
       - ./config/php-fpm-8.2/php-fpm.d:/docker-cli/php-fpm.d:ro
-      - /home:/home
+      - ${HOME}:${HOME}
+      - ${HOME}:/home/docker-cli
       - /:/host
     extra_hosts:
       - "host.docker.internal:host-gateway"

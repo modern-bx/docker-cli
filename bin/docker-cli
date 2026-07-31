@@ -49,9 +49,24 @@ use DockerCli\Command\QueueResumeCommand;
 use DockerCli\Command\QueueItemCreateCommand;
 use DockerCli\Command\QueueListCommand;
 use DockerCli\Command\QueueItemDeleteCommand;
+use DockerCli\Command\ShellBashCommand;
+use DockerCli\Command\ShellRunCommand;
 use Symfony\Component\Console\Application;
 
 require __DIR__ . '/../vendor/autoload.php';
+
+$separator = array_search('--', $argv, true);
+$usesDefaultCommand = is_int($separator) && $separator > 0;
+foreach ($usesDefaultCommand ? array_slice($argv, 1, $separator - 1) : [] as $argument) {
+    if (!str_starts_with($argument, '-')) {
+        $usesDefaultCommand = false;
+        break;
+    }
+}
+if ($usesDefaultCommand) {
+    array_splice($argv, 1, 0, ['shell:run']);
+    $_SERVER['argv'] = $argv;
+}
 
 $application = new Application('docker-cli', '0.1.0');
 $application->add(new ConfigInitCommand());
@@ -102,5 +117,7 @@ $application->add(new QueueResumeCommand());
 $application->add(new QueueItemCreateCommand());
 $application->add(new QueueListCommand());
 $application->add(new QueueItemDeleteCommand());
-$application->setDefaultCommand('list');
+$application->add(new ShellBashCommand());
+$application->add(new ShellRunCommand());
+$application->setDefaultCommand('shell:run');
 $application->run();

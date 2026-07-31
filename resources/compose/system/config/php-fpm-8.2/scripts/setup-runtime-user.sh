@@ -36,9 +36,9 @@ user_name="$(awk -F: -v uid="${target_uid}" '$3 == uid { print $1; exit }' /etc/
 if [ -z "${user_name}" ]; then
     user_name=docker-cli
     if command -v useradd >/dev/null 2>&1; then
-        useradd --uid "${target_uid}" --gid "${group_name}" --no-create-home --shell /usr/sbin/nologin "${user_name}"
+        useradd --uid "${target_uid}" --gid "${group_name}" --home-dir /home/docker-cli --create-home --shell /bin/bash "${user_name}"
     else
-        adduser -D -H -u "${target_uid}" -G "${group_name}" "${user_name}"
+        adduser -D -h /home/docker-cli -s /bin/sh -u "${target_uid}" -G "${group_name}" "${user_name}"
     fi
 fi
 

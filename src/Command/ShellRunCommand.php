@@ -1,0 +1,42 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DockerCli\Command;
+
+use DockerCli\Project\ProjectRegistry;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+
+final class ShellRunCommand extends AbstractShellCommand
+{
+    public function __construct(?ProjectRegistry $registry = null)
+    {
+        parent::__construct('shell:run', $registry);
+        $this->setAliases(['run']);
+        $this->setDescription('Выполнить команду в контейнере PHP-FPM от имени пользователя docker-cli.');
+        $this->addArgument('args', InputArgument::IS_ARRAY, 'Команда и её аргументы.');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        /** @var list<string> $arguments */
+        $arguments = $input->getArgument('args');
+        if ($arguments === []) {
+            $this->writeMessage($output, '<error>Укажите команду для выполнения в контейнере.</error>');
+
+            return self::INVALID;
+        }
+
+        return $this->runInPhpFpm($input, $output, [
+            'bash',
+            '--noprofile',
+            '--norc',
+            '-c',
+            'if [[ -f /home/docker-cli/.docker-cli.profile ]]; then source /home/docker-cli/.docker-cli.profile; fi; eval "$1"',
+            'docker-cli-run',
+            implode(' ', $arguments),
+        ]);
+    }
+}
