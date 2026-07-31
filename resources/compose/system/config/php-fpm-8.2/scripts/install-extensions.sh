@@ -14,6 +14,7 @@ apt-get install -y --no-install-recommends \
     libssl-dev \
     libxml2-dev \
     libzip-dev \
+    msmtp \
     zlib1g-dev
 
 docker-php-ext-configure gd --with-freetype --with-jpeg

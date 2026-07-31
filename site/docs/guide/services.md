@@ -9,6 +9,7 @@
 - `mydumper` на образе `mydumper/mydumper:v1.0.3-1` (профиль `tools`, запускается только командами дампа и загрузки);
 - `postgres` на образе `postgres:18`, актуальной стабильной ветке PostgreSQL на 12 июля 2026 года;
 - `adminer` как HTTPS web-интерфейс для работы с базами данных;
+- `mailpit` как локальный SMTP-сервер и web-интерфейс для просмотра писем;
 - `openresty` для отдачи статики зарегистрированных проектов через проектные хосты вида `web-<project-name>.${BASE_HOST}`.
 
 ## Dockhand
@@ -25,6 +26,10 @@ MySQL и PostgreSQL не публикуют порты на хост: они д�
 - для PostgreSQL — `data/postgres/data` и `data/postgres/logs`.
 
 Adminer публикуется только через Traefik с TLS и доступен по адресу `https://adminer.<ваш-домен>`.
+
+## Mailpit
+
+Mailpit принимает почту внутри сети `docker-cli` по адресу `mailpit:1025`. PHP-FPM настроен на этот SMTP-сервер через `msmtp`, поэтому письма, отправленные стандартной функцией PHP `mail()`, автоматически попадают в Mailpit. Web-интерфейс доступен через Traefik по адресу `https://mailpit.<ваш-домен>`.
 
 ## OpenResty и проектные хосты
 
