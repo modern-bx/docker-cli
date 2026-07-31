@@ -106,5 +106,5 @@ $application->add(new QueueListCommand());
 $application->add(new QueueItemDeleteCommand());
 $application->add(new ShellBashCommand());
 $application->add(new ShellRunCommand());
-$application->setDefaultCommand('list');
+$application->setDefaultCommand('shell:run');
 $application->run();

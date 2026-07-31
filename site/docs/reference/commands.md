@@ -58,8 +58,8 @@ bin/docker-cli bash --project=my-project
 ### `bin/docker-cli shell:run [--project=project] <args>...`
 
 Выполняет команду в контейнере `php-fpm-8.2` от имени пользователя `docker-cli`.
-Короткий алиас — `run`. Рабочая директория выбирается по тем же правилам, что и у
-`shell:bash`.
+Короткий алиас — `run`; это также команда `docker-cli` по умолчанию. Рабочая
+директория выбирается по тем же правилам, что и у `shell:bash`.
 
 ```bash
 bin/docker-cli shell:run 'php -v'
