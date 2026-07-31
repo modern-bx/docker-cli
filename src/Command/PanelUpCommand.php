@@ -25,6 +25,7 @@ use DockerCli\Panel\UserRepository;
 use DockerCli\Panel\WebSocket\PanelStateChannel;
 use DockerCli\Project\ProjectRegistry;
 use DockerCli\Queue\QueueRepository;
+use DockerCli\Task\TaskRepository;
 use React\EventLoop\Loop;
 use React\Http\HttpServer;
 use React\Socket\SocketServer;
@@ -105,7 +106,7 @@ final class PanelUpCommand extends AbstractCommand
         $projectsSettings = new \DockerCli\Panel\ProjectsSettingsRepository();
         $tokens = new JwtTokenService($jwtSecret, $tokenRepository, $securitySettings);
         $queues = new QueueRepository();
-        $projects = new ProjectController(new ProjectRegistry(), $compose, $queues, new ProjectsSettingsRepository());
+        $projects = new ProjectController(new ProjectRegistry(), $compose, $queues, new ProjectsSettingsRepository(), new TaskRepository());
         $system = new SystemController($compose);
         $queue = new QueueController($queues);
         $notifications = new NotificationController(new NotificationRepository());

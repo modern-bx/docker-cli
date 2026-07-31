@@ -110,10 +110,11 @@
   let projectAddDialog = null;
   let projectRenameDialog = null;
   let projectRenaming = false;
-  let projectAddOptions = { locations: [], languages: [], frameworks: {} };
+  let projectAddOptions = { locations: [], languages: [], frameworks: {}, deploymentScripts: [] };
   let projectLocationCollection = useListCollection({ items: [] });
   let projectLanguageCollection = useListCollection({ items: [] });
   let projectFrameworkCollection = useListCollection({ items: [] });
+  let projectDeploymentCollection = useListCollection({ items: [] });
   let projectAdding = false;
   let backupItems = [];
   let backupTotal = 0;
@@ -182,9 +183,11 @@
       : notifications.some((item) => item.level === 'warn')
       ? 'warn'
       : notifications.some((item) => item.level === 'info') ? 'info' : 'debug';
-  $: projectLocationCollection = useListCollection({ items: projectAddOptions.locations.map((item) => ({ value: item.code, label: `${item.code} — ${item.path}` })) });
+  $: projectLocationCollection = useListCollection({ items: projectAddOptions.locations.map((item) => ({ value: item.code, label: item.code })) });
   $: projectLanguageCollection = useListCollection({ items: projectAddOptions.languages.map((item) => ({ value: item.code, label: item.name })) });
   $: projectFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectAddDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
+  $: projectDeploymentCollection = useListCollection({ items: [{ value: '', label: 'Не использовать' }, ...projectAddOptions.deploymentScripts.map((item) => ({ value: item.code, label: item.name }))] });
+  $: selectedDeploymentScript = projectAddOptions.deploymentScripts.find((item) => item.code === projectAddDialog?.deploymentScript) || null;
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
   $: if (selectedProject && selectedProject.name !== notesProjectName) {
@@ -860,11 +863,26 @@
       projectAddOptions = await getProjectOptions(api);
       const location = projectAddOptions.locations.find((item) => item.default) || projectAddOptions.locations[0];
       const language = projectAddOptions.languages[0];
-      projectAddDialog = { code: '', location: location?.code || '', language: language?.code || '', framework: projectAddOptions.frameworks[language?.code]?.[0]?.code || '' };
+      projectAddDialog = { code: '', location: location?.code || '', language: language?.code || '', framework: projectAddOptions.frameworks[language?.code]?.[0]?.code || '', deploymentScript: '', deploymentArguments: {} };
     } catch (cause) {
       errorTitle = 'Не удалось открыть добавление проекта';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить параметры проекта.';
     }
+  }
+
+  function selectDeploymentScript(code) {
+    const script = projectAddOptions.deploymentScripts.find((item) => item.code === code);
+    const deploymentArguments = {};
+    for (const [name, parameter] of Object.entries(script?.parameters || {})) {
+      if ('default' in parameter) deploymentArguments[name] = parameter.default;
+      else if (parameter.type === 'boolean') deploymentArguments[name] = false;
+      else deploymentArguments[name] = '';
+    }
+    projectAddDialog = { ...projectAddDialog, deploymentScript: code, deploymentArguments };
+  }
+
+  function setDeploymentArgument(name, value) {
+    projectAddDialog = { ...projectAddDialog, deploymentArguments: { ...projectAddDialog.deploymentArguments, [name]: value } };
   }
 
   async function addProject() {
@@ -1931,9 +1949,28 @@
       <Dialog.Title class="login-error-title">Добавить проект</Dialog.Title>
       <form class="project-add-form" onsubmit={(event) => { event.preventDefault(); addProject(); }}>
         <label class="label"><span class="label-text">Код (опционально)</span><input class="input" bind:value={projectAddDialog.code} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
-        <label class="label"><span class="label-text">Локация</span><Combobox collection={projectLocationCollection} value={[projectAddDialog.location]} openOnClick onValueChange={(details) => { if (details.value[0]) projectAddDialog.location = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly required /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.locations.map((location) => ({ value: location.code, label: `${location.code} — ${location.path}` })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+        <label class="label"><span class="label-text">Локация</span><Combobox collection={projectLocationCollection} value={[projectAddDialog.location]} openOnClick onValueChange={(details) => { if (details.value[0]) projectAddDialog.location = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly required /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.locations.map((location) => ({ value: location.code, label: location.code })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
         <label class="label"><span class="label-text">Язык</span><Combobox collection={projectLanguageCollection} value={[projectAddDialog.language]} openOnClick onValueChange={(details) => { if (details.value[0]) { projectAddDialog.language = details.value[0]; projectAddDialog.framework = projectAddOptions.frameworks[projectAddDialog.language]?.[0]?.code || ''; } }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languages.map((language) => ({ value: language.code, label: language.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
         <label class="label"><span class="label-text">Фреймворк</span><Combobox collection={projectFrameworkCollection} value={[projectAddDialog.framework]} openOnClick onValueChange={(details) => { projectAddDialog.framework = details.value[0] ?? ''; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each (projectAddOptions.frameworks[projectAddDialog.language] || []).map((framework) => ({ value: framework.code, label: framework.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+        <div class="project-add-divider"></div>
+        <label class="label"><span class="label-text">Скрипт развертки</span><Combobox collection={projectDeploymentCollection} value={[projectAddDialog.deploymentScript]} openOnClick onValueChange={(details) => { selectDeploymentScript(details.value[0] ?? ''); }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Не использовать' }, ...projectAddOptions.deploymentScripts.map((script) => ({ value: script.code, label: script.name }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+        {#if selectedDeploymentScript}
+          {#if Object.keys(selectedDeploymentScript.parameters).length === 0}
+            <p class="project-deployment-hint">Скрипт не требует аргументов.</p>
+          {:else}
+            <div class="project-deployment-arguments">
+              {#each Object.entries(selectedDeploymentScript.parameters) as [name, parameter]}
+                {#if parameter.type === 'boolean'}
+                  <label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" checked={projectAddDialog.deploymentArguments[name] === true} onchange={(event) => setDeploymentArgument(name, event.currentTarget.checked)} /><span>{parameter.name || name}</span></label>
+                {:else if parameter.type === 'list'}
+                  <label class="label"><span class="label-text">{parameter.name || name}{parameter.required ? ' *' : ''}</span><select class="select" required={parameter.required} value={projectAddDialog.deploymentArguments[name]} onchange={(event) => setDeploymentArgument(name, event.currentTarget.value)}><option value="">Не выбрано</option>{#each parameter.items || [] as item}<option value={item.value}>{item.name || item.value}</option>{/each}</select></label>
+                {:else}
+                  <label class="label"><span class="label-text">{parameter.name || name}{parameter.required ? ' *' : ''}</span><input class="input" type={parameter.type === 'integer' ? 'number' : 'text'} required={parameter.required} min={parameter.min} max={parameter.max} value={projectAddDialog.deploymentArguments[name]} oninput={(event) => setDeploymentArgument(name, parameter.type === 'integer' && event.currentTarget.value !== '' ? event.currentTarget.valueAsNumber : event.currentTarget.value)} /></label>
+                {/if}
+              {/each}
+            </div>
+          {/if}
+        {/if}
         <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectAdding} onclick={() => { projectAddDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectAdding || !projectAddDialog.location}>{projectAdding ? 'Добавляем…' : 'Добавить'}</button></div>
       </form>
       {/if}

@@ -376,6 +376,11 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
   .project-fields { grid-template-columns: 1fr; }
 }
 .locations-card h2 { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 1rem; font-size: 1rem; font-weight: 700; }
+.project-add-divider { height: 1px; margin: 0.35rem 0; background: var(--color-surface-300); }
+.dark .project-add-divider { background: var(--color-surface-700); }
+.project-deployment-arguments { display: grid; gap: 0.75rem; }
+.project-deployment-hint { color: var(--color-surface-500); font-size: 0.9rem; }
+.project-deployment-checkbox { display: flex; align-items: center; gap: 0.55rem; cursor: pointer; }
 .location-list { display: grid; gap: 0.4rem; }
 .location-item { display: grid; gap: 0.5rem; }
 .location-row { display: flex; align-items: center; gap: 0.6rem; }
