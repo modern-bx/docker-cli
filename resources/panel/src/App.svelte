@@ -377,12 +377,6 @@
   }
 
   function openBackupContextMenu(event, backup) {
-    if (selectedProject?.protected) {
-      event.preventDefault();
-      backupContextMenu = null;
-      protectedAlert = selectedProject;
-      return;
-    }
     if (event.ctrlKey) { backupContextMenu = null; return; }
     event.preventDefault();
     event.stopPropagation();
@@ -394,6 +388,15 @@
       x: Math.max(8, Math.min(x, window.innerWidth - 184)),
       y: Math.max(8, Math.min(y, window.innerHeight - 104)),
     };
+  }
+
+  function openBackupRestoreDialog(backup) {
+    backupContextMenu = null;
+    if (selectedProject?.protected) {
+      protectedAlert = selectedProject;
+      return;
+    }
+    backupRestoreConfirmation = backup;
   }
 
   function openBackupCreateDialog() {
@@ -1637,7 +1640,7 @@
                       <tbody>
                         {#if backupsLoading}<tr><td colspan="6" class="log-empty animate-pulse">Загрузка…</td></tr>
                         {:else if backupItems.length === 0}<tr><td colspan="6" class="log-empty">Бэкапы не найдены</td></tr>
-                        {:else}{#each backupItems as item}<tr oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" disabled={selectedProject.protected} title={selectedProject.protected ? 'Восстановление запрещено для защищённого проекта' : 'Действия'} aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td></tr>{/each}{/if}
+                        {:else}{#each backupItems as item}<tr oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td></tr>{/each}{/if}
                       </tbody>
                     </table>
                   </div>
@@ -1852,7 +1855,7 @@
 
 {#if backupContextMenu}
   <div class="backup-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${backupContextMenu.x}px;top:${backupContextMenu.y}px`} role="menu" aria-label={`Действия с бэкапом ${backupContextMenu.backup.name}`}>
-    <button type="button" role="menuitem" onclick={() => { backupRestoreConfirmation = backupContextMenu.backup; backupContextMenu = null; }}><Undo2 size={16} aria-hidden="true" />Восстановить</button>
+    <button type="button" role="menuitem" onclick={() => openBackupRestoreDialog(backupContextMenu.backup)}><Undo2 size={16} aria-hidden="true" />Восстановить</button>
     <button class="danger" type="button" role="menuitem" onclick={() => { backupDeleteConfirmation = backupContextMenu.backup; backupContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
