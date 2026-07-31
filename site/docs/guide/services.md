@@ -14,7 +14,7 @@
 
 ## Dockhand
 
-После настройки `BASE_HOST` Dockhand доступен по адресу `https://dockhand.<ваш-домен>`. При первом открытии интерфейс предложит создать локального администратора. Данные Dockhand хранятся в именованном Docker volume `dockhand-data`.
+После настройки `BASE_HOST` Dockhand доступен по адресу `https://dockhand.<ваш-домен>`. При первом открытии интерфейс предложит создать локального администратора. Все данные Dockhand, включая настройки окружений, хранятся на хосте в `~/.config/docker-cli/compose/system/data/dockhand` и монтируются в контейнер как `/app/data`.
 
 ## MySQL, PostgreSQL и Adminer
 

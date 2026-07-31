@@ -239,7 +239,7 @@ services:
       DNSDOCK_IMAGE: system
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - dockhand-data:/app/data
+      - ./data/dockhand:/app/data
     labels:
       traefik.enable: "true"
       traefik.http.routers.dockhand.rule: Host(`dockhand.${BASE_HOST}`)
@@ -282,6 +282,5 @@ networks:
     driver: bridge
 
 volumes:
-  dockhand-data:
   traefik-letsencrypt:
   playwright-node-modules:

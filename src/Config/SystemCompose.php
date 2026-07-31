@@ -312,6 +312,7 @@ final class SystemCompose
         $data = join_path($this->directory(), 'data');
 
         return [
+            join_path($data, 'dockhand'),
             join_path($data, 'mysql', 'data'),
             join_path($data, 'mysql', 'logs'),
             join_path($data, 'postgres', 'data'),
