@@ -19,6 +19,10 @@ final class ShellBashCommand extends AbstractShellCommand
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        return $this->runInPhpFpm($input, $output, ['bash']);
+        return $this->runInPhpFpm($input, $output, [
+            'bash',
+            '--noprofile',
+            '--rcfile', '/home/docker-cli/.docker-cli.profile',
+        ]);
     }
 }

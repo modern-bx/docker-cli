@@ -24,6 +24,14 @@ final class ShellRunCommand extends AbstractShellCommand
         /** @var list<string> $arguments */
         $arguments = $input->getArgument('args');
 
-        return $this->runInPhpFpm($input, $output, ['bash', '-c', implode(' ', $arguments)]);
+        return $this->runInPhpFpm($input, $output, [
+            'bash',
+            '--noprofile',
+            '--norc',
+            '-c',
+            'if [[ -f /home/docker-cli/.docker-cli.profile ]]; then source /home/docker-cli/.docker-cli.profile; fi; eval "$1"',
+            'docker-cli-run',
+            implode(' ', $arguments),
+        ]);
     }
 }

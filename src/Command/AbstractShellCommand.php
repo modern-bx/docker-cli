@@ -36,6 +36,7 @@ abstract class AbstractShellCommand extends AbstractCommand
             '--env', 'USER=docker-cli',
             '--env', 'LOGNAME=docker-cli',
             '--env', 'SHELL=/bin/bash',
+            '--env', 'BASH_ENV=/dev/null',
             'php-fpm-8.2',
             ...$command,
         ], $output, TranslatorFactory::create());
