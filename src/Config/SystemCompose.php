@@ -316,6 +316,7 @@ final class SystemCompose
             join_path($data, 'mysql', 'logs'),
             join_path($data, 'postgres', 'data'),
             join_path($data, 'postgres', 'logs'),
+            join_path($data, 'mailpit'),
             join_path($this->directory(), 'config', 'openresty', 'hosts'),
             join_path($this->directory(), 'config', 'panel'),
             join_path($this->directory(), 'config', 'php-fpm-8.2', 'php', 'conf.d'),

@@ -137,6 +137,9 @@ services:
     environment:
       DNSDOCK_NAME: mailpit
       DNSDOCK_IMAGE: system
+      MP_DATABASE: /data/mailpit.db
+    volumes:
+      - ./data/mailpit:/data
     labels:
       traefik.enable: "true"
       traefik.http.routers.mailpit.rule: Host(`mailpit.${BASE_HOST}`)
