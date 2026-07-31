@@ -114,25 +114,28 @@ final class ProjectController
         if (!is_string($root) || $root === '') throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
 
         $items = [];
-        $directory = join_path($root, '.docker-cli', 'backups', 'mysql');
-        foreach (glob(join_path($directory, '*'), GLOB_ONLYDIR) ?: [] as $backup) {
-            $timestamp = filemtime($backup);
-            $metadataFile = join_path($backup, 'docker-cli.json');
-            $metadata = is_file($metadataFile) ? json_decode((string) file_get_contents($metadataFile), true) : null;
-            $createdAt = is_array($metadata) && is_string($metadata['createdAt'] ?? null) ? strtotime($metadata['createdAt']) : false;
-            $items[] = [
-                'name' => basename($backup),
-                'date' => gmdate(DATE_ATOM, $createdAt !== false ? $createdAt : ($timestamp === false ? 0 : $timestamp)),
-                'composition' => 'БД',
-                'size' => $this->directorySize($backup),
-                'database' => 'MySQL',
-            ];
+        foreach (['mysql' => 'MySQL', 'postgres' => 'PostgreSQL'] as $databaseCode => $databaseName) {
+            $directory = join_path($root, '.docker-cli', 'backups', $databaseCode);
+            foreach (glob(join_path($directory, '*'), GLOB_ONLYDIR) ?: [] as $backup) {
+                $timestamp = filemtime($backup);
+                $metadataFile = join_path($backup, 'docker-cli.json');
+                $metadata = is_file($metadataFile) ? json_decode((string) file_get_contents($metadataFile), true) : null;
+                $createdAt = is_array($metadata) && is_string($metadata['createdAt'] ?? null) ? strtotime($metadata['createdAt']) : false;
+                $items[] = [
+                    'name' => basename($backup),
+                    'date' => gmdate(DATE_ATOM, $createdAt !== false ? $createdAt : ($timestamp === false ? 0 : $timestamp)),
+                    'composition' => 'БД',
+                    'size' => $this->directorySize($backup),
+                    'database' => $databaseName,
+                    'databaseCode' => $databaseCode,
+                ];
+            }
         }
         $items = array_values(array_filter($items, static function (array $item) use ($request): bool {
             $date = substr($item['date'], 0, 10);
             return ($request->backupName === '' || str_contains(mb_strtolower($item['name']), mb_strtolower($request->backupName)))
                 && ($request->composition === 'all' || $request->composition === 'database')
-                && ($request->database === 'all' || $request->database === 'mysql')
+                && ($request->database === 'all' || $request->database === $item['databaseCode'])
                 && ($request->dateFrom === null || $date >= $request->dateFrom)
                 && ($request->dateTo === null || $date <= $request->dateTo);
         }));
@@ -143,6 +146,10 @@ final class ProjectController
         });
         $total = count($items);
         $items = array_slice($items, ($request->page - 1) * $request->pageSize, $request->pageSize);
+        $items = array_map(static function (array $item): array {
+            unset($item['databaseCode']);
+            return $item;
+        }, $items);
         return new ProjectBackupListDto($items, $total, $request->page, $request->pageSize);
     }
 
@@ -153,15 +160,26 @@ final class ProjectController
         if (!$request->database && !$request->files) throw new ProjectActionException('Выберите данные для создания бэкапа.', 422);
         if ($request->files) throw new ProjectActionException('Создание бэкапа файлов пока не реализовано.', 422);
         if (!$request->mysql && !$request->postgres) throw new ProjectActionException('Выберите хотя бы одну базу данных.', 422);
-        if ($request->postgres) throw new ProjectActionException('Создание бэкапа PostgreSQL пока не реализовано.', 422);
-
-        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
-            'code' => 'core.mysql.dump',
-            'arguments' => [],
-            'project' => $request->name,
-        ]]]];
+        $backupName = sprintf('%s-%s', $request->name, date('Ymd-His'));
+        $tasks = [];
+        if ($request->mysql) {
+            $tasks[] = [
+                'code' => 'core.mysql.dump',
+                'arguments' => ['backup' => ['value' => $backupName]],
+                'project' => $request->name,
+            ];
+        }
+        if ($request->postgres) {
+            $tasks[] = [
+                'code' => 'core.postgres.dump',
+                'arguments' => ['backup' => ['value' => $backupName]],
+                'project' => $request->name,
+            ];
+        }
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => $tasks]];
+        $operationCode = $request->mysql ? 'core.mysql.dump' : 'core.postgres.dump';
         try {
-            $file = ($this->queues ?? new QueueRepository())->create('default', 'core.mysql.dump', $item);
+            $file = ($this->queues ?? new QueueRepository())->create('default', $operationCode, $item);
         } catch (\InvalidArgumentException|\RuntimeException $exception) {
             throw new ProjectActionException($exception->getMessage(), 500);
         }

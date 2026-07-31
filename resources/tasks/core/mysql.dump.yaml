@@ -7,5 +7,13 @@ task:
   type: shell
   context: project
   description: Создает параллельный бэкап MySQL-базы проекта.
+  parameters:
+    backup:
+      name: Короткое имя бэкапа
+      type: string
   action: |
-    docker-cli mysql:dump --project="$project"
+    if [ -n "${backup:-}" ]; then
+      docker-cli mysql:dump --project="$project" ".docker-cli/backups/mysql/$backup"
+    else
+      docker-cli mysql:dump --project="$project"
+    fi

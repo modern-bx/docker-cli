@@ -20,6 +20,7 @@ final class PostgresDumpCommand extends AbstractCommand
         $this->setDescription('Создать быстрый параллельный бэкап PostgreSQL в directory-формате.');
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
         $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Родительская директория бэкапа.', './.docker-cli/backups/postgres/');
+        $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Короткое имя директории бэкапа.');
         $this->addOption('jobs', 'j', InputOption::VALUE_REQUIRED, 'Число параллельных процессов.', '4');
     }
 
@@ -42,7 +43,12 @@ final class PostgresDumpCommand extends AbstractCommand
             return Command::FAILURE;
         }
         $parent = rtrim($this->absolutePath((string) $input->getOption('path')), DIRECTORY_SEPARATOR);
-        $path = $parent . DIRECTORY_SEPARATOR . sprintf('%s-%s', $project, date('Ymd-His'));
+        $name = $input->getOption('name');
+        if ($name !== null && (!is_string($name) || $name === '' || basename($name) !== $name)) {
+            $this->writeMessage($output, '<error>Опция --name должна содержать короткое имя директории бэкапа.</error>');
+            return Command::INVALID;
+        }
+        $path = $parent . DIRECTORY_SEPARATOR . ($name ?? sprintf('%s-%s', $project, date('Ymd-His')));
         try {
             $code = ($this->dumpLoader ?? new PostgresDumpLoader())->dump($database, $path, $jobs, $output);
         } catch (MissingConfigException) {

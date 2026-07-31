@@ -138,7 +138,7 @@
   let backupDeleteConfirmation = null;
   let backupDeletePending = false;
   const backupCompositionOptions = [{ value: 'all', label: 'Любой состав' }, { value: 'database', label: 'БД' }, { value: 'files', label: 'Файлы' }, { value: 'database-files', label: 'БД и файлы' }];
-  const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }];
+  const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }, { value: 'postgres', label: 'PostgreSQL' }];
   const backupCompositionCollection = useListCollection({ items: backupCompositionOptions });
   const backupDatabaseCollection = useListCollection({ items: backupDatabaseOptions });
   let notesProjectName = '';
