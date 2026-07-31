@@ -4,7 +4,7 @@
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
-  import { createPanelUser, createProject, createProjectBackup, deletePanelUser, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -134,6 +134,8 @@
   let backupRestorePending = false;
   let backupCreateDialog = null;
   let backupCreatePending = false;
+  let backupDeleteConfirmation = null;
+  let backupDeletePending = false;
   const backupCompositionOptions = [{ value: 'all', label: 'Любой состав' }, { value: 'database', label: 'БД' }, { value: 'files', label: 'Файлы' }, { value: 'database-files', label: 'БД и файлы' }];
   const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }];
   const backupCompositionCollection = useListCollection({ items: backupCompositionOptions });
@@ -387,7 +389,7 @@
     backupContextMenu = {
       backup,
       x: Math.max(8, Math.min(x, window.innerWidth - 184)),
-      y: Math.max(8, Math.min(y, window.innerHeight - 64)),
+      y: Math.max(8, Math.min(y, window.innerHeight - 104)),
     };
   }
 
@@ -435,6 +437,23 @@
       errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
     } finally {
       backupRestorePending = false;
+    }
+  }
+
+  async function deleteBackup() {
+    if (!backupDeleteConfirmation || !selectedProjectName) return;
+    const backup = backupDeleteConfirmation;
+    backupDeleteConfirmation = null;
+    backupDeletePending = true;
+    try {
+      await deleteProjectBackup(api, selectedProjectName, backup.name);
+      notifyQueuedOperation(`Удаление бэкапа «${backup.name}»`);
+    } catch (cause) {
+      errorTitle = 'Не удалось удалить бэкап';
+      error = cause instanceof Error ? cause.message : 'Не удалось поставить удаление бэкапа в очередь.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      backupDeletePending = false;
     }
   }
 
@@ -1816,6 +1835,7 @@
 {#if backupContextMenu}
   <div class="backup-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${backupContextMenu.x}px;top:${backupContextMenu.y}px`} role="menu" aria-label={`Действия с бэкапом ${backupContextMenu.backup.name}`}>
     <button type="button" role="menuitem" onclick={() => { backupRestoreConfirmation = backupContextMenu.backup; backupContextMenu = null; }}><Undo2 size={16} aria-hidden="true" />Восстановить</button>
+    <button class="danger" type="button" role="menuitem" onclick={() => { backupDeleteConfirmation = backupContextMenu.backup; backupContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
 
@@ -1980,6 +2000,22 @@
       <div class="login-error-actions system-confirm-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
         <button class="btn preset-filled-error-500" type="button" disabled={backupRestorePending} onclick={restoreBackup}>Восстановить</button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(backupDeleteConfirmation)} onOpenChange={({ open }) => { if (!open && !backupDeletePending) backupDeleteConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Удалить бэкап?</Dialog.Title>
+      <Dialog.Description class="login-error-description">
+        MySQL-бэкап «{backupDeleteConfirmation?.name}» проекта «{selectedProjectName}» будет безвозвратно удалён.
+      </Dialog.Description>
+      <div class="login-error-actions system-confirm-actions">
+        <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
+        <button class="btn preset-filled-error-500" type="button" disabled={backupDeletePending} onclick={deleteBackup}>Удалить</button>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>

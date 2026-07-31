@@ -192,6 +192,24 @@ final class ProjectController
         return new QueuedOperationDto($file);
     }
 
+    #[Route('POST', '/api/projects/{name}/backups/{backup}/delete', ProjectBackupRestoreRequestDto::class, QueuedOperationDto::class)]
+    public function deleteBackup(ProjectBackupRestoreRequestDto $request): QueuedOperationDto
+    {
+        if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
+        if ($this->projects->isProjectProtected($request->name)) throw new ProjectActionException('Проект защищен.', 409);
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
+            'code' => 'core.mysql.backup-delete',
+            'arguments' => ['backup' => ['value' => $request->backup]],
+            'project' => $request->name,
+        ]]]];
+        try {
+            $file = ($this->queues ?? new QueueRepository())->create('default', 'core.mysql.backup-delete', $item);
+        } catch (\InvalidArgumentException|\RuntimeException $exception) {
+            throw new ProjectActionException($exception->getMessage(), 500);
+        }
+        return new QueuedOperationDto($file);
+    }
+
     private const FRAMEWORK_NAMES = ['symfony' => 'Symfony', 'laravel' => 'Laravel', 'bitrix' => 'Bitrix', 'bitrix24' => 'Bitrix24'];
 
     #[Route('GET', '/api/projects/options', EmptyRequestDto::class, ProjectOptionsDto::class)]
