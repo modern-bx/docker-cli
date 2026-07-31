@@ -12,6 +12,7 @@ use DockerCli\Panel\Dto\ProjectOptionsDto;
 use DockerCli\Panel\Dto\ProjectBackupListDto;
 use DockerCli\Panel\Dto\QueuedOperationDto;
 use DockerCli\Panel\Dto\Request\ProjectBackupListRequestDto;
+use DockerCli\Panel\Dto\Request\ProjectBackupCreateRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectBackupRestoreRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectCreateRequestDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
@@ -139,6 +140,28 @@ final class ProjectController
         $total = count($items);
         $items = array_slice($items, ($request->page - 1) * $request->pageSize, $request->pageSize);
         return new ProjectBackupListDto($items, $total, $request->page, $request->pageSize);
+    }
+
+    #[Route('POST', '/api/projects/{name}/backups', ProjectBackupCreateRequestDto::class, QueuedOperationDto::class)]
+    public function createBackup(ProjectBackupCreateRequestDto $request): QueuedOperationDto
+    {
+        if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
+        if (!$request->database && !$request->files) throw new ProjectActionException('Выберите данные для создания бэкапа.', 422);
+        if ($request->files) throw new ProjectActionException('Создание бэкапа файлов пока не реализовано.', 422);
+        if (!$request->mysql && !$request->postgres) throw new ProjectActionException('Выберите хотя бы одну базу данных.', 422);
+        if ($request->postgres) throw new ProjectActionException('Создание бэкапа PostgreSQL пока не реализовано.', 422);
+
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
+            'code' => 'core.mysql.dump',
+            'arguments' => [],
+            'project' => $request->name,
+        ]]]];
+        try {
+            $file = ($this->queues ?? new QueueRepository())->create('default', 'core.mysql.dump', $item);
+        } catch (\InvalidArgumentException|\RuntimeException $exception) {
+            throw new ProjectActionException($exception->getMessage(), 500);
+        }
+        return new QueuedOperationDto($file);
     }
 
     #[Route('POST', '/api/projects/{name}/backups/{backup}/restore', ProjectBackupRestoreRequestDto::class, QueuedOperationDto::class)]

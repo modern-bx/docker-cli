@@ -1,0 +1,11 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Создание бэкапа MySQL
+  code: core.mysql.dump
+  type: shell
+  context: project
+  description: Создает параллельный бэкап MySQL-базы проекта.
+  action: |
+    docker-cli mysql:dump --project="$project"
