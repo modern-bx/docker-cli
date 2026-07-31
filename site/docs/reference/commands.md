@@ -35,6 +35,19 @@ bin/docker-cli config:seed --yes
 
 ## Проекты
 
+### `bin/docker-cli shell:bash`
+
+Открывает интерактивный Bash в контейнере `php-fpm-8.2` от имени пользователя
+`docker-cli`. Короткий алиас команды — `bash`.
+
+```bash
+bin/docker-cli shell:bash
+bin/docker-cli bash
+```
+
+При запуске из зарегистрированного проекта рабочей директорией становится корень
+проекта. При запуске вне проекта оболочка открывается в `/home/docker-cli`.
+
 ### `bin/docker-cli project:up [name]`
 
 Регистрирует Laravel, Symfony, Bitrix или Bitrix24 проект из текущей директории или вложенного пути. Опция `--force` разрешает регистрацию, даже если определить фреймворк не удалось.
