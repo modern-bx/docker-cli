@@ -46,30 +46,10 @@ html[data-font='noto'] input:is(:autofill, :-moz-autofill, :-moz-autofill-previe
 pre, code, kbd, samp { font-family: var(--panel-mono-font-family) !important; }
 button { cursor: pointer; }
 .table { cursor: default; user-select: none; }
-.table:has(tr > :nth-child(1):hover) tr > :nth-child(1),
-.table:has(tr > :nth-child(2):hover) tr > :nth-child(2),
-.table:has(tr > :nth-child(3):hover) tr > :nth-child(3),
-.table:has(tr > :nth-child(4):hover) tr > :nth-child(4),
-.table:has(tr > :nth-child(5):hover) tr > :nth-child(5),
-.table:has(tr > :nth-child(6):hover) tr > :nth-child(6),
-.table:has(tr > :nth-child(7):hover) tr > :nth-child(7),
-.table:has(tr > :nth-child(8):hover) tr > :nth-child(8),
-.table:has(tr > :nth-child(9):hover) tr > :nth-child(9),
-.table:has(tr > :nth-child(10):hover) tr > :nth-child(10),
-.table:has(tr > :nth-child(11):hover) tr > :nth-child(11) {
+.table tbody tr:hover > * {
   background: color-mix(in oklab, var(--color-primary-500) 14%, var(--color-surface-100)) !important;
 }
-.dark .table:has(tr > :nth-child(1):hover) tr > :nth-child(1),
-.dark .table:has(tr > :nth-child(2):hover) tr > :nth-child(2),
-.dark .table:has(tr > :nth-child(3):hover) tr > :nth-child(3),
-.dark .table:has(tr > :nth-child(4):hover) tr > :nth-child(4),
-.dark .table:has(tr > :nth-child(5):hover) tr > :nth-child(5),
-.dark .table:has(tr > :nth-child(6):hover) tr > :nth-child(6),
-.dark .table:has(tr > :nth-child(7):hover) tr > :nth-child(7),
-.dark .table:has(tr > :nth-child(8):hover) tr > :nth-child(8),
-.dark .table:has(tr > :nth-child(9):hover) tr > :nth-child(9),
-.dark .table:has(tr > :nth-child(10):hover) tr > :nth-child(10),
-.dark .table:has(tr > :nth-child(11):hover) tr > :nth-child(11) {
+.dark .table tbody tr:hover > * {
   background: color-mix(in oklab, var(--color-primary-500) 18%, var(--color-surface-900)) !important;
 }
 .panel-shell { height: 100dvh; min-height: 0; overflow: hidden; }
