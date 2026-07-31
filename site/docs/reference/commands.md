@@ -65,11 +65,14 @@ bin/docker-cli bash --project=my-project
 bin/docker-cli shell:run 'php -v'
 bin/docker-cli run --project=my-project 'composer install'
 bin/docker-cli run 'echo "$USER" && ls -la | head'
+bin/docker-cli -- 'echo "$USER"'
 ```
 
 Команда выполняется через Bash, поэтому поддерживает переменные окружения, пайпы,
 перенаправления и цепочки команд. Чтобы внешний shell не обработал выражение раньше
 контейнера, всю команду рекомендуется передавать одним аргументом в одинарных кавычках.
+Так как `shell:run` является командой по умолчанию, её имя можно опустить, отделив
+выражение от глобальных опций `docker-cli` с помощью `--`.
 Перед выполнением стандартные профили Bash не загружаются, но при наличии явно
 подключается `/home/docker-cli/.docker-cli.profile`.
 
