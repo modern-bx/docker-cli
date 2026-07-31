@@ -53,7 +53,11 @@ final class MysqlDumpCommand extends AbstractCommand
         }
         if ($code === Command::SUCCESS) {
             file_put_contents($path . '/docker-cli.json', json_encode(['project' => $project, 'database' => $database, 'createdAt' => date(DATE_ATOM)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
-            $this->writeMessage($output, sprintf('<info>Дамп базы "%s" записан в "%s".</info>', $database, $path));
+            CommandContext::fromEnvironment($this, $output)->addMessage(new Message(
+                sprintf('Бэкап MySQL-базы "%s" проекта "%s" создан: "%s".', $database, $project, basename($path)),
+                MessageLevel::Info,
+                notify: true,
+            ));
         }
         return $code;
     }

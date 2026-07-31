@@ -228,6 +228,17 @@ bin/docker-cli mysql:dump --project=my-project --threads=8 /mnt/fast/backups/rel
 назначения должен быть пустым. MySQL продолжает обслуживать запросы во время
 создания дампа.
 
+### `bin/docker-cli mysql:backup-delete <backup>`
+
+Безвозвратно удаляет каталог MySQL-бэкапа с указанным коротким именем из
+`.docker-cli/backups/mysql` текущего проекта. Команда работает только из контекста
+зарегистрированного проекта и не поддерживает переопределение проекта через
+`--project`.
+
+```bash
+bin/docker-cli mysql:backup-delete my-project-20260728-120000
+```
+
 ### `bin/docker-cli mysql:load <path> --force`
 
 Полностью заменяет и многопоточно загружает только MySQL-базу выбранного проекта.

@@ -1,0 +1,16 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Восстановление MySQL из бэкапа
+  code: core.mysql.load
+  type: shell
+  context: project
+  description: Полностью заменяет MySQL-базу проекта данными из выбранного бэкапа.
+  parameters:
+    path:
+      name: Путь к бэкапу
+      type: string
+      required: true
+  action: |
+    docker-cli mysql:load --project="$project" --force {{ path }}

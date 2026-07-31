@@ -1,10 +1,10 @@
 <script>
   import { onMount } from 'svelte';
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2 } from '@lucide/svelte';
+  import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
-  import { createPanelUser, createProject, deletePanelUser, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -129,6 +129,13 @@
   let backupsLoading = false;
   let backupFilterTimer = null;
   let backupRequestId = 0;
+  let backupContextMenu = null;
+  let backupRestoreConfirmation = null;
+  let backupRestorePending = false;
+  let backupCreateDialog = null;
+  let backupCreatePending = false;
+  let backupDeleteConfirmation = null;
+  let backupDeletePending = false;
   const backupCompositionOptions = [{ value: 'all', label: 'Любой состав' }, { value: 'database', label: 'БД' }, { value: 'files', label: 'Файлы' }, { value: 'database-files', label: 'БД и файлы' }];
   const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }];
   const backupCompositionCollection = useListCollection({ items: backupCompositionOptions });
@@ -364,6 +371,90 @@
     backupSort = field;
     backupPage = 1;
     loadProjectBackups();
+  }
+
+  function openBackupContextMenu(event, backup) {
+    if (selectedProject?.protected) {
+      event.preventDefault();
+      backupContextMenu = null;
+      protectedAlert = selectedProject;
+      return;
+    }
+    if (event.ctrlKey) { backupContextMenu = null; return; }
+    event.preventDefault();
+    event.stopPropagation();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
+    const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.bottom;
+    backupContextMenu = {
+      backup,
+      x: Math.max(8, Math.min(x, window.innerWidth - 184)),
+      y: Math.max(8, Math.min(y, window.innerHeight - 104)),
+    };
+  }
+
+  function openBackupCreateDialog() {
+    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, filesAlert: false };
+  }
+
+  function selectBackupFiles(event) {
+    event.preventDefault();
+    if (backupCreateDialog) backupCreateDialog = { ...backupCreateDialog, files: false, filesAlert: true };
+  }
+
+  async function createBackup() {
+    if (!backupCreateDialog || !selectedProjectName || !backupCreateDialog.database || (!backupCreateDialog.mysql && !backupCreateDialog.postgres)) return;
+    backupCreatePending = true;
+    try {
+      await createProjectBackup(api, selectedProjectName, {
+        database: backupCreateDialog.database,
+        files: backupCreateDialog.files,
+        mysql: backupCreateDialog.mysql,
+        postgres: backupCreateDialog.postgres,
+      });
+      backupCreateDialog = null;
+      notifyQueuedOperation(`Создание бэкапа проекта «${selectedProjectName}»`);
+    } catch (cause) {
+      errorTitle = 'Не удалось создать бэкап';
+      error = cause instanceof Error ? cause.message : 'Не удалось поставить создание бэкапа в очередь.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      backupCreatePending = false;
+    }
+  }
+
+  async function restoreBackup() {
+    if (!backupRestoreConfirmation || !selectedProjectName) return;
+    const backup = backupRestoreConfirmation;
+    backupRestoreConfirmation = null;
+    backupRestorePending = true;
+    try {
+      await restoreProjectBackup(api, selectedProjectName, backup.name);
+      notifyQueuedOperation(`Восстановление бэкапа «${backup.name}»`);
+    } catch (cause) {
+      errorTitle = 'Не удалось восстановить бэкап';
+      error = cause instanceof Error ? cause.message : 'Не удалось поставить восстановление бэкапа в очередь.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      backupRestorePending = false;
+    }
+  }
+
+  async function deleteBackup() {
+    if (!backupDeleteConfirmation || !selectedProjectName) return;
+    const backup = backupDeleteConfirmation;
+    backupDeleteConfirmation = null;
+    backupDeletePending = true;
+    try {
+      await deleteProjectBackup(api, selectedProjectName, backup.name);
+      notifyQueuedOperation(`Удаление бэкапа «${backup.name}»`);
+    } catch (cause) {
+      errorTitle = 'Не удалось удалить бэкап';
+      error = cause instanceof Error ? cause.message : 'Не удалось поставить удаление бэкапа в очередь.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      backupDeletePending = false;
+    }
   }
 
   function formatBytes(value) {
@@ -729,8 +820,10 @@
   function closeMenus(event) {
     if (event.target instanceof Element && event.target.closest('.project-context-menu')) return;
     if (event.target instanceof Element && event.target.closest('.user-context-menu')) return;
+    if (event.target instanceof Element && event.target.closest('.backup-context-menu')) return;
     projectContextMenu = null;
     userContextMenu = null;
+    backupContextMenu = null;
     if (event.target instanceof Element && event.target.closest('.header-menu')) return;
     themeOpen = false;
     notificationsOpen = false;
@@ -1193,7 +1286,7 @@
 
 <svelte:window
   onclick={closeMenus}
-  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; notificationsOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; } }}
+  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; notificationsOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; backupContextMenu = null; } }}
 />
 
 <svelte:head><title>{authenticated ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
@@ -1510,6 +1603,9 @@
                 </section>
                 {:else if projectDetailTab === 'backups'}
                 <section class="project-log-view backup-view" aria-label={`Бэкапы проекта ${selectedProject.name}`}>
+                  <div class="backup-actions-toolbar">
+                    <button class="btn preset-filled-primary-500" type="button" onclick={openBackupCreateDialog}><Plus size={16} aria-hidden="true" />Добавить</button>
+                  </div>
                   <div class="log-toolbar card preset-filled-surface-100-900">
                     <label><span>Название</span><span class="log-text-filter"><input type="search" value={backupName} oninput={(event) => changeBackupFilter('name', event.currentTarget.value)} />{#if backupName}<button type="button" aria-label="Сбросить название" onclick={() => changeBackupFilter('name', '')}>×</button>{/if}</span></label>
                     <label><span>Состав</span><Combobox collection={backupCompositionCollection} value={[backupComposition]} openOnClick onValueChange={(details) => changeBackupFilter('composition', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCompositionOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
@@ -1518,12 +1614,12 @@
                     <BackupDateFilter label="Дата до" value={backupDateTo} onchange={(value) => changeBackupFilter('dateTo', value)} />
                   </div>
                   <div class="log-table-wrap card preset-filled-surface-100-900">
-                    <table class="table log-table backup-table">
-                      <thead><tr>{#each [['name', 'Название'], ['date', 'Дата'], ['composition', 'Состав'], ['size', 'Размер'], ['database', 'Тип СУБД']] as [field, label]}<th><button type="button" onclick={() => sortBackups(field)}>{label}<span aria-hidden="true">{backupSort === field ? (backupDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
+                    <table class="table table-zebra log-table backup-table">
+                      <thead><tr><th class="backup-menu-column"><button class="backup-refresh-trigger" type="button" disabled={backupsLoading} aria-label="Обновить список бэкапов" title="Обновить" onclick={loadProjectBackups}><RotateCw size={17} class={backupsLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th>{#each [['name', 'Название'], ['date', 'Дата'], ['composition', 'Состав'], ['size', 'Размер'], ['database', 'Тип СУБД']] as [field, label]}<th><button type="button" onclick={() => sortBackups(field)}>{label}<span aria-hidden="true">{backupSort === field ? (backupDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
                       <tbody>
-                        {#if backupsLoading}<tr><td colspan="5" class="log-empty animate-pulse">Загрузка…</td></tr>
-                        {:else if backupItems.length === 0}<tr><td colspan="5" class="log-empty">Бэкапы не найдены</td></tr>
-                        {:else}{#each backupItems as item}<tr><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td></tr>{/each}{/if}
+                        {#if backupsLoading}<tr><td colspan="6" class="log-empty animate-pulse">Загрузка…</td></tr>
+                        {:else if backupItems.length === 0}<tr><td colspan="6" class="log-empty">Бэкапы не найдены</td></tr>
+                        {:else}{#each backupItems as item}<tr oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" disabled={selectedProject.protected} title={selectedProject.protected ? 'Восстановление запрещено для защищённого проекта' : 'Действия'} aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td></tr>{/each}{/if}
                       </tbody>
                     </table>
                   </div>
@@ -1558,7 +1654,7 @@
                     {/each}
                   </div>
                   <div class="log-table-wrap card preset-filled-surface-100-900">
-                    <table class="table log-table project-log-table">
+                    <table class="table table-zebra log-table project-log-table">
                       <thead><tr>{#each [['timestamp', 'Время'], ['queueItem', 'Элемент очереди'], ['itemCode', 'Код элемента'], ['queueCode', 'Очередь'], ['status', 'Статус'], ['taskCode', 'Задача'], ['level', 'Уровень'], ['context', 'Контекст'], ['result', 'Результат'], ['message', 'Сообщение']] as [field, label]}<th><button type="button" onclick={() => sortLogs(field)}>{label}<span aria-hidden="true">{logSort === field ? (logDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
                       <tbody>
                         {#if logsLoading}<tr><td colspan="10" class="log-empty animate-pulse">Загрузка…</td></tr>
@@ -1612,7 +1708,7 @@
               {/each}
             </div>
             <div class="log-table-wrap card preset-filled-surface-100-900">
-              <table class="table log-table">
+              <table class="table table-zebra log-table">
                 <thead><tr>
                   {#each [['timestamp', 'Время'], ['queueItem', 'Элемент очереди'], ['itemCode', 'Код элемента'], ['project', 'Проект'], ['queueCode', 'Очередь'], ['status', 'Статус'], ['taskCode', 'Задача'], ['level', 'Уровень'], ['context', 'Контекст'], ['result', 'Результат'], ['message', 'Сообщение']] as [field, label]}
                     <th><button type="button" onclick={() => sortLogs(field)}>{label}<span aria-hidden="true">{logSort === field ? (logDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>
@@ -1680,7 +1776,7 @@
                 <button class="btn preset-filled-primary-500" type="button" onclick={() => { userDialog = { create: true, login: '', comments: '' }; }}><Plus size={16} aria-hidden="true" />Добавить</button>
               </div>
               <div class="users-table-wrap card preset-filled-surface-100-900">
-                <table class="table users-table">
+                <table class="table table-zebra users-table">
                   <thead><tr><th>Логин</th><th>Комментарии</th><th aria-label="Действия"></th></tr></thead>
                   <tbody>
                     {#if usersLoading}<tr><td colspan="3" class="log-empty animate-pulse">Загрузка…</td></tr>
@@ -1733,6 +1829,13 @@
   <div class="user-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${userContextMenu.x}px;top:${userContextMenu.y}px`} role="menu">
     <button type="button" role="menuitem" onclick={() => { userDialog = { create: false, ...userContextMenu.user }; userContextMenu = null; }}>Изменить</button>
     <button class="danger" type="button" role="menuitem" onclick={() => { userDeleteConfirmation = userContextMenu.user; userContextMenu = null; }}>Удалить</button>
+  </div>
+{/if}
+
+{#if backupContextMenu}
+  <div class="backup-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${backupContextMenu.x}px;top:${backupContextMenu.y}px`} role="menu" aria-label={`Действия с бэкапом ${backupContextMenu.backup.name}`}>
+    <button type="button" role="menuitem" onclick={() => { backupRestoreConfirmation = backupContextMenu.backup; backupContextMenu = null; }}><Undo2 size={16} aria-hidden="true" />Восстановить</button>
+    <button class="danger" type="button" role="menuitem" onclick={() => { backupDeleteConfirmation = backupContextMenu.backup; backupContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
 
@@ -1867,7 +1970,7 @@
   <Dialog.Positioner class="login-error-positioner">
     <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
       <Dialog.Title class="login-error-title">Проект защищен</Dialog.Title>
-      <Dialog.Description class="login-error-description">Проект «{protectedAlert?.name}» защищен. Стирание файлов и баз данных запрещено.</Dialog.Description>
+      <Dialog.Description class="login-error-description">Проект «{protectedAlert?.name}» защищен. Изменение файлов и баз данных запрещено.</Dialog.Description>
       <div class="login-error-actions"><Dialog.CloseTrigger class="btn preset-filled-primary-500" type="button">Закрыть</Dialog.CloseTrigger></div>
     </Dialog.Content>
   </Dialog.Positioner>
@@ -1881,6 +1984,76 @@
       <Dialog.Description class="login-error-description">{queuedOperationNotice}</Dialog.Description>
       <div class="login-error-actions">
         <Dialog.CloseTrigger class="btn preset-filled-primary-500" type="button">ОК</Dialog.CloseTrigger>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(backupRestoreConfirmation)} onOpenChange={({ open }) => { if (!open && !backupRestorePending) backupRestoreConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Восстановить бэкап?</Dialog.Title>
+      <Dialog.Description class="login-error-description">
+        Текущая MySQL-база проекта «{selectedProjectName}» будет полностью заменена данными из бэкапа «{backupRestoreConfirmation?.name}».
+      </Dialog.Description>
+      <div class="login-error-actions system-confirm-actions">
+        <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
+        <button class="btn preset-filled-error-500" type="button" disabled={backupRestorePending} onclick={restoreBackup}>Восстановить</button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(backupDeleteConfirmation)} onOpenChange={({ open }) => { if (!open && !backupDeletePending) backupDeleteConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Удалить бэкап?</Dialog.Title>
+      <Dialog.Description class="login-error-description">
+        MySQL-бэкап «{backupDeleteConfirmation?.name}» проекта «{selectedProjectName}» будет безвозвратно удалён.
+      </Dialog.Description>
+      <div class="login-error-actions system-confirm-actions">
+        <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
+        <button class="btn preset-filled-error-500" type="button" disabled={backupDeletePending} onclick={deleteBackup}>Удалить</button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(backupCreateDialog)} onOpenChange={({ open }) => { if (!open && !backupCreatePending) backupCreateDialog = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog backup-create-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Создать бэкап</Dialog.Title>
+      {#if backupCreateDialog}
+        <div class="backup-create-content">
+          <div class="backup-checkbox-row" aria-label="Состав бэкапа">
+            <label><input class="checkbox" type="checkbox" checked={backupCreateDialog.database} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, database: event.currentTarget.checked }; }} />БД</label>
+            <label><input class="checkbox" type="checkbox" checked={false} onclick={selectBackupFiles} />Файлы</label>
+          </div>
+          {#if backupCreateDialog.filesAlert}
+            <p class="backup-create-alert" role="alert">Создание бэкапа файлов пока не реализовано.</p>
+          {/if}
+          {#if backupCreateDialog.database}
+            <fieldset class="backup-database-options">
+              <legend>Базы данных</legend>
+              <div class="backup-checkbox-row">
+                <label><input class="checkbox" type="checkbox" checked={backupCreateDialog.mysql} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, mysql: event.currentTarget.checked }; }} />MySQL</label>
+                <label><input class="checkbox" type="checkbox" checked={backupCreateDialog.postgres} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, postgres: event.currentTarget.checked }; }} />PostgreSQL</label>
+              </div>
+            </fieldset>
+          {:else}
+            <p class="backup-create-hint">Выберите хотя бы один тип данных для создания бэкапа.</p>
+          {/if}
+          {#if backupCreateDialog.database && !backupCreateDialog.mysql && !backupCreateDialog.postgres}
+            <p class="backup-create-hint">Выберите хотя бы одну базу данных.</p>
+          {/if}
+        </div>
+      {/if}
+      <div class="login-error-actions system-confirm-actions">
+        <Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={backupCreatePending}>Отмена</Dialog.CloseTrigger>
+        <button class="btn preset-filled-primary-500" type="button" disabled={backupCreatePending || !backupCreateDialog?.database || (!backupCreateDialog?.mysql && !backupCreateDialog?.postgres)} onclick={createBackup}>{backupCreatePending ? 'Создаём…' : 'Создать'}</button>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>
