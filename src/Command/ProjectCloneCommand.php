@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
-use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\ProjectsSettingsRepository;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\DataInitializer;
@@ -29,7 +28,6 @@ final class ProjectCloneCommand extends AbstractCommand
         private readonly ?ProjectsSettingsRepository $settings = null,
         private readonly ?MysqlDumpLoader $mysqlDumpLoader = null,
         private readonly ?DataInitializer $dataInitializer = null,
-        private readonly ?SystemCompose $compose = null,
     )
     {
         parent::__construct('project:clone');
@@ -156,8 +154,6 @@ final class ProjectCloneCommand extends AbstractCommand
         }
         $restartCode = (new ConfigurableServicesRestarter())->restart($output);
         if ($restartCode !== Command::SUCCESS) return $restartCode;
-        $reloadCode = $this->reloadOpenResty($output);
-        if ($reloadCode !== Command::SUCCESS) return $reloadCode;
 
         $this->writeMessage($output, sprintf(
             '<info>Проект "%s" клонирован в "%s" (%s; всего: %s; копирование файлов: %s%s).</info>',
@@ -169,22 +165,6 @@ final class ProjectCloneCommand extends AbstractCommand
             $databaseDuration > 0 ? '; копирование БД: ' . $this->formatDuration($databaseDuration) : '',
         ));
         return Command::SUCCESS;
-    }
-
-    private function reloadOpenResty(OutputInterface $output): int
-    {
-        $compose = $this->compose ?? new SystemCompose();
-        $command = [...$compose->dockerComposeCommand('exec'), '--no-TTY', 'openresty', 'openresty', '-s', 'reload'];
-        $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, $compose->directory(), $compose->dockerProcessEnvironment());
-        if (!is_resource($process)) {
-            $this->writeMessage($output, '<error>Не удалось запустить перезагрузку OpenResty.</error>');
-            return Command::FAILURE;
-        }
-        $code = proc_close($process);
-        if ($code !== Command::SUCCESS) {
-            $this->writeMessage($output, '<error>Не удалось перезагрузить конфигурацию OpenResty.</error>');
-        }
-        return $code;
     }
 
     private function destinationForName(string $name, string $sourceRoot, InputInterface $input): string
