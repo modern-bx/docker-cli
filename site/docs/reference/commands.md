@@ -293,7 +293,7 @@ bin/docker-cli data:apply --dbms=mysql './backups/*'
 
 ## Быстрые параллельные дампы MySQL
 
-### `bin/docker-cli mysql:dump [path]`
+### `bin/docker-cli mysql:dump [--name=<имя> | --path=<путь>]`
 
 Создаёт согласованный многопоточный дамп только MySQL-базы выбранного проекта через
 контейнер `mydumper/mydumper:v1.0.3-1`. Проект выбирается через `--project` или по
@@ -303,11 +303,14 @@ bin/docker-cli data:apply --dbms=mysql './backups/*'
 
 ```bash
 bin/docker-cli mysql:dump
-bin/docker-cli mysql:dump --project=my-project --threads=8 /mnt/fast/backups/release-42
+bin/docker-cli mysql:dump --project=my-project --name=release-42
+bin/docker-cli mysql:dump --project=my-project --threads=8 --path=/mnt/fast/backups/release-42
 ```
 
 `--threads` (`-j`, по умолчанию `4`) управляет числом потоков mydumper. Каталог
-назначения должен быть пустым. MySQL продолжает обслуживать запросы во время
+назначения должен быть пустым. `--name` задаёт короткое имя внутри стандартного
+каталога `.docker-cli/backups/mysql`, а `--path` — полный путь к каталогу конкретного
+бэкапа. Эти опции взаимоисключающие. MySQL продолжает обслуживать запросы во время
 создания дампа.
 
 ### `bin/docker-cli mysql:backup-delete <backup>`
@@ -347,7 +350,7 @@ bin/docker-cli mysql:load --force --skip-checks /mnt/fast/backups/another-projec
 
 ## Быстрые параллельные дампы PostgreSQL
 
-### `bin/docker-cli postgres:dump`
+### `bin/docker-cli postgres:dump [--name=<имя> | --path=<путь>]`
 
 Создаёт directory-бэкап PostgreSQL-базы выбранного проекта с помощью параллельного
 `pg_dump`. Проект выбирается через `--project` или по текущей директории. По
@@ -356,12 +359,15 @@ bin/docker-cli mysql:load --force --skip-checks /mnt/fast/backups/another-projec
 
 ```bash
 bin/docker-cli postgres:dump
-bin/docker-cli postgres:dump --project=my-project --jobs=8 --path=/mnt/fast/backups
+bin/docker-cli postgres:dump --project=my-project --name=release-42
+bin/docker-cli postgres:dump --project=my-project --jobs=8 --path=/mnt/fast/backups/release-42
 ```
 
-`--jobs` (`-j`, по умолчанию `4`) задаёт число параллельных процессов, а `--path` —
-родительскую директорию для нового бэкапа. В бэкап записывается `docker-cli.json` с
-кодом проекта и именем базы для проверки при восстановлении.
+`--jobs` (`-j`, по умолчанию `4`) задаёт число параллельных процессов. `--name`
+задаёт короткое имя внутри стандартного каталога `.docker-cli/backups/postgres`, а
+`--path` — полный путь к каталогу конкретного бэкапа. Эти опции взаимоисключающие.
+В бэкап записывается `docker-cli.json` с кодом проекта и именем базы для проверки
+при восстановлении.
 
 ### `bin/docker-cli postgres:load <path>`
 

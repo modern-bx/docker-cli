@@ -90,6 +90,9 @@ button { cursor: pointer; }
 .dark .system-service { border-color: var(--color-surface-800); }
 .system-service:last-child { border-bottom: 0; }
 .system-service-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.system-service-link { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--color-primary-700); text-decoration: underline; text-underline-offset: 0.15rem; }
+.system-service-link svg { flex: 0 0 auto; }
+.dark .system-service-link { color: var(--color-primary-300); }
 .system-actions { display: flex; align-items: center; gap: 0.25rem; }
 .system-actions .btn { padding-inline: 0.6rem; font-size: 0.7rem; }
 .system-menu-global-actions { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.8rem; }
@@ -408,9 +411,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .dark .users-table th { background: var(--color-surface-800); }
 .users-table td { padding: 0.7rem 0.75rem; border-top: 1px solid var(--color-surface-200); overflow-wrap: anywhere; }
 .dark .users-table td { border-color: var(--color-surface-800); }
-.users-table th:last-child, .users-table td:last-child { width: 6.5rem; text-align: right; }
-.user-actions { white-space: nowrap; }
-.user-actions .btn-icon + .btn-icon { margin-left: 0.4rem; }
+.users-table .user-menu-column { width: 3rem; padding: 0.35rem; text-align: center; }
 .users-pagination { max-width: 64rem; margin-top: 1rem; }
 .user-context-menu { position: fixed; }
 .user-dialog { width: min(32rem, calc(100vw - 2rem)); }

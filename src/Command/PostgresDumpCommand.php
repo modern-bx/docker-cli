@@ -19,7 +19,8 @@ final class PostgresDumpCommand extends AbstractCommand
         parent::__construct('postgres:dump');
         $this->setDescription('Создать быстрый параллельный бэкап PostgreSQL в directory-формате.');
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
-        $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Родительская директория бэкапа.', './.docker-cli/backups/postgres/');
+        $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Путь к директории создаваемого бэкапа.');
+        $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Короткое имя директории бэкапа.');
         $this->addOption('jobs', 'j', InputOption::VALUE_REQUIRED, 'Число параллельных процессов.', '4');
     }
 
@@ -41,8 +42,22 @@ final class PostgresDumpCommand extends AbstractCommand
             $this->writeMessage($output, sprintf('<error>В конфигурации проекта "%s" не задана база PostgreSQL.</error>', $project));
             return Command::FAILURE;
         }
-        $parent = rtrim($this->absolutePath((string) $input->getOption('path')), DIRECTORY_SEPARATOR);
-        $path = $parent . DIRECTORY_SEPARATOR . sprintf('%s-%s', $project, date('Ymd-His'));
+        $name = $input->getOption('name');
+        $path = $input->getOption('path');
+        if ($name !== null && $path !== null) {
+            $this->writeMessage($output, '<error>Опции --name и --path нельзя использовать одновременно.</error>');
+            return Command::INVALID;
+        }
+        if ($name !== null && (!is_string($name) || $name === '' || basename($name) !== $name)) {
+            $this->writeMessage($output, '<error>Опция --name должна содержать короткое имя директории бэкапа.</error>');
+            return Command::INVALID;
+        }
+        if ($path !== null && (!is_string($path) || $path === '')) {
+            $this->writeMessage($output, '<error>Опция --path должна содержать путь к директории бэкапа.</error>');
+            return Command::INVALID;
+        }
+        $path = $path ?? sprintf('.docker-cli/backups/postgres/%s', $name ?? sprintf('%s-%s', $project, date('Ymd-His')));
+        $path = $this->absolutePath($path);
         try {
             $code = ($this->dumpLoader ?? new PostgresDumpLoader())->dump($database, $path, $jobs, $output);
         } catch (MissingConfigException) {
@@ -52,7 +67,7 @@ final class PostgresDumpCommand extends AbstractCommand
         if ($code === Command::SUCCESS) {
             file_put_contents($path . '/docker-cli.json', json_encode(['project' => $project, 'database' => $database, 'createdAt' => date(DATE_ATOM)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
             CommandContext::fromEnvironment($this, $output)->addMessage(new Message(
-                sprintf('Бэкап PostgreSQL-базы "%s" проекта "%s" создан: "%s".', $database, $project, $path),
+                sprintf('Бэкап PostgreSQL-базы "%s" проекта "%s" создан: "%s".', $database, $project, basename($path)),
                 MessageLevel::Info,
                 notify: true,
             ));
@@ -63,6 +78,6 @@ final class PostgresDumpCommand extends AbstractCommand
 
     private function absolutePath(string $path): string
     {
-        return str_starts_with($path, DIRECTORY_SEPARATOR) ? $path : (getcwd() ?: '.') . DIRECTORY_SEPARATOR . $path;
+        return str_starts_with($path, DIRECTORY_SEPARATOR) ? rtrim($path, DIRECTORY_SEPARATOR) : rtrim((getcwd() ?: '.') . DIRECTORY_SEPARATOR . $path, DIRECTORY_SEPARATOR);
     }
 }

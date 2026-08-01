@@ -138,7 +138,7 @@
   let backupDeleteConfirmation = null;
   let backupDeletePending = false;
   const backupCompositionOptions = [{ value: 'all', label: 'Любой состав' }, { value: 'database', label: 'БД' }, { value: 'files', label: 'Файлы' }, { value: 'database-files', label: 'БД и файлы' }];
-  const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }];
+  const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }, { value: 'postgres', label: 'PostgreSQL' }];
   const backupCompositionCollection = useListCollection({ items: backupCompositionOptions });
   const backupDatabaseCollection = useListCollection({ items: backupDatabaseOptions });
   let notesProjectName = '';
@@ -377,12 +377,6 @@
   }
 
   function openBackupContextMenu(event, backup) {
-    if (selectedProject?.protected) {
-      event.preventDefault();
-      backupContextMenu = null;
-      protectedAlert = selectedProject;
-      return;
-    }
     if (event.ctrlKey) { backupContextMenu = null; return; }
     event.preventDefault();
     event.stopPropagation();
@@ -394,6 +388,15 @@
       x: Math.max(8, Math.min(x, window.innerWidth - 184)),
       y: Math.max(8, Math.min(y, window.innerHeight - 104)),
     };
+  }
+
+  function openBackupRestoreDialog(backup) {
+    backupContextMenu = null;
+    if (selectedProject?.protected) {
+      protectedAlert = selectedProject;
+      return;
+    }
+    backupRestoreConfirmation = backup;
   }
 
   function openBackupCreateDialog() {
@@ -432,8 +435,8 @@
     backupRestoreConfirmation = null;
     backupRestorePending = true;
     try {
-      await restoreProjectBackup(api, selectedProjectName, backup.name);
-      notifyQueuedOperation(`Восстановление бэкапа «${backup.name}»`);
+      await restoreProjectBackup(api, selectedProjectName, backup.name, backup.databaseCode);
+      notifyQueuedOperation(`Восстановление ${backup.database}-бэкапа «${backup.name}»`);
     } catch (cause) {
       errorTitle = 'Не удалось восстановить бэкап';
       error = cause instanceof Error ? cause.message : 'Не удалось поставить восстановление бэкапа в очередь.';
@@ -541,7 +544,11 @@
   function openUserContextMenu(event, user) {
     if (event.ctrlKey) { userContextMenu = null; return; }
     event.preventDefault();
-    userContextMenu = { user, x: Math.min(event.clientX, window.innerWidth - 180), y: Math.min(event.clientY, window.innerHeight - 120) };
+    event.stopPropagation();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
+    const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.bottom;
+    userContextMenu = { user, x: Math.max(8, Math.min(x, window.innerWidth - 180)), y: Math.max(8, Math.min(y, window.innerHeight - 120)) };
   }
 
   async function saveUser() {
@@ -1176,6 +1183,12 @@
     projectAction(action, project.name);
   }
 
+  function systemServiceUrl(service) {
+    if (!['mailpit', 'dockhand', 'adminer'].includes(service.name)) return null;
+    const baseHost = window.location.hostname.replace(/^panel\./, '');
+    return `https://${service.name}.${baseHost}`;
+  }
+
   async function systemAction(action, service = '') {
     systemOpen = false;
     systemPending = true;
@@ -1360,9 +1373,14 @@
               <div class="system-menu-divider" aria-hidden="true"></div>
               {#if systemServices.length === 0}<p class="system-empty">Сервисы не найдены</p>{/if}
               {#each systemServices as service (service.name)}
+                {@const serviceUrl = systemServiceUrl(service)}
                 <div class="system-service">
                   <span class={`system-dot ${service.running ? 'running' : 'stopped'}`} aria-hidden="true"></span>
-                  <span class="system-service-name" title={service.image}>{service.name}</span>
+                  {#if serviceUrl}
+                    <a class="system-service-name system-service-link" href={serviceUrl} target="_blank" rel="noopener noreferrer" title={service.image}>{service.name}<ExternalLink size={13} aria-hidden="true" /></a>
+                  {:else}
+                    <span class="system-service-name" title={service.image}>{service.name}</span>
+                  {/if}
                   <div class="system-actions">
                     <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction(service.running ? 'stop' : 'start', service.name)}>
                       {#if service.running}<Square size={14} aria-hidden="true" />{:else}<Play size={14} aria-hidden="true" />{/if}
@@ -1637,7 +1655,7 @@
                       <tbody>
                         {#if backupsLoading}<tr><td colspan="6" class="log-empty animate-pulse">Загрузка…</td></tr>
                         {:else if backupItems.length === 0}<tr><td colspan="6" class="log-empty">Бэкапы не найдены</td></tr>
-                        {:else}{#each backupItems as item}<tr oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" disabled={selectedProject.protected} title={selectedProject.protected ? 'Восстановление запрещено для защищённого проекта' : 'Действия'} aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td></tr>{/each}{/if}
+                        {:else}{#each backupItems as item}<tr oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td></tr>{/each}{/if}
                       </tbody>
                     </table>
                   </div>
@@ -1795,14 +1813,14 @@
               </div>
               <div class="users-table-wrap card preset-filled-surface-100-900">
                 <table class="table table-zebra users-table">
-                  <thead><tr><th>Логин</th><th>Комментарии</th><th aria-label="Действия"></th></tr></thead>
+                  <thead><tr><th class="user-menu-column" aria-label="Действия"></th><th>Логин</th><th>Комментарии</th></tr></thead>
                   <tbody>
                     {#if usersLoading}<tr><td colspan="3" class="log-empty animate-pulse">Загрузка…</td></tr>
                     {:else if users.length === 0}<tr><td colspan="3" class="log-empty">Пользователей нет</td></tr>
                     {:else}{#each users as user (user.login)}
                       <tr oncontextmenu={(event) => openUserContextMenu(event, user)}>
+                        <td class="user-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с пользователем ${user.login}`} aria-haspopup="menu" onclick={(event) => openUserContextMenu(event, user)}><Menu size={18} aria-hidden="true" /></button></td>
                         <td>{user.login}</td><td>{user.comments || '—'}</td>
-                        <td class="user-actions"><button class="btn-icon preset-tonal" type="button" aria-label={`Изменить пользователя ${user.login}`} title="Изменить" onclick={() => { userDialog = { create: false, ...user }; }}><Pencil size={16} aria-hidden="true" /></button><button class="btn-icon preset-tonal" type="button" aria-label={`Удалить пользователя ${user.login}`} title="Удалить" onclick={() => { userDeleteConfirmation = user; }}><Trash2 size={16} aria-hidden="true" /></button></td>
                       </tr>
                     {/each}{/if}
                   </tbody>
@@ -1845,14 +1863,14 @@
 
 {#if userContextMenu}
   <div class="user-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${userContextMenu.x}px;top:${userContextMenu.y}px`} role="menu">
-    <button type="button" role="menuitem" onclick={() => { userDialog = { create: false, ...userContextMenu.user }; userContextMenu = null; }}>Изменить</button>
-    <button class="danger" type="button" role="menuitem" onclick={() => { userDeleteConfirmation = userContextMenu.user; userContextMenu = null; }}>Удалить</button>
+    <button type="button" role="menuitem" onclick={() => { userDialog = { create: false, ...userContextMenu.user }; userContextMenu = null; }}><Pencil size={16} aria-hidden="true" />Изменить</button>
+    <button class="danger" type="button" role="menuitem" onclick={() => { userDeleteConfirmation = userContextMenu.user; userContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
 
 {#if backupContextMenu}
   <div class="backup-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${backupContextMenu.x}px;top:${backupContextMenu.y}px`} role="menu" aria-label={`Действия с бэкапом ${backupContextMenu.backup.name}`}>
-    <button type="button" role="menuitem" onclick={() => { backupRestoreConfirmation = backupContextMenu.backup; backupContextMenu = null; }}><Undo2 size={16} aria-hidden="true" />Восстановить</button>
+    <button type="button" role="menuitem" onclick={() => openBackupRestoreDialog(backupContextMenu.backup)}><Undo2 size={16} aria-hidden="true" />Восстановить</button>
     <button class="danger" type="button" role="menuitem" onclick={() => { backupDeleteConfirmation = backupContextMenu.backup; backupContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
@@ -2038,7 +2056,7 @@
     <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
       <Dialog.Title class="login-error-title">Восстановить бэкап?</Dialog.Title>
       <Dialog.Description class="login-error-description">
-        Текущая MySQL-база проекта «{selectedProjectName}» будет полностью заменена данными из бэкапа «{backupRestoreConfirmation?.name}».
+        Текущая {backupRestoreConfirmation?.database}-база проекта «{selectedProjectName}» будет полностью заменена данными из бэкапа «{backupRestoreConfirmation?.name}».
       </Dialog.Description>
       <div class="login-error-actions system-confirm-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>

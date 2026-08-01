@@ -25,7 +25,7 @@ final readonly class ProjectBackupListRequestDto implements RequestDto
         $dateTo = self::date($request->query['dateTo'] ?? '');
         $sort = $request->query['sort'] ?? 'date';
         $direction = $request->query['direction'] ?? 'desc';
-        if ($page === false || !in_array($pageSize, [25, 50, 100], true) || !is_string($name) || mb_strlen($name) > 500 || !in_array($composition, ['all', 'database', 'files', 'database-files'], true) || !in_array($database, ['all', 'mysql'], true) || $dateFrom === false || $dateTo === false || ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) || !in_array($sort, ['name', 'date', 'composition', 'size', 'database'], true) || !in_array($direction, ['asc', 'desc'], true)) {
+        if ($page === false || !in_array($pageSize, [25, 50, 100], true) || !is_string($name) || mb_strlen($name) > 500 || !in_array($composition, ['all', 'database', 'files', 'database-files'], true) || !in_array($database, ['all', 'mysql', 'postgres'], true) || $dateFrom === false || $dateTo === false || ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) || !in_array($sort, ['name', 'date', 'composition', 'size', 'database'], true) || !in_array($direction, ['asc', 'desc'], true)) {
             throw new RequestValidationException('Некорректные параметры списка бэкапов.');
         }
         return new static(rawurldecode($request->route['name']), $page, $pageSize, trim($name), $composition, $database, $dateFrom, $dateTo, $sort, $direction);
