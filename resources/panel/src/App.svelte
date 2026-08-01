@@ -464,7 +464,7 @@
     backupDeleteConfirmation = null;
     backupDeletePending = true;
     try {
-      await deleteProjectBackup(api, selectedProjectName, backup.name);
+      await deleteProjectBackup(api, selectedProjectName, backup.name, backup.databaseCode);
       notifyQueuedOperation(`Удаление бэкапа «${backup.name}»`);
     } catch (cause) {
       errorTitle = 'Не удалось удалить бэкап';
