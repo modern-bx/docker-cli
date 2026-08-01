@@ -62,9 +62,9 @@ export async function cloneProject(request, project, parameters) {
 }
 
 /** @returns {Promise<ProjectListDto>} */
-export async function renameProject(request, project, code) {
-  return /** @type {Promise<ProjectListDto>} */ (request(`/api/projects/${encodeURIComponent(project)}/rename`, {
-    method: 'POST', body: JSON.stringify({ code }),
+export async function updateProject(request, project, changes) {
+  return /** @type {Promise<ProjectListDto>} */ (request(`/api/projects/${encodeURIComponent(project)}/update`, {
+    method: 'POST', body: JSON.stringify(changes),
   }));
 }
 

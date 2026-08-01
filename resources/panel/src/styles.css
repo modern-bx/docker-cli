@@ -176,6 +176,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .dark .log-table th { background: var(--color-surface-800); }
 .log-table th button { width: 100%; padding: 0.75rem; text-align: left; font-weight: 700; white-space: nowrap; }
 .log-table td { max-width: 28rem; padding: 0.7rem 0.75rem; border-top: 1px solid var(--color-surface-200); overflow-wrap: anywhere; vertical-align: top; }
+.log-table td.log-nowrap { white-space: nowrap; overflow-wrap: normal; }
 .log-filter-link { color: var(--color-primary-700); text-align: left; text-decoration: underline; text-underline-offset: 0.15rem; }
 .log-status-link { display: inline-flex; align-items: center; gap: 0.55rem; }
 .dark .log-filter-link { color: var(--color-primary-300); }
@@ -226,6 +227,8 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .project-name { display: flex; min-width: 0; align-items: center; gap: 0.35rem; }
 .project-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-name svg { flex: 0 0 auto; color: var(--color-surface-500); }
+.project-notes-help { display: inline-flex; flex: 0 0 auto; padding: 0; border: 0; background: transparent; color: var(--color-surface-500); cursor: help; }
+.project-notes-tooltip { z-index: 100; max-width: 22rem; padding: 0.625rem 0.75rem; font-size: 0.875rem; line-height: 1.35; white-space: pre-wrap; }
 .project-tags { display: flex; gap: 0.35rem; margin-top: 0.3rem; flex-wrap: wrap; }
 .project-tags button { padding: 0.12rem 0.45rem; border-radius: 999px; background: var(--color-surface-200); color: var(--color-surface-600); font-size: 0.68rem; line-height: 1.1rem; }
 .dark .project-tags button { background: var(--color-surface-800); color: var(--color-surface-300); }

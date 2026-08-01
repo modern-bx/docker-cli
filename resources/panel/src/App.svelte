@@ -4,7 +4,7 @@
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
-  import { cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, updateProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -110,8 +110,8 @@
   let projectAddDialog = null;
   let projectCloneDialog = null;
   let projectCloning = false;
-  let projectRenameDialog = null;
-  let projectRenaming = false;
+  let projectUpdateDialog = null;
+  let projectUpdating = false;
   let projectAddOptions = { locations: [], languages: [], frameworks: {}, deploymentScripts: [] };
   let projectLocationCollection = useListCollection({ items: [] });
   let projectLanguageCollection = useListCollection({ items: [] });
@@ -188,6 +188,7 @@
   $: projectLocationCollection = useListCollection({ items: projectAddOptions.locations.map((item) => ({ value: item.code, label: item.code })) });
   $: projectLanguageCollection = useListCollection({ items: projectAddOptions.languages.map((item) => ({ value: item.code, label: item.name })) });
   $: projectFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectAddDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
+  $: projectUpdateFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectUpdateDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
   $: projectDeploymentCollection = useListCollection({ items: [{ value: '', label: 'Не использовать' }, ...projectAddOptions.deploymentScripts.map((item) => ({ value: item.code, label: item.name }))] });
   $: selectedDeploymentScript = projectAddOptions.deploymentScripts.find((item) => item.code === projectAddDialog?.deploymentScript) || null;
 
@@ -899,6 +900,18 @@
     }
   }
 
+  async function openProjectUpdateDialog(project) {
+    try {
+      projectAddOptions = await getProjectOptions(api);
+      const language = project.language?.code || projectAddOptions.languages[0]?.code || '';
+      projectUpdateDialog = { project: project.name, name: project.name, language, framework: project.framework?.code || '' };
+      projectContextMenu = null;
+    } catch (cause) {
+      errorTitle = 'Не удалось открыть изменение проекта';
+      error = cause instanceof Error ? cause.message : 'Не удалось загрузить параметры проекта.';
+    }
+  }
+
   function selectDeploymentScript(code) {
     const script = projectAddOptions.deploymentScripts.find((item) => item.code === code);
     const deploymentArguments = {};
@@ -929,18 +942,18 @@
     finally { projectAdding = false; }
   }
 
-  async function submitProjectRename() {
-    if (!projectRenameDialog || projectRenaming) return;
-    projectRenaming = true;
+  async function submitProjectUpdate() {
+    if (!projectUpdateDialog || projectUpdating) return;
+    projectUpdating = true;
     try {
-      const data = await renameProject(api, projectRenameDialog.project, projectRenameDialog.code);
+      const data = await updateProject(api, projectUpdateDialog.project, { name: projectUpdateDialog.name, language: projectUpdateDialog.language, framework: projectUpdateDialog.framework });
       projects = data.projects;
-      projectRenameDialog = null;
-      notifyQueuedOperation('Переименование проекта');
+      projectUpdateDialog = null;
+      notifyQueuedOperation('Изменение проекта');
     } catch (cause) {
-      errorTitle = 'Не удалось переименовать проект';
-      error = cause instanceof Error ? cause.message : 'Не удалось переименовать проект.';
-    } finally { projectRenaming = false; }
+      errorTitle = 'Не удалось изменить проект';
+      error = cause instanceof Error ? cause.message : 'Не удалось изменить проект.';
+    } finally { projectUpdating = false; }
   }
 
   async function api(path, options = {}) {
@@ -1583,7 +1596,16 @@
                     >
                       <span class:enabled={project.enabled} class="status-dot" title={project.enabled ? 'Включен' : 'Выключен'}></span>
                       <span class="project-summary">
-                        <span class="project-name"><strong>{project.name}</strong>{#if project.protected}<Lock size={14} aria-label="Защищённый проект" />{/if}</span>
+                        <span class="project-name">
+                          <strong>{project.name}</strong>
+                          {#if project.description.trim()}
+                            <Tooltip positioning={{ placement: 'top' }}>
+                              <Tooltip.Trigger class="project-notes-help" aria-label={`Заметки проекта ${project.name}`} onclick={(event) => event.stopPropagation()}><CircleHelp size={14} aria-hidden="true" /></Tooltip.Trigger>
+                              <Tooltip.Positioner><Tooltip.Content class="project-notes-tooltip card preset-filled-surface-900-100 shadow-xl">{project.description}</Tooltip.Content></Tooltip.Positioner>
+                            </Tooltip>
+                          {/if}
+                          {#if project.protected}<Lock size={14} aria-label="Защищённый проект" />{/if}
+                        </span>
                         <span class="project-tags">
                           {#each [{ code: project.language?.code || 'no-language', name: project.language?.name || 'no-language' }, { code: project.framework?.code || 'no-framework', name: project.framework?.name || 'Без фреймворка' }, ...project.tags.map((tag) => ({ code: tag, name: tag }))] as tag}
                             <button type="button" onclick={(event) => { event.stopPropagation(); addProjectTag(tag.code); }}>{tag.name}</button>
@@ -1720,7 +1742,7 @@
                       <tbody>
                         {#if logsLoading}<tr><td colspan="10" class="log-empty animate-pulse">Загрузка…</td></tr>
                         {:else if logItems.length === 0}<tr><td colspan="10" class="log-empty">Записей нет</td></tr>
-                        {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('queueItem', item.queueItem)}>{formatLogValue(item.queueItem)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('itemCode', item.itemCode)}>{formatLogValue(item.itemCode)}</button></td><td>{formatLogValue(item.queueCode)}</td><td>{#if item.status}<button class="log-filter-link log-status-link" type="button" onclick={() => changeLogStatus(item.status)}><span class={`queue-dot status-${item.status}`} aria-hidden="true"></span>{logStatusLabel(item.status)}</button>{:else}—{/if}</td><td>{#if item.taskCode}<button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('taskCode', item.taskCode)}>{item.taskCode}</button>{:else}—{/if}</td><td>{#if item.level}<button class={`log-filter-link log-level level-${item.level}`} type="button" onclick={() => changeLogCategory('level', item.level)}>{logCategoryLabel(logLevels, item.level)}</button>{:else}—{/if}</td><td>{#if item.context}<button class="log-filter-link" type="button" onclick={() => changeLogCategory('context', item.context)}>{logCategoryLabel(logContexts, item.context)}</button>{:else}—{/if}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
+                        {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('queueItem', item.queueItem)}>{formatLogValue(item.queueItem)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('itemCode', item.itemCode)}>{formatLogValue(item.itemCode)}</button></td><td>{formatLogValue(item.queueCode)}</td><td class="log-nowrap">{#if item.status}<button class="log-filter-link log-status-link" type="button" onclick={() => changeLogStatus(item.status)}><span class={`queue-dot status-${item.status}`} aria-hidden="true"></span>{logStatusLabel(item.status)}</button>{:else}—{/if}</td><td>{#if item.taskCode}<button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('taskCode', item.taskCode)}>{item.taskCode}</button>{:else}—{/if}</td><td class="log-nowrap">{#if item.level}<button class={`log-filter-link log-level level-${item.level}`} type="button" onclick={() => changeLogCategory('level', item.level)}>{logCategoryLabel(logLevels, item.level)}</button>{:else}—{/if}</td><td class="log-nowrap">{#if item.context}<button class="log-filter-link" type="button" onclick={() => changeLogCategory('context', item.context)}>{logCategoryLabel(logContexts, item.context)}</button>{:else}—{/if}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
                       </tbody>
                     </table>
                   </div>
@@ -1778,7 +1800,7 @@
                 <tbody>
                   {#if logsLoading}<tr><td colspan="11" class="log-empty animate-pulse">Загрузка…</td></tr>
                   {:else if logItems.length === 0}<tr><td colspan="11" class="log-empty">Записей нет</td></tr>
-                  {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('queueItem', item.queueItem)}>{formatLogValue(item.queueItem)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('itemCode', item.itemCode)}>{formatLogValue(item.itemCode)}</button></td><td>{#if logRecordProjects(item).length}{#each logRecordProjects(item) as project, index}{#if index}, {/if}<button class="log-filter-link" type="button" onclick={() => changeLogProject(project)}>{project}</button>{/each}{:else}—{/if}</td><td>{formatLogValue(item.queueCode)}</td><td>{#if item.status}<button class="log-filter-link log-status-link" type="button" onclick={() => changeLogStatus(item.status)}><span class={`queue-dot status-${item.status}`} aria-hidden="true"></span>{logStatusLabel(item.status)}</button>{:else}—{/if}</td><td>{#if item.taskCode}<button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('taskCode', item.taskCode)}>{item.taskCode}</button>{:else}—{/if}</td><td>{#if item.level}<button class={`log-filter-link log-level level-${item.level}`} type="button" onclick={() => changeLogCategory('level', item.level)}>{logCategoryLabel(logLevels, item.level)}</button>{:else}—{/if}</td><td>{#if item.context}<button class="log-filter-link" type="button" onclick={() => changeLogCategory('context', item.context)}>{logCategoryLabel(logContexts, item.context)}</button>{:else}—{/if}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
+                  {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('queueItem', item.queueItem)}>{formatLogValue(item.queueItem)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('itemCode', item.itemCode)}>{formatLogValue(item.itemCode)}</button></td><td>{#if logRecordProjects(item).length}{#each logRecordProjects(item) as project, index}{#if index}, {/if}<button class="log-filter-link" type="button" onclick={() => changeLogProject(project)}>{project}</button>{/each}{:else}—{/if}</td><td>{formatLogValue(item.queueCode)}</td><td class="log-nowrap">{#if item.status}<button class="log-filter-link log-status-link" type="button" onclick={() => changeLogStatus(item.status)}><span class={`queue-dot status-${item.status}`} aria-hidden="true"></span>{logStatusLabel(item.status)}</button>{:else}—{/if}</td><td>{#if item.taskCode}<button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('taskCode', item.taskCode)}>{item.taskCode}</button>{:else}—{/if}</td><td class="log-nowrap">{#if item.level}<button class={`log-filter-link log-level level-${item.level}`} type="button" onclick={() => changeLogCategory('level', item.level)}>{logCategoryLabel(logLevels, item.level)}</button>{:else}—{/if}</td><td class="log-nowrap">{#if item.context}<button class="log-filter-link" type="button" onclick={() => changeLogCategory('context', item.context)}>{logCategoryLabel(logContexts, item.context)}</button>{:else}—{/if}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
                 </tbody>
               </table>
             </div>
@@ -1957,8 +1979,8 @@
     <button type="button" role="menuitem" onclick={() => openProjectCloneDialog(projectContextMenu.project)}>
       <Copy size={16} aria-hidden="true" />Клонировать
     </button>
-    <button type="button" role="menuitem" onclick={() => { projectRenameDialog = { project: projectContextMenu.project.name, code: projectContextMenu.project.name }; projectContextMenu = null; }}>
-      <Pencil size={16} aria-hidden="true" />Переименовать
+    <button type="button" role="menuitem" onclick={() => openProjectUpdateDialog(projectContextMenu.project)}>
+      <Pencil size={16} aria-hidden="true" />Изменить
     </button>
     <button type="button" role="menuitem" onclick={() => runContextProjectAction(projectContextMenu.project.enabled ? 'disable' : 'enable')}>
       <Power size={16} aria-hidden="true" />{projectContextMenu.project.enabled ? 'Отключить' : 'Включить'}
@@ -1988,15 +2010,17 @@
   </Dialog.Positioner>
 </Dialog>
 
-<Dialog open={Boolean(projectRenameDialog)} onOpenChange={({ open }) => { if (!open && !projectRenaming) projectRenameDialog = null; }}>
+<Dialog open={Boolean(projectUpdateDialog)} onOpenChange={({ open }) => { if (!open && !projectUpdating) projectUpdateDialog = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
     <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
-      <Dialog.Title class="login-error-title">Переименовать проект</Dialog.Title>
-      {#if projectRenameDialog}
-        <form class="project-add-form" onsubmit={(event) => { event.preventDefault(); submitProjectRename(); }}>
-          <label class="label"><span class="label-text">Код</span><input class="input" bind:value={projectRenameDialog.code} required pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
-          <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectRenaming} onclick={() => { projectRenameDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectRenaming || !projectRenameDialog.code}>{projectRenaming ? 'Переименовываем…' : 'Переименовать'}</button></div>
+      <Dialog.Title class="login-error-title">Изменить проект</Dialog.Title>
+      {#if projectUpdateDialog}
+        <form class="project-add-form" onsubmit={(event) => { event.preventDefault(); submitProjectUpdate(); }}>
+          <label class="label"><span class="label-text">Имя</span><input class="input" bind:value={projectUpdateDialog.name} required pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
+          <label class="label"><span class="label-text">Язык</span><Combobox collection={projectLanguageCollection} value={[projectUpdateDialog.language]} openOnClick onValueChange={(details) => { if (details.value[0]) { projectUpdateDialog.language = details.value[0]; projectUpdateDialog.framework = projectAddOptions.frameworks[projectUpdateDialog.language]?.[0]?.code || ''; } }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languages.map((language) => ({ value: language.code, label: language.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          <label class="label"><span class="label-text">Фреймворк</span><Combobox collection={projectUpdateFrameworkCollection} value={[projectUpdateDialog.framework]} openOnClick onValueChange={(details) => { projectUpdateDialog.framework = details.value[0] ?? ''; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each (projectAddOptions.frameworks[projectUpdateDialog.language] || []).map((framework) => ({ value: framework.code, label: framework.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectUpdating} onclick={() => { projectUpdateDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectUpdating || !projectUpdateDialog.name}>{projectUpdating ? 'Изменяем…' : 'Изменить'}</button></div>
         </form>
       {/if}
     </Dialog.Content>
