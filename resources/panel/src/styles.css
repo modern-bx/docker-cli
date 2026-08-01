@@ -90,6 +90,9 @@ button { cursor: pointer; }
 .dark .system-service { border-color: var(--color-surface-800); }
 .system-service:last-child { border-bottom: 0; }
 .system-service-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.system-service-link { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--color-primary-700); text-decoration: underline; text-underline-offset: 0.15rem; }
+.system-service-link svg { flex: 0 0 auto; }
+.dark .system-service-link { color: var(--color-primary-300); }
 .system-actions { display: flex; align-items: center; gap: 0.25rem; }
 .system-actions .btn { padding-inline: 0.6rem; font-size: 0.7rem; }
 .system-menu-global-actions { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.8rem; }

@@ -1183,6 +1183,12 @@
     projectAction(action, project.name);
   }
 
+  function systemServiceUrl(service) {
+    if (!['mailpit', 'dockhand', 'adminer'].includes(service.name)) return null;
+    const baseHost = window.location.hostname.replace(/^panel\./, '');
+    return `https://${service.name}.${baseHost}`;
+  }
+
   async function systemAction(action, service = '') {
     systemOpen = false;
     systemPending = true;
@@ -1367,9 +1373,14 @@
               <div class="system-menu-divider" aria-hidden="true"></div>
               {#if systemServices.length === 0}<p class="system-empty">Сервисы не найдены</p>{/if}
               {#each systemServices as service (service.name)}
+                {@const serviceUrl = systemServiceUrl(service)}
                 <div class="system-service">
                   <span class={`system-dot ${service.running ? 'running' : 'stopped'}`} aria-hidden="true"></span>
-                  <span class="system-service-name" title={service.image}>{service.name}</span>
+                  {#if serviceUrl}
+                    <a class="system-service-name system-service-link" href={serviceUrl} target="_blank" rel="noopener noreferrer" title={service.image}>{service.name}<ExternalLink size={13} aria-hidden="true" /></a>
+                  {:else}
+                    <span class="system-service-name" title={service.image}>{service.name}</span>
+                  {/if}
                   <div class="system-actions">
                     <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction(service.running ? 'stop' : 'start', service.name)}>
                       {#if service.running}<Square size={14} aria-hidden="true" />{:else}<Play size={14} aria-hidden="true" />{/if}
