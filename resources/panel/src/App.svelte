@@ -402,6 +402,15 @@
     backupRestoreConfirmation = backup;
   }
 
+  function openBackupDeleteDialog(backup) {
+    backupContextMenu = null;
+    if (selectedProject?.protected) {
+      protectedAlert = selectedProject;
+      return;
+    }
+    backupDeleteConfirmation = backup;
+  }
+
   function openBackupCreateDialog() {
     backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, filesAlert: false };
   }
@@ -455,7 +464,7 @@
     backupDeleteConfirmation = null;
     backupDeletePending = true;
     try {
-      await deleteProjectBackup(api, selectedProjectName, backup.name);
+      await deleteProjectBackup(api, selectedProjectName, backup.name, backup.databaseCode);
       notifyQueuedOperation(`Удаление бэкапа «${backup.name}»`);
     } catch (cause) {
       errorTitle = 'Не удалось удалить бэкап';
@@ -1918,7 +1927,7 @@
 {#if backupContextMenu}
   <div class="backup-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${backupContextMenu.x}px;top:${backupContextMenu.y}px`} role="menu" aria-label={`Действия с бэкапом ${backupContextMenu.backup.name}`}>
     <button type="button" role="menuitem" onclick={() => openBackupRestoreDialog(backupContextMenu.backup)}><Undo2 size={16} aria-hidden="true" />Восстановить</button>
-    <button class="danger" type="button" role="menuitem" onclick={() => { backupDeleteConfirmation = backupContextMenu.backup; backupContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
+    <button class="danger" type="button" role="menuitem" onclick={() => openBackupDeleteDialog(backupContextMenu.backup)}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
 
@@ -2140,7 +2149,7 @@
     <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
       <Dialog.Title class="login-error-title">Удалить бэкап?</Dialog.Title>
       <Dialog.Description class="login-error-description">
-        MySQL-бэкап «{backupDeleteConfirmation?.name}» проекта «{selectedProjectName}» будет безвозвратно удалён.
+        {backupDeleteConfirmation?.database}-бэкап «{backupDeleteConfirmation?.name}» проекта «{selectedProjectName}» будет безвозвратно удалён.
       </Dialog.Description>
       <div class="login-error-actions system-confirm-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>

@@ -49,8 +49,8 @@ export async function restoreProjectBackup(request, project, backup, database) {
   return request(`/api/projects/${encodeURIComponent(project)}/backups/${encodeURIComponent(backup)}/restore`, { method: 'POST', body: JSON.stringify({ database }) });
 }
 
-export async function deleteProjectBackup(request, project, backup) {
-  return request(`/api/projects/${encodeURIComponent(project)}/backups/${encodeURIComponent(backup)}/delete`, { method: 'POST' });
+export async function deleteProjectBackup(request, project, backup, database) {
+  return request(`/api/projects/${encodeURIComponent(project)}/backups/${encodeURIComponent(backup)}/delete`, { method: 'POST', body: JSON.stringify({ database }) });
 }
 
 export async function createProject(request, project) {

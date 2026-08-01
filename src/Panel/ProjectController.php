@@ -217,13 +217,14 @@ final class ProjectController
     {
         if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
         if ($this->projects->isProjectProtected($request->name)) throw new ProjectActionException('Проект защищен.', 409);
+        $taskCode = 'core.' . $request->database . '.backup-delete';
         $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
-            'code' => 'core.mysql.backup-delete',
+            'code' => $taskCode,
             'arguments' => ['backup' => ['value' => $request->backup]],
             'project' => $request->name,
         ]]]];
         try {
-            $file = ($this->queues ?? new QueueRepository())->create('default', 'core.mysql.backup-delete', $item);
+            $file = ($this->queues ?? new QueueRepository())->create('default', $taskCode, $item);
         } catch (\InvalidArgumentException|\RuntimeException $exception) {
             throw new ProjectActionException($exception->getMessage(), 500);
         }
