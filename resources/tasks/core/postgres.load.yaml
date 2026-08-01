@@ -1,0 +1,16 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Восстановление PostgreSQL из бэкапа
+  code: core.postgres.load
+  type: shell
+  context: project
+  description: Полностью заменяет PostgreSQL-базу проекта данными из выбранного бэкапа.
+  parameters:
+    path:
+      name: Путь к бэкапу
+      type: string
+      required: true
+  action: |
+    docker-cli postgres:load --project="$project" {{ path }}

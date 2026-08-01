@@ -435,8 +435,8 @@
     backupRestoreConfirmation = null;
     backupRestorePending = true;
     try {
-      await restoreProjectBackup(api, selectedProjectName, backup.name);
-      notifyQueuedOperation(`Восстановление бэкапа «${backup.name}»`);
+      await restoreProjectBackup(api, selectedProjectName, backup.name, backup.databaseCode);
+      notifyQueuedOperation(`Восстановление ${backup.database}-бэкапа «${backup.name}»`);
     } catch (cause) {
       errorTitle = 'Не удалось восстановить бэкап';
       error = cause instanceof Error ? cause.message : 'Не удалось поставить восстановление бэкапа в очередь.';
@@ -544,7 +544,11 @@
   function openUserContextMenu(event, user) {
     if (event.ctrlKey) { userContextMenu = null; return; }
     event.preventDefault();
-    userContextMenu = { user, x: Math.min(event.clientX, window.innerWidth - 180), y: Math.min(event.clientY, window.innerHeight - 120) };
+    event.stopPropagation();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
+    const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.bottom;
+    userContextMenu = { user, x: Math.max(8, Math.min(x, window.innerWidth - 180)), y: Math.max(8, Math.min(y, window.innerHeight - 120)) };
   }
 
   async function saveUser() {
@@ -1798,14 +1802,14 @@
               </div>
               <div class="users-table-wrap card preset-filled-surface-100-900">
                 <table class="table table-zebra users-table">
-                  <thead><tr><th>Логин</th><th>Комментарии</th><th aria-label="Действия"></th></tr></thead>
+                  <thead><tr><th class="user-menu-column" aria-label="Действия"></th><th>Логин</th><th>Комментарии</th></tr></thead>
                   <tbody>
                     {#if usersLoading}<tr><td colspan="3" class="log-empty animate-pulse">Загрузка…</td></tr>
                     {:else if users.length === 0}<tr><td colspan="3" class="log-empty">Пользователей нет</td></tr>
                     {:else}{#each users as user (user.login)}
                       <tr oncontextmenu={(event) => openUserContextMenu(event, user)}>
+                        <td class="user-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с пользователем ${user.login}`} aria-haspopup="menu" onclick={(event) => openUserContextMenu(event, user)}><Menu size={18} aria-hidden="true" /></button></td>
                         <td>{user.login}</td><td>{user.comments || '—'}</td>
-                        <td class="user-actions"><button class="btn-icon preset-tonal" type="button" aria-label={`Изменить пользователя ${user.login}`} title="Изменить" onclick={() => { userDialog = { create: false, ...user }; }}><Pencil size={16} aria-hidden="true" /></button><button class="btn-icon preset-tonal" type="button" aria-label={`Удалить пользователя ${user.login}`} title="Удалить" onclick={() => { userDeleteConfirmation = user; }}><Trash2 size={16} aria-hidden="true" /></button></td>
                       </tr>
                     {/each}{/if}
                   </tbody>
@@ -1848,8 +1852,8 @@
 
 {#if userContextMenu}
   <div class="user-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${userContextMenu.x}px;top:${userContextMenu.y}px`} role="menu">
-    <button type="button" role="menuitem" onclick={() => { userDialog = { create: false, ...userContextMenu.user }; userContextMenu = null; }}>Изменить</button>
-    <button class="danger" type="button" role="menuitem" onclick={() => { userDeleteConfirmation = userContextMenu.user; userContextMenu = null; }}>Удалить</button>
+    <button type="button" role="menuitem" onclick={() => { userDialog = { create: false, ...userContextMenu.user }; userContextMenu = null; }}><Pencil size={16} aria-hidden="true" />Изменить</button>
+    <button class="danger" type="button" role="menuitem" onclick={() => { userDeleteConfirmation = userContextMenu.user; userContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
 
@@ -2041,7 +2045,7 @@
     <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
       <Dialog.Title class="login-error-title">Восстановить бэкап?</Dialog.Title>
       <Dialog.Description class="login-error-description">
-        Текущая MySQL-база проекта «{selectedProjectName}» будет полностью заменена данными из бэкапа «{backupRestoreConfirmation?.name}».
+        Текущая {backupRestoreConfirmation?.database}-база проекта «{selectedProjectName}» будет полностью заменена данными из бэкапа «{backupRestoreConfirmation?.name}».
       </Dialog.Description>
       <div class="login-error-actions system-confirm-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>

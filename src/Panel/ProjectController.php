@@ -146,10 +146,6 @@ final class ProjectController
         });
         $total = count($items);
         $items = array_slice($items, ($request->page - 1) * $request->pageSize, $request->pageSize);
-        $items = array_map(static function (array $item): array {
-            unset($item['databaseCode']);
-            return $item;
-        }, $items);
         return new ProjectBackupListDto($items, $total, $request->page, $request->pageSize);
     }
 
@@ -195,19 +191,20 @@ final class ProjectController
         $root = $config['data']['project']['root'] ?? null;
         if (!is_string($root) || $root === '') throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
 
-        $backupRoot = realpath(join_path($root, '.docker-cli', 'backups', 'mysql'));
+        $backupRoot = realpath(join_path($root, '.docker-cli', 'backups', $request->database));
         $backup = $backupRoot === false ? false : realpath(join_path($backupRoot, $request->backup));
         if ($backup === false || !is_dir($backup) || !str_starts_with($backup . DIRECTORY_SEPARATOR, $backupRoot . DIRECTORY_SEPARATOR)) {
             throw new ProjectActionException('Бэкап не найден.', 404);
         }
 
+        $taskCode = 'core.' . $request->database . '.load';
         $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
-            'code' => 'core.mysql.load',
+            'code' => $taskCode,
             'arguments' => ['path' => ['value' => $backup]],
             'project' => $request->name,
         ]]]];
         try {
-            $file = ($this->queues ?? new QueueRepository())->create('default', 'core.mysql.load', $item);
+            $file = ($this->queues ?? new QueueRepository())->create('default', $taskCode, $item);
         } catch (\InvalidArgumentException|\RuntimeException $exception) {
             throw new ProjectActionException($exception->getMessage(), 500);
         }
