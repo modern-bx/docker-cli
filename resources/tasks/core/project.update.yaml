@@ -1,0 +1,27 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Изменение проекта
+  code: core.project.update
+  type: shell
+  context: project
+  description: Изменяет имя, язык или фреймворк проекта.
+  parameters:
+    name: { type: string, required: false }
+    language: { type: list, required: false, items: [{ name: PHP, value: php }] }
+    framework:
+      type: list
+      required: false
+      items:
+        - { name: Без фреймворка, value: '' }
+        - { name: Symfony, value: symfony }
+        - { name: Laravel, value: laravel }
+        - { name: Bitrix, value: bitrix }
+        - { name: Bitrix24, value: bitrix24 }
+  action: |
+    options=()
+    [ -n "${name+x}" ] && options+=(--name="$name")
+    [ -n "${language+x}" ] && options+=(--language="$language")
+    [ -n "${framework+x}" ] && options+=(--framework="$framework")
+    docker-cli project:update "${options[@]}"

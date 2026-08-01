@@ -125,14 +125,15 @@ bin/docker-cli project:clone --to=my-project-copy --here
 DNS-алиасы через Traefik и Dnsdock и выполняет reload OpenResty, поэтому новый
 проект сразу открывается на собственном хосте.
 
-### `bin/docker-cli project:rename <code>`
+### `bin/docker-cli project:update [--name] [--language] [--framework]`
 
-Меняет код проекта в глобальном реестре и локальном `.docker-cli/project.yaml`.
-Команду нужно запускать из директории переименовываемого проекта; сама директория
-с файлами проекта не переименовывается.
+Изменяет имя, язык и фреймворк проекта. Команду нужно запускать из директории
+зарегистрированного проекта. Если язык или фреймворк изменились, команда пересобирает
+конфигурацию OpenResty и перезагружает связанные сервисы. Вызов без опций выводит
+предупреждение и завершается успешно.
 
 ```bash
-bin/docker-cli project:rename new-project-code
+bin/docker-cli project:update --name=new-project --language=php --framework=symfony
 ```
 
 ### `bin/docker-cli project:disable [project]` / `bin/docker-cli project:enable [project]`

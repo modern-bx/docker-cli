@@ -20,7 +20,7 @@ use DockerCli\Panel\Dto\Request\ProjectCloneRequestDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectActionRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectNotesRequestDto;
-use DockerCli\Panel\Dto\Request\ProjectRenameRequestDto;
+use DockerCli\Panel\Dto\Request\ProjectUpdateRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectSecurityRequestDto;
 use DockerCli\Panel\Enum\ProjectActionEnum;
 use DockerCli\Panel\Http\Attribute\Route;
@@ -312,18 +312,24 @@ final class ProjectController
         return new QueuedOperationDto($file);
     }
 
-    #[Route('POST', '/api/projects/{name}/rename', ProjectRenameRequestDto::class, ProjectListDto::class)]
-    public function rename(ProjectRenameRequestDto $request): ProjectListDto
+    #[Route('POST', '/api/projects/{name}/update', ProjectUpdateRequestDto::class, ProjectListDto::class)]
+    public function update(ProjectUpdateRequestDto $request): ProjectListDto
     {
-        if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
-        if (preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $request->code) !== 1) throw new ProjectActionException('Код проекта должен содержать строчные латинские буквы, цифры и дефисы.', 422);
-        if ($request->code !== $request->name && $this->projects->hasProject($request->code)) throw new ProjectActionException('Проект с таким кодом уже существует.', 409);
+        if (!$this->projects->hasProject($request->project)) throw new ProjectActionException('Проект не найден.', 404);
+        if ($request->name !== null && preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $request->name) !== 1) throw new ProjectActionException('Имя проекта должно содержать строчные латинские буквы, цифры и дефисы.', 422);
+        if ($request->name !== null && $request->name !== $request->project && $this->projects->hasProject($request->name)) throw new ProjectActionException('Проект с таким именем уже существует.', 409);
+        $options = $this->options(new EmptyRequestDto());
+        if ($request->language !== null && !isset($options->frameworks[$request->language])) throw new ProjectActionException('Язык не поддерживается.', 422);
+        $language = $request->language ?? 'php';
+        if ($request->framework !== null && !in_array($request->framework, array_map(static fn (ConceptDto $item) => $item->code, $options->frameworks[$language] ?? []), true)) throw new ProjectActionException('Фреймворк не поддерживается.', 422);
+        $arguments = [];
+        foreach (['name', 'language', 'framework'] as $option) {
+            if ($request->{$option} !== null) $arguments[$option] = ['value' => $request->{$option}];
+        }
         $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
-            'code' => 'core.project.rename',
-            'arguments' => ['code' => ['value' => $request->code]],
-            'project' => $request->name,
+            'code' => 'core.project.update', 'arguments' => $arguments, 'project' => $request->project,
         ]]]];
-        try { ($this->queues ?? new QueueRepository())->create('default', 'core.project.rename', $item); }
+        try { ($this->queues ?? new QueueRepository())->create('default', 'core.project.update', $item); }
         catch (\InvalidArgumentException|\RuntimeException $exception) { throw new ProjectActionException($exception->getMessage(), 500); }
         return $this->projects(new EmptyRequestDto());
     }
