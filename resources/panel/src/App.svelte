@@ -1596,7 +1596,16 @@
                     >
                       <span class:enabled={project.enabled} class="status-dot" title={project.enabled ? 'Включен' : 'Выключен'}></span>
                       <span class="project-summary">
-                        <span class="project-name"><strong>{project.name}</strong>{#if project.protected}<Lock size={14} aria-label="Защищённый проект" />{/if}</span>
+                        <span class="project-name">
+                          <strong>{project.name}</strong>
+                          {#if project.description.trim()}
+                            <Tooltip positioning={{ placement: 'top' }}>
+                              <Tooltip.Trigger class="project-notes-help" aria-label={`Заметки проекта ${project.name}`} onclick={(event) => event.stopPropagation()}><CircleHelp size={14} aria-hidden="true" /></Tooltip.Trigger>
+                              <Tooltip.Positioner><Tooltip.Content class="project-notes-tooltip card preset-filled-surface-900-100 shadow-xl">{project.description}</Tooltip.Content></Tooltip.Positioner>
+                            </Tooltip>
+                          {/if}
+                          {#if project.protected}<Lock size={14} aria-label="Защищённый проект" />{/if}
+                        </span>
                         <span class="project-tags">
                           {#each [{ code: project.language?.code || 'no-language', name: project.language?.name || 'no-language' }, { code: project.framework?.code || 'no-framework', name: project.framework?.name || 'Без фреймворка' }, ...project.tags.map((tag) => ({ code: tag, name: tag }))] as tag}
                             <button type="button" onclick={(event) => { event.stopPropagation(); addProjectTag(tag.code); }}>{tag.name}</button>
