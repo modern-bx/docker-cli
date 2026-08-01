@@ -869,7 +869,7 @@
 
   function openProjectCloneDialog(project) {
     projectContextMenu = null;
-    projectCloneDialog = { project: project.name, to: '', skipDb: false, mysql: true, postgres: true };
+    projectCloneDialog = { project: project.name, to: '', mysql: true, postgres: true };
   }
 
   async function submitProjectClone() {
@@ -878,7 +878,7 @@
     try {
       const dialog = projectCloneDialog;
       const dbms = [dialog.mysql && 'mysql', dialog.postgres && 'postgres'].filter(Boolean);
-      await cloneProject(api, dialog.project, { to: dialog.to, skipDb: dialog.skipDb, dbms });
+      await cloneProject(api, dialog.project, { to: dialog.to, dbms });
       projectCloneDialog = null;
       notifyQueuedOperation(`Клонирование проекта «${dialog.project}»`);
     } catch (cause) {
@@ -1975,16 +1975,12 @@
 <Dialog open={Boolean(projectCloneDialog)} onOpenChange={({ open }) => { if (!open && !projectCloning) projectCloneDialog = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
-    <Dialog.Content class="login-error-dialog project-add-dialog card preset-filled-surface-100-900 shadow-2xl">
+    <Dialog.Content class="login-error-dialog project-clone-dialog card preset-filled-surface-100-900 shadow-2xl">
       <Dialog.Title class="login-error-title">Клонировать проект</Dialog.Title>
       {#if projectCloneDialog}
-        <form class="project-add-form" onsubmit={(event) => { event.preventDefault(); submitProjectClone(); }}>
+        <form class="project-add-form project-clone-form" onsubmit={(event) => { event.preventDefault(); submitProjectClone(); }}>
           <label class="label"><span class="label-text">Имя проекта (опционально)</span><input class="input" bind:value={projectCloneDialog.to} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
-          <div class="security-option">
-            <label><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.skipDb} />Не клонировать базы данных</label>
-            <Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" type="button" aria-label="О клонировании баз данных"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Файлы и настройки проекта будут клонированы без содержимого баз данных.</Tooltip.Content></Tooltip.Positioner></Tooltip>
-          </div>
-          <fieldset disabled={projectCloneDialog.skipDb}><legend class="label-text">DBMS</legend><div class="project-deployment-checkboxes"><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.mysql} /><span>MySQL</span></label><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.postgres} /><span>PostgreSQL</span></label></div></fieldset>
+          <fieldset class="project-clone-dbms"><legend class="label-text">СУБД</legend><div class="project-deployment-checkboxes"><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.mysql} /><span>MySQL</span></label><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.postgres} /><span>PostgreSQL</span></label></div></fieldset>
           <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectCloning} onclick={() => { projectCloneDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectCloning}>{projectCloning ? 'Добавляем…' : 'Добавить'}</button></div>
         </form>
       {/if}
