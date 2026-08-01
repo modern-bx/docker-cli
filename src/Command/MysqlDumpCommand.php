@@ -8,7 +8,6 @@ use DockerCli\Config\MissingConfigException;
 use DockerCli\Project\MysqlDumpLoader;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -19,8 +18,9 @@ final class MysqlDumpCommand extends AbstractCommand
     {
         parent::__construct('mysql:dump');
         $this->setDescription('Создать параллельный дамп MySQL-базы проекта через mydumper.');
-        $this->addArgument('path', InputArgument::OPTIONAL, 'Директория дампа (по умолчанию .docker-cli/backups/mysql/<дата>).');
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
+        $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Путь к директории создаваемого бэкапа.');
+        $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Короткое имя директории бэкапа.');
         $this->addOption('threads', 'j', InputOption::VALUE_REQUIRED, 'Число параллельных потоков.', '4');
     }
 
@@ -42,8 +42,21 @@ final class MysqlDumpCommand extends AbstractCommand
             $this->writeMessage($output, sprintf('<error>В конфигурации проекта "%s" не задана база MySQL.</error>', $project));
             return Command::FAILURE;
         }
-        $path = $input->getArgument('path');
-        $path = is_string($path) && $path !== '' ? $path : sprintf('.docker-cli/backups/mysql/%s-%s', $project, date('Ymd-His'));
+        $name = $input->getOption('name');
+        $path = $input->getOption('path');
+        if ($name !== null && $path !== null) {
+            $this->writeMessage($output, '<error>Опции --name и --path нельзя использовать одновременно.</error>');
+            return Command::INVALID;
+        }
+        if ($name !== null && (!is_string($name) || $name === '' || basename($name) !== $name)) {
+            $this->writeMessage($output, '<error>Опция --name должна содержать короткое имя директории бэкапа.</error>');
+            return Command::INVALID;
+        }
+        if ($path !== null && (!is_string($path) || $path === '')) {
+            $this->writeMessage($output, '<error>Опция --path должна содержать путь к директории бэкапа.</error>');
+            return Command::INVALID;
+        }
+        $path = $path ?? sprintf('.docker-cli/backups/mysql/%s', $name ?? sprintf('%s-%s', $project, date('Ymd-His')));
         $path = $this->absolutePath($path);
         try {
             $code = ($this->dumpLoader ?? new MysqlDumpLoader())->dump($database, $path, $threads, $output);

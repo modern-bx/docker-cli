@@ -13,7 +13,7 @@ task:
       type: string
   action: |
     if [ -n "${backup:-}" ]; then
-      docker-cli mysql:dump --project="$project" ".docker-cli/backups/mysql/$backup"
+      docker-cli mysql:dump --project="$project" --name="$backup"
     else
       docker-cli mysql:dump --project="$project"
     fi
