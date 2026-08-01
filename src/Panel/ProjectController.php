@@ -16,6 +16,7 @@ use DockerCli\Panel\Dto\Request\ProjectBackupListRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectBackupCreateRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectBackupRestoreRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectCreateRequestDto;
+use DockerCli\Panel\Dto\Request\ProjectCloneRequestDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectActionRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectNotesRequestDto;
@@ -291,6 +292,24 @@ final class ProjectController
         try { ($this->queues ?? new QueueRepository())->create('default', 'core.project.up', $item); }
         catch (\InvalidArgumentException|\RuntimeException $exception) { throw new ProjectActionException($exception->getMessage(), 500); }
         return $this->projects(new EmptyRequestDto());
+    }
+
+    #[Route('POST', '/api/projects/{name}/clone', ProjectCloneRequestDto::class, QueuedOperationDto::class)]
+    public function clone(ProjectCloneRequestDto $request): QueuedOperationDto
+    {
+        if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
+        $arguments = ['from' => ['value' => $request->name], 'here' => ['value' => true]];
+        if ($request->to !== null) $arguments['to'] = ['value' => $request->to];
+        if ($request->skipDb || $request->dbms === []) $arguments['skip-db'] = ['value' => true];
+        else $arguments['dbms'] = ['value' => implode(',', $request->dbms)];
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
+            'code' => 'core.project.clone', 'arguments' => $arguments,
+        ]]]];
+        $validationErrors = (new QueueItemValidator($this->tasks ?? new TaskRepository()))->validate($item);
+        if ($validationErrors !== []) throw new ProjectActionException(implode("\n", $validationErrors), 422);
+        try { $file = ($this->queues ?? new QueueRepository())->create('default', 'core.project.clone', $item); }
+        catch (\InvalidArgumentException|\RuntimeException $exception) { throw new ProjectActionException($exception->getMessage(), 500); }
+        return new QueuedOperationDto($file);
     }
 
     #[Route('POST', '/api/projects/{name}/rename', ProjectRenameRequestDto::class, ProjectListDto::class)]

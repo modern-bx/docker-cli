@@ -6,8 +6,10 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Panel\ProjectsSettingsRepository;
+use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\DataInitializer;
 use DockerCli\Project\MysqlDumpLoader;
+use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectDatabaseConfig;
 use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Project\ProjectRegistry;
@@ -144,6 +146,15 @@ final class ProjectCloneCommand extends AbstractCommand
             $databaseDuration = microtime(true) - $databaseStarted;
             if ($databaseCode !== Command::SUCCESS) return $databaseCode;
         }
+        try {
+            (new OpenRestyHostRenderer())->render();
+        } catch (\RuntimeException $exception) {
+            $this->writeMessage($output, '<error>Не удалось пересобрать конфигурацию хостов OpenResty: ' . $exception->getMessage() . '</error>');
+            return Command::FAILURE;
+        }
+        $restartCode = (new ConfigurableServicesRestarter())->restart($output);
+        if ($restartCode !== Command::SUCCESS) return $restartCode;
+
         $this->writeMessage($output, sprintf(
             '<info>Проект "%s" клонирован в "%s" (%s; всего: %s; копирование файлов: %s%s).</info>',
             $name,

@@ -425,5 +425,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 @media (max-width: 700px) { .location-row { align-items: stretch; flex-wrap: wrap; } .location-row > .input { width: 100%; flex-basis: 100%; } .location-default, .location-default-help { align-self: center; } }
 .project-add-button { width: 125px; margin: 0 1.5rem .75rem; justify-content: center; }
 .project-add-form { display: grid; gap: 1rem; margin-top: 1rem; }
+.project-clone-form { grid-template-columns: minmax(0, 1fr); }
+.project-clone-dbms .project-deployment-checkboxes { margin-top: .375rem; }
 .project-add-form .label { position: relative; }
 .project-add-form .label:focus-within, .project-add-form .font-combobox-positioner { z-index: 60; }

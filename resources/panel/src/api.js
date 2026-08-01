@@ -57,6 +57,10 @@ export async function createProject(request, project) {
   return request('/api/projects', { method: 'POST', body: JSON.stringify(project) });
 }
 
+export async function cloneProject(request, project, parameters) {
+  return request(`/api/projects/${encodeURIComponent(project)}/clone`, { method: 'POST', body: JSON.stringify(parameters) });
+}
+
 /** @returns {Promise<ProjectListDto>} */
 export async function renameProject(request, project, code) {
   return /** @type {Promise<ProjectListDto>} */ (request(`/api/projects/${encodeURIComponent(project)}/rename`, {

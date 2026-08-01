@@ -4,7 +4,7 @@
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
-  import { createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, renameProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -108,6 +108,8 @@
   let projectConfirmation = null;
   let projectContextMenu = null;
   let projectAddDialog = null;
+  let projectCloneDialog = null;
+  let projectCloning = false;
   let projectRenameDialog = null;
   let projectRenaming = false;
   let projectAddOptions = { locations: [], languages: [], frameworks: {}, deploymentScripts: [] };
@@ -865,6 +867,26 @@
     if (project) requestProjectAction(action, project);
   }
 
+  function openProjectCloneDialog(project) {
+    projectContextMenu = null;
+    projectCloneDialog = { project: project.name, to: '', mysql: true, postgres: true };
+  }
+
+  async function submitProjectClone() {
+    if (!projectCloneDialog || projectCloning) return;
+    projectCloning = true;
+    try {
+      const dialog = projectCloneDialog;
+      const dbms = [dialog.mysql && 'mysql', dialog.postgres && 'postgres'].filter(Boolean);
+      await cloneProject(api, dialog.project, { to: dialog.to, dbms });
+      projectCloneDialog = null;
+      notifyQueuedOperation(`Клонирование проекта «${dialog.project}»`);
+    } catch (cause) {
+      errorTitle = 'Не удалось клонировать проект';
+      error = cause instanceof Error ? cause.message : 'Не удалось клонировать проект.';
+    } finally { projectCloning = false; }
+  }
+
   async function openProjectAddDialog() {
     try {
       projectAddOptions = await getProjectOptions(api);
@@ -1594,6 +1616,9 @@
                     <div><dt>Основной хост</dt><dd>{#if selectedProject.url}<a class="project-host" href={selectedProject.url} target="_blank" rel="noreferrer">{selectedProject.url}<ExternalLink size={14} aria-hidden="true" /></a>{:else}Не указан{/if}</dd></div>
                   </dl>
                   <div class="project-general-actions">
+                    <button class="btn preset-tonal" type="button" onclick={() => openProjectCloneDialog(selectedProject)}>
+                      <Copy size={16} aria-hidden="true" />Клонировать
+                    </button>
                     <button class="btn preset-tonal" type="button" onclick={() => requestProjectAction(selectedProject.enabled ? 'disable' : 'enable', selectedProject)}>
                       <Power size={16} aria-hidden="true" />{selectedProject.enabled ? 'Отключить' : 'Включить'}
                     </button>
@@ -1929,6 +1954,9 @@
       <button type="button" role="menuitem" disabled><ExternalLink size={16} aria-hidden="true" />Открыть</button>
     {/if}
     <hr />
+    <button type="button" role="menuitem" onclick={() => openProjectCloneDialog(projectContextMenu.project)}>
+      <Copy size={16} aria-hidden="true" />Клонировать
+    </button>
     <button type="button" role="menuitem" onclick={() => { projectRenameDialog = { project: projectContextMenu.project.name, code: projectContextMenu.project.name }; projectContextMenu = null; }}>
       <Pencil size={16} aria-hidden="true" />Переименовать
     </button>
@@ -1943,6 +1971,22 @@
     </button>
   </div>
 {/if}
+
+<Dialog open={Boolean(projectCloneDialog)} onOpenChange={({ open }) => { if (!open && !projectCloning) projectCloneDialog = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog project-clone-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Клонировать проект</Dialog.Title>
+      {#if projectCloneDialog}
+        <form class="project-add-form project-clone-form" onsubmit={(event) => { event.preventDefault(); submitProjectClone(); }}>
+          <label class="label"><span class="label-text">Имя проекта (опционально)</span><input class="input" bind:value={projectCloneDialog.to} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
+          <fieldset class="project-clone-dbms"><legend class="label-text">СУБД</legend><div class="project-deployment-checkboxes"><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.mysql} /><span>MySQL</span></label><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.postgres} /><span>PostgreSQL</span></label></div></fieldset>
+          <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectCloning} onclick={() => { projectCloneDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectCloning}>{projectCloning ? 'Добавляем…' : 'Добавить'}</button></div>
+        </form>
+      {/if}
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
 
 <Dialog open={Boolean(projectRenameDialog)} onOpenChange={({ open }) => { if (!open && !projectRenaming) projectRenameDialog = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
