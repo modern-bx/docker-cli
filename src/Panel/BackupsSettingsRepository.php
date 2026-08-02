@@ -38,8 +38,18 @@ final class BackupsSettingsRepository
         return $valid;
     }
 
-    /** @param list<array{path: string, code: string, default: bool}> $locations */
-    public function save(array $locations): array
+    /** @return list<array{name: string, code: string, include: list<string>, exclude: list<string>}> */
+    public function fileStrategies(): array
+    {
+        return $this->storedSettings()['fileStrategies'];
+    }
+
+    /**
+     * @param list<array{path: string, code: string, default: bool}> $locations
+     * @param list<array{name: string, code: string, include: list<string>, exclude: list<string>}> $fileStrategies
+     * @return array{locations: list<array{path: string, code: string, default: bool}>, fileStrategies: list<array{name: string, code: string, include: list<string>, exclude: list<string>}>}
+     */
+    public function save(array $locations, array $fileStrategies): array
     {
         // Use the values actually persisted in the file to distinguish an
         // existing location from a newly added one. Existing location codes may
@@ -67,33 +77,48 @@ final class BackupsSettingsRepository
                 throw new \InvalidArgumentException(sprintf('Каталог «%s» должен быть доступен для чтения, записи и листинга.', $path));
             }
         }
+        $usedStrategies = [];
+        foreach ($fileStrategies as &$strategy) {
+            if ($strategy['code'] === '') {
+                $strategy['code'] = (new ProjectNameGenerator())->generate(array_keys($usedStrategies));
+            }
+            if (isset($usedStrategies[$strategy['code']])) throw new \InvalidArgumentException('Коды файловых стратегий должны быть уникальными.');
+            $usedStrategies[$strategy['code']] = true;
+        }
         $directory = dirname($this->file);
         if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf('Unable to create settings directory "%s".', $directory));
         }
         $contents = Yaml::dump([
             'meta' => ['schema' => 'settings.backups', 'version' => 0.1],
-            'settings.backups' => ['locations' => $locations],
+            'settings.backups' => ['locations' => $locations, 'fileStrategies' => $fileStrategies],
         ], 4, 2);
         if (file_put_contents($this->file, $contents, LOCK_EX) === false) {
             throw new \RuntimeException(sprintf('Unable to write backups settings "%s".', $this->file));
         }
         chmod($this->file, 0600);
-        return $locations;
+        return ['locations' => $locations, 'fileStrategies' => $fileStrategies];
     }
 
     /** @return list<array{path: string, code?: mixed, default: bool}> */
     private function storedLocations(): array
     {
-        if (!is_file($this->file)) return [];
-        $data = Yaml::parseFile($this->file);
-        $locations = is_array($data)
-            && ($data['meta']['schema'] ?? null) === 'settings.backups'
-            && ($data['meta']['version'] ?? null) === 0.1
-            && is_array($data['settings.backups']['locations'] ?? null)
-            ? $data['settings.backups']['locations'] : [];
+        return $this->storedSettings()['locations'];
+    }
 
-        return array_values(array_filter($locations, static fn ($item): bool => is_array($item)
+    /** @return array{locations: list<array{path: string, code?: mixed, default: bool}>, fileStrategies: list<array{name: string, code: string, include: list<string>, exclude: list<string>}>} */
+    private function storedSettings(): array
+    {
+        $data = is_file($this->file) ? Yaml::parseFile($this->file) : [];
+        $settings = is_array($data) && ($data['meta']['schema'] ?? null) === 'settings.backups'
+            && ($data['meta']['version'] ?? null) === 0.1 && is_array($data['settings.backups'] ?? null)
+            ? $data['settings.backups'] : [];
+        $locations = array_values(array_filter(is_array($settings['locations'] ?? null) ? $settings['locations'] : [], static fn ($item): bool => is_array($item)
             && is_string($item['path'] ?? null) && is_bool($item['default'] ?? null)));
+        $strategies = array_values(array_filter(is_array($settings['fileStrategies'] ?? null) ? $settings['fileStrategies'] : [], static fn ($item): bool => is_array($item)
+            && is_string($item['name'] ?? null) && is_string($item['code'] ?? null)
+            && is_array($item['include'] ?? null) && array_is_list($item['include']) && !array_filter($item['include'], static fn ($value): bool => !is_string($value))
+            && is_array($item['exclude'] ?? null) && array_is_list($item['exclude']) && !array_filter($item['exclude'], static fn ($value): bool => !is_string($value))));
+        return ['locations' => $locations, 'fileStrategies' => $strategies];
     }
 }

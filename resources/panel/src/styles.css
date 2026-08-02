@@ -406,6 +406,11 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .location-default-help { flex: none; }
 .location-delete { color: var(--color-error-600); }
 .dark .location-delete { color: var(--color-error-400); }
+.file-strategy-dialog { width: min(42rem, calc(100vw - 2rem)); }
+.file-strategy-fields { display: grid; gap: 1.25rem; margin-top: 1rem; }
+.strategy-pattern-section h3 { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.6rem; font-weight: 700; }
+.strategy-pattern-list { display: grid; gap: 0.45rem; }
+.strategy-pattern-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.6rem; }
 .users-settings-scroll { display: flex; flex-direction: column; }
 .users-table-wrap { max-width: 64rem; overflow-x: auto; border: 1px solid var(--color-surface-200); }
 .dark .users-table-wrap { border-color: var(--color-surface-800); }

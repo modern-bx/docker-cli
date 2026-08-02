@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2, Undo2 } from '@lucide/svelte';
+  import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Settings, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
   import { cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, getBackupsSettings, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, updateProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
@@ -161,6 +161,8 @@
   let projectSettingsLoading = false;
   let projectSettingsSaving = false;
   let backupLocations = [{ path: '', code: '', default: true }];
+  let backupFileStrategies = [];
+  let fileStrategyDialog = null;
   let backupSettingsLoading = false;
   let backupSettingsSaving = false;
   let users = [];
@@ -561,6 +563,9 @@
       backupLocations = Array.isArray(data.locations) && data.locations.length
         ? data.locations.map((location) => ({ path: location.path, code: location.code || '', default: location.default === true }))
         : [{ path: '', code: '', default: true }];
+      backupFileStrategies = Array.isArray(data.fileStrategies)
+        ? data.fileStrategies.map((strategy) => ({ name: strategy.name, code: strategy.code || '', include: strategy.include || [], exclude: strategy.exclude || [] }))
+        : [];
     } catch (cause) {
       errorTitle = 'Не удалось загрузить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить расположения бэкапов.';
@@ -696,12 +701,57 @@
     backupLocations = backupLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === index }));
   }
 
+  function updateFileStrategy(index, field, value) {
+    backupFileStrategies = backupFileStrategies.map((strategy, itemIndex) => itemIndex === index ? { ...strategy, [field]: value } : strategy);
+  }
+
+  function addFileStrategy() {
+    backupFileStrategies = [...backupFileStrategies, { name: '', code: '', include: [], exclude: [] }];
+  }
+
+  function removeFileStrategy(index) {
+    backupFileStrategies = backupFileStrategies.filter((_, itemIndex) => itemIndex !== index);
+  }
+
+  function openFileStrategySettings(index) {
+    const strategy = backupFileStrategies[index];
+    fileStrategyDialog = {
+      index,
+      include: strategy.include.length ? [...strategy.include] : [''],
+      exclude: strategy.exclude.length ? [...strategy.exclude] : [''],
+    };
+  }
+
+  function updateStrategyPattern(kind, index, value) {
+    fileStrategyDialog = { ...fileStrategyDialog, [kind]: fileStrategyDialog[kind].map((item, itemIndex) => itemIndex === index ? value : item) };
+  }
+
+  function addStrategyPattern(kind) {
+    fileStrategyDialog = { ...fileStrategyDialog, [kind]: [...fileStrategyDialog[kind], ''] };
+  }
+
+  function removeStrategyPattern(kind, index) {
+    const patterns = fileStrategyDialog[kind].filter((_, itemIndex) => itemIndex !== index);
+    fileStrategyDialog = { ...fileStrategyDialog, [kind]: patterns.length ? patterns : [''] };
+  }
+
+  function saveFileStrategySettings() {
+    const { index, include, exclude } = fileStrategyDialog;
+    backupFileStrategies = backupFileStrategies.map((strategy, itemIndex) => itemIndex === index ? {
+      ...strategy,
+      include: include.map((item) => item.trim()).filter(Boolean),
+      exclude: exclude.map((item) => item.trim()).filter(Boolean),
+    } : strategy);
+    fileStrategyDialog = null;
+  }
+
   async function saveBackupLocations() {
-    if (backupSettingsSaving || backupLocations.some((location) => !location.path.trim())) return;
+    if (backupSettingsSaving || backupLocations.some((location) => !location.path.trim()) || backupFileStrategies.some((strategy) => !strategy.name.trim())) return;
     backupSettingsSaving = true;
     try {
-      const data = await saveBackupsSettings(api, backupLocations.map((location) => ({ ...location, path: location.path.trim() })));
+      const data = await saveBackupsSettings(api, backupLocations.map((location) => ({ ...location, path: location.path.trim() })), backupFileStrategies.map((strategy) => ({ ...strategy, name: strategy.name.trim(), code: strategy.code.trim() })));
       backupLocations = data.locations;
+      backupFileStrategies = data.fileStrategies;
     } catch (cause) {
       errorTitle = 'Не удалось сохранить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось сохранить расположения бэкапов.';
@@ -1933,7 +1983,7 @@
             {:else if settingsTab === 'backups'}
             <div class="settings-scroll">
               <div class="project-toolbar">
-                <button class="btn preset-filled-primary-500" type="button" disabled={backupSettingsLoading || backupSettingsSaving || backupLocations.some((location) => !location.path.trim())} onclick={saveBackupLocations}>
+                <button class="btn preset-filled-primary-500" type="button" disabled={backupSettingsLoading || backupSettingsSaving || backupLocations.some((location) => !location.path.trim()) || backupFileStrategies.some((strategy) => !strategy.name.trim())} onclick={saveBackupLocations}>
                   <Save size={16} aria-hidden="true" />{backupSettingsSaving ? 'Сохраняем…' : 'Сохранить'}
                 </button>
               </div>
@@ -1959,6 +2009,27 @@
                         </Tooltip>
                       </div>
                     </div>
+                  {/each}
+                </div>
+              </section>
+              <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Файловые стратегии">
+                <h2>Файловые стратегии
+                  <Tooltip positioning={{ placement: 'right' }}>
+                    <Tooltip.Trigger class="security-help" aria-label="О файловых стратегиях"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                    <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Стратегии, использующиеся для создания файловых бэкапов проектов</Tooltip.Content></Tooltip.Positioner>
+                  </Tooltip>
+                </h2>
+                <div class="location-list">
+                  {#each backupFileStrategies as strategy, index}
+                    <div class="location-item"><div class="location-row">
+                      <input class="input location-path" type="text" value={strategy.name} disabled={backupSettingsLoading || backupSettingsSaving} placeholder="название стратегии" aria-label={`Название файловой стратегии ${index + 1}`} oninput={(event) => updateFileStrategy(index, 'name', event.currentTarget.value)} />
+                      <input class="input location-code" type="text" value={strategy.code} disabled={backupSettingsLoading || backupSettingsSaving} placeholder="код (автоматически)" aria-label={`Код файловой стратегии ${index + 1}`} oninput={(event) => updateFileStrategy(index, 'code', event.currentTarget.value)} />
+                      <button class="btn preset-tonal" type="button" title="Настройки" aria-label={`Настройки файловой стратегии ${index + 1}`} disabled={backupSettingsLoading || backupSettingsSaving} onclick={() => openFileStrategySettings(index)}><Settings size={16} aria-hidden="true" /></button>
+                      <button class="btn preset-tonal" type="button" title="Добавить стратегию" aria-label="Добавить файловую стратегию" disabled={!strategy.name.trim() || backupSettingsLoading || backupSettingsSaving} onclick={addFileStrategy}><Plus size={16} aria-hidden="true" /></button>
+                      <button class="btn preset-tonal location-delete" type="button" title="Удалить стратегию" aria-label="Удалить файловую стратегию" disabled={backupSettingsLoading || backupSettingsSaving} onclick={() => removeFileStrategy(index)}><Trash2 size={16} aria-hidden="true" /></button>
+                    </div></div>
+                  {:else}
+                    <button class="btn preset-tonal" type="button" disabled={backupSettingsLoading || backupSettingsSaving} onclick={addFileStrategy}><Plus size={16} aria-hidden="true" />Добавить стратегию</button>
                   {/each}
                 </div>
               </section>
@@ -2223,6 +2294,37 @@
       <Dialog.Description class="login-error-description">{queuedOperationNotice}</Dialog.Description>
       <div class="login-error-actions">
         <Dialog.CloseTrigger class="btn preset-filled-primary-500" type="button">ОК</Dialog.CloseTrigger>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(fileStrategyDialog)} onOpenChange={({ open }) => { if (!open) fileStrategyDialog = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog file-strategy-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Настройки файловой стратегии</Dialog.Title>
+      {#if fileStrategyDialog}
+        <div class="file-strategy-fields">
+          {#each [['include', 'Включить', 'Относительные пути или паттерны, которые нужно включить в файловый бэкап'], ['exclude', 'Исключить', 'Относительные пути или паттерны, которые нужно исключить из бэкапа']] as [kind, title, hint]}
+            <section class="strategy-pattern-section">
+              <h3>{title}<Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" aria-label={`О блоке ${title}`}><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">{hint}</Tooltip.Content></Tooltip.Positioner></Tooltip></h3>
+              <div class="strategy-pattern-list">
+                {#each fileStrategyDialog[kind] as pattern, index}
+                  <div class="strategy-pattern-row">
+                    <input class="input" type="text" value={pattern} placeholder="путь или паттерн" aria-label={`${title}: путь или паттерн ${index + 1}`} oninput={(event) => updateStrategyPattern(kind, index, event.currentTarget.value)} />
+                    <button class="btn preset-tonal" type="button" title="Добавить" aria-label={`Добавить паттерн в ${title.toLocaleLowerCase()}`} onclick={() => addStrategyPattern(kind)}><Plus size={16} aria-hidden="true" /></button>
+                    <button class="btn preset-tonal location-delete" type="button" title="Удалить" aria-label={`Удалить паттерн из ${title.toLocaleLowerCase()}`} onclick={() => removeStrategyPattern(kind, index)}>−</button>
+                  </div>
+                {/each}
+              </div>
+            </section>
+          {/each}
+        </div>
+      {/if}
+      <div class="login-error-actions">
+        <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отменить</Dialog.CloseTrigger>
+        <button class="btn preset-filled-primary-500" type="button" onclick={saveFileStrategySettings}>Сохранить</button>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>
