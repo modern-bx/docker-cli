@@ -2369,7 +2369,7 @@
             <section class="backup-restore-section">
               {#if backupRestoreConfirmation.hasDatabase}<h3>Файлы</h3>{/if}
               <div class="backup-restore-options">
-                <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.restoreFiles} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, restoreFiles: event.currentTarget.checked }; }} />Восстановить файлы</label>
+                {#if backupRestoreConfirmation.hasDatabase}<label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.restoreFiles} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, restoreFiles: event.currentTarget.checked }; }} />Восстановить файлы</label>{/if}
                 <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.force} disabled={!backupRestoreConfirmation.restoreFiles} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, force: event.currentTarget.checked }; }} />Перезаписывать файлы</label>
                 <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.wipe} disabled={!backupRestoreConfirmation.restoreFiles} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, wipe: event.currentTarget.checked }; }} />Предварительно стереть все файлы</label>
               </div>
