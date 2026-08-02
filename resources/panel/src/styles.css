@@ -399,7 +399,8 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .location-list { display: grid; gap: 0.4rem; }
 .location-item { display: grid; gap: 0.5rem; }
 .location-row { display: flex; align-items: center; gap: 0.6rem; }
-.locations-card { width: min(100%, 72rem); }
+.locations-card { width: min(100%, 72rem); max-width: 44.5rem; }
+.locations-card + .locations-card { margin-top: 0.75rem; }
 .location-row > .location-path { width: 20rem; min-width: 10rem; flex: 0 0 20rem; }
 .location-row > .location-code { width: 12rem; min-width: 9rem; flex: 0 0 12rem; }
 .location-default { flex: none; cursor: pointer; }
