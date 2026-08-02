@@ -134,6 +134,17 @@ export async function saveProjectsSettings(request, locations) {
   });
 }
 
+export async function getBackupsSettings(request) {
+  return request('/api/settings/backups');
+}
+
+export async function saveBackupsSettings(request, locations) {
+  return request('/api/settings/backups', {
+    method: 'POST',
+    body: JSON.stringify({ locations }),
+  });
+}
+
 export async function getUsersSettings(request, page, pageSize) {
   return request(`/api/settings/users?${new URLSearchParams({ page: String(page), pageSize: String(pageSize) })}`);
 }

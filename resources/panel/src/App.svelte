@@ -4,7 +4,7 @@
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
-  import { cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, updateProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, getBackupsSettings, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, updateProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -155,6 +155,9 @@
   let projectLocations = [{ path: '', default: true }];
   let projectSettingsLoading = false;
   let projectSettingsSaving = false;
+  let backupLocations = [{ path: '', code: '', default: true }];
+  let backupSettingsLoading = false;
+  let backupSettingsSaving = false;
   let users = [];
   let usersTotal = 0;
   let usersPage = 1;
@@ -306,11 +309,12 @@
       loadLogs();
       return;
     }
-    if (segments.length === 2 && segments[0] === 'settings' && ['projects', 'users', 'security'].includes(segments[1])) {
+    if (segments.length === 2 && segments[0] === 'settings' && ['projects', 'backups', 'users', 'security'].includes(segments[1])) {
       activeSection = 'settings';
       settingsTab = segments[1];
       selectedProjectName = '';
       if (settingsTab === 'projects') loadProjectsSettings();
+      else if (settingsTab === 'backups') loadBackupsSettings();
       else if (settingsTab === 'users') loadUsersSettings();
       else loadSecuritySettings();
       return;
@@ -537,6 +541,23 @@
     }
   }
 
+  async function loadBackupsSettings() {
+    if (!authenticated || backupSettingsLoading) return;
+    backupSettingsLoading = true;
+    try {
+      const data = await getBackupsSettings(api);
+      backupLocations = Array.isArray(data.locations) && data.locations.length
+        ? data.locations.map((location) => ({ path: location.path, code: location.code || '', default: location.default === true }))
+        : [{ path: '', code: '', default: true }];
+    } catch (cause) {
+      errorTitle = 'Не удалось загрузить настройки';
+      error = cause instanceof Error ? cause.message : 'Не удалось загрузить расположения бэкапов.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      backupSettingsLoading = false;
+    }
+  }
+
   async function loadUsersSettings() {
     if (!authenticated || usersLoading) return;
     usersLoading = true;
@@ -642,6 +663,39 @@
       errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
     } finally {
       projectSettingsSaving = false;
+    }
+  }
+
+  function updateBackupLocation(index, field, value) {
+    backupLocations = backupLocations.map((location, itemIndex) => itemIndex === index ? { ...location, [field]: value } : location);
+  }
+
+  function addBackupLocation() {
+    backupLocations = [...backupLocations, { path: '', code: '', default: false }];
+  }
+
+  function removeBackupLocation(index) {
+    const wasDefault = backupLocations[index].default;
+    backupLocations = backupLocations.filter((_, itemIndex) => itemIndex !== index);
+    if (wasDefault && backupLocations.length) backupLocations = backupLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === 0 }));
+  }
+
+  function setDefaultBackupLocation(index) {
+    backupLocations = backupLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === index }));
+  }
+
+  async function saveBackupLocations() {
+    if (backupSettingsSaving || backupLocations.some((location) => !location.path.trim())) return;
+    backupSettingsSaving = true;
+    try {
+      const data = await saveBackupsSettings(api, backupLocations.map((location) => ({ ...location, path: location.path.trim() })));
+      backupLocations = data.locations;
+    } catch (cause) {
+      errorTitle = 'Не удалось сохранить настройки';
+      error = cause instanceof Error ? cause.message : 'Не удалось сохранить расположения бэкапов.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      backupSettingsSaving = false;
     }
   }
 
@@ -1826,6 +1880,7 @@
           <section class="settings-view" aria-label="Настройки">
             <nav class="project-detail-tabs settings-tabs" aria-label="Разделы настроек">
               <a class:active={settingsTab === 'projects'} class="project-detail-tab" href="#/settings/projects" aria-current={settingsTab === 'projects' ? 'page' : undefined}>Проекты</a>
+              <a class:active={settingsTab === 'backups'} class="project-detail-tab" href="#/settings/backups" aria-current={settingsTab === 'backups' ? 'page' : undefined}>Бэкапы</a>
               <a class:active={settingsTab === 'users'} class="project-detail-tab" href="#/settings/users" aria-current={settingsTab === 'users' ? 'page' : undefined}>Пользователи</a>
               <a class:active={settingsTab === 'security'} class="project-detail-tab" href="#/settings/security" aria-current={settingsTab === 'security' ? 'page' : undefined}>Безопасность</a>
             </nav>
@@ -1855,6 +1910,39 @@
                         <Tooltip positioning={{ placement: 'right' }}>
                           <Tooltip.Trigger class="security-help location-default-help" aria-label="О пути по умолчанию"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
                           <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Путь для автоматической развертки проектов по умолчанию</Tooltip.Content></Tooltip.Positioner>
+                        </Tooltip>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </section>
+            </div>
+            {:else if settingsTab === 'backups'}
+            <div class="settings-scroll">
+              <div class="project-toolbar">
+                <button class="btn preset-filled-primary-500" type="button" disabled={backupSettingsLoading || backupSettingsSaving || backupLocations.some((location) => !location.path.trim())} onclick={saveBackupLocations}>
+                  <Save size={16} aria-hidden="true" />{backupSettingsSaving ? 'Сохраняем…' : 'Сохранить'}
+                </button>
+              </div>
+              <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Расположение">
+                <h2>Расположение
+                  <Tooltip positioning={{ placement: 'right' }}>
+                    <Tooltip.Trigger class="security-help" aria-label="О расположениях бэкапов"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                    <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Расположение централизованных хранилищ проектных бэкапов</Tooltip.Content></Tooltip.Positioner>
+                  </Tooltip>
+                </h2>
+                <div class="location-list">
+                  {#each backupLocations as location, index}
+                    <div class="location-item">
+                      <div class="location-row">
+                        <input class="input location-path" type="text" value={location.path} disabled={backupSettingsLoading || backupSettingsSaving} placeholder="/путь/к/бэкапам" aria-label={`Расположение бэкапов ${index + 1}`} oninput={(event) => updateBackupLocation(index, 'path', event.currentTarget.value)} />
+                        <input class="input location-code" type="text" value={location.code} disabled={backupSettingsLoading || backupSettingsSaving} placeholder="код (автоматически)" aria-label={`Код расположения ${index + 1}`} oninput={(event) => updateBackupLocation(index, 'code', event.currentTarget.value)} />
+                        <button class="btn preset-tonal" type="button" title="Добавить расположение" aria-label="Добавить расположение" disabled={!location.path.trim() || backupSettingsLoading || backupSettingsSaving} onclick={addBackupLocation}><Plus size={16} aria-hidden="true" /></button>
+                        {#if backupLocations.length > 1}<button class="btn preset-tonal location-delete" type="button" title="Удалить расположение" aria-label="Удалить расположение" disabled={backupSettingsLoading || backupSettingsSaving} onclick={() => removeBackupLocation(index)}><Trash2 size={16} aria-hidden="true" /></button>{/if}
+                        <input class="radio location-default" type="radio" name="default-backup-location" checked={location.default} disabled={backupSettingsLoading || backupSettingsSaving} aria-label="Путь по умолчанию" onchange={() => setDefaultBackupLocation(index)} />
+                        <Tooltip positioning={{ placement: 'right' }}>
+                          <Tooltip.Trigger class="security-help location-default-help" aria-label="О пути по умолчанию"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                          <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Централизованное хранилище проектных бэкапов по умолчанию</Tooltip.Content></Tooltip.Positioner>
                         </Tooltip>
                       </div>
                     </div>
