@@ -44,12 +44,18 @@ final class BackupsSettingsRepository
         return $this->storedSettings()['fileStrategies'];
     }
 
+    /** @return list<array{name: string, code: string, include: list<string>, exclude: list<string>}> */
+    public function databaseStrategies(): array
+    {
+        return $this->storedSettings()['databaseStrategies'];
+    }
+
     /**
      * @param list<array{path: string, code: string, default: bool}> $locations
      * @param list<array{name: string, code: string, include: list<string>, exclude: list<string>}> $fileStrategies
      * @return array{locations: list<array{path: string, code: string, default: bool}>, fileStrategies: list<array{name: string, code: string, include: list<string>, exclude: list<string>}>}
      */
-    public function save(array $locations, array $fileStrategies): array
+    public function save(array $locations, array $fileStrategies, array $databaseStrategies): array
     {
         // Use the values actually persisted in the file to distinguish an
         // existing location from a newly added one. Existing location codes may
@@ -85,19 +91,27 @@ final class BackupsSettingsRepository
             if (isset($usedStrategies[$strategy['code']])) throw new \InvalidArgumentException('Коды файловых стратегий должны быть уникальными.');
             $usedStrategies[$strategy['code']] = true;
         }
+        $usedStrategies = [];
+        foreach ($databaseStrategies as &$strategy) {
+            if ($strategy['code'] === '') {
+                $strategy['code'] = (new ProjectNameGenerator())->generate(array_keys($usedStrategies));
+            }
+            if (isset($usedStrategies[$strategy['code']])) throw new \InvalidArgumentException('Коды стратегий БД должны быть уникальными.');
+            $usedStrategies[$strategy['code']] = true;
+        }
         $directory = dirname($this->file);
         if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf('Unable to create settings directory "%s".', $directory));
         }
         $contents = Yaml::dump([
             'meta' => ['schema' => 'settings.backups', 'version' => 0.1],
-            'settings.backups' => ['locations' => $locations, 'fileStrategies' => $fileStrategies],
+            'settings.backups' => ['locations' => $locations, 'fileStrategies' => $fileStrategies, 'databaseStrategies' => $databaseStrategies],
         ], 4, 2);
         if (file_put_contents($this->file, $contents, LOCK_EX) === false) {
             throw new \RuntimeException(sprintf('Unable to write backups settings "%s".', $this->file));
         }
         chmod($this->file, 0600);
-        return ['locations' => $locations, 'fileStrategies' => $fileStrategies];
+        return ['locations' => $locations, 'fileStrategies' => $fileStrategies, 'databaseStrategies' => $databaseStrategies];
     }
 
     /** @return list<array{path: string, code?: mixed, default: bool}> */
@@ -119,6 +133,10 @@ final class BackupsSettingsRepository
             && is_string($item['name'] ?? null) && is_string($item['code'] ?? null)
             && is_array($item['include'] ?? null) && array_is_list($item['include']) && !array_filter($item['include'], static fn ($value): bool => !is_string($value))
             && is_array($item['exclude'] ?? null) && array_is_list($item['exclude']) && !array_filter($item['exclude'], static fn ($value): bool => !is_string($value))));
-        return ['locations' => $locations, 'fileStrategies' => $strategies];
+        $databaseStrategies = array_values(array_filter(is_array($settings['databaseStrategies'] ?? null) ? $settings['databaseStrategies'] : [], static fn ($item): bool => is_array($item)
+            && is_string($item['name'] ?? null) && is_string($item['code'] ?? null)
+            && is_array($item['include'] ?? null) && array_is_list($item['include']) && !array_filter($item['include'], static fn ($value): bool => !is_string($value))
+            && is_array($item['exclude'] ?? null) && array_is_list($item['exclude']) && !array_filter($item['exclude'], static fn ($value): bool => !is_string($value))));
+        return ['locations' => $locations, 'fileStrategies' => $strategies, 'databaseStrategies' => $databaseStrategies];
     }
 }

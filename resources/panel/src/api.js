@@ -139,10 +139,10 @@ export async function getBackupsSettings(request) {
   return request('/api/settings/backups');
 }
 
-export async function saveBackupsSettings(request, locations, fileStrategies) {
+export async function saveBackupsSettings(request, locations, fileStrategies, databaseStrategies) {
   return request('/api/settings/backups', {
     method: 'POST',
-    body: JSON.stringify({ locations, fileStrategies }),
+    body: JSON.stringify({ locations, fileStrategies, databaseStrategies }),
   });
 }
 

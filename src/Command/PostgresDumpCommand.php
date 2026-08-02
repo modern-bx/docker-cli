@@ -8,6 +8,7 @@ use DockerCli\Config\MissingConfigException;
 use DockerCli\Project\PostgresDumpLoader;
 use DockerCli\Project\BackupStorageLocator;
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Panel\BackupsSettingsRepository;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -15,7 +16,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class PostgresDumpCommand extends AbstractCommand
 {
-    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?PostgresDumpLoader $dumpLoader = null, private readonly ?BackupStorageLocator $storageLocator = null)
+    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?PostgresDumpLoader $dumpLoader = null, private readonly ?BackupStorageLocator $storageLocator = null, private readonly ?BackupsSettingsRepository $backupsSettings = null)
     {
         parent::__construct('postgres:dump');
         $this->setDescription('Создать быстрый параллельный бэкап PostgreSQL в directory-формате.');
@@ -23,6 +24,7 @@ final class PostgresDumpCommand extends AbstractCommand
         $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Путь к директории создаваемого бэкапа.');
         $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Короткое имя директории бэкапа.');
         $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код централизованного хранилища бэкапов.');
+        $this->addOption('strategy', null, InputOption::VALUE_REQUIRED, 'Код стратегии БД.');
         $this->addOption('jobs', 'j', InputOption::VALUE_REQUIRED, 'Число параллельных процессов.', '4');
     }
 
@@ -71,14 +73,18 @@ final class PostgresDumpCommand extends AbstractCommand
         }
         $path = $path ?? sprintf('%s/%s', $backupRoot, $name ?? sprintf('%s-%s', $project, date('Ymd-His')));
         $path = $this->absolutePath($path);
+        $strategy = $this->resolveStrategy($input, $output);
+        if ($strategy === false) return Command::INVALID;
         try {
-            $code = ($this->dumpLoader ?? new PostgresDumpLoader())->dump($database, $path, $jobs, $output);
+            $code = ($this->dumpLoader ?? new PostgresDumpLoader())->dump($database, $path, $jobs, $output, $strategy['include'] ?? [], $strategy['exclude'] ?? []);
         } catch (MissingConfigException) {
             $this->writeMessage($output, '<error>Системная конфигурация не инициализирована.</error>');
             return Command::FAILURE;
         }
         if ($code === Command::SUCCESS) {
-            file_put_contents($path . '/docker-cli.json', json_encode(['project' => $project, 'database' => $database, 'createdAt' => date(DATE_ATOM)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+            $metadata = ['project' => $project, 'database' => $database, 'createdAt' => date(DATE_ATOM)];
+            if (is_array($strategy)) { $metadata['databaseStrategy'] = $strategy['code']; $metadata['databaseStrategyTables'] = ['include' => $strategy['include'], 'exclude' => $strategy['exclude']]; }
+            file_put_contents($path . '/docker-cli.json', json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
             CommandContext::fromEnvironment($this, $output)->addMessage(new Message(
                 sprintf('Бэкап PostgreSQL-базы "%s" проекта "%s" создан: "%s".', $database, $project, basename($path)),
                 MessageLevel::Info,
@@ -87,6 +93,16 @@ final class PostgresDumpCommand extends AbstractCommand
         }
 
         return $code;
+    }
+
+    private function resolveStrategy(InputInterface $input, OutputInterface $output): array|false|null
+    {
+        $code = $input->getOption('strategy');
+        if ($code === null) return null;
+        if (!is_string($code) || $code === '') { $this->writeMessage($output, '<error>Опция --strategy должна содержать код стратегии БД.</error>'); return false; }
+        foreach (($this->backupsSettings ?? new BackupsSettingsRepository())->databaseStrategies() as $strategy) if ($strategy['code'] === $code) return $strategy;
+        $this->writeMessage($output, sprintf('<error>Стратегия БД с кодом «%s» не найдена.</error>', $code));
+        return false;
     }
 
     private function absolutePath(string $path): string

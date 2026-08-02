@@ -19,17 +19,17 @@ final readonly class BackupsSettingsController
     #[Route('GET', '/api/settings/backups', EmptyRequestDto::class, BackupsSettingsDto::class)]
     public function get(EmptyRequestDto $request): BackupsSettingsDto
     {
-        return new BackupsSettingsDto($this->settings->locations(), $this->settings->fileStrategies());
+        return new BackupsSettingsDto($this->settings->locations(), $this->settings->fileStrategies(), $this->settings->databaseStrategies());
     }
 
     #[Route('POST', '/api/settings/backups', BackupsSettingsRequestDto::class, BackupsSettingsDto::class)]
     public function save(BackupsSettingsRequestDto $request): BackupsSettingsDto
     {
         try {
-            $settings = $this->settings->save($request->locations, $request->fileStrategies);
+            $settings = $this->settings->save($request->locations, $request->fileStrategies, $request->databaseStrategies);
         } catch (\InvalidArgumentException $exception) {
             throw new RequestValidationException($exception->getMessage());
         }
-        return new BackupsSettingsDto($settings['locations'], $settings['fileStrategies']);
+        return new BackupsSettingsDto($settings['locations'], $settings['fileStrategies'], $settings['databaseStrategies']);
     }
 }

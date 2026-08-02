@@ -170,6 +170,7 @@
   let projectSettingsSaving = false;
   let backupLocations = [{ path: '', code: '', default: true }];
   let backupFileStrategies = [{ name: '', code: '', include: [], exclude: [] }];
+  let backupDatabaseStrategies = [{ name: '', code: '', include: [], exclude: [] }];
   let fileStrategyDialog = null;
   let backupSettingsLoading = false;
   let backupSettingsSaving = false;
@@ -218,6 +219,9 @@
   $: backupCreateStrategyOptions = [{ value: '', label: 'Без стратегии' }, ...backupFileStrategies.filter((item) => item.code && item.name).map((item) => ({ value: item.code, label: item.name }))];
   $: backupCreateStrategyCollection = useListCollection({ items: backupCreateStrategyOptions });
   $: selectedBackupCreateStrategy = backupFileStrategies.find((item) => item.code === backupCreateDialog?.strategy) || null;
+  $: backupCreateDatabaseStrategyOptions = [{ value: '', label: 'Без стратегии' }, ...backupDatabaseStrategies.filter((item) => item.code && item.name).map((item) => ({ value: item.code, label: item.name }))];
+  $: backupCreateDatabaseStrategyCollection = useListCollection({ items: backupCreateDatabaseStrategyOptions });
+  $: selectedBackupCreateDatabaseStrategy = backupDatabaseStrategies.find((item) => item.code === backupCreateDialog?.databaseStrategy) || null;
   $: selectedDeploymentScript = projectAddOptions.deploymentScripts.find((item) => item.code === projectAddDialog?.deploymentScript) || null;
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
@@ -459,7 +463,7 @@
   }
 
   function openBackupCreateDialog() {
-    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, strategy: '', compress: '', chunkSize: '', chunkCount: '', location: '' };
+    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, databaseStrategy: '', strategy: '', compress: '', chunkSize: '', chunkCount: '', location: '' };
     loadBackupsSettings();
   }
 
@@ -473,6 +477,7 @@
         mysql: backupCreateDialog.mysql,
         postgres: backupCreateDialog.postgres,
         location: backupCreateDialog.location,
+        databaseStrategy: backupCreateDialog.databaseStrategy,
         strategy: backupCreateDialog.strategy,
         compress: backupCreateDialog.compress,
         chunkSize: backupCreateDialog.chunkSize,
@@ -616,6 +621,9 @@
       backupFileStrategies = Array.isArray(data.fileStrategies)
         && data.fileStrategies.length
         ? data.fileStrategies.map((strategy) => ({ name: strategy.name, code: strategy.code || '', include: strategy.include || [], exclude: strategy.exclude || [] }))
+        : [{ name: '', code: '', include: [], exclude: [] }];
+      backupDatabaseStrategies = Array.isArray(data.databaseStrategies) && data.databaseStrategies.length
+        ? data.databaseStrategies.map((strategy) => ({ name: strategy.name, code: strategy.code || '', include: strategy.include || [], exclude: strategy.exclude || [] }))
         : [{ name: '', code: '', include: [], exclude: [] }];
     } catch (cause) {
       errorTitle = 'Не удалось загрузить настройки';
@@ -769,9 +777,18 @@
     const strategy = backupFileStrategies[index];
     fileStrategyDialog = {
       index,
+      type: 'file',
       include: strategy.include.length ? [...strategy.include] : [''],
       exclude: strategy.exclude.length ? [...strategy.exclude] : [''],
     };
+  }
+
+  function updateDatabaseStrategy(index, field, value) { backupDatabaseStrategies = backupDatabaseStrategies.map((strategy, itemIndex) => itemIndex === index ? { ...strategy, [field]: value } : strategy); }
+  function addDatabaseStrategy() { backupDatabaseStrategies = [...backupDatabaseStrategies, { name: '', code: '', include: [], exclude: [] }]; }
+  function removeDatabaseStrategy(index) { backupDatabaseStrategies = backupDatabaseStrategies.filter((_, itemIndex) => itemIndex !== index); if (!backupDatabaseStrategies.length) backupDatabaseStrategies = [{ name: '', code: '', include: [], exclude: [] }]; }
+  function openDatabaseStrategySettings(index) {
+    const strategy = backupDatabaseStrategies[index];
+    fileStrategyDialog = { index, type: 'database', include: strategy.include.length ? [...strategy.include] : [''], exclude: strategy.exclude.length ? [...strategy.exclude] : [''] };
   }
 
   function updateStrategyPattern(kind, index, value) {
@@ -789,21 +806,25 @@
 
   function saveFileStrategySettings() {
     const { index, include, exclude } = fileStrategyDialog;
-    backupFileStrategies = backupFileStrategies.map((strategy, itemIndex) => itemIndex === index ? {
+    const strategies = fileStrategyDialog.type === 'database' ? backupDatabaseStrategies : backupFileStrategies;
+    const updated = strategies.map((strategy, itemIndex) => itemIndex === index ? {
       ...strategy,
       include: include.map((item) => item.trim()).filter(Boolean),
       exclude: exclude.map((item) => item.trim()).filter(Boolean),
     } : strategy);
+    if (fileStrategyDialog.type === 'database') backupDatabaseStrategies = updated;
+    else backupFileStrategies = updated;
     fileStrategyDialog = null;
   }
 
   async function saveBackupLocations() {
-    if (backupSettingsSaving || backupLocations.some((location) => !location.path.trim()) || backupFileStrategies.some((strategy) => !strategy.name.trim())) return;
+    if (backupSettingsSaving || backupLocations.some((location) => !location.path.trim()) || backupFileStrategies.some((strategy) => !strategy.name.trim()) || backupDatabaseStrategies.some((strategy) => !strategy.name.trim())) return;
     backupSettingsSaving = true;
     try {
-      const data = await saveBackupsSettings(api, backupLocations.map((location) => ({ ...location, path: location.path.trim() })), backupFileStrategies.map((strategy) => ({ ...strategy, name: strategy.name.trim(), code: strategy.code.trim() })));
+      const data = await saveBackupsSettings(api, backupLocations.map((location) => ({ ...location, path: location.path.trim() })), backupFileStrategies.map((strategy) => ({ ...strategy, name: strategy.name.trim(), code: strategy.code.trim() })), backupDatabaseStrategies.map((strategy) => ({ ...strategy, name: strategy.name.trim(), code: strategy.code.trim() })));
       backupLocations = data.locations;
       backupFileStrategies = data.fileStrategies;
+      backupDatabaseStrategies = data.databaseStrategies;
     } catch (cause) {
       errorTitle = 'Не удалось сохранить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось сохранить расположения бэкапов.';
@@ -2044,7 +2065,7 @@
             {:else if settingsTab === 'backups'}
             <div class="settings-scroll">
               <div class="project-toolbar">
-                <button class="btn preset-filled-primary-500" type="button" disabled={backupSettingsLoading || backupSettingsSaving || backupLocations.some((location) => !location.path.trim()) || backupFileStrategies.some((strategy) => !strategy.name.trim())} onclick={saveBackupLocations}>
+                <button class="btn preset-filled-primary-500" type="button" disabled={backupSettingsLoading || backupSettingsSaving || backupLocations.some((location) => !location.path.trim()) || backupFileStrategies.some((strategy) => !strategy.name.trim()) || backupDatabaseStrategies.some((strategy) => !strategy.name.trim())} onclick={saveBackupLocations}>
                   <Save size={16} aria-hidden="true" />{backupSettingsSaving ? 'Сохраняем…' : 'Сохранить'}
                 </button>
               </div>
@@ -2088,6 +2109,20 @@
                       <button class="btn preset-tonal" type="button" title="Настройки" aria-label={`Настройки файловой стратегии ${index + 1}`} disabled={backupSettingsLoading || backupSettingsSaving} onclick={() => openFileStrategySettings(index)}><Settings size={16} aria-hidden="true" /></button>
                       <button class="btn preset-tonal" type="button" title="Добавить стратегию" aria-label="Добавить файловую стратегию" disabled={!strategy.name.trim() || backupSettingsLoading || backupSettingsSaving} onclick={addFileStrategy}><Plus size={16} aria-hidden="true" /></button>
                       <button class="btn preset-tonal location-delete" type="button" title="Удалить стратегию" aria-label="Удалить файловую стратегию" disabled={backupSettingsLoading || backupSettingsSaving} onclick={() => removeFileStrategy(index)}><Trash2 size={16} aria-hidden="true" /></button>
+                    </div></div>
+                  {/each}
+                </div>
+              </section>
+              <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Стратегии БД">
+                <h2>Стратегии БД <Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" aria-label="О стратегиях БД"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Стратегии определяют таблицы, включаемые в дампы БД и исключаемые из них. Поддерживаются точные имена и glob-маски со звёздочками.</Tooltip.Content></Tooltip.Positioner></Tooltip></h2>
+                <div class="location-list">
+                  {#each backupDatabaseStrategies as strategy, index}
+                    <div class="location-item"><div class="location-row">
+                      <input class="input location-path" type="text" value={strategy.name} disabled={backupSettingsLoading || backupSettingsSaving} placeholder="название стратегии" aria-label={`Название стратегии БД ${index + 1}`} oninput={(event) => updateDatabaseStrategy(index, 'name', event.currentTarget.value)} />
+                      <input class="input location-code" type="text" value={strategy.code} disabled={backupSettingsLoading || backupSettingsSaving} placeholder="код (автоматически)" aria-label={`Код стратегии БД ${index + 1}`} oninput={(event) => updateDatabaseStrategy(index, 'code', event.currentTarget.value)} />
+                      <button class="btn preset-tonal" type="button" title="Настройки" aria-label={`Настройки стратегии БД ${index + 1}`} disabled={backupSettingsLoading || backupSettingsSaving} onclick={() => openDatabaseStrategySettings(index)}><Settings size={16} aria-hidden="true" /></button>
+                      <button class="btn preset-tonal" type="button" title="Добавить стратегию" aria-label="Добавить стратегию БД" disabled={!strategy.name.trim() || backupSettingsLoading || backupSettingsSaving} onclick={addDatabaseStrategy}><Plus size={16} aria-hidden="true" /></button>
+                      <button class="btn preset-tonal location-delete" type="button" title="Удалить стратегию" aria-label="Удалить стратегию БД" disabled={backupSettingsLoading || backupSettingsSaving} onclick={() => removeDatabaseStrategy(index)}><Trash2 size={16} aria-hidden="true" /></button>
                     </div></div>
                   {/each}
                 </div>
@@ -2365,16 +2400,16 @@
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
     <Dialog.Content class="login-error-dialog file-strategy-dialog card preset-filled-surface-100-900 shadow-2xl">
-      <Dialog.Title class="login-error-title">Настройки файловой стратегии</Dialog.Title>
+      <Dialog.Title class="login-error-title">Настройки {fileStrategyDialog?.type === 'database' ? 'стратегии БД' : 'файловой стратегии'}</Dialog.Title>
       {#if fileStrategyDialog}
         <div class="file-strategy-fields">
-          {#each [['include', 'Включить', 'Относительные пути или паттерны, которые нужно включить в файловый бэкап'], ['exclude', 'Исключить', 'Относительные пути или паттерны, которые нужно исключить из бэкапа']] as [kind, title, hint]}
+          {#each fileStrategyDialog.type === 'database' ? [['include', 'Включить', 'Точные имена таблиц или glob-маски (например, public.*), которые нужно включить в дамп'], ['exclude', 'Исключить', 'Точные имена таблиц или glob-маски, которые нужно исключить из дампа']] : [['include', 'Включить', 'Относительные пути или паттерны, которые нужно включить в файловый бэкап'], ['exclude', 'Исключить', 'Относительные пути или паттерны, которые нужно исключить из бэкапа']] as [kind, title, hint]}
             <section class="strategy-pattern-section">
               <h3>{title}<Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" aria-label={`О блоке ${title}`}><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">{hint}</Tooltip.Content></Tooltip.Positioner></Tooltip></h3>
               <div class="strategy-pattern-list">
                 {#each fileStrategyDialog[kind] as pattern, index}
                   <div class="strategy-pattern-row">
-                    <input class="input" type="text" value={pattern} placeholder="путь или паттерн" aria-label={`${title}: путь или паттерн ${index + 1}`} oninput={(event) => updateStrategyPattern(kind, index, event.currentTarget.value)} />
+                    <input class="input" type="text" value={pattern} placeholder={fileStrategyDialog.type === 'database' ? 'таблица или glob-маска' : 'путь или паттерн'} aria-label={`${title}: шаблон ${index + 1}`} oninput={(event) => updateStrategyPattern(kind, index, event.currentTarget.value)} />
                     <button class="btn preset-tonal" type="button" title="Добавить" aria-label={`Добавить паттерн в ${title.toLocaleLowerCase()}`} onclick={() => addStrategyPattern(kind)}><Plus size={16} aria-hidden="true" /></button>
                     <button class="btn preset-tonal location-delete" type="button" title="Удалить" aria-label={`Удалить паттерн из ${title.toLocaleLowerCase()}`} onclick={() => removeStrategyPattern(kind, index)}>−</button>
                   </div>
@@ -2410,6 +2445,12 @@
               {#if backupRestoreConfirmation.restoreDatabases.length}
                 <p class="backup-restore-warning">Выбранные базы проекта «{selectedProjectName}» будут полностью заменены данными из бэкапа «{backupRestoreConfirmation.name}».</p>
               {:else}<p>Базы данных восстанавливаться не будут.</p>{/if}
+              <div class="backup-strategy-contents">
+                <p>Стратегия БД: {backupRestoreConfirmation.databaseStrategy || 'без стратегии'}. Дамп включает:</p>
+                {#if backupRestoreConfirmation.databaseStrategyTables?.include?.length}<ul>{#each backupRestoreConfirmation.databaseStrategyTables.include as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Все таблицы</li></ul>{/if}
+                <p>Из включённого исключены:</p>
+                {#if backupRestoreConfirmation.databaseStrategyTables?.exclude?.length}<ul>{#each backupRestoreConfirmation.databaseStrategyTables.exclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Исключений нет</li></ul>{/if}
+              </div>
             </section>
           {/if}
           {#if backupRestoreConfirmation.hasFiles}
@@ -2496,6 +2537,10 @@
               <div class="backup-checkbox-row">
                 <label><input class="checkbox" type="checkbox" checked={backupCreateDialog.mysql} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, mysql: event.currentTarget.checked }; }} />MySQL</label>
                 <label><input class="checkbox" type="checkbox" checked={backupCreateDialog.postgres} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, postgres: event.currentTarget.checked }; }} />PostgreSQL</label>
+              </div>
+              <div class="backup-files-column backup-files-strategy">
+                <label class="label"><span class="label-text">Стратегия БД</span><Combobox collection={backupCreateDatabaseStrategyCollection} value={[backupCreateDialog.databaseStrategy]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, databaseStrategy: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Стратегия дампа БД" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCreateDatabaseStrategyOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                <div class="backup-strategy-contents"><p>Дамп включает:</p>{#if selectedBackupCreateDatabaseStrategy?.include?.length}<ul>{#each selectedBackupCreateDatabaseStrategy.include as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Все таблицы</li></ul>{/if}<p>Из включённого исключены:</p>{#if selectedBackupCreateDatabaseStrategy?.exclude?.length}<ul>{#each selectedBackupCreateDatabaseStrategy.exclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Исключений нет</li></ul>{/if}</div>
               </div>
             </fieldset>
           {/if}

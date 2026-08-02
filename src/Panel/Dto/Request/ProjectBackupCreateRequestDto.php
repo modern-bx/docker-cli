@@ -17,6 +17,7 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto
         public bool $mysql,
         public bool $postgres,
         public string $location,
+        public string $databaseStrategy = '',
         public string $strategy = '',
         public string $compress = '',
         public string $chunkSize = '',
@@ -33,13 +34,15 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto
         }
         $location = $request->body['location'] ?? null;
         $strategy = $request->body['strategy'] ?? '';
+        $databaseStrategy = $request->body['databaseStrategy'] ?? '';
         $compress = $request->body['compress'] ?? '';
         $chunkSize = $request->body['chunkSize'] ?? '';
         $chunkCount = $request->body['chunkCount'] ?? '';
         if (!is_string($location) || ($location !== '' && preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $location) !== 1)) {
             throw new RequestValidationException('Некорректное расположение бэкапа.');
         }
-        if (!is_string($strategy) || ($strategy !== '' && preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $strategy) !== 1)
+        if (!is_string($databaseStrategy) || ($databaseStrategy !== '' && preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $databaseStrategy) !== 1)
+            || !is_string($strategy) || ($strategy !== '' && preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $strategy) !== 1)
             || !is_string($compress) || !in_array($compress, ['', 'gzip', 'bzip2', 'xz', 'zstd', 'lz4', 'zip'], true)) {
             throw new RequestValidationException('Некорректные параметры файлового бэкапа.');
         }
@@ -56,6 +59,7 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto
             $request->body['mysql'],
             $request->body['postgres'],
             $location,
+            $databaseStrategy,
             $strategy,
             $compress,
             $chunkSize,
