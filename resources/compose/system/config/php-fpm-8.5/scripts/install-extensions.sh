@@ -19,6 +19,7 @@ apt-get install -y --no-install-recommends \
 
 docker-php-ext-configure gd --with-freetype --with-jpeg
 
+# OPcache is compiled into PHP 8.5 and is no longer built as a shared extension.
 docker-php-ext-install -j"$(nproc)" \
     gd \
     zip \
@@ -26,7 +27,6 @@ docker-php-ext-install -j"$(nproc)" \
     exif \
     pgsql \
     mysqli \
-    opcache \
     gettext \
     calendar \
     pdo_mysql \
