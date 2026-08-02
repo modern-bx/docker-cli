@@ -27,6 +27,7 @@ use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\PhpLanguageVersion;
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Project\TreeArchiveVolumes;
 use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Queue\QueueRepository;
 use DockerCli\Queue\QueueItemValidator;
@@ -163,7 +164,8 @@ final class ProjectController
                 $metadata = is_file($metadataFile) ? json_decode((string) file_get_contents($metadataFile), true) : null;
                 if (!is_array($metadata) || ($metadata['project'] ?? null) !== $request->name) continue;
                 $archive = $metadata['archive'] ?? null;
-                if (!is_string($archive) || !is_file(join_path($backup, basename($archive)))) continue;
+                if (!is_string($archive)) continue;
+                $volumeErrors = (new TreeArchiveVolumes())->validate($backup, $metadata);
                 $timestamp = filemtime($backup);
                 $createdAt = is_string($metadata['createdAt'] ?? null) ? strtotime($metadata['createdAt']) : false;
                 $strategyCode = is_string($metadata['strategy'] ?? null) ? $metadata['strategy'] : '';
@@ -180,6 +182,8 @@ final class ProjectController
                     'strategyPaths' => $strategyPaths,
                     'hasDatabase' => false,
                     'hasFiles' => true,
+                    'filesValid' => $volumeErrors === [],
+                    'filesError' => $volumeErrors === [] ? null : implode(' ', $volumeErrors),
                     'location' => $location['code'],
                     'locationName' => $location['name'],
                 ];
@@ -191,6 +195,8 @@ final class ProjectController
                     $grouped[$key]['strategyCode'] = $fileData['strategyCode'];
                     $grouped[$key]['strategyPaths'] = $fileData['strategyPaths'];
                     $grouped[$key]['hasFiles'] = true;
+                    $grouped[$key]['filesValid'] = $fileData['filesValid'];
+                    $grouped[$key]['filesError'] = $fileData['filesError'];
                 } else {
                     $fileData['databaseCodes'] = [];
                     $grouped[$key] = $fileData;
@@ -254,6 +260,8 @@ final class ProjectController
                     'location' => ['value' => $request->location],
                     'strategy' => ['value' => $request->strategy],
                     'compress' => ['value' => $request->compress],
+                    'chunk-size' => ['value' => $request->chunkSize],
+                    'chunk-count' => ['value' => $request->chunkCount],
                 ],
                 'project' => $request->name,
             ];
@@ -301,6 +309,9 @@ final class ProjectController
         }
         if ($request->files) {
             $backup = $this->backupPath($backupDirectory, 'tree', $request->backup, $request->name, true);
+            $metadata = json_decode((string) @file_get_contents(join_path($backup, 'docker-cli.json')), true);
+            $volumeErrors = is_array($metadata) ? (new TreeArchiveVolumes())->validate($backup, $metadata) : ['Метаданные файлового бэкапа повреждены.'];
+            if ($volumeErrors !== []) throw new ProjectActionException('Файловый бэкап повреждён: ' . implode(' ', $volumeErrors), 422);
             $tasks[] = [
                 'code' => 'core.tree.load',
                 'arguments' => [

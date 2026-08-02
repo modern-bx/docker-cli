@@ -7,6 +7,7 @@ namespace DockerCli\Command;
 use DockerCli\Project\BackupStorageLocator;
 use DockerCli\Project\ProjectRegistry;
 use DockerCli\Project\TreeArchiveManager;
+use DockerCli\Project\TreeArchiveVolumes;
 use DockerCli\Panel\BackupsSettingsRepository;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -30,6 +31,8 @@ final class TreeDumpCommand extends AbstractCommand
         $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Короткое имя директории бэкапа.');
         $this->addOption('strategy', null, InputOption::VALUE_REQUIRED, 'Код файловой стратегии.');
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
+        $this->addOption('chunk-size', null, InputOption::VALUE_REQUIRED, 'Максимальный размер тома: например 10K, 1.5M или 2.25G.');
+        $this->addOption('chunk-count', null, InputOption::VALUE_REQUIRED, 'Количество томов (не меньше двух).');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -56,6 +59,20 @@ final class TreeDumpCommand extends AbstractCommand
             return Command::INVALID;
         }
         $strategyCode = $input->getOption('strategy');
+        $chunkSizeOption = $input->getOption('chunk-size');
+        $chunkCountOption = $input->getOption('chunk-count');
+        if ($chunkSizeOption !== null && $chunkCountOption !== null) {
+            $this->writeMessage($output, '<error>Опции --chunk-size и --chunk-count нельзя использовать одновременно.</error>');
+            return Command::INVALID;
+        }
+        try {
+            $chunkSize = is_string($chunkSizeOption) ? TreeArchiveVolumes::parseSize($chunkSizeOption) : null;
+            $chunkCount = $chunkCountOption === null ? null : filter_var($chunkCountOption, FILTER_VALIDATE_INT, ['options' => ['min_range' => 2]]);
+            if ($chunkCountOption !== null && $chunkCount === false) throw new \InvalidArgumentException('Количество томов должно быть целым числом не меньше 2.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
+            return Command::INVALID;
+        }
         if ($strategyCode !== null && (!is_string($strategyCode) || $strategyCode === '')) {
             $this->writeMessage($output, '<error>Опция --strategy должна содержать код файловой стратегии.</error>');
             return Command::INVALID;
@@ -92,6 +109,7 @@ final class TreeDumpCommand extends AbstractCommand
                 $strategy['exclude'] ?? [],
             );
             $metadata = ['project' => $project, 'createdAt' => date(DATE_ATOM), 'archive' => $archive];
+            if ($chunkSize !== null || $chunkCount !== null) $metadata['volumes'] = (new TreeArchiveVolumes())->split($backupDirectory, $archive, $chunkSize, $chunkCount === false ? null : $chunkCount);
             if ($strategy !== null) {
                 $metadata['strategy'] = $strategy['code'];
                 $metadata['strategyPaths'] = ['include' => $strategy['include'], 'exclude' => $strategy['exclude']];
