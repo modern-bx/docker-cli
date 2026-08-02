@@ -112,9 +112,10 @@
   let projectCloning = false;
   let projectUpdateDialog = null;
   let projectUpdating = false;
-  let projectAddOptions = { locations: [], languages: [], frameworks: {}, deploymentScripts: [] };
+  let projectAddOptions = { locations: [], languages: [], languageVersions: [], defaultLanguageVersion: '8.2', frameworks: {}, deploymentScripts: [] };
   let projectLocationCollection = useListCollection({ items: [] });
   let projectLanguageCollection = useListCollection({ items: [] });
+  let projectLanguageVersionCollection = useListCollection({ items: [] });
   let projectFrameworkCollection = useListCollection({ items: [] });
   let projectDeploymentCollection = useListCollection({ items: [] });
   let projectAdding = false;
@@ -204,6 +205,7 @@
       : notifications.some((item) => item.level === 'info') ? 'info' : 'debug';
   $: projectLocationCollection = useListCollection({ items: projectAddOptions.locations.map((item) => ({ value: item.code, label: item.code })) });
   $: projectLanguageCollection = useListCollection({ items: projectAddOptions.languages.map((item) => ({ value: item.code, label: item.name })) });
+  $: projectLanguageVersionCollection = useListCollection({ items: projectAddOptions.languageVersions.map((version) => ({ value: version, label: `PHP ${version}` })) });
   $: projectFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectAddDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
   $: projectUpdateFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectUpdateDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
   $: projectDeploymentCollection = useListCollection({ items: [{ value: '', label: 'Не использовать' }, ...projectAddOptions.deploymentScripts.map((item) => ({ value: item.code, label: item.name }))] });
@@ -1057,7 +1059,7 @@
     try {
       projectAddOptions = await getProjectOptions(api);
       const language = project.language?.code || projectAddOptions.languages[0]?.code || '';
-      projectUpdateDialog = { project: project.name, name: project.name, language, framework: project.framework?.code || '' };
+      projectUpdateDialog = { project: project.name, name: project.name, language, languageVersion: project.languageVersion || projectAddOptions.defaultLanguageVersion, framework: project.framework?.code || '' };
       projectContextMenu = null;
     } catch (cause) {
       errorTitle = 'Не удалось открыть изменение проекта';
@@ -1099,7 +1101,7 @@
     if (!projectUpdateDialog || projectUpdating) return;
     projectUpdating = true;
     try {
-      const data = await updateProject(api, projectUpdateDialog.project, { name: projectUpdateDialog.name, language: projectUpdateDialog.language, framework: projectUpdateDialog.framework });
+      const data = await updateProject(api, projectUpdateDialog.project, { name: projectUpdateDialog.name, language: projectUpdateDialog.language, languageVersion: projectUpdateDialog.languageVersion, framework: projectUpdateDialog.framework });
       projects = data.projects;
       projectUpdateDialog = null;
       notifyQueuedOperation('Изменение проекта');
@@ -1790,7 +1792,7 @@
                 <section class="project-tab-content card preset-filled-surface-100-900" aria-label="Общее">
                   <dl class="project-fields">
                     <div><dt>Название</dt><dd>{selectedProject.name}</dd></div>
-                    <div><dt>Язык</dt><dd>{selectedProject.language?.name || 'Не указан'}</dd></div>
+                    <div><dt>Язык</dt><dd>{selectedProject.language?.name ? `${selectedProject.language.name}${selectedProject.languageVersion ? ` ${selectedProject.languageVersion}` : ''}` : 'Не указан'}</dd></div>
                     <div><dt>Фреймворк</dt><dd>{selectedProject.framework?.name || 'Без фреймворка'}</dd></div>
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
                     <div><dt>Основной хост</dt><dd>{#if selectedProject.url}<a class="project-host" href={selectedProject.url} target="_blank" rel="noreferrer">{selectedProject.url}<ExternalLink size={14} aria-hidden="true" /></a>{:else}Не указан{/if}</dd></div>
@@ -2232,6 +2234,9 @@
         <form class="project-add-form" onsubmit={(event) => { event.preventDefault(); submitProjectUpdate(); }}>
           <label class="label"><span class="label-text">Имя</span><input class="input" bind:value={projectUpdateDialog.name} required pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
           <label class="label"><span class="label-text">Язык</span><Combobox collection={projectLanguageCollection} value={[projectUpdateDialog.language]} openOnClick onValueChange={(details) => { if (details.value[0]) { projectUpdateDialog.language = details.value[0]; projectUpdateDialog.framework = projectAddOptions.frameworks[projectUpdateDialog.language]?.[0]?.code || ''; } }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languages.map((language) => ({ value: language.code, label: language.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          {#if projectUpdateDialog.language === 'php'}
+            <label class="label"><span class="label-text">Версия PHP</span><Combobox collection={projectLanguageVersionCollection} value={[projectUpdateDialog.languageVersion]} openOnClick onValueChange={(details) => { if (details.value[0]) projectUpdateDialog.languageVersion = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languageVersions.map((version) => ({ value: version, label: `PHP ${version}` })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          {/if}
           <label class="label"><span class="label-text">Фреймворк</span><Combobox collection={projectUpdateFrameworkCollection} value={[projectUpdateDialog.framework]} openOnClick onValueChange={(details) => { projectUpdateDialog.framework = details.value[0] ?? ''; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each (projectAddOptions.frameworks[projectUpdateDialog.language] || []).map((framework) => ({ value: framework.code, label: framework.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectUpdating} onclick={() => { projectUpdateDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectUpdating || !projectUpdateDialog.name}>{projectUpdating ? 'Изменяем…' : 'Изменить'}</button></div>
         </form>

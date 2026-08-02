@@ -69,7 +69,7 @@ final class OpenRestyHostRenderer
         return join_path($compose->directory(), self::HOSTS_RELATIVE_PATH);
     }
 
-    /** @return list<array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?: int, language?: string, version?: string}> */
+    /** @return list<array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?: int, language?: string, language_version?: string}> */
     private function registeredProjects(): array
     {
         $projectsDirectory = $this->projectsDirectory();
@@ -102,7 +102,7 @@ final class OpenRestyHostRenderer
                     'enabled' => ($project['enabled'] ?? true) !== false,
                     'framework' => $framework,
                     'language' => is_string($project['language'] ?? null) ? $project['language'] : null,
-                    'version' => is_string($project['version'] ?? null) ? $project['version'] : null,
+                    'language_version' => PhpLanguageVersion::isSupported($project['language_version'] ?? null) ? $project['language_version'] : null,
                     'document_root' => $documentRoot,
                     'xdebug_client_port' => $this->xdebugClientPort($project),
                 ], static fn (mixed $value): bool => $value !== null);
@@ -142,11 +142,11 @@ final class OpenRestyHostRenderer
         return 9003;
     }
 
-    /** @param array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?: int, language?: string, version?: string} $project */
+    /** @param array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?: int, language?: string, language_version?: string} $project */
     private function phpFpmUpstream(array $project): string
     {
         $language = $project['language'] ?? 'php';
-        $version = $project['version'] ?? '8.2';
+        $version = $project['language_version'] ?? PhpLanguageVersion::default();
 
         if ($language !== 'php') {
             throw new \RuntimeException(sprintf('Unsupported project language "%s" for PHP-FPM upstream.', $language));

@@ -6,6 +6,7 @@ namespace DockerCli\Command;
 
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\OpenRestyHostRenderer;
+use DockerCli\Project\PhpLanguageVersion;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -22,6 +23,7 @@ final class ProjectUpdateCommand extends AbstractCommand
         $this->setDescription('Изменить зарегистрированный проект.');
         $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Новое имя проекта.');
         $this->addOption('language', null, InputOption::VALUE_REQUIRED, 'Код языка проекта.');
+        $this->addOption('language-version', null, InputOption::VALUE_REQUIRED, 'Версия языка проекта: 8.2, 8.3, 8.4 или 8.5.');
         $this->addOption('framework', null, InputOption::VALUE_REQUIRED, 'Код фреймворка проекта.');
     }
 
@@ -29,9 +31,10 @@ final class ProjectUpdateCommand extends AbstractCommand
     {
         $name = $input->getOption('name');
         $language = $input->getOption('language');
+        $languageVersion = $input->getOption('language-version');
         $framework = $input->getOption('framework');
-        if ($name === null && $language === null && $framework === null) {
-            $this->writeMessage($output, '<comment>Не указаны изменения: используйте --name, --language или --framework.</comment>');
+        if ($name === null && $language === null && $languageVersion === null && $framework === null) {
+            $this->writeMessage($output, '<comment>Не указаны изменения: используйте --name, --language, --language-version или --framework.</comment>');
             return Command::SUCCESS;
         }
         if ($name !== null && (!is_string($name) || preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $name) !== 1)) {
@@ -40,6 +43,10 @@ final class ProjectUpdateCommand extends AbstractCommand
         }
         if ($language !== null && $language !== 'php' || $framework !== null && !in_array($framework, ['', 'symfony', 'laravel', 'bitrix', 'bitrix24'], true)) {
             $this->writeMessage($output, '<error>Указан неподдерживаемый язык или фреймворк.</error>');
+            return Command::FAILURE;
+        }
+        if ($languageVersion !== null && !PhpLanguageVersion::isSupported($languageVersion)) {
+            $this->writeMessage($output, '<error>Версия PHP должна быть одной из: 8.2, 8.3, 8.4, 8.5.</error>');
             return Command::FAILURE;
         }
 
@@ -71,10 +78,12 @@ final class ProjectUpdateCommand extends AbstractCommand
 
         $originalConfig = $config;
         $routingChanged = $newName !== $oldName || ($language !== null && $language !== ($project['language'] ?? null))
+            || ($languageVersion !== null && $languageVersion !== ($project['language_version'] ?? PhpLanguageVersion::default()))
             || ($framework !== null && ($framework !== '' ? $framework : null) !== ($project['framework'] ?? null));
         $config['data']['project']['name'] = $newName;
         $localConfig['data']['project']['name'] = $newName;
         if (is_string($language)) $config['data']['project']['language'] = $language;
+        if (is_string($languageVersion)) $config['data']['project']['language_version'] = $languageVersion;
         if (is_string($framework)) $config['data']['project']['framework'] = $framework !== '' ? $framework : null;
         $oldDirectory = $registry->projectDirectory($oldName);
         $newDirectory = $registry->projectDirectory($newName);
