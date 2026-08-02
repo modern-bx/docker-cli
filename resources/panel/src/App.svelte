@@ -2462,7 +2462,7 @@
 <Dialog open={Boolean(backupCreateDialog)} onOpenChange={({ open }) => { if (!open && !backupCreatePending) backupCreateDialog = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
-    <Dialog.Content class="login-error-dialog backup-create-dialog card preset-filled-surface-100-900 shadow-2xl">
+    <Dialog.Content class={`login-error-dialog backup-create-dialog card preset-filled-surface-100-900 shadow-2xl${backupCreateDialog?.files === true ? ' backup-create-dialog-wide' : ''}`}>
       <Dialog.Title class="login-error-title">Создать бэкап</Dialog.Title>
       {#if backupCreateDialog}
         <div class="backup-create-content">
@@ -2482,6 +2482,7 @@
           {#if backupCreateDialog.files}
             <fieldset class="backup-database-options backup-files-options">
               <legend>Файлы</legend>
+              <div class="backup-files-column backup-files-strategy">
               <label class="label"><span class="label-text">Стратегия</span><Combobox collection={backupCreateStrategyCollection} value={[backupCreateDialog.strategy]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, strategy: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Стратегия файлового бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCreateStrategyOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
               <div class="backup-strategy-contents">
                 <p>Бэкап включает:</p>
@@ -2489,9 +2490,12 @@
                 <p>Из включённого исключены:</p>
                 {#if selectedBackupCreateStrategy?.exclude?.length}<ul>{#each selectedBackupCreateStrategy.exclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Исключений нет</li></ul>{/if}
               </div>
+              </div>
+              <div class="backup-files-column backup-files-volumes">
               <label class="label"><span class="label-text">Сжатие</span><Combobox collection={backupCompressionCollection} value={[backupCreateDialog.compress]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, compress: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Сжатие файлового бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCompressionOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
               <label class="label"><span class="label-text">Размер тома <Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" aria-label="О размере тома"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Максимальный размер каждой части архива. Допустимы байты и суффиксы B, K, M, G, например 1024, 10K или 1.5M. Не заполняйте одновременно с количеством томов.</Tooltip.Content></Tooltip.Positioner></Tooltip></span><input class="input" type="text" placeholder="например, 10K" value={backupCreateDialog.chunkSize} disabled={backupCreateDialog.chunkCount !== ''} oninput={(event) => { backupCreateDialog = { ...backupCreateDialog, chunkSize: event.currentTarget.value }; }} /></label>
               <label class="label"><span class="label-text">Количество томов <Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" aria-label="О количестве томов"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Желаемое количество равных частей архива, целое число не меньше двух. Не заполняйте одновременно с размером тома.</Tooltip.Content></Tooltip.Positioner></Tooltip></span><input class="input" type="number" min="2" step="1" placeholder="не задано" value={backupCreateDialog.chunkCount} disabled={backupCreateDialog.chunkSize !== ''} oninput={(event) => { backupCreateDialog = { ...backupCreateDialog, chunkCount: event.currentTarget.value }; }} /></label>
+              </div>
             </fieldset>
           {/if}
           {#if !backupCreateDialog.database && !backupCreateDialog.files}

@@ -130,6 +130,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .dark .backup-menu-trigger:hover { color: var(--color-primary-300); }
 .backup-menu-trigger:disabled { cursor: not-allowed; opacity: 0.4; }
 .backup-create-dialog { width: min(32rem, calc(100vw - 2rem)); }
+.backup-create-dialog-wide { width: min(66rem, calc(100vw - 2rem)); }
 .backup-create-content { display: grid; gap: 1rem; margin-top: 1rem; }
 .backup-create-content .label { position: relative; }
 .backup-create-content .label:focus-within { z-index: 40; }
@@ -138,7 +139,10 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .backup-database-options { display: grid; gap: 0.65rem; padding: 0.85rem; border: 1px solid var(--color-surface-300); border-radius: var(--radius-container); }
 .dark .backup-database-options { border-color: var(--color-surface-700); }
 .backup-database-options legend { padding: 0 0.3rem; color: var(--color-surface-500); font-size: 0.8rem; font-weight: 600; }
-.backup-files-options { gap: 1rem; }
+.backup-files-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.backup-files-options legend { grid-column: 1 / -1; }
+.backup-files-column { display: grid; align-content: start; gap: 1rem; }
+@media (max-width: 720px) { .backup-files-options { grid-template-columns: minmax(0, 1fr); } }
 .backup-create-alert { padding: 0.7rem 0.8rem; border-radius: var(--radius-base); background: color-mix(in oklab, var(--color-warning-500) 16%, transparent); color: var(--color-warning-700); }
 .dark .backup-create-alert { color: var(--color-warning-300); }
 .backup-create-hint { color: var(--color-surface-500); }
@@ -452,7 +456,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .project-add-button { width: 125px; margin: 0 1.5rem .75rem; justify-content: center; }
 .project-add-form { display: grid; gap: 1rem; margin-top: 1rem; }
 .project-clone-form { grid-template-columns: minmax(0, 1fr); }
-.project-clone-dbms .project-deployment-checkboxes { margin-top: .375rem; }
+.project-clone-dbms .project-deployment-checkboxes { display: flex; align-items: center; gap: 1.5rem; margin-top: .375rem; }
 .project-add-form .label { position: relative; }
 .project-add-form .label:focus-within, .project-add-form .font-combobox-positioner { z-index: 60; }
 .backup-invalid > td { background: color-mix(in oklab, var(--color-error-500) 18%, transparent) !important; color: var(--color-error-800); }
