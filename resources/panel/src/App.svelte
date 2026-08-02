@@ -2194,11 +2194,11 @@
       <button type="button" role="menuitem" disabled><ExternalLink size={16} aria-hidden="true" />Открыть</button>
     {/if}
     <hr />
-    <button type="button" role="menuitem" onclick={() => openProjectCloneDialog(projectContextMenu.project)}>
-      <Copy size={16} aria-hidden="true" />Клонировать
-    </button>
     <button type="button" role="menuitem" onclick={() => openProjectUpdateDialog(projectContextMenu.project)}>
       <Pencil size={16} aria-hidden="true" />Изменить
+    </button>
+    <button type="button" role="menuitem" onclick={() => openProjectCloneDialog(projectContextMenu.project)}>
+      <Copy size={16} aria-hidden="true" />Клонировать
     </button>
     <button type="button" role="menuitem" onclick={() => runContextProjectAction(projectContextMenu.project.enabled ? 'disable' : 'enable')}>
       <Power size={16} aria-hidden="true" />{projectContextMenu.project.enabled ? 'Отключить' : 'Включить'}
