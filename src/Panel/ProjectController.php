@@ -206,10 +206,28 @@ final class ProjectController
         $root = $config['data']['project']['root'] ?? null;
         if (!is_string($root) || $root === '') throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
 
-        $backupRoot = realpath(join_path($root, '.docker-cli', 'backups', $request->database));
+        $backupDirectory = join_path($root, '.docker-cli', 'backups');
+        if ($request->location !== '') {
+            $location = null;
+            foreach (($this->backupSettings ?? new BackupsSettingsRepository())->locations() as $candidate) {
+                if ($candidate['code'] === $request->location) {
+                    $location = $candidate;
+                    break;
+                }
+            }
+            if ($location === null) throw new ProjectActionException('Хранилище бэкапов не найдено.', 404);
+            $backupDirectory = $location['path'];
+        }
+        $backupRoot = realpath(join_path($backupDirectory, $request->database));
         $backup = $backupRoot === false ? false : realpath(join_path($backupRoot, $request->backup));
         if ($backup === false || !is_dir($backup) || !str_starts_with($backup . DIRECTORY_SEPARATOR, $backupRoot . DIRECTORY_SEPARATOR)) {
             throw new ProjectActionException('Бэкап не найден.', 404);
+        }
+        if ($request->location !== '') {
+            $metadata = json_decode((string) @file_get_contents(join_path($backup, 'docker-cli.json')), true);
+            if (!is_array($metadata) || ($metadata['project'] ?? null) !== $request->name) {
+                throw new ProjectActionException('Бэкап не найден.', 404);
+            }
         }
 
         $taskCode = 'core.' . $request->database . '.load';

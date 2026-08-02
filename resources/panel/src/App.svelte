@@ -463,7 +463,7 @@
     backupRestoreConfirmation = null;
     backupRestorePending = true;
     try {
-      await restoreProjectBackup(api, selectedProjectName, backup.name, backup.databaseCode);
+      await restoreProjectBackup(api, selectedProjectName, backup.name, backup.databaseCode, backup.location);
       notifyQueuedOperation(`Восстановление ${backup.database}-бэкапа «${backup.name}»`);
     } catch (cause) {
       errorTitle = 'Не удалось восстановить бэкап';
