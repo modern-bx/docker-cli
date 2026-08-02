@@ -104,6 +104,18 @@ final class TreeArchiveManager
     /** @param list<string> $include @param list<string> $exclude */
     private function createManifest(string $projectRoot, array $include, array $exclude): string
     {
+        $paths = $this->selectedPaths($projectRoot, $include, $exclude);
+        $manifest = tempnam(sys_get_temp_dir(), 'docker-cli-tree-');
+        if ($manifest === false || file_put_contents($manifest, $paths === [] ? '' : implode("\0", array_map(static fn (string $path): string => './' . $path, $paths)) . "\0") === false) {
+            if (is_string($manifest)) @unlink($manifest);
+            throw new \RuntimeException('Не удалось создать список файлов бэкапа.');
+        }
+        return $manifest;
+    }
+
+    /** @param list<string> $include @param list<string> $exclude @return list<string> */
+    public function selectedPaths(string $projectRoot, array $include, array $exclude): array
+    {
         $include = array_values(array_filter(array_map($this->normalizePattern(...), $include), static fn (string $pattern): bool => $pattern !== ''));
         $exclude = array_values(array_filter(array_map($this->normalizePattern(...), $exclude), static fn (string $pattern): bool => $pattern !== ''));
         $paths = [];
@@ -117,14 +129,23 @@ final class TreeArchiveManager
             if ($path === '.docker-cli' || str_starts_with($path, '.docker-cli/')) continue;
             if ($include !== [] && !$this->matchesAny($path, $include)) continue;
             if ($this->matchesAny($path, $exclude)) continue;
-            $paths[] = './' . $path;
+            $paths[] = $path;
         }
-        $manifest = tempnam(sys_get_temp_dir(), 'docker-cli-tree-');
-        if ($manifest === false || file_put_contents($manifest, $paths === [] ? '' : implode("\0", $paths) . "\0") === false) {
-            if (is_string($manifest)) @unlink($manifest);
-            throw new \RuntimeException('Не удалось создать список файлов бэкапа.');
+        return $paths;
+    }
+
+    /** @param list<string> $include @param list<string> $exclude */
+    public function wipeSelected(string $projectRoot, array $include, array $exclude): void
+    {
+        $paths = $this->selectedPaths($projectRoot, $include, $exclude);
+        usort($paths, static fn (string $left, string $right): int => substr_count($right, '/') <=> substr_count($left, '/'));
+        foreach ($paths as $path) {
+            $absolute = join_path($projectRoot, $path);
+            if (is_dir($absolute) && !is_link($absolute)) @rmdir($absolute);
+            elseif ((file_exists($absolute) || is_link($absolute)) && !unlink($absolute)) {
+                throw new \RuntimeException(sprintf('Не удалось удалить «%s».', $absolute));
+            }
         }
-        return $manifest;
     }
 
     private function normalizePattern(string $pattern): string

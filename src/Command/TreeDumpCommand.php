@@ -29,14 +29,15 @@ final class TreeDumpCommand extends AbstractCommand
         $this->addOption('compress', null, InputOption::VALUE_REQUIRED, 'Архиватор: gzip, bzip2, xz, zstd, lz4 или zip.');
         $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Короткое имя директории бэкапа.');
         $this->addOption('strategy', null, InputOption::VALUE_REQUIRED, 'Код файловой стратегии.');
+        $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $registry = $this->registry ?? new ProjectRegistry();
-        $project = $registry->projectNameFromContext();
-        if ($project === null || !$registry->hasProject($project)) {
-            $this->writeMessage($output, '<error>Запустите команду из директории зарегистрированного проекта.</error>');
+        $project = $input->getOption('project') ?: $registry->projectNameFromContext();
+        if (!is_string($project) || !$registry->hasProject($project)) {
+            $this->writeMessage($output, '<error>Укажите зарегистрированный проект через --project или запустите команду из проекта.</error>');
             return Command::FAILURE;
         }
         $name = $input->getOption('name') ?? sprintf('%s-%s', $project, date('Ymd-His'));
@@ -91,7 +92,10 @@ final class TreeDumpCommand extends AbstractCommand
                 $strategy['exclude'] ?? [],
             );
             $metadata = ['project' => $project, 'createdAt' => date(DATE_ATOM), 'archive' => $archive];
-            if ($strategy !== null) $metadata['strategy'] = $strategy['code'];
+            if ($strategy !== null) {
+                $metadata['strategy'] = $strategy['code'];
+                $metadata['strategyPaths'] = ['include' => $strategy['include'], 'exclude' => $strategy['exclude']];
+            }
             if (file_put_contents(join_path($backupDirectory, 'docker-cli.json'), json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL) === false) {
                 throw new \RuntimeException('Не удалось записать метаданные бэкапа.');
             }
