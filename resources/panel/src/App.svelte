@@ -430,7 +430,7 @@
       protectedAlert = selectedProject;
       return;
     }
-    backupRestoreConfirmation = { ...backup, restoreDatabases: [...(backup.databaseCodes || [])], restoreFiles: backup.hasFiles === true, force: true, wipe: false };
+    backupRestoreConfirmation = { ...backup, restoreDatabases: [...(backup.databaseCodes || [])], restoreFiles: backup.hasFiles === true && backup.filesValid !== false, force: true, wipe: false };
   }
 
   function toggleRestoreDatabase(database, checked) {
@@ -459,7 +459,7 @@
   }
 
   function openBackupCreateDialog() {
-    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, strategy: '', compress: '', location: '' };
+    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, strategy: '', compress: '', chunkSize: '', chunkCount: '', location: '' };
     loadBackupsSettings();
   }
 
@@ -475,6 +475,8 @@
         location: backupCreateDialog.location,
         strategy: backupCreateDialog.strategy,
         compress: backupCreateDialog.compress,
+        chunkSize: backupCreateDialog.chunkSize,
+        chunkCount: backupCreateDialog.chunkCount,
       });
       backupCreateDialog = null;
       notifyQueuedOperation(`Создание бэкапа проекта «${selectedProjectName}»`);
@@ -527,6 +529,26 @@
     const units = ['КБ', 'МБ', 'ГБ', 'ТБ'];
     const unit = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)) - 1, units.length - 1);
     return `${(bytes / (1024 ** (unit + 1))).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} ${units[unit]}`;
+  }
+
+  function formatVolumeCount(value) {
+    const count = Number(value) || 1;
+    const remainder100 = count % 100;
+    const remainder10 = count % 10;
+    const noun = remainder100 >= 11 && remainder100 <= 14 ? 'томов' : remainder10 === 1 ? 'том' : remainder10 >= 2 && remainder10 <= 4 ? 'тома' : 'томов';
+    return `${count} ${noun}`;
+  }
+
+  function formatBackupSize(backup) {
+    const parts = Array.isArray(backup?.sizeParts) ? backup.sizeParts : [];
+    if (parts.length === 0) return formatBytes(backup?.size);
+    if (parts.length === 1) {
+      const part = parts[0];
+      return part.type === 'files' ? `${formatBytes(part.size)} (${formatVolumeCount(part.volumeCount)})` : formatBytes(part.size);
+    }
+    return parts.map((part) => part.type === 'files'
+      ? `Файлы: ${formatBytes(part.size)} [${formatVolumeCount(part.volumeCount)}]`
+      : `${part.name}: ${formatBytes(part.size)}`).join(', ');
   }
 
   async function loadLogs() {
@@ -1867,7 +1889,7 @@
                       <tbody>
                         {#if backupsLoading}<tr><td colspan="8" class="log-empty animate-pulse">Загрузка…</td></tr>
                         {:else if backupItems.length === 0}<tr><td colspan="8" class="log-empty">Бэкапы не найдены</td></tr>
-                        {:else}{#each backupItems as item}<tr oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td><td>{item.strategy || '—'}</td><td>{item.locationName}</td></tr>{/each}{/if}
+                        {:else}{#each backupItems as item}<tr class:backup-invalid={item.filesValid === false} oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}{#if item.filesValid === false}<Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help backup-error-help" aria-label="Почему бэкап повреждён"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">{item.filesError}</Tooltip.Content></Tooltip.Positioner></Tooltip>{/if}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBackupSize(item)}</td><td>{item.database || '—'}</td><td>{item.strategy || '—'}</td><td>{item.locationName}</td></tr>{/each}{/if}
                       </tbody>
                     </table>
                   </div>
@@ -2394,10 +2416,11 @@
             <section class="backup-restore-section">
               {#if backupRestoreConfirmation.hasDatabase}<h3>Файлы</h3>{/if}
               <div class="backup-restore-options">
-                {#if backupRestoreConfirmation.hasDatabase}<label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.restoreFiles} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, restoreFiles: event.currentTarget.checked }; }} />Восстановить файлы</label>{/if}
+                {#if backupRestoreConfirmation.hasDatabase}<label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.restoreFiles} disabled={backupRestoreConfirmation.filesValid === false} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, restoreFiles: event.currentTarget.checked }; }} />Восстановить файлы</label>{/if}
                 <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.force} disabled={!backupRestoreConfirmation.restoreFiles} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, force: event.currentTarget.checked }; }} />Перезаписывать файлы</label>
                 <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.wipe} disabled={!backupRestoreConfirmation.restoreFiles} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, wipe: event.currentTarget.checked }; }} />Предварительно стереть все файлы</label>
               </div>
+              {#if backupRestoreConfirmation.filesValid === false}<p class="backup-restore-warning">Файлы восстановить нельзя: {backupRestoreConfirmation.filesError}</p>{/if}
               {#if !backupRestoreConfirmation.restoreFiles}<p>Файлы восстанавливаться не будут.</p>
               {:else}<p class="backup-restore-warning">
                 {#if backupRestoreConfirmation.wipe}
@@ -2479,6 +2502,7 @@
           {#if backupCreateDialog.files}
             <fieldset class="backup-database-options backup-files-options">
               <legend>Файлы</legend>
+              <div class="backup-files-column backup-files-strategy">
               <label class="label"><span class="label-text">Стратегия</span><Combobox collection={backupCreateStrategyCollection} value={[backupCreateDialog.strategy]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, strategy: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Стратегия файлового бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCreateStrategyOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
               <div class="backup-strategy-contents">
                 <p>Бэкап включает:</p>
@@ -2486,7 +2510,12 @@
                 <p>Из включённого исключены:</p>
                 {#if selectedBackupCreateStrategy?.exclude?.length}<ul>{#each selectedBackupCreateStrategy.exclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Исключений нет</li></ul>{/if}
               </div>
+              </div>
+              <div class="backup-files-column backup-files-volumes">
               <label class="label"><span class="label-text">Сжатие</span><Combobox collection={backupCompressionCollection} value={[backupCreateDialog.compress]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, compress: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Сжатие файлового бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCompressionOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+              <label class="label"><span class="label-text">Размер тома <Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" aria-label="О размере тома"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Максимальный размер каждой части архива. Допустимы байты и суффиксы B, K, M, G, например 1024, 10K или 1.5M. Не заполняйте одновременно с количеством томов.</Tooltip.Content></Tooltip.Positioner></Tooltip></span><input class="input" type="text" placeholder="например, 10K" value={backupCreateDialog.chunkSize} disabled={backupCreateDialog.chunkCount !== ''} oninput={(event) => { backupCreateDialog = { ...backupCreateDialog, chunkSize: event.currentTarget.value }; }} /></label>
+              <label class="label"><span class="label-text">Количество томов <Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" aria-label="О количестве томов"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Желаемое количество равных частей архива, целое число не меньше двух. Не заполняйте одновременно с размером тома.</Tooltip.Content></Tooltip.Positioner></Tooltip></span><input class="input" type="number" min="2" step="1" placeholder="не задано" value={backupCreateDialog.chunkCount} disabled={backupCreateDialog.chunkSize !== ''} oninput={(event) => { backupCreateDialog = { ...backupCreateDialog, chunkCount: event.currentTarget.value }; }} /></label>
+              </div>
             </fieldset>
           {/if}
           {#if !backupCreateDialog.database && !backupCreateDialog.files}
