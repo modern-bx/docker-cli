@@ -531,6 +531,26 @@
     return `${(bytes / (1024 ** (unit + 1))).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} ${units[unit]}`;
   }
 
+  function formatVolumeCount(value) {
+    const count = Number(value) || 1;
+    const remainder100 = count % 100;
+    const remainder10 = count % 10;
+    const noun = remainder100 >= 11 && remainder100 <= 14 ? 'томов' : remainder10 === 1 ? 'том' : remainder10 >= 2 && remainder10 <= 4 ? 'тома' : 'томов';
+    return `${count} ${noun}`;
+  }
+
+  function formatBackupSize(backup) {
+    const parts = Array.isArray(backup?.sizeParts) ? backup.sizeParts : [];
+    if (parts.length === 0) return formatBytes(backup?.size);
+    if (parts.length === 1) {
+      const part = parts[0];
+      return part.type === 'files' ? `${formatBytes(part.size)} (${formatVolumeCount(part.volumeCount)})` : formatBytes(part.size);
+    }
+    return parts.map((part) => part.type === 'files'
+      ? `Файлы: ${formatBytes(part.size)} [${formatVolumeCount(part.volumeCount)}]`
+      : `${part.name}: ${formatBytes(part.size)}`).join(', ');
+  }
+
   async function loadLogs() {
     if (!authenticated) return;
     const requestId = ++logRequestId;
@@ -1869,7 +1889,7 @@
                       <tbody>
                         {#if backupsLoading}<tr><td colspan="8" class="log-empty animate-pulse">Загрузка…</td></tr>
                         {:else if backupItems.length === 0}<tr><td colspan="8" class="log-empty">Бэкапы не найдены</td></tr>
-                        {:else}{#each backupItems as item}<tr class:backup-invalid={item.filesValid === false} oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}{#if item.filesValid === false}<Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help backup-error-help" aria-label="Почему бэкап повреждён"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">{item.filesError}</Tooltip.Content></Tooltip.Positioner></Tooltip>{/if}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td><td>{item.strategy || '—'}</td><td>{item.locationName}</td></tr>{/each}{/if}
+                        {:else}{#each backupItems as item}<tr class:backup-invalid={item.filesValid === false} oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}{#if item.filesValid === false}<Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help backup-error-help" aria-label="Почему бэкап повреждён"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">{item.filesError}</Tooltip.Content></Tooltip.Positioner></Tooltip>{/if}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBackupSize(item)}</td><td>{item.database || '—'}</td><td>{item.strategy || '—'}</td><td>{item.locationName}</td></tr>{/each}{/if}
                       </tbody>
                     </table>
                   </div>

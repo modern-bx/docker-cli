@@ -141,6 +141,7 @@ final class ProjectController
                         'date' => gmdate(DATE_ATOM, $createdAt !== false ? $createdAt : ($timestamp === false ? 0 : $timestamp)),
                         'composition' => 'БД',
                         'size' => 0,
+                        'sizeParts' => [],
                         'database' => null,
                         'databaseCode' => '',
                         'databaseCodes' => [],
@@ -155,7 +156,9 @@ final class ProjectController
                     $grouped[$key]['databaseCodes'][] = $databaseCode;
                     $grouped[$key]['database'] = implode(', ', array_map(static fn (string $code): string => ['mysql' => 'MySQL', 'postgres' => 'PostgreSQL'][$code], $grouped[$key]['databaseCodes']));
                     $grouped[$key]['databaseCode'] = $grouped[$key]['databaseCodes'][0];
-                    $grouped[$key]['size'] += $this->directorySize($backup);
+                    $databaseSize = $this->directorySize($backup);
+                    $grouped[$key]['size'] += $databaseSize;
+                    $grouped[$key]['sizeParts'][] = ['type' => $databaseCode, 'name' => $databaseName, 'size' => $databaseSize];
                 }
             }
             $directory = join_path($location['path'], 'tree');
@@ -170,11 +173,15 @@ final class ProjectController
                 $createdAt = is_string($metadata['createdAt'] ?? null) ? strtotime($metadata['createdAt']) : false;
                 $strategyCode = is_string($metadata['strategy'] ?? null) ? $metadata['strategy'] : '';
                 $strategyPaths = is_array($metadata['strategyPaths'] ?? null) ? $metadata['strategyPaths'] : ['include' => [], 'exclude' => []];
+                $fileSize = $this->directorySize($backup);
+                $volumeCount = is_array($metadata['volumes'] ?? null) && is_int($metadata['volumes']['chunkCount'] ?? null)
+                    ? $metadata['volumes']['chunkCount'] : 1;
                 $fileData = [
                     'name' => basename($backup),
                     'date' => gmdate(DATE_ATOM, $createdAt !== false ? $createdAt : ($timestamp === false ? 0 : $timestamp)),
                     'composition' => 'Файлы',
-                    'size' => $this->directorySize($backup),
+                    'size' => $fileSize,
+                    'sizeParts' => [['type' => 'files', 'name' => 'Файлы', 'size' => $fileSize, 'volumeCount' => $volumeCount]],
                     'database' => null,
                     'databaseCode' => '',
                     'strategy' => $strategyCode !== '' ? ($strategies[$strategyCode] ?? null) : null,
@@ -191,6 +198,7 @@ final class ProjectController
                 if (isset($grouped[$key])) {
                     $grouped[$key]['composition'] = 'БД и файлы';
                     $grouped[$key]['size'] += $fileData['size'];
+                    $grouped[$key]['sizeParts'][] = $fileData['sizeParts'][0];
                     $grouped[$key]['strategy'] = $fileData['strategy'];
                     $grouped[$key]['strategyCode'] = $fileData['strategyCode'];
                     $grouped[$key]['strategyPaths'] = $fileData['strategyPaths'];
