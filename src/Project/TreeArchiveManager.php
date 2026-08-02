@@ -60,7 +60,7 @@ final class TreeArchiveManager
     {
         $command = ['tar', '-cf', $tar, '-C', $projectRoot];
         if ($manifest !== null) array_push($command, '--null', '--verbatim-files-from', '--no-recursion', '-T', $manifest);
-        else array_push($command, '--exclude=./.docker-cli', '.');
+        else array_push($command, '--exclude=./.docker-cli', '--exclude=./.docker-cli-task-*', '.');
         $this->run($command);
     }
 
@@ -68,7 +68,7 @@ final class TreeArchiveManager
     {
         $tarCommand = ['tar', '-cf', '-', '-C', $projectRoot];
         if ($manifest !== null) array_push($tarCommand, '--null', '--verbatim-files-from', '--no-recursion', '-T', $manifest);
-        else array_push($tarCommand, '--exclude=./.docker-cli', '.');
+        else array_push($tarCommand, '--exclude=./.docker-cli', '--exclude=./.docker-cli-task-*', '.');
         $compressCommand = match ($compressor) {
             'gzip', 'gz' => [$this->executable('pigz') ? 'pigz' : 'gzip', '-1', '-c'],
             'bzip2', 'bz2' => [$this->executable('pbzip2') ? 'pbzip2' : 'bzip2', '-1', '-c'],
@@ -126,7 +126,7 @@ final class TreeArchiveManager
         foreach ($iterator as $item) {
             $path = substr($item->getPathname(), strlen(rtrim($projectRoot, DIRECTORY_SEPARATOR)) + 1);
             $path = str_replace(DIRECTORY_SEPARATOR, '/', $path);
-            if ($path === '.docker-cli' || str_starts_with($path, '.docker-cli/')) continue;
+            if ($path === '.docker-cli' || str_starts_with($path, '.docker-cli/') || str_starts_with($path, '.docker-cli-task-')) continue;
             if ($include !== [] && !$this->matchesAny($path, $include)) continue;
             if ($this->matchesAny($path, $exclude)) continue;
             $paths[] = $path;
