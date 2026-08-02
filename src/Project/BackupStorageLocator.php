@@ -24,4 +24,9 @@ final readonly class BackupStorageLocator
 
         throw new \InvalidArgumentException(sprintf('Хранилище бэкапов с кодом «%s» не найдено.', $location));
     }
+
+    public function treeDirectory(string $location): string
+    {
+        return $this->databaseDirectory($location, 'tree');
+    }
 }
