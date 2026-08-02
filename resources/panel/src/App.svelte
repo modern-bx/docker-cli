@@ -2403,7 +2403,7 @@
                 <p>Из включённого исключены:</p>
                 {#if backupRestoreConfirmation.strategyPaths?.exclude?.length}
                   <ul>{#each backupRestoreConfirmation.strategyPaths.exclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>
-                {:else}<p>Исключений нет.</p>{/if}
+                {:else}<ul><li>Исключений нет</li></ul>{/if}
               </div>
             </section>
           {/if}
@@ -2471,7 +2471,7 @@
                 <p>Бэкап включает:</p>
                 {#if selectedBackupCreateStrategy?.include?.length}<ul>{#each selectedBackupCreateStrategy.include as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Все файлы и каталоги проекта</li></ul>{/if}
                 <p>Из включённого исключены:</p>
-                {#if selectedBackupCreateStrategy?.exclude?.length}<ul>{#each selectedBackupCreateStrategy.exclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Исключений нет.</li></ul>{/if}
+                {#if selectedBackupCreateStrategy?.exclude?.length}<ul>{#each selectedBackupCreateStrategy.exclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Исключений нет</li></ul>{/if}
               </div>
               <label class="label"><span class="label-text">Сжатие</span><Combobox collection={backupCompressionCollection} value={[backupCreateDialog.compress]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, compress: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Сжатие файлового бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCompressionOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
             </fieldset>
