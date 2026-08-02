@@ -2420,12 +2420,14 @@
       <Dialog.Title class="login-error-title">Удалить бэкап?</Dialog.Title>
       {#if backupDeleteConfirmation}
         <div class="backup-delete-content">
-          <div class="backup-restore-options">
-            {#each backupDeleteConfirmation.databaseCodes as database}
-              <label><input class="checkbox" type="checkbox" checked={backupDeleteConfirmation.deleteDatabases.includes(database)} onchange={(event) => toggleDeleteDatabase(database, event.currentTarget.checked)} />Удалить {database === 'mysql' ? 'MySQL' : 'PostgreSQL'}</label>
-            {/each}
-            {#if backupDeleteConfirmation.hasFiles}<label><input class="checkbox" type="checkbox" checked={backupDeleteConfirmation.deleteFiles} onchange={(event) => { backupDeleteConfirmation = { ...backupDeleteConfirmation, deleteFiles: event.currentTarget.checked }; }} />Удалить файлы</label>{/if}
-          </div>
+          {#if backupDeleteConfirmation.databaseCodes.length + (backupDeleteConfirmation.hasFiles ? 1 : 0) > 1}
+            <div class="backup-restore-options">
+              {#each backupDeleteConfirmation.databaseCodes as database}
+                <label><input class="checkbox" type="checkbox" checked={backupDeleteConfirmation.deleteDatabases.includes(database)} onchange={(event) => toggleDeleteDatabase(database, event.currentTarget.checked)} />Удалить {database === 'mysql' ? 'MySQL' : 'PostgreSQL'}</label>
+              {/each}
+              {#if backupDeleteConfirmation.hasFiles}<label><input class="checkbox" type="checkbox" checked={backupDeleteConfirmation.deleteFiles} onchange={(event) => { backupDeleteConfirmation = { ...backupDeleteConfirmation, deleteFiles: event.currentTarget.checked }; }} />Удалить файлы</label>{/if}
+            </div>
+          {/if}
           <p class="login-error-description">Выбранные части бэкапа «{backupDeleteConfirmation.name}» проекта «{selectedProjectName}» будут безвозвратно удалены.</p>
         </div>
       {/if}
