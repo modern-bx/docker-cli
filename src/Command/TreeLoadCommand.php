@@ -30,7 +30,7 @@ final class TreeLoadCommand extends AbstractCommand
         $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Путь к директории, созданной tree:dump.');
         $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код централизованного хранилища бэкапов.');
         $this->addOption('force', 'f', InputOption::VALUE_NONE, 'Разрешить перезапись существующих файлов.');
-        $this->addOption('wipe', null, InputOption::VALUE_NONE, 'Удалить перед восстановлением файлы, входящие в сохранённую стратегию.');
+        $this->addOption('wipe', null, InputOption::VALUE_NONE, 'Очистить проект перед восстановлением, сохранив только .docker-cli.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -84,7 +84,6 @@ final class TreeLoadCommand extends AbstractCommand
             $strategyCode = is_string($metadata['strategy'] ?? null) ? $metadata['strategy'] : null;
             $strategyPaths = $metadata['strategyPaths'] ?? null;
             if ($strategyCode !== null && (!is_array($strategyPaths) || !is_array($strategyPaths['include'] ?? null) || !is_array($strategyPaths['exclude'] ?? null))) {
-                if ($input->getOption('wipe')) throw new \InvalidArgumentException('В метаданных бэкапа отсутствуют пути стратегии; безопасная очистка невозможна.');
                 $strategyPaths = ['include' => [], 'exclude' => []];
             }
             $strategyPaths = is_array($strategyPaths) ? $strategyPaths : ['include' => [], 'exclude' => []];
@@ -97,7 +96,6 @@ final class TreeLoadCommand extends AbstractCommand
             if ($input->getOption('wipe') && $strategyCode !== null) $this->warnStrategyDifference($output, $strategyCode, $strategyPaths);
             ($this->loader ?? new TreeArchiveLoader())->load(
                 $path, $root, (bool) $input->getOption('force'), (bool) $input->getOption('wipe'),
-                $strategyPaths['include'], $strategyPaths['exclude'],
             );
         } catch (\InvalidArgumentException $exception) {
             $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
@@ -122,7 +120,7 @@ final class TreeLoadCommand extends AbstractCommand
             if ($strategy['code'] === $code) { $current = $strategy; break; }
         }
         if ($current === null || $current['include'] !== $savedPaths['include'] || $current['exclude'] !== $savedPaths['exclude']) {
-            $this->writeMessage($output, sprintf('<comment>Сохранённые пути стратегии «%s» отличаются от текущих настроек; для очистки используются пути из бэкапа.</comment>', $code));
+            $this->writeMessage($output, sprintf('<comment>Сохранённые пути стратегии «%s» отличаются от текущих настроек.</comment>', $code));
         }
     }
 }

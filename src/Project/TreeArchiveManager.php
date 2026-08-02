@@ -134,17 +134,21 @@ final class TreeArchiveManager
         return $paths;
     }
 
-    /** @param list<string> $include @param list<string> $exclude */
-    public function wipeSelected(string $projectRoot, array $include, array $exclude): void
+    public function wipeProject(string $projectRoot): void
     {
-        $paths = $this->selectedPaths($projectRoot, $include, $exclude);
-        usort($paths, static fn (string $left, string $right): int => substr_count($right, '/') <=> substr_count($left, '/'));
-        foreach ($paths as $path) {
-            $absolute = join_path($projectRoot, $path);
-            if (is_dir($absolute) && !is_link($absolute)) @rmdir($absolute);
-            elseif ((file_exists($absolute) || is_link($absolute)) && !unlink($absolute)) {
-                throw new \RuntimeException(sprintf('Не удалось удалить «%s».', $absolute));
-            }
+        foreach (new \FilesystemIterator($projectRoot) as $item) {
+            if ($item->getFilename() === '.docker-cli') continue;
+            $this->removePath($item->getPathname());
+        }
+    }
+
+    private function removePath(string $path): void
+    {
+        if (is_dir($path) && !is_link($path)) {
+            foreach (new \FilesystemIterator($path) as $item) $this->removePath($item->getPathname());
+            if (!rmdir($path)) throw new \RuntimeException(sprintf('Не удалось удалить «%s».', $path));
+        } elseif (!unlink($path)) {
+            throw new \RuntimeException(sprintf('Не удалось удалить «%s».', $path));
         }
     }
 

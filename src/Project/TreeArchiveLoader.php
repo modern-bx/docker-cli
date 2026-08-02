@@ -10,14 +10,13 @@ final readonly class TreeArchiveLoader
 {
     public function __construct(private ?TreeArchiveManager $manager = null) {}
 
-    /** @param list<string> $include @param list<string> $exclude */
-    public function load(string $backupDirectory, string $projectRoot, bool $force, bool $wipe, array $include, array $exclude): void
+    public function load(string $backupDirectory, string $projectRoot, bool $force, bool $wipe): void
     {
         $archive = $this->archive($backupDirectory);
         $entries = $this->entries($archive);
         foreach ($entries as $entry) $this->assertSafeEntry($entry);
 
-        if ($wipe) ($this->manager ?? new TreeArchiveManager())->wipeSelected($projectRoot, $include, $exclude);
+        if ($wipe) ($this->manager ?? new TreeArchiveManager())->wipeProject($projectRoot);
         if (!$force) {
             foreach ($entries as $entry) {
                 $relative = rtrim($entry, '/');
