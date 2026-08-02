@@ -36,7 +36,11 @@ final class TreeArchiveManager
         $tar = join_path($backupDirectory, 'tree.tar');
         $manifest = null;
         try {
-            if ($include !== [] || $exclude !== []) $manifest = $this->createManifest($projectRoot, $include, $exclude);
+            // Always freeze the file list before tar starts. Besides making an
+            // unfiltered backup follow the same rules as a strategy backup,
+            // this prevents transient task scripts and the growing backup file
+            // from affecting traversal while the archive is being written.
+            $manifest = $this->createManifest($projectRoot, $include, $exclude);
             if ($compressor !== null && $compressor !== 'zip') {
                 $archive = $tar . '.' . self::EXTENSIONS[$compressor];
                 $this->streamCompressedTar($projectRoot, $archive, $compressor, $manifest);
