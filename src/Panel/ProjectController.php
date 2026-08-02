@@ -226,6 +226,7 @@ final class ProjectController
                 && ($request->composition === 'all' || ($request->composition === 'database' && $item['composition'] === 'БД') || ($request->composition === 'files' && $item['composition'] === 'Файлы') || ($request->composition === 'database-files' && $item['composition'] === 'БД и файлы'))
                 && ($request->database === 'all' || in_array($request->database, $item['databaseCodes'], true))
                 && ($request->strategy === 'all' || ($request->strategy === 'none' ? $item['strategyCode'] === '' : $request->strategy === $item['strategyCode']))
+                && ($request->databaseStrategy === 'all' || ($request->databaseStrategy === 'none' ? $item['databaseStrategyCode'] === '' : $request->databaseStrategy === $item['databaseStrategyCode']))
                 && ($request->location === 'all' || ($request->location === 'project' ? $item['location'] === '' : $request->location === $item['location']))
                 && ($request->dateFrom === null || $date >= $request->dateFrom)
                 && ($request->dateTo === null || $date <= $request->dateTo);
