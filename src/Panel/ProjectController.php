@@ -115,7 +115,7 @@ final class ProjectController
         $root = $config['data']['project']['root'] ?? null;
         if (!is_string($root) || $root === '') throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
 
-        $items = [];
+        $grouped = [];
         $strategies = array_column(($this->backupSettings ?? new BackupsSettingsRepository())->fileStrategies(), 'name', 'code');
         $locations = [['path' => join_path($root, '.docker-cli', 'backups'), 'code' => '', 'name' => 'Папка проекта']];
         foreach (($this->backupSettings ?? new BackupsSettingsRepository())->locations() as $location) {
@@ -130,13 +130,15 @@ final class ProjectController
                     $metadata = is_file($metadataFile) ? json_decode((string) file_get_contents($metadataFile), true) : null;
                     if ($location['code'] !== '' && (!is_array($metadata) || ($metadata['project'] ?? null) !== $request->name)) continue;
                     $createdAt = is_array($metadata) && is_string($metadata['createdAt'] ?? null) ? strtotime($metadata['createdAt']) : false;
-                    $items[] = [
+                    $key = $location['code'] . "\0" . basename($backup);
+                    if (!isset($grouped[$key])) $grouped[$key] = [
                         'name' => basename($backup),
                         'date' => gmdate(DATE_ATOM, $createdAt !== false ? $createdAt : ($timestamp === false ? 0 : $timestamp)),
                         'composition' => 'БД',
-                        'size' => $this->directorySize($backup),
-                        'database' => $databaseName,
-                        'databaseCode' => $databaseCode,
+                        'size' => 0,
+                        'database' => null,
+                        'databaseCode' => '',
+                        'databaseCodes' => [],
                         'strategy' => null,
                         'strategyCode' => '',
                         'strategyPaths' => null,
@@ -145,6 +147,10 @@ final class ProjectController
                         'location' => $location['code'],
                         'locationName' => $location['name'],
                     ];
+                    $grouped[$key]['databaseCodes'][] = $databaseCode;
+                    $grouped[$key]['database'] = implode(', ', array_map(static fn (string $code): string => ['mysql' => 'MySQL', 'postgres' => 'PostgreSQL'][$code], $grouped[$key]['databaseCodes']));
+                    $grouped[$key]['databaseCode'] = $grouped[$key]['databaseCodes'][0];
+                    $grouped[$key]['size'] += $this->directorySize($backup);
                 }
             }
             $directory = join_path($location['path'], 'tree');
@@ -173,27 +179,26 @@ final class ProjectController
                     'location' => $location['code'],
                     'locationName' => $location['name'],
                 ];
-                $combined = false;
-                foreach ($items as &$item) {
-                    if ($item['location'] === $location['code'] && $item['name'] === basename($backup) && $item['hasDatabase']) {
-                        $item['composition'] = 'БД и файлы';
-                        $item['size'] += $fileData['size'];
-                        $item['strategy'] = $fileData['strategy'];
-                        $item['strategyCode'] = $fileData['strategyCode'];
-                        $item['strategyPaths'] = $fileData['strategyPaths'];
-                        $item['hasFiles'] = true;
-                        $combined = true;
-                    }
+                $key = $location['code'] . "\0" . basename($backup);
+                if (isset($grouped[$key])) {
+                    $grouped[$key]['composition'] = 'БД и файлы';
+                    $grouped[$key]['size'] += $fileData['size'];
+                    $grouped[$key]['strategy'] = $fileData['strategy'];
+                    $grouped[$key]['strategyCode'] = $fileData['strategyCode'];
+                    $grouped[$key]['strategyPaths'] = $fileData['strategyPaths'];
+                    $grouped[$key]['hasFiles'] = true;
+                } else {
+                    $fileData['databaseCodes'] = [];
+                    $grouped[$key] = $fileData;
                 }
-                unset($item);
-                if (!$combined) $items[] = $fileData;
             }
         }
+        $items = array_values($grouped);
         $items = array_values(array_filter($items, static function (array $item) use ($request): bool {
             $date = substr($item['date'], 0, 10);
             return ($request->backupName === '' || str_contains(mb_strtolower($item['name']), mb_strtolower($request->backupName)))
                 && ($request->composition === 'all' || ($request->composition === 'database' && $item['composition'] === 'БД') || ($request->composition === 'files' && $item['composition'] === 'Файлы') || ($request->composition === 'database-files' && $item['composition'] === 'БД и файлы'))
-                && ($request->database === 'all' || $request->database === $item['databaseCode'])
+                && ($request->database === 'all' || in_array($request->database, $item['databaseCodes'], true))
                 && ($request->strategy === 'all' || ($request->strategy === 'none' ? $item['strategyCode'] === '' : $request->strategy === $item['strategyCode']))
                 && ($request->location === 'all' || ($request->location === 'project' ? $item['location'] === '' : $request->location === $item['location']))
                 && ($request->dateFrom === null || $date >= $request->dateFrom)
@@ -267,10 +272,11 @@ final class ProjectController
             $backupDirectory = $location['path'];
         }
         $tasks = [];
-        if ($request->database !== '') {
-            $backup = $this->backupPath($backupDirectory, $request->database, $request->backup, $request->name, $request->location !== '');
+        $databases = $request->databases !== [] ? $request->databases : ($request->database !== '' ? [$request->database] : []);
+        foreach ($databases as $database) {
+            $backup = $this->backupPath($backupDirectory, $database, $request->backup, $request->name, $request->location !== '');
             $tasks[] = [
-                'code' => 'core.' . $request->database . '.load',
+                'code' => 'core.' . $database . '.load',
                 'arguments' => ['path' => ['value' => $backup]],
                 'project' => $request->name,
             ];
@@ -287,7 +293,7 @@ final class ProjectController
                 'project' => $request->name,
             ];
         }
-        $taskCode = $request->database !== '' ? 'core.' . $request->database . '.load' : 'core.tree.load';
+        $taskCode = $databases !== [] ? 'core.' . $databases[0] . '.load' : 'core.tree.load';
         $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => $tasks]];
         try {
             $file = ($this->queues ?? new QueueRepository())->create('default', $taskCode, $item);

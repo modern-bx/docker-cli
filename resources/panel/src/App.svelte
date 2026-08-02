@@ -421,7 +421,15 @@
       protectedAlert = selectedProject;
       return;
     }
-    backupRestoreConfirmation = { ...backup, force: true, wipe: false };
+    backupRestoreConfirmation = { ...backup, restoreDatabases: [...(backup.databaseCodes || [])], restoreFiles: backup.hasFiles === true, force: true, wipe: false };
+  }
+
+  function toggleRestoreDatabase(database, checked) {
+    if (!backupRestoreConfirmation) return;
+    const restoreDatabases = checked
+      ? [...backupRestoreConfirmation.restoreDatabases, database]
+      : backupRestoreConfirmation.restoreDatabases.filter((item) => item !== database);
+    backupRestoreConfirmation = { ...backupRestoreConfirmation, restoreDatabases };
   }
 
   function openBackupDeleteDialog(backup) {
@@ -471,7 +479,7 @@
     backupRestoreConfirmation = null;
     backupRestorePending = true;
     try {
-      await restoreProjectBackup(api, selectedProjectName, backup.name, { database: backup.databaseCode, location: backup.location, files: backup.hasFiles === true, force: backup.force, wipe: backup.wipe });
+      await restoreProjectBackup(api, selectedProjectName, backup.name, { database: backup.restoreDatabases[0] || '', databases: backup.restoreDatabases, location: backup.location, files: backup.restoreFiles, force: backup.force, wipe: backup.wipe });
       notifyQueuedOperation(`Восстановление бэкапа «${backup.name}»`);
     } catch (cause) {
       errorTitle = 'Не удалось восстановить бэкап';
@@ -2347,17 +2355,26 @@
           {#if backupRestoreConfirmation.hasDatabase}
             <section class="backup-restore-section">
               {#if backupRestoreConfirmation.hasFiles}<h3>БД</h3>{/if}
-              <p class="backup-restore-warning">Текущая {backupRestoreConfirmation.database}-база проекта «{selectedProjectName}» будет полностью заменена данными из бэкапа «{backupRestoreConfirmation.name}».</p>
+              <div class="backup-restore-options">
+                {#each backupRestoreConfirmation.databaseCodes as database}
+                  <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.restoreDatabases.includes(database)} onchange={(event) => toggleRestoreDatabase(database, event.currentTarget.checked)} />{database === 'mysql' ? 'MySQL' : 'PostgreSQL'}</label>
+                {/each}
+              </div>
+              {#if backupRestoreConfirmation.restoreDatabases.length}
+                <p class="backup-restore-warning">Выбранные базы проекта «{selectedProjectName}» будут полностью заменены данными из бэкапа «{backupRestoreConfirmation.name}».</p>
+              {:else}<p>Базы данных восстанавливаться не будут.</p>{/if}
             </section>
           {/if}
           {#if backupRestoreConfirmation.hasFiles}
             <section class="backup-restore-section">
               {#if backupRestoreConfirmation.hasDatabase}<h3>Файлы</h3>{/if}
               <div class="backup-restore-options">
-                <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.force} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, force: event.currentTarget.checked }; }} />Перезаписывать файлы</label>
-                <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.wipe} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, wipe: event.currentTarget.checked }; }} />Предварительно стереть все файлы</label>
+                <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.restoreFiles} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, restoreFiles: event.currentTarget.checked }; }} />Восстановить файлы</label>
+                <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.force} disabled={!backupRestoreConfirmation.restoreFiles} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, force: event.currentTarget.checked }; }} />Перезаписывать файлы</label>
+                <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.wipe} disabled={!backupRestoreConfirmation.restoreFiles} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, wipe: event.currentTarget.checked }; }} />Предварительно стереть все файлы</label>
               </div>
-              <p class="backup-restore-warning">
+              {#if !backupRestoreConfirmation.restoreFiles}<p>Файлы восстанавливаться не будут.</p>
+              {:else}<p class="backup-restore-warning">
                 {#if backupRestoreConfirmation.wipe}
                   Все текущие файлы проекта, кроме содержимого .docker-cli, будут удалены перед восстановлением. {backupRestoreConfirmation.force ? 'Файлы бэкапа будут восстановлены с разрешением перезаписи.' : 'После очистки файлы бэкапа будут восстановлены без перезаписи существующих файлов.'}
                 {:else if backupRestoreConfirmation.force}
@@ -2365,7 +2382,7 @@
                 {:else}
                   Файлы будут восстановлены без перезаписи. Если одноимённый файл уже существует, восстановление завершится ошибкой; остальные файлы проекта останутся без изменений.
                 {/if}
-              </p>
+              </p>{/if}
               <div class="backup-strategy-contents">
                 <p>Бэкап включает:</p>
                 {#if backupRestoreConfirmation.strategyPaths?.include?.length}
@@ -2382,7 +2399,7 @@
       {/if}
       <div class="login-error-actions system-confirm-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
-        <button class="btn preset-filled-error-500" type="button" disabled={backupRestorePending} onclick={restoreBackup}>Восстановить</button>
+        <button class="btn preset-filled-error-500" type="button" disabled={backupRestorePending || (!backupRestoreConfirmation?.restoreFiles && !backupRestoreConfirmation?.restoreDatabases?.length)} onclick={restoreBackup}>Восстановить</button>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>
