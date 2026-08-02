@@ -11,13 +11,13 @@ use DockerCli\Panel\Http\RequestValidationException;
 /** JSON request accepted by POST /api/projects/{project}/update. */
 final readonly class ProjectUpdateRequestDto implements RequestDto
 {
-    public function __construct(public string $project, public ?string $name, public ?string $language, public ?string $framework)
+    public function __construct(public string $project, public ?string $name, public ?string $language, public ?string $languageVersion, public ?string $framework)
     {
     }
 
     public static function fromRequest(RequestData $request): static
     {
-        foreach (['name', 'language', 'framework'] as $field) {
+        foreach (['name', 'language', 'languageVersion', 'framework'] as $field) {
             if (array_key_exists($field, $request->body) && !is_string($request->body[$field])) {
                 throw new RequestValidationException('Параметры проекта должны быть строками.');
             }
@@ -26,6 +26,7 @@ final readonly class ProjectUpdateRequestDto implements RequestDto
             rawurldecode($request->route['name']),
             isset($request->body['name']) && $request->body['name'] !== '' ? $request->body['name'] : null,
             isset($request->body['language']) && $request->body['language'] !== '' ? $request->body['language'] : null,
+            isset($request->body['languageVersion']) && $request->body['languageVersion'] !== '' ? $request->body['languageVersion'] : null,
             array_key_exists('framework', $request->body) ? $request->body['framework'] : null,
         );
     }

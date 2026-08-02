@@ -25,6 +25,7 @@ use DockerCli\Panel\Dto\Request\ProjectSecurityRequestDto;
 use DockerCli\Panel\Enum\ProjectActionEnum;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Project\OpenRestyHostRenderer;
+use DockerCli\Project\PhpLanguageVersion;
 use DockerCli\Project\ProjectRegistry;
 use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Queue\QueueRepository;
@@ -93,6 +94,9 @@ final class ProjectController
             $projects[] = new ProjectDto(
                 name: $projectName,
                 language: $this->concept($project['language'] ?? null, ['php' => 'PHP']),
+                languageVersion: ($project['language'] ?? null) === 'php'
+                    ? (PhpLanguageVersion::isSupported($project['language_version'] ?? null) ? $project['language_version'] : PhpLanguageVersion::default($this->compose))
+                    : null,
                 framework: $this->concept($project['framework'] ?? null, self::FRAMEWORK_NAMES),
                 // Older project configs predate this flag and are enabled by default,
                 // just like OpenRestyHostRenderer treats them.
@@ -376,6 +380,8 @@ final class ProjectController
         return new ProjectOptionsDto(
             ($this->settings ?? new ProjectsSettingsRepository())->locations(),
             [new ConceptDto('php', 'PHP')],
+            PhpLanguageVersion::SUPPORTED,
+            PhpLanguageVersion::default($this->compose),
             ['php' => [new ConceptDto('', 'Без фреймворка'), ...array_map(static fn (string $code, string $name) => new ConceptDto($code, $name), array_keys(self::FRAMEWORK_NAMES), self::FRAMEWORK_NAMES)]],
             $deploymentScripts,
         );
@@ -449,11 +455,13 @@ final class ProjectController
         $options = $this->options(new EmptyRequestDto());
         if ($request->language !== null && !isset($options->frameworks[$request->language])) throw new ProjectActionException('Язык не поддерживается.', 422);
         $language = $request->language ?? 'php';
+        if ($request->languageVersion !== null && ($language !== 'php' || !PhpLanguageVersion::isSupported($request->languageVersion))) throw new ProjectActionException('Версия языка не поддерживается.', 422);
         if ($request->framework !== null && !in_array($request->framework, array_map(static fn (ConceptDto $item) => $item->code, $options->frameworks[$language] ?? []), true)) throw new ProjectActionException('Фреймворк не поддерживается.', 422);
         $arguments = [];
         foreach (['name', 'language', 'framework'] as $option) {
             if ($request->{$option} !== null) $arguments[$option] = ['value' => $request->{$option}];
         }
+        if ($request->languageVersion !== null) $arguments['language_version'] = ['value' => $request->languageVersion];
         $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
             'code' => 'core.project.update', 'arguments' => $arguments, 'project' => $request->project,
         ]]]];

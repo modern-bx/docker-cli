@@ -6,10 +6,11 @@ task:
   code: core.project.update
   type: shell
   context: project
-  description: Изменяет имя, язык или фреймворк проекта.
+  description: Изменяет имя, язык, версию языка или фреймворк проекта.
   parameters:
     name: { type: string, required: false }
     language: { type: list, required: false, items: [{ name: PHP, value: php }] }
+    language_version: { type: list, required: false, items: [{ name: PHP 8.2, value: '8.2' }, { name: PHP 8.3, value: '8.3' }, { name: PHP 8.4, value: '8.4' }, { name: PHP 8.5, value: '8.5' }] }
     framework:
       type: list
       required: false
@@ -23,5 +24,6 @@ task:
     options=()
     [ -n "${name+x}" ] && options+=(--name="$name")
     [ -n "${language+x}" ] && options+=(--language="$language")
+    [ -n "${language_version+x}" ] && options+=(--language-version="$language_version")
     [ -n "${framework+x}" ] && options+=(--framework="$framework")
     docker-cli project:update "${options[@]}"
