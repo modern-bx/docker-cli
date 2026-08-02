@@ -421,7 +421,7 @@
       protectedAlert = selectedProject;
       return;
     }
-    backupRestoreConfirmation = backup;
+    backupRestoreConfirmation = { ...backup, force: true, wipe: false };
   }
 
   function openBackupDeleteDialog(backup) {
@@ -471,8 +471,8 @@
     backupRestoreConfirmation = null;
     backupRestorePending = true;
     try {
-      await restoreProjectBackup(api, selectedProjectName, backup.name, backup.databaseCode, backup.location);
-      notifyQueuedOperation(`Восстановление ${backup.database}-бэкапа «${backup.name}»`);
+      await restoreProjectBackup(api, selectedProjectName, backup.name, { database: backup.databaseCode, location: backup.location, files: backup.hasFiles === true, force: backup.force, wipe: backup.wipe });
+      notifyQueuedOperation(`Восстановление бэкапа «${backup.name}»`);
     } catch (cause) {
       errorTitle = 'Не удалось восстановить бэкап';
       error = cause instanceof Error ? cause.message : 'Не удалось поставить восстановление бэкапа в очередь.';
@@ -2340,11 +2340,46 @@
 <Dialog open={Boolean(backupRestoreConfirmation)} onOpenChange={({ open }) => { if (!open && !backupRestorePending) backupRestoreConfirmation = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
-    <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
+    <Dialog.Content class="login-error-dialog backup-restore-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
       <Dialog.Title class="login-error-title">Восстановить бэкап?</Dialog.Title>
-      <Dialog.Description class="login-error-description">
-        Текущая {backupRestoreConfirmation?.database}-база проекта «{selectedProjectName}» будет полностью заменена данными из бэкапа «{backupRestoreConfirmation?.name}».
-      </Dialog.Description>
+      {#if backupRestoreConfirmation}
+        <div class="backup-restore-content">
+          {#if backupRestoreConfirmation.hasDatabase}
+            <section class="backup-restore-section">
+              {#if backupRestoreConfirmation.hasFiles}<h3>БД</h3>{/if}
+              <p class="backup-restore-warning">Текущая {backupRestoreConfirmation.database}-база проекта «{selectedProjectName}» будет полностью заменена данными из бэкапа «{backupRestoreConfirmation.name}».</p>
+            </section>
+          {/if}
+          {#if backupRestoreConfirmation.hasFiles}
+            <section class="backup-restore-section">
+              {#if backupRestoreConfirmation.hasDatabase}<h3>Файлы</h3>{/if}
+              <div class="backup-restore-options">
+                <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.force} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, force: event.currentTarget.checked }; }} />Перезаписывать файлы</label>
+                <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.wipe} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, wipe: event.currentTarget.checked }; }} />Предварительно стереть все файлы</label>
+              </div>
+              <p class="backup-restore-warning">
+                {#if backupRestoreConfirmation.wipe}
+                  Все текущие файлы проекта, кроме содержимого .docker-cli, будут удалены перед восстановлением. {backupRestoreConfirmation.force ? 'Файлы бэкапа будут восстановлены с разрешением перезаписи.' : 'После очистки файлы бэкапа будут восстановлены без перезаписи существующих файлов.'}
+                {:else if backupRestoreConfirmation.force}
+                  Файлы из бэкапа заменят одноимённые файлы проекта. Остальные файлы проекта останутся без изменений.
+                {:else}
+                  Файлы будут восстановлены без перезаписи. Если одноимённый файл уже существует, восстановление завершится ошибкой; остальные файлы проекта останутся без изменений.
+                {/if}
+              </p>
+              <div class="backup-strategy-contents">
+                <p>Бэкап включает:</p>
+                {#if backupRestoreConfirmation.strategyPaths?.include?.length}
+                  <ul>{#each backupRestoreConfirmation.strategyPaths.include as pattern}<li><code>{pattern}</code></li>{/each}</ul>
+                {:else}<p>Все файлы и каталоги проекта.</p>{/if}
+                <p>Из включённого исключены:</p>
+                {#if backupRestoreConfirmation.strategyPaths?.exclude?.length}
+                  <ul>{#each backupRestoreConfirmation.strategyPaths.exclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>
+                {:else}<p>Исключений нет.</p>{/if}
+              </div>
+            </section>
+          {/if}
+        </div>
+      {/if}
       <div class="login-error-actions system-confirm-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
         <button class="btn preset-filled-error-500" type="button" disabled={backupRestorePending} onclick={restoreBackup}>Восстановить</button>

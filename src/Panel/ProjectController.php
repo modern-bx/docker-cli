@@ -139,6 +139,9 @@ final class ProjectController
                         'databaseCode' => $databaseCode,
                         'strategy' => null,
                         'strategyCode' => '',
+                        'strategyPaths' => null,
+                        'hasDatabase' => true,
+                        'hasFiles' => false,
                         'location' => $location['code'],
                         'locationName' => $location['name'],
                     ];
@@ -154,7 +157,8 @@ final class ProjectController
                 $timestamp = filemtime($backup);
                 $createdAt = is_string($metadata['createdAt'] ?? null) ? strtotime($metadata['createdAt']) : false;
                 $strategyCode = is_string($metadata['strategy'] ?? null) ? $metadata['strategy'] : '';
-                $items[] = [
+                $strategyPaths = is_array($metadata['strategyPaths'] ?? null) ? $metadata['strategyPaths'] : ['include' => [], 'exclude' => []];
+                $fileData = [
                     'name' => basename($backup),
                     'date' => gmdate(DATE_ATOM, $createdAt !== false ? $createdAt : ($timestamp === false ? 0 : $timestamp)),
                     'composition' => 'Файлы',
@@ -163,15 +167,32 @@ final class ProjectController
                     'databaseCode' => '',
                     'strategy' => $strategyCode !== '' ? ($strategies[$strategyCode] ?? null) : null,
                     'strategyCode' => $strategyCode,
+                    'strategyPaths' => $strategyPaths,
+                    'hasDatabase' => false,
+                    'hasFiles' => true,
                     'location' => $location['code'],
                     'locationName' => $location['name'],
                 ];
+                $combined = false;
+                foreach ($items as &$item) {
+                    if ($item['location'] === $location['code'] && $item['name'] === basename($backup) && $item['hasDatabase']) {
+                        $item['composition'] = 'БД и файлы';
+                        $item['size'] += $fileData['size'];
+                        $item['strategy'] = $fileData['strategy'];
+                        $item['strategyCode'] = $fileData['strategyCode'];
+                        $item['strategyPaths'] = $fileData['strategyPaths'];
+                        $item['hasFiles'] = true;
+                        $combined = true;
+                    }
+                }
+                unset($item);
+                if (!$combined) $items[] = $fileData;
             }
         }
         $items = array_values(array_filter($items, static function (array $item) use ($request): bool {
             $date = substr($item['date'], 0, 10);
             return ($request->backupName === '' || str_contains(mb_strtolower($item['name']), mb_strtolower($request->backupName)))
-                && ($request->composition === 'all' || ($request->composition === 'database' && $item['composition'] === 'БД') || ($request->composition === 'files' && $item['composition'] === 'Файлы'))
+                && ($request->composition === 'all' || ($request->composition === 'database' && $item['composition'] === 'БД') || ($request->composition === 'files' && $item['composition'] === 'Файлы') || ($request->composition === 'database-files' && $item['composition'] === 'БД и файлы'))
                 && ($request->database === 'all' || $request->database === $item['databaseCode'])
                 && ($request->strategy === 'all' || ($request->strategy === 'none' ? $item['strategyCode'] === '' : $request->strategy === $item['strategyCode']))
                 && ($request->location === 'all' || ($request->location === 'project' ? $item['location'] === '' : $request->location === $item['location']))
@@ -245,30 +266,49 @@ final class ProjectController
             if ($location === null) throw new ProjectActionException('Хранилище бэкапов не найдено.', 404);
             $backupDirectory = $location['path'];
         }
-        $backupRoot = realpath(join_path($backupDirectory, $request->database));
-        $backup = $backupRoot === false ? false : realpath(join_path($backupRoot, $request->backup));
-        if ($backup === false || !is_dir($backup) || !str_starts_with($backup . DIRECTORY_SEPARATOR, $backupRoot . DIRECTORY_SEPARATOR)) {
-            throw new ProjectActionException('Бэкап не найден.', 404);
+        $tasks = [];
+        if ($request->database !== '') {
+            $backup = $this->backupPath($backupDirectory, $request->database, $request->backup, $request->name, $request->location !== '');
+            $tasks[] = [
+                'code' => 'core.' . $request->database . '.load',
+                'arguments' => ['path' => ['value' => $backup]],
+                'project' => $request->name,
+            ];
         }
-        if ($request->location !== '') {
-            $metadata = json_decode((string) @file_get_contents(join_path($backup, 'docker-cli.json')), true);
-            if (!is_array($metadata) || ($metadata['project'] ?? null) !== $request->name) {
-                throw new ProjectActionException('Бэкап не найден.', 404);
-            }
+        if ($request->files) {
+            $backup = $this->backupPath($backupDirectory, 'tree', $request->backup, $request->name, true);
+            $tasks[] = [
+                'code' => 'core.tree.load',
+                'arguments' => [
+                    'path' => ['value' => $backup],
+                    'force' => ['value' => $request->force],
+                    'wipe' => ['value' => $request->wipe],
+                ],
+                'project' => $request->name,
+            ];
         }
-
-        $taskCode = 'core.' . $request->database . '.load';
-        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
-            'code' => $taskCode,
-            'arguments' => ['path' => ['value' => $backup]],
-            'project' => $request->name,
-        ]]]];
+        $taskCode = $request->database !== '' ? 'core.' . $request->database . '.load' : 'core.tree.load';
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => $tasks]];
         try {
             $file = ($this->queues ?? new QueueRepository())->create('default', $taskCode, $item);
         } catch (\InvalidArgumentException|\RuntimeException $exception) {
             throw new ProjectActionException($exception->getMessage(), 500);
         }
         return new QueuedOperationDto($file);
+    }
+
+    private function backupPath(string $directory, string $type, string $name, string $project, bool $checkMetadata): string
+    {
+        $root = realpath(join_path($directory, $type));
+        $backup = $root === false ? false : realpath(join_path($root, $name));
+        if ($backup === false || !is_dir($backup) || !str_starts_with($backup . DIRECTORY_SEPARATOR, $root . DIRECTORY_SEPARATOR)) {
+            throw new ProjectActionException('Бэкап не найден.', 404);
+        }
+        if ($checkMetadata) {
+            $metadata = json_decode((string) @file_get_contents(join_path($backup, 'docker-cli.json')), true);
+            if (!is_array($metadata) || ($metadata['project'] ?? null) !== $project) throw new ProjectActionException('Бэкап не найден.', 404);
+        }
+        return $backup;
     }
 
     #[Route('POST', '/api/projects/{name}/backups/{backup}/delete', ProjectBackupRestoreRequestDto::class, QueuedOperationDto::class)]
