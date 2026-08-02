@@ -5,19 +5,22 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Project\BackupStorageLocator;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use function DockerCli\Util\join_path;
 
 final class PostgresBackupDeleteCommand extends AbstractCommand
 {
-    public function __construct(private readonly ?ProjectRegistry $registry = null)
+    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?BackupStorageLocator $storageLocator = null)
     {
         parent::__construct('postgres:backup-delete');
         $this->setDescription('Удалить PostgreSQL-бэкап текущего проекта.');
         $this->addArgument('backup', InputArgument::REQUIRED, 'Короткое имя бэкапа.');
+        $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код централизованного хранилища бэкапов.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -39,11 +42,29 @@ final class PostgresBackupDeleteCommand extends AbstractCommand
             $this->writeMessage($output, '<error>Конфигурация проекта повреждена.</error>');
             return Command::FAILURE;
         }
-        $backupRoot = realpath(join_path($root, '.docker-cli', 'backups', 'postgres'));
+        $location = $input->getOption('location');
+        if ($location !== null && (!is_string($location) || $location === '')) {
+            $this->writeMessage($output, '<error>Опция --location должна содержать код хранилища бэкапов.</error>');
+            return Command::INVALID;
+        }
+        try {
+            $directory = $location === null ? join_path($root, '.docker-cli', 'backups', 'postgres') : ($this->storageLocator ?? new BackupStorageLocator())->databaseDirectory($location, 'postgres');
+        } catch (\InvalidArgumentException $exception) {
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
+            return Command::INVALID;
+        }
+        $backupRoot = realpath($directory);
         $backup = $backupRoot === false ? false : realpath(join_path($backupRoot, $name));
         if ($backup === false || !is_dir($backup) || dirname($backup) !== $backupRoot) {
             $this->writeMessage($output, sprintf('<error>Бэкап "%s" не найден.</error>', $name));
             return Command::FAILURE;
+        }
+        if ($location !== null) {
+            $metadata = json_decode((string) @file_get_contents(join_path($backup, 'docker-cli.json')), true);
+            if (!is_array($metadata) || ($metadata['project'] ?? null) !== $project) {
+                $this->writeMessage($output, sprintf('<error>Бэкап "%s" не найден.</error>', $name));
+                return Command::FAILURE;
+            }
         }
 
         try {

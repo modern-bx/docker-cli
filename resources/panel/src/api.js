@@ -45,12 +45,12 @@ export async function createProjectBackup(request, project, selection) {
   return request(`/api/projects/${encodeURIComponent(project)}/backups`, { method: 'POST', body: JSON.stringify(selection) });
 }
 
-export async function restoreProjectBackup(request, project, backup, database, location) {
-  return request(`/api/projects/${encodeURIComponent(project)}/backups/${encodeURIComponent(backup)}/restore`, { method: 'POST', body: JSON.stringify({ database, location }) });
+export async function restoreProjectBackup(request, project, backup, options) {
+  return request(`/api/projects/${encodeURIComponent(project)}/backups/${encodeURIComponent(backup)}/restore`, { method: 'POST', body: JSON.stringify(options) });
 }
 
-export async function deleteProjectBackup(request, project, backup, database) {
-  return request(`/api/projects/${encodeURIComponent(project)}/backups/${encodeURIComponent(backup)}/delete`, { method: 'POST', body: JSON.stringify({ database }) });
+export async function deleteProjectBackup(request, project, backup, options) {
+  return request(`/api/projects/${encodeURIComponent(project)}/backups/${encodeURIComponent(backup)}/delete`, { method: 'POST', body: JSON.stringify(options) });
 }
 
 export async function createProject(request, project) {
@@ -138,10 +138,10 @@ export async function getBackupsSettings(request) {
   return request('/api/settings/backups');
 }
 
-export async function saveBackupsSettings(request, locations) {
+export async function saveBackupsSettings(request, locations, fileStrategies) {
   return request('/api/settings/backups', {
     method: 'POST',
-    body: JSON.stringify({ locations }),
+    body: JSON.stringify({ locations, fileStrategies }),
   });
 }
 
