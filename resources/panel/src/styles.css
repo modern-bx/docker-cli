@@ -129,8 +129,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .dark .backup-menu-trigger { color: var(--color-surface-300); }
 .dark .backup-menu-trigger:hover { color: var(--color-primary-300); }
 .backup-menu-trigger:disabled { cursor: not-allowed; opacity: 0.4; }
-.backup-create-dialog { width: min(32rem, calc(100vw - 2rem)); }
-.backup-create-dialog-wide { width: min(66rem, calc(100vw - 2rem)); }
+.login-error-dialog.backup-create-dialog { width: min(48rem, calc(100vw - 2rem)); }
 .backup-create-content { display: grid; gap: 1rem; margin-top: 1rem; }
 .backup-create-content .label { position: relative; }
 .backup-create-content .label:focus-within { z-index: 40; }
@@ -456,6 +455,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .project-add-button { width: 125px; margin: 0 1.5rem .75rem; justify-content: center; }
 .project-add-form { display: grid; gap: 1rem; margin-top: 1rem; }
 .project-clone-form { grid-template-columns: minmax(0, 1fr); }
+.login-error-dialog.project-clone-dialog { width: min(18.667rem, calc(100vw - 2rem)); }
 .project-clone-dbms .project-deployment-checkboxes { display: flex; align-items: center; gap: 1.5rem; margin-top: .375rem; }
 .project-add-form .label { position: relative; }
 .project-add-form .label:focus-within, .project-add-form .font-combobox-positioner { z-index: 60; }

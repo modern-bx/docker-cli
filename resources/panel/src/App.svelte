@@ -2462,7 +2462,7 @@
 <Dialog open={Boolean(backupCreateDialog)} onOpenChange={({ open }) => { if (!open && !backupCreatePending) backupCreateDialog = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
-    <Dialog.Content class={`login-error-dialog backup-create-dialog card preset-filled-surface-100-900 shadow-2xl${backupCreateDialog?.files === true ? ' backup-create-dialog-wide' : ''}`}>
+    <Dialog.Content class="login-error-dialog backup-create-dialog card preset-filled-surface-100-900 shadow-2xl">
       <Dialog.Title class="login-error-title">Создать бэкап</Dialog.Title>
       {#if backupCreateDialog}
         <div class="backup-create-content">
