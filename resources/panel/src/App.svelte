@@ -2387,7 +2387,7 @@
                 <p>Бэкап включает:</p>
                 {#if backupRestoreConfirmation.strategyPaths?.include?.length}
                   <ul>{#each backupRestoreConfirmation.strategyPaths.include as pattern}<li><code>{pattern}</code></li>{/each}</ul>
-                {:else}<p>Все файлы и каталоги проекта.</p>{/if}
+                {:else}<ul><li>Все файлы и каталоги проекта</li></ul>{/if}
                 <p>Из включённого исключены:</p>
                 {#if backupRestoreConfirmation.strategyPaths?.exclude?.length}
                   <ul>{#each backupRestoreConfirmation.strategyPaths.exclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>
