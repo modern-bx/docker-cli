@@ -1110,13 +1110,18 @@
   }
 
   async function api(path, options = {}) {
-    const response = await fetch(path, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
-    });
+    let response;
+    try {
+      response = await fetch(path, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers || {}),
+        },
+      });
+    } catch {
+      throw new Error('Панель временно недоступна — возможно, она перезапускается. Подождите несколько секунд и повторите запрос.');
+    }
     let data;
     try {
       data = await response.json();

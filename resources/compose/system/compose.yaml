@@ -24,6 +24,9 @@ services:
       - --providers.docker.exposedbydefault=false
       - --providers.docker.network=docker-cli
       - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
       - --entrypoints.websecure.address=:443
       - --entrypoints.websecure.http.tls.certresolver=cloudflare
       - --entrypoints.websecure.http.tls.domains[0].main=${BASE_HOST}
@@ -187,6 +190,12 @@ services:
       traefik.http.routers.openresty.tls.certresolver: cloudflare
       traefik.http.routers.openresty.tls.domains[0].main: ${BASE_HOST}
       traefik.http.routers.openresty.tls.domains[0].sans: '*.${BASE_HOST}'
+      traefik.http.routers.fallback.rule: HostRegexp(`^(.+\.)?${BASE_HOST}$`)
+      traefik.http.routers.fallback.entrypoints: websecure
+      traefik.http.routers.fallback.tls: "true"
+      traefik.http.routers.fallback.tls.certresolver: cloudflare
+      traefik.http.routers.fallback.service: openresty
+      traefik.http.routers.fallback.priority: "1"
       traefik.http.middlewares.openresty-https-redirect.redirectscheme.scheme: https
       traefik.http.middlewares.openresty-https-redirect.redirectscheme.permanent: "true"
       traefik.http.services.openresty.loadbalancer.server.port: "${OPENRESTY_PORT:-80}"
