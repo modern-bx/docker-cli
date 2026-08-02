@@ -438,7 +438,15 @@
       protectedAlert = selectedProject;
       return;
     }
-    backupDeleteConfirmation = backup;
+    backupDeleteConfirmation = { ...backup, deleteDatabases: [...(backup.databaseCodes || [])], deleteFiles: backup.hasFiles === true };
+  }
+
+  function toggleDeleteDatabase(database, checked) {
+    if (!backupDeleteConfirmation) return;
+    const deleteDatabases = checked
+      ? [...backupDeleteConfirmation.deleteDatabases, database]
+      : backupDeleteConfirmation.deleteDatabases.filter((item) => item !== database);
+    backupDeleteConfirmation = { ...backupDeleteConfirmation, deleteDatabases };
   }
 
   function openBackupCreateDialog() {
@@ -496,7 +504,7 @@
     backupDeleteConfirmation = null;
     backupDeletePending = true;
     try {
-      await deleteProjectBackup(api, selectedProjectName, backup.name, backup.databaseCode);
+      await deleteProjectBackup(api, selectedProjectName, backup.name, { database: backup.deleteDatabases[0] || '', databases: backup.deleteDatabases, files: backup.deleteFiles, location: backup.location });
       notifyQueuedOperation(`Удаление бэкапа «${backup.name}»`);
     } catch (cause) {
       errorTitle = 'Не удалось удалить бэкап';
@@ -2410,12 +2418,20 @@
   <Dialog.Positioner class="login-error-positioner">
     <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
       <Dialog.Title class="login-error-title">Удалить бэкап?</Dialog.Title>
-      <Dialog.Description class="login-error-description">
-        {backupDeleteConfirmation?.database}-бэкап «{backupDeleteConfirmation?.name}» проекта «{selectedProjectName}» будет безвозвратно удалён.
-      </Dialog.Description>
+      {#if backupDeleteConfirmation}
+        <div class="backup-delete-content">
+          <div class="backup-restore-options">
+            {#each backupDeleteConfirmation.databaseCodes as database}
+              <label><input class="checkbox" type="checkbox" checked={backupDeleteConfirmation.deleteDatabases.includes(database)} onchange={(event) => toggleDeleteDatabase(database, event.currentTarget.checked)} />Удалить {database === 'mysql' ? 'MySQL' : 'PostgreSQL'}</label>
+            {/each}
+            {#if backupDeleteConfirmation.hasFiles}<label><input class="checkbox" type="checkbox" checked={backupDeleteConfirmation.deleteFiles} onchange={(event) => { backupDeleteConfirmation = { ...backupDeleteConfirmation, deleteFiles: event.currentTarget.checked }; }} />Удалить файлы</label>{/if}
+          </div>
+          <p class="login-error-description">Выбранные части бэкапа «{backupDeleteConfirmation.name}» проекта «{selectedProjectName}» будут безвозвратно удалены.</p>
+        </div>
+      {/if}
       <div class="login-error-actions system-confirm-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отмена</Dialog.CloseTrigger>
-        <button class="btn preset-filled-error-500" type="button" disabled={backupDeletePending} onclick={deleteBackup}>Удалить</button>
+        <button class="btn preset-filled-error-500" type="button" disabled={backupDeletePending || (!backupDeleteConfirmation?.deleteFiles && !backupDeleteConfirmation?.deleteDatabases?.length)} onclick={deleteBackup}>Удалить</button>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>

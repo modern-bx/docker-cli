@@ -4,21 +4,22 @@ declare(strict_types=1);
 
 namespace DockerCli\Command;
 
-use DockerCli\Project\ProjectRegistry;
 use DockerCli\Project\BackupStorageLocator;
+use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+
 use function DockerCli\Util\join_path;
 
-final class MysqlBackupDeleteCommand extends AbstractCommand
+final class TreeBackupDeleteCommand extends AbstractCommand
 {
     public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?BackupStorageLocator $storageLocator = null)
     {
-        parent::__construct('mysql:backup-delete');
-        $this->setDescription('Удалить MySQL-бэкап текущего проекта.');
+        parent::__construct('tree:backup-delete');
+        $this->setDescription('Удалить файловый бэкап текущего проекта.');
         $this->addArgument('backup', InputArgument::REQUIRED, 'Короткое имя бэкапа.');
         $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код централизованного хранилища бэкапов.');
     }
@@ -31,10 +32,14 @@ final class MysqlBackupDeleteCommand extends AbstractCommand
             $this->writeMessage($output, '<error>Запустите команду из директории зарегистрированного проекта.</error>');
             return Command::FAILURE;
         }
-
         $name = (string) $input->getArgument('backup');
         if ($name === '' || basename($name) !== $name || in_array($name, ['.', '..'], true)) {
             $this->writeMessage($output, '<error>Укажите корректное короткое имя бэкапа.</error>');
+            return Command::INVALID;
+        }
+        $location = $input->getOption('location');
+        if ($location !== null && (!is_string($location) || $location === '')) {
+            $this->writeMessage($output, '<error>Опция --location должна содержать код хранилища бэкапов.</error>');
             return Command::INVALID;
         }
         $root = $registry->readProjectConfig($project)['data']['project']['root'] ?? null;
@@ -42,13 +47,8 @@ final class MysqlBackupDeleteCommand extends AbstractCommand
             $this->writeMessage($output, '<error>Конфигурация проекта повреждена.</error>');
             return Command::FAILURE;
         }
-        $location = $input->getOption('location');
-        if ($location !== null && (!is_string($location) || $location === '')) {
-            $this->writeMessage($output, '<error>Опция --location должна содержать код хранилища бэкапов.</error>');
-            return Command::INVALID;
-        }
         try {
-            $directory = $location === null ? join_path($root, '.docker-cli', 'backups', 'mysql') : ($this->storageLocator ?? new BackupStorageLocator())->databaseDirectory($location, 'mysql');
+            $directory = $location === null ? join_path($root, '.docker-cli', 'backups', 'tree') : ($this->storageLocator ?? new BackupStorageLocator())->treeDirectory($location);
         } catch (\InvalidArgumentException $exception) {
             $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::INVALID;
@@ -59,22 +59,19 @@ final class MysqlBackupDeleteCommand extends AbstractCommand
             $this->writeMessage($output, sprintf('<error>Бэкап "%s" не найден.</error>', $name));
             return Command::FAILURE;
         }
-        if ($location !== null) {
-            $metadata = json_decode((string) @file_get_contents(join_path($backup, 'docker-cli.json')), true);
-            if (!is_array($metadata) || ($metadata['project'] ?? null) !== $project) {
-                $this->writeMessage($output, sprintf('<error>Бэкап "%s" не найден.</error>', $name));
-                return Command::FAILURE;
-            }
+        $metadata = json_decode((string) @file_get_contents(join_path($backup, 'docker-cli.json')), true);
+        if (!is_array($metadata) || ($metadata['project'] ?? null) !== $project) {
+            $this->writeMessage($output, sprintf('<error>Бэкап "%s" не найден.</error>', $name));
+            return Command::FAILURE;
         }
-
         try {
             $this->removeDirectory($backup);
         } catch (\RuntimeException $exception) {
-            $this->writeMessage($output, sprintf('<error>%s</error>', $exception->getMessage()));
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
         }
         CommandContext::fromEnvironment($this, $output)->addMessage(new Message(
-            sprintf('MySQL-бэкап "%s" проекта "%s" удалён.', $name, $project),
+            sprintf('Файловый бэкап "%s" проекта "%s" удалён.', $name, $project),
             MessageLevel::Info,
             notify: true,
         ));

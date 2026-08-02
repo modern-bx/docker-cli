@@ -12,5 +12,8 @@ task:
       name: Короткое имя бэкапа
       type: string
       required: true
+    location: { name: Расположение, type: string }
   action: |
-    docker-cli mysql:backup-delete {{ backup }}
+    options=()
+    [ -n "${location:-}" ] && options+=(--location="$location")
+    docker-cli mysql:backup-delete {{ backup }} "${options[@]}"

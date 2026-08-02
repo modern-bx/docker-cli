@@ -322,12 +322,20 @@ final class ProjectController
     {
         if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
         if ($this->projects->isProjectProtected($request->name)) throw new ProjectActionException('Проект защищен.', 409);
-        $taskCode = 'core.' . $request->database . '.backup-delete';
-        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
-            'code' => $taskCode,
-            'arguments' => ['backup' => ['value' => $request->backup]],
+        $databases = $request->databases !== [] ? $request->databases : ($request->database !== '' ? [$request->database] : []);
+        $tasks = [];
+        foreach ($databases as $database) $tasks[] = [
+            'code' => 'core.' . $database . '.backup-delete',
+            'arguments' => ['backup' => ['value' => $request->backup], 'location' => ['value' => $request->location]],
             'project' => $request->name,
-        ]]]];
+        ];
+        if ($request->files) $tasks[] = [
+            'code' => 'core.tree.backup-delete',
+            'arguments' => ['backup' => ['value' => $request->backup], 'location' => ['value' => $request->location]],
+            'project' => $request->name,
+        ];
+        $taskCode = $databases !== [] ? 'core.' . $databases[0] . '.backup-delete' : 'core.tree.backup-delete';
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => $tasks]];
         try {
             $file = ($this->queues ?? new QueueRepository())->create('default', $taskCode, $item);
         } catch (\InvalidArgumentException|\RuntimeException $exception) {
