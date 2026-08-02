@@ -6,6 +6,7 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Project\PostgresDumpLoader;
+use DockerCli\Project\BackupStorageLocator;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -14,12 +15,13 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class PostgresLoadCommand extends AbstractCommand
 {
-    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?PostgresDumpLoader $dumpLoader = null)
+    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?PostgresDumpLoader $dumpLoader = null, private readonly ?BackupStorageLocator $storageLocator = null)
     {
         parent::__construct('postgres:load');
         $this->setDescription('Параллельно восстановить PostgreSQL из directory-бэкапа.');
         $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Путь к директории, созданной postgres:dump.');
         $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Короткое имя директории бэкапа.');
+        $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код централизованного хранилища бэкапов.');
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
         $this->addOption('jobs', 'j', InputOption::VALUE_REQUIRED, 'Число параллельных процессов.', '4');
     }
@@ -50,6 +52,7 @@ final class PostgresLoadCommand extends AbstractCommand
         }
         $name = $input->getOption('name');
         $path = $input->getOption('path');
+        $location = $input->getOption('location');
         if (($name === null) === ($path === null)) {
             $this->writeMessage($output, '<error>Укажите ровно одну из опций --name или --path.</error>');
             return Command::INVALID;
@@ -62,7 +65,17 @@ final class PostgresLoadCommand extends AbstractCommand
             $this->writeMessage($output, '<error>Опция --path должна содержать путь к директории бэкапа.</error>');
             return Command::INVALID;
         }
-        $path = realpath($path ?? sprintf('.docker-cli/backups/postgres/%s', $name));
+        if ($location !== null && (!is_string($location) || $location === '' || $path !== null)) {
+            $this->writeMessage($output, '<error>Опцию --location можно использовать только вместе с --name.</error>');
+            return Command::INVALID;
+        }
+        try {
+            $backupRoot = $location === null ? '.docker-cli/backups/postgres' : ($this->storageLocator ?? new BackupStorageLocator())->databaseDirectory($location, 'postgres');
+        } catch (\InvalidArgumentException $exception) {
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
+            return Command::INVALID;
+        }
+        $path = realpath($path ?? sprintf('%s/%s', $backupRoot, $name));
         if ($path === false || !is_file($path . '/toc.dat')) {
             $this->writeMessage($output, '<error>Указанная директория не является directory-бэкапом pg_dump.</error>');
             return Command::FAILURE;
