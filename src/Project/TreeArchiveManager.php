@@ -53,7 +53,7 @@ final class TreeArchiveManager
 
     private function createTar(string $projectRoot, string $tar): void
     {
-        $command = ['tar', '-cf', $tar];
+        $command = ['tar', '-cf', $tar, '--exclude=./.docker-cli'];
         $relativeTar = $this->relativePath($projectRoot, $tar);
         if ($relativeTar !== null) $command[] = '--exclude=./' . $relativeTar;
         array_push($command, '-C', $projectRoot, '.');
@@ -62,7 +62,7 @@ final class TreeArchiveManager
 
     private function streamCompressedTar(string $projectRoot, string $archive, string $compressor): void
     {
-        $tarCommand = ['tar', '-cf', '-'];
+        $tarCommand = ['tar', '-cf', '-', '--exclude=./.docker-cli'];
         $relativeArchive = $this->relativePath($projectRoot, $archive);
         if ($relativeArchive !== null) $tarCommand[] = '--exclude=./' . $relativeArchive;
         array_push($tarCommand, '-C', $projectRoot, '.');
