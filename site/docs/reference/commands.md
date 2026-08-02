@@ -125,15 +125,15 @@ bin/docker-cli project:clone --to=my-project-copy --here
 DNS-алиасы через Traefik и Dnsdock и выполняет reload OpenResty, поэтому новый
 проект сразу открывается на собственном хосте.
 
-### `bin/docker-cli project:update [--name] [--language] [--framework] [--php-version]`
+### `bin/docker-cli project:update [--name] [--language] [--framework] [--language-version]`
 
-Изменяет имя, язык, фреймворк и версию PHP проекта. `--php-version` принимает `8.2`, `8.3`, `8.4` или `8.5`. Команду нужно запускать из директории
+Изменяет имя, язык, фреймворк и версию PHP проекта. `--language-version` принимает `8.2`, `8.3`, `8.4` или `8.5`. Команду нужно запускать из директории
 зарегистрированного проекта. Если язык или фреймворк изменились, команда пересобирает
 конфигурацию OpenResty и перезагружает связанные сервисы. Вызов без опций выводит
 предупреждение и завершается успешно.
 
 ```bash
-bin/docker-cli project:update --name=new-project --language=php --framework=symfony --php-version=8.4
+bin/docker-cli project:update --name=new-project --language=php --framework=symfony --language-version=8.4
 ```
 
 ### `bin/docker-cli project:disable [project]` / `bin/docker-cli project:enable [project]`
