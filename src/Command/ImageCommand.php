@@ -21,6 +21,21 @@ abstract class ImageCommand extends AbstractCommand
             'service' => 'php-fpm-8.2',
         ],
         [
+            'name' => 'php-fpm-8.3',
+            'context' => 'resources/compose/system/config/php-fpm-8.3',
+            'service' => 'php-fpm-8.3',
+        ],
+        [
+            'name' => 'php-fpm-8.4',
+            'context' => 'resources/compose/system/config/php-fpm-8.4',
+            'service' => 'php-fpm-8.4',
+        ],
+        [
+            'name' => 'php-fpm-8.5',
+            'context' => 'resources/compose/system/config/php-fpm-8.5',
+            'service' => 'php-fpm-8.5',
+        ],
+        [
             'name' => 'playwright',
             'context' => 'resources/compose/system/config/playwright',
             'service' => 'playwright',
