@@ -13,4 +13,4 @@ task:
       type: string
       required: true
   action: |
-    docker-cli mysql:load --project="$project" --force {{ path }}
+    docker-cli mysql:load --project="$project" --force --path={{ path }}

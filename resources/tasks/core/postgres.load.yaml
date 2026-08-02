@@ -13,4 +13,4 @@ task:
       type: string
       required: true
   action: |
-    docker-cli postgres:load --project="$project" {{ path }}
+    docker-cli postgres:load --project="$project" --path={{ path }}

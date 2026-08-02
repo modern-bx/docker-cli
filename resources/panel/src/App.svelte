@@ -4,7 +4,7 @@
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
-  import { cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, updateProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, getBackupsSettings, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, updateProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -125,6 +125,7 @@
   let backupName = '';
   let backupComposition = 'all';
   let backupDatabase = 'all';
+  let backupLocation = 'all';
   let backupDateFrom = '';
   let backupDateTo = '';
   let backupSort = 'date';
@@ -143,6 +144,10 @@
   const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }, { value: 'postgres', label: 'PostgreSQL' }];
   const backupCompositionCollection = useListCollection({ items: backupCompositionOptions });
   const backupDatabaseCollection = useListCollection({ items: backupDatabaseOptions });
+  let backupStorageOptions = [{ value: '', label: 'Папка проекта' }];
+  let backupStorageCollection = useListCollection({ items: backupStorageOptions });
+  let backupLocationFilterOptions = [{ value: 'all', label: 'Все расположения' }, { value: 'project', label: 'Папка проекта' }];
+  let backupLocationFilterCollection = useListCollection({ items: backupLocationFilterOptions });
   let notesProjectName = '';
   let noteTags = [];
   let noteTagInput = '';
@@ -155,6 +160,9 @@
   let projectLocations = [{ path: '', default: true }];
   let projectSettingsLoading = false;
   let projectSettingsSaving = false;
+  let backupLocations = [{ path: '', code: '', default: true }];
+  let backupSettingsLoading = false;
+  let backupSettingsSaving = false;
   let users = [];
   let usersTotal = 0;
   let usersPage = 1;
@@ -190,6 +198,10 @@
   $: projectFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectAddDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
   $: projectUpdateFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectUpdateDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
   $: projectDeploymentCollection = useListCollection({ items: [{ value: '', label: 'Не использовать' }, ...projectAddOptions.deploymentScripts.map((item) => ({ value: item.code, label: item.name }))] });
+  $: backupStorageOptions = [{ value: '', label: 'Папка проекта' }, ...backupLocations.filter((item) => item.code && item.path).map((item) => ({ value: item.code, label: item.code }))];
+  $: backupStorageCollection = useListCollection({ items: backupStorageOptions });
+  $: backupLocationFilterOptions = [{ value: 'all', label: 'Все расположения' }, { value: 'project', label: 'Папка проекта' }, ...backupLocations.filter((item) => item.code && item.path).map((item) => ({ value: item.code, label: item.code }))];
+  $: backupLocationFilterCollection = useListCollection({ items: backupLocationFilterOptions });
   $: selectedDeploymentScript = projectAddOptions.deploymentScripts.find((item) => item.code === projectAddDialog?.deploymentScript) || null;
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
@@ -306,11 +318,12 @@
       loadLogs();
       return;
     }
-    if (segments.length === 2 && segments[0] === 'settings' && ['projects', 'users', 'security'].includes(segments[1])) {
+    if (segments.length === 2 && segments[0] === 'settings' && ['projects', 'backups', 'users', 'security'].includes(segments[1])) {
       activeSection = 'settings';
       settingsTab = segments[1];
       selectedProjectName = '';
       if (settingsTab === 'projects') loadProjectsSettings();
+      else if (settingsTab === 'backups') loadBackupsSettings();
       else if (settingsTab === 'users') loadUsersSettings();
       else loadSecuritySettings();
       return;
@@ -340,7 +353,7 @@
       applyJournalFilters(true);
       loadLogs();
     }
-    if (tab === 'backups') loadProjectBackups();
+    if (tab === 'backups') { loadBackupsSettings(); loadProjectBackups(); }
     if (segments.length !== 3 || !projectDetailTabs.includes(segments[2])) navigateToProject(projectName, tab);
   }
 
@@ -350,7 +363,7 @@
     backupsLoading = true;
     projectsError = '';
     try {
-      const data = await getProjectBackups(api, selectedProjectName, { page: String(backupPage), pageSize: String(backupPageSize), name: backupName, composition: backupComposition, database: backupDatabase, dateFrom: backupDateFrom, dateTo: backupDateTo, sort: backupSort, direction: backupDirection });
+      const data = await getProjectBackups(api, selectedProjectName, { page: String(backupPage), pageSize: String(backupPageSize), name: backupName, composition: backupComposition, database: backupDatabase, location: backupLocation, dateFrom: backupDateFrom, dateTo: backupDateTo, sort: backupSort, direction: backupDirection });
       if (requestId !== backupRequestId) return;
       backupItems = Array.isArray(data.items) ? data.items : [];
       backupTotal = Number(data.total) || 0;
@@ -365,6 +378,7 @@
     if (field === 'name') backupName = value;
     else if (field === 'composition') backupComposition = value;
     else if (field === 'database') backupDatabase = value;
+    else if (field === 'location') backupLocation = value;
     else if (field === 'dateFrom') backupDateFrom = value;
     else backupDateTo = value;
     backupPage = 1;
@@ -412,7 +426,8 @@
   }
 
   function openBackupCreateDialog() {
-    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, filesAlert: false };
+    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, location: '', filesAlert: false };
+    loadBackupsSettings();
   }
 
   function selectBackupFiles(event) {
@@ -429,6 +444,7 @@
         files: backupCreateDialog.files,
         mysql: backupCreateDialog.mysql,
         postgres: backupCreateDialog.postgres,
+        location: backupCreateDialog.location,
       });
       backupCreateDialog = null;
       notifyQueuedOperation(`Создание бэкапа проекта «${selectedProjectName}»`);
@@ -447,7 +463,7 @@
     backupRestoreConfirmation = null;
     backupRestorePending = true;
     try {
-      await restoreProjectBackup(api, selectedProjectName, backup.name, backup.databaseCode);
+      await restoreProjectBackup(api, selectedProjectName, backup.name, backup.databaseCode, backup.location);
       notifyQueuedOperation(`Восстановление ${backup.database}-бэкапа «${backup.name}»`);
     } catch (cause) {
       errorTitle = 'Не удалось восстановить бэкап';
@@ -534,6 +550,23 @@
       errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
     } finally {
       projectSettingsLoading = false;
+    }
+  }
+
+  async function loadBackupsSettings() {
+    if (!authenticated || backupSettingsLoading) return;
+    backupSettingsLoading = true;
+    try {
+      const data = await getBackupsSettings(api);
+      backupLocations = Array.isArray(data.locations) && data.locations.length
+        ? data.locations.map((location) => ({ path: location.path, code: location.code || '', default: location.default === true }))
+        : [{ path: '', code: '', default: true }];
+    } catch (cause) {
+      errorTitle = 'Не удалось загрузить настройки';
+      error = cause instanceof Error ? cause.message : 'Не удалось загрузить расположения бэкапов.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      backupSettingsLoading = false;
     }
   }
 
@@ -642,6 +675,39 @@
       errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
     } finally {
       projectSettingsSaving = false;
+    }
+  }
+
+  function updateBackupLocation(index, field, value) {
+    backupLocations = backupLocations.map((location, itemIndex) => itemIndex === index ? { ...location, [field]: value } : location);
+  }
+
+  function addBackupLocation() {
+    backupLocations = [...backupLocations, { path: '', code: '', default: false }];
+  }
+
+  function removeBackupLocation(index) {
+    const wasDefault = backupLocations[index].default;
+    backupLocations = backupLocations.filter((_, itemIndex) => itemIndex !== index);
+    if (wasDefault && backupLocations.length) backupLocations = backupLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === 0 }));
+  }
+
+  function setDefaultBackupLocation(index) {
+    backupLocations = backupLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === index }));
+  }
+
+  async function saveBackupLocations() {
+    if (backupSettingsSaving || backupLocations.some((location) => !location.path.trim())) return;
+    backupSettingsSaving = true;
+    try {
+      const data = await saveBackupsSettings(api, backupLocations.map((location) => ({ ...location, path: location.path.trim() })));
+      backupLocations = data.locations;
+    } catch (cause) {
+      errorTitle = 'Не удалось сохранить настройки';
+      error = cause instanceof Error ? cause.message : 'Не удалось сохранить расположения бэкапов.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      backupSettingsSaving = false;
     }
   }
 
@@ -1702,16 +1768,17 @@
                     <label><span>Название</span><span class="log-text-filter"><input type="search" value={backupName} oninput={(event) => changeBackupFilter('name', event.currentTarget.value)} />{#if backupName}<button type="button" aria-label="Сбросить название" onclick={() => changeBackupFilter('name', '')}>×</button>{/if}</span></label>
                     <label><span>Состав</span><Combobox collection={backupCompositionCollection} value={[backupComposition]} openOnClick onValueChange={(details) => changeBackupFilter('composition', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCompositionOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
                     <label><span>Тип СУБД</span><Combobox collection={backupDatabaseCollection} value={[backupDatabase]} openOnClick onValueChange={(details) => changeBackupFilter('database', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupDatabaseOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                    <label><span>Расположение</span><Combobox collection={backupLocationFilterCollection} value={[backupLocation]} openOnClick onValueChange={(details) => changeBackupFilter('location', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupLocationFilterOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
                     <BackupDateFilter label="Дата от" value={backupDateFrom} onchange={(value) => changeBackupFilter('dateFrom', value)} />
                     <BackupDateFilter label="Дата до" value={backupDateTo} onchange={(value) => changeBackupFilter('dateTo', value)} />
                   </div>
                   <div class="log-table-wrap card preset-filled-surface-100-900">
                     <table class="table table-zebra log-table backup-table">
-                      <thead><tr><th class="backup-menu-column"><button class="backup-refresh-trigger" type="button" disabled={backupsLoading} aria-label="Обновить список бэкапов" title="Обновить" onclick={loadProjectBackups}><RotateCw size={17} class={backupsLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th>{#each [['name', 'Название'], ['date', 'Дата'], ['composition', 'Состав'], ['size', 'Размер'], ['database', 'Тип СУБД']] as [field, label]}<th><button type="button" onclick={() => sortBackups(field)}>{label}<span aria-hidden="true">{backupSort === field ? (backupDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
+                      <thead><tr><th class="backup-menu-column"><button class="backup-refresh-trigger" type="button" disabled={backupsLoading} aria-label="Обновить список бэкапов" title="Обновить" onclick={loadProjectBackups}><RotateCw size={17} class={backupsLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th>{#each [['name', 'Название'], ['date', 'Дата'], ['composition', 'Состав'], ['size', 'Размер'], ['database', 'Тип СУБД'], ['location', 'Расположение']] as [field, label]}<th><button type="button" onclick={() => sortBackups(field)}>{label}<span aria-hidden="true">{backupSort === field ? (backupDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
                       <tbody>
-                        {#if backupsLoading}<tr><td colspan="6" class="log-empty animate-pulse">Загрузка…</td></tr>
-                        {:else if backupItems.length === 0}<tr><td colspan="6" class="log-empty">Бэкапы не найдены</td></tr>
-                        {:else}{#each backupItems as item}<tr oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td></tr>{/each}{/if}
+                        {#if backupsLoading}<tr><td colspan="7" class="log-empty animate-pulse">Загрузка…</td></tr>
+                        {:else if backupItems.length === 0}<tr><td colspan="7" class="log-empty">Бэкапы не найдены</td></tr>
+                        {:else}{#each backupItems as item}<tr oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td><td>{item.locationName}</td></tr>{/each}{/if}
                       </tbody>
                     </table>
                   </div>
@@ -1826,6 +1893,7 @@
           <section class="settings-view" aria-label="Настройки">
             <nav class="project-detail-tabs settings-tabs" aria-label="Разделы настроек">
               <a class:active={settingsTab === 'projects'} class="project-detail-tab" href="#/settings/projects" aria-current={settingsTab === 'projects' ? 'page' : undefined}>Проекты</a>
+              <a class:active={settingsTab === 'backups'} class="project-detail-tab" href="#/settings/backups" aria-current={settingsTab === 'backups' ? 'page' : undefined}>Бэкапы</a>
               <a class:active={settingsTab === 'users'} class="project-detail-tab" href="#/settings/users" aria-current={settingsTab === 'users' ? 'page' : undefined}>Пользователи</a>
               <a class:active={settingsTab === 'security'} class="project-detail-tab" href="#/settings/security" aria-current={settingsTab === 'security' ? 'page' : undefined}>Безопасность</a>
             </nav>
@@ -1855,6 +1923,39 @@
                         <Tooltip positioning={{ placement: 'right' }}>
                           <Tooltip.Trigger class="security-help location-default-help" aria-label="О пути по умолчанию"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
                           <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Путь для автоматической развертки проектов по умолчанию</Tooltip.Content></Tooltip.Positioner>
+                        </Tooltip>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </section>
+            </div>
+            {:else if settingsTab === 'backups'}
+            <div class="settings-scroll">
+              <div class="project-toolbar">
+                <button class="btn preset-filled-primary-500" type="button" disabled={backupSettingsLoading || backupSettingsSaving || backupLocations.some((location) => !location.path.trim())} onclick={saveBackupLocations}>
+                  <Save size={16} aria-hidden="true" />{backupSettingsSaving ? 'Сохраняем…' : 'Сохранить'}
+                </button>
+              </div>
+              <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Расположение">
+                <h2>Расположение
+                  <Tooltip positioning={{ placement: 'right' }}>
+                    <Tooltip.Trigger class="security-help" aria-label="О расположениях бэкапов"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                    <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Расположение централизованных хранилищ проектных бэкапов</Tooltip.Content></Tooltip.Positioner>
+                  </Tooltip>
+                </h2>
+                <div class="location-list">
+                  {#each backupLocations as location, index}
+                    <div class="location-item">
+                      <div class="location-row">
+                        <input class="input location-path" type="text" value={location.path} disabled={backupSettingsLoading || backupSettingsSaving} placeholder="/путь/к/бэкапам" aria-label={`Расположение бэкапов ${index + 1}`} oninput={(event) => updateBackupLocation(index, 'path', event.currentTarget.value)} />
+                        <input class="input location-code" type="text" value={location.code} disabled={backupSettingsLoading || backupSettingsSaving} placeholder="код (автоматически)" aria-label={`Код расположения ${index + 1}`} oninput={(event) => updateBackupLocation(index, 'code', event.currentTarget.value)} />
+                        <button class="btn preset-tonal" type="button" title="Добавить расположение" aria-label="Добавить расположение" disabled={!location.path.trim() || backupSettingsLoading || backupSettingsSaving} onclick={addBackupLocation}><Plus size={16} aria-hidden="true" /></button>
+                        {#if backupLocations.length > 1}<button class="btn preset-tonal location-delete" type="button" title="Удалить расположение" aria-label="Удалить расположение" disabled={backupSettingsLoading || backupSettingsSaving} onclick={() => removeBackupLocation(index)}><Trash2 size={16} aria-hidden="true" /></button>{/if}
+                        <input class="radio location-default" type="radio" name="default-backup-location" checked={location.default} disabled={backupSettingsLoading || backupSettingsSaving} aria-label="Путь по умолчанию" onchange={() => setDefaultBackupLocation(index)} />
+                        <Tooltip positioning={{ placement: 'right' }}>
+                          <Tooltip.Trigger class="security-help location-default-help" aria-label="О пути по умолчанию"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                          <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Централизованное хранилище проектных бэкапов по умолчанию</Tooltip.Content></Tooltip.Positioner>
                         </Tooltip>
                       </div>
                     </div>
@@ -2174,6 +2275,7 @@
             <p class="backup-create-alert" role="alert">Создание бэкапа файлов пока не реализовано.</p>
           {/if}
           {#if backupCreateDialog.database}
+            <label class="label"><span class="label-text">Хранилище</span><Combobox collection={backupStorageCollection} value={[backupCreateDialog.location]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, location: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Хранилище бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupStorageOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
             <fieldset class="backup-database-options">
               <legend>Базы данных</legend>
               <div class="backup-checkbox-row">

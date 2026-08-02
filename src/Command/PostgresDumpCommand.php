@@ -6,6 +6,7 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Project\PostgresDumpLoader;
+use DockerCli\Project\BackupStorageLocator;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -14,13 +15,14 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class PostgresDumpCommand extends AbstractCommand
 {
-    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?PostgresDumpLoader $dumpLoader = null)
+    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?PostgresDumpLoader $dumpLoader = null, private readonly ?BackupStorageLocator $storageLocator = null)
     {
         parent::__construct('postgres:dump');
         $this->setDescription('Создать быстрый параллельный бэкап PostgreSQL в directory-формате.');
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
         $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Путь к директории создаваемого бэкапа.');
         $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Короткое имя директории бэкапа.');
+        $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код централизованного хранилища бэкапов.');
         $this->addOption('jobs', 'j', InputOption::VALUE_REQUIRED, 'Число параллельных процессов.', '4');
     }
 
@@ -44,6 +46,7 @@ final class PostgresDumpCommand extends AbstractCommand
         }
         $name = $input->getOption('name');
         $path = $input->getOption('path');
+        $location = $input->getOption('location');
         if ($name !== null && $path !== null) {
             $this->writeMessage($output, '<error>Опции --name и --path нельзя использовать одновременно.</error>');
             return Command::INVALID;
@@ -56,7 +59,17 @@ final class PostgresDumpCommand extends AbstractCommand
             $this->writeMessage($output, '<error>Опция --path должна содержать путь к директории бэкапа.</error>');
             return Command::INVALID;
         }
-        $path = $path ?? sprintf('.docker-cli/backups/postgres/%s', $name ?? sprintf('%s-%s', $project, date('Ymd-His')));
+        if ($location !== null && (!is_string($location) || $location === '' || $name === null || $path !== null)) {
+            $this->writeMessage($output, '<error>Опцию --location можно использовать только вместе с --name.</error>');
+            return Command::INVALID;
+        }
+        try {
+            $backupRoot = $location === null ? '.docker-cli/backups/postgres' : ($this->storageLocator ?? new BackupStorageLocator())->databaseDirectory($location, 'postgres');
+        } catch (\InvalidArgumentException $exception) {
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
+            return Command::INVALID;
+        }
+        $path = $path ?? sprintf('%s/%s', $backupRoot, $name ?? sprintf('%s-%s', $project, date('Ymd-His')));
         $path = $this->absolutePath($path);
         try {
             $code = ($this->dumpLoader ?? new PostgresDumpLoader())->dump($database, $path, $jobs, $output);

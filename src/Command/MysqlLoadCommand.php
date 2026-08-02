@@ -6,20 +6,22 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Project\MysqlDumpLoader;
+use DockerCli\Project\BackupStorageLocator;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 final class MysqlLoadCommand extends AbstractCommand
 {
-    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?MysqlDumpLoader $dumpLoader = null)
+    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?MysqlDumpLoader $dumpLoader = null, private readonly ?BackupStorageLocator $storageLocator = null)
     {
         parent::__construct('mysql:load');
         $this->setDescription('Параллельно восстановить MySQL-базу проекта через myloader.');
-        $this->addArgument('path', InputArgument::REQUIRED, 'Директория, созданная mysql:dump.');
+        $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Путь к директории, созданной mysql:dump.');
+        $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Короткое имя директории бэкапа.');
+        $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код централизованного хранилища бэкапов.');
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
         $this->addOption('threads', 'j', InputOption::VALUE_REQUIRED, 'Число параллельных потоков.', '4');
         $this->addOption('force', 'f', InputOption::VALUE_NONE, 'Подтвердить полную замену выбранной базы.');
@@ -53,7 +55,32 @@ final class MysqlLoadCommand extends AbstractCommand
             $this->writeMessage($output, sprintf('<error>В конфигурации проекта "%s" не задана база MySQL.</error>', $project));
             return Command::FAILURE;
         }
-        $path = realpath((string) $input->getArgument('path'));
+        $name = $input->getOption('name');
+        $path = $input->getOption('path');
+        $location = $input->getOption('location');
+        if (($name === null) === ($path === null)) {
+            $this->writeMessage($output, '<error>Укажите ровно одну из опций --name или --path.</error>');
+            return Command::INVALID;
+        }
+        if ($name !== null && (!is_string($name) || $name === '' || basename($name) !== $name)) {
+            $this->writeMessage($output, '<error>Опция --name должна содержать короткое имя директории бэкапа.</error>');
+            return Command::INVALID;
+        }
+        if ($path !== null && (!is_string($path) || $path === '')) {
+            $this->writeMessage($output, '<error>Опция --path должна содержать путь к директории бэкапа.</error>');
+            return Command::INVALID;
+        }
+        if ($location !== null && (!is_string($location) || $location === '' || $path !== null)) {
+            $this->writeMessage($output, '<error>Опцию --location можно использовать только вместе с --name.</error>');
+            return Command::INVALID;
+        }
+        try {
+            $backupRoot = $location === null ? '.docker-cli/backups/mysql' : ($this->storageLocator ?? new BackupStorageLocator())->databaseDirectory($location, 'mysql');
+        } catch (\InvalidArgumentException $exception) {
+            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
+            return Command::INVALID;
+        }
+        $path = realpath($path ?? sprintf('%s/%s', $backupRoot, $name));
         if ($path === false || !is_file($path . '/metadata')) {
             $this->writeMessage($output, '<error>Указанная директория не является дампом mydumper.</error>');
             return Command::FAILURE;

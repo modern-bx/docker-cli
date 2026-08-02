@@ -9,6 +9,8 @@ use DockerCli\Config\SystemCompose;
 use DockerCli\Notification\NotificationRepository;
 use DockerCli\Panel\AssetController;
 use DockerCli\Panel\AuthController;
+use DockerCli\Panel\BackupsSettingsController;
+use DockerCli\Panel\BackupsSettingsRepository;
 use DockerCli\Panel\Http\ControllerInvoker;
 use DockerCli\Panel\Http\Middleware\AuthMiddleware;
 use DockerCli\Panel\Http\ResponseEmitter;
@@ -104,16 +106,17 @@ final class PanelUpCommand extends AbstractCommand
         $tokenRepository = new \DockerCli\Panel\TokenRepository();
         $securitySettings = new \DockerCli\Panel\SecuritySettingsRepository();
         $projectsSettings = new \DockerCli\Panel\ProjectsSettingsRepository();
+        $backupsSettings = new BackupsSettingsRepository();
         $tokens = new JwtTokenService($jwtSecret, $tokenRepository, $securitySettings);
         $queues = new QueueRepository();
-        $projects = new ProjectController(new ProjectRegistry(), $compose, $queues, new ProjectsSettingsRepository(), new TaskRepository());
+        $projects = new ProjectController(new ProjectRegistry(), $compose, $queues, new ProjectsSettingsRepository(), new TaskRepository(), $backupsSettings);
         $system = new SystemController($compose);
         $queue = new QueueController($queues);
         $notifications = new NotificationController(new NotificationRepository());
         $responses = new ResponseEmitter($assets);
         $state = new StateController($projects, $system, $queue, $notifications);
         $router = new Router(
-            [new AuthController($users, $tokens, $tokenRepository), new \DockerCli\Panel\SecuritySettingsController($securitySettings), new \DockerCli\Panel\ProjectsSettingsController($projectsSettings), new \DockerCli\Panel\UsersSettingsController($users, $tokenRepository, new \DockerCli\Panel\PanelPasswordGenerator()), $state, $projects, $system, $queue, $notifications, new AssetController()],
+            [new AuthController($users, $tokens, $tokenRepository), new \DockerCli\Panel\SecuritySettingsController($securitySettings), new \DockerCli\Panel\ProjectsSettingsController($projectsSettings), new BackupsSettingsController($backupsSettings), new \DockerCli\Panel\UsersSettingsController($users, $tokenRepository, new \DockerCli\Panel\PanelPasswordGenerator()), $state, $projects, $system, $queue, $notifications, new AssetController()],
             new ControllerInvoker(),
             new AuthMiddleware($tokens, $responses),
             $responses,
