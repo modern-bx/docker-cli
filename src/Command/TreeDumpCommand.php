@@ -7,6 +7,7 @@ namespace DockerCli\Command;
 use DockerCli\Project\BackupStorageLocator;
 use DockerCli\Project\ProjectRegistry;
 use DockerCli\Project\TreeArchiveManager;
+use DockerCli\Panel\BackupsSettingsRepository;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -20,12 +21,14 @@ final class TreeDumpCommand extends AbstractCommand
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?BackupStorageLocator $storageLocator = null,
         private readonly ?TreeArchiveManager $archiveManager = null,
+        private readonly ?BackupsSettingsRepository $backupsSettings = null,
     ) {
         parent::__construct('tree:dump');
         $this->setDescription('Создать файловый бэкап проекта в tar-формате.');
         $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код централизованного хранилища бэкапов.');
         $this->addOption('compress', null, InputOption::VALUE_REQUIRED, 'Архиватор: gzip, bzip2, xz, zstd, lz4 или zip.');
         $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Короткое имя директории бэкапа.');
+        $this->addOption('strategy', null, InputOption::VALUE_REQUIRED, 'Код файловой стратегии.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -51,6 +54,24 @@ final class TreeDumpCommand extends AbstractCommand
             $this->writeMessage($output, '<error>Опция --compress должна содержать название архиватора.</error>');
             return Command::INVALID;
         }
+        $strategyCode = $input->getOption('strategy');
+        if ($strategyCode !== null && (!is_string($strategyCode) || $strategyCode === '')) {
+            $this->writeMessage($output, '<error>Опция --strategy должна содержать код файловой стратегии.</error>');
+            return Command::INVALID;
+        }
+        $strategy = null;
+        if (is_string($strategyCode)) {
+            foreach (($this->backupsSettings ?? new BackupsSettingsRepository())->fileStrategies() as $candidate) {
+                if ($candidate['code'] === $strategyCode) {
+                    $strategy = $candidate;
+                    break;
+                }
+            }
+            if ($strategy === null) {
+                $this->writeMessage($output, sprintf('<error>Файловая стратегия с кодом «%s» не найдена.</error>', $strategyCode));
+                return Command::INVALID;
+            }
+        }
         $root = $registry->readProjectConfig($project)['data']['project']['root'] ?? null;
         if (!is_string($root) || $root === '' || !is_dir($root)) {
             $this->writeMessage($output, '<error>Конфигурация проекта повреждена.</error>');
@@ -62,8 +83,15 @@ final class TreeDumpCommand extends AbstractCommand
                 ? join_path($root, '.docker-cli', 'backups', 'tree')
                 : ($this->storageLocator ?? new BackupStorageLocator())->treeDirectory($location);
             $backupDirectory = join_path($backupRoot, $name);
-            $archive = ($this->archiveManager ?? new TreeArchiveManager())->dump($root, $backupDirectory, $compressor);
+            $archive = ($this->archiveManager ?? new TreeArchiveManager())->dump(
+                $root,
+                $backupDirectory,
+                $compressor,
+                $strategy['include'] ?? [],
+                $strategy['exclude'] ?? [],
+            );
             $metadata = ['project' => $project, 'createdAt' => date(DATE_ATOM), 'archive' => $archive];
+            if ($strategy !== null) $metadata['strategy'] = $strategy['code'];
             if (file_put_contents(join_path($backupDirectory, 'docker-cli.json'), json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL) === false) {
                 throw new \RuntimeException('Не удалось записать метаданные бэкапа.');
             }

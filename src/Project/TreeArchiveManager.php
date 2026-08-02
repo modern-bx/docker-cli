@@ -18,7 +18,8 @@ final class TreeArchiveManager
         'zip' => 'zip',
     ];
 
-    public function dump(string $projectRoot, string $backupDirectory, ?string $compressor): string
+    /** @param list<string> $include @param list<string> $exclude */
+    public function dump(string $projectRoot, string $backupDirectory, ?string $compressor, array $include = [], array $exclude = []): string
     {
         $projectRoot = realpath($projectRoot) ?: throw new \InvalidArgumentException('Корневая директория проекта не существует.');
         $compressor = $compressor === null ? null : strtolower($compressor);
@@ -33,14 +34,16 @@ final class TreeArchiveManager
         }
 
         $tar = join_path($backupDirectory, 'tree.tar');
+        $manifest = null;
         try {
+            if ($include !== [] || $exclude !== []) $manifest = $this->createManifest($projectRoot, $include, $exclude);
             if ($compressor !== null && $compressor !== 'zip') {
                 $archive = $tar . '.' . self::EXTENSIONS[$compressor];
-                $this->streamCompressedTar($projectRoot, $archive, $compressor);
+                $this->streamCompressedTar($projectRoot, $archive, $compressor, $manifest);
                 return basename($archive);
             }
 
-            $this->createTar($projectRoot, $tar);
+            $this->createTar($projectRoot, $tar, $manifest);
             if ($compressor === null) return basename($tar);
 
             $archive = $this->compress($tar, $compressor);
@@ -48,24 +51,24 @@ final class TreeArchiveManager
         } catch (\Throwable $exception) {
             $this->removeDirectory($backupDirectory);
             throw $exception;
+        } finally {
+            if ($manifest !== null) @unlink($manifest);
         }
     }
 
-    private function createTar(string $projectRoot, string $tar): void
+    private function createTar(string $projectRoot, string $tar, ?string $manifest): void
     {
-        $command = ['tar', '-cf', $tar, '--exclude=./.docker-cli'];
-        $relativeTar = $this->relativePath($projectRoot, $tar);
-        if ($relativeTar !== null) $command[] = '--exclude=./' . $relativeTar;
-        array_push($command, '-C', $projectRoot, '.');
+        $command = ['tar', '-cf', $tar, '-C', $projectRoot];
+        if ($manifest !== null) array_push($command, '--null', '--verbatim-files-from', '--no-recursion', '-T', $manifest);
+        else array_push($command, '--exclude=./.docker-cli', '.');
         $this->run($command);
     }
 
-    private function streamCompressedTar(string $projectRoot, string $archive, string $compressor): void
+    private function streamCompressedTar(string $projectRoot, string $archive, string $compressor, ?string $manifest): void
     {
-        $tarCommand = ['tar', '-cf', '-', '--exclude=./.docker-cli'];
-        $relativeArchive = $this->relativePath($projectRoot, $archive);
-        if ($relativeArchive !== null) $tarCommand[] = '--exclude=./' . $relativeArchive;
-        array_push($tarCommand, '-C', $projectRoot, '.');
+        $tarCommand = ['tar', '-cf', '-', '-C', $projectRoot];
+        if ($manifest !== null) array_push($tarCommand, '--null', '--verbatim-files-from', '--no-recursion', '-T', $manifest);
+        else array_push($tarCommand, '--exclude=./.docker-cli', '.');
         $compressCommand = match ($compressor) {
             'gzip', 'gz' => [$this->executable('pigz') ? 'pigz' : 'gzip', '-1', '-c'],
             'bzip2', 'bz2' => [$this->executable('pbzip2') ? 'pbzip2' : 'bzip2', '-1', '-c'],
@@ -96,6 +99,62 @@ final class TreeArchiveManager
         if ($tarCode !== 0 || $compressCode !== 0) {
             throw new \RuntimeException(sprintf('Архивация завершилась с ошибкой (tar: %d, %s: %d).', $tarCode, $compressCommand[0], $compressCode));
         }
+    }
+
+    /** @param list<string> $include @param list<string> $exclude */
+    private function createManifest(string $projectRoot, array $include, array $exclude): string
+    {
+        $include = array_values(array_filter(array_map($this->normalizePattern(...), $include), static fn (string $pattern): bool => $pattern !== ''));
+        $exclude = array_values(array_filter(array_map($this->normalizePattern(...), $exclude), static fn (string $pattern): bool => $pattern !== ''));
+        $paths = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($projectRoot, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST,
+        );
+        foreach ($iterator as $item) {
+            $path = substr($item->getPathname(), strlen(rtrim($projectRoot, DIRECTORY_SEPARATOR)) + 1);
+            $path = str_replace(DIRECTORY_SEPARATOR, '/', $path);
+            if ($path === '.docker-cli' || str_starts_with($path, '.docker-cli/')) continue;
+            if ($include !== [] && !$this->matchesAny($path, $include)) continue;
+            if ($this->matchesAny($path, $exclude)) continue;
+            $paths[] = './' . $path;
+        }
+        $manifest = tempnam(sys_get_temp_dir(), 'docker-cli-tree-');
+        if ($manifest === false || file_put_contents($manifest, $paths === [] ? '' : implode("\0", $paths) . "\0") === false) {
+            if (is_string($manifest)) @unlink($manifest);
+            throw new \RuntimeException('Не удалось создать список файлов бэкапа.');
+        }
+        return $manifest;
+    }
+
+    private function normalizePattern(string $pattern): string
+    {
+        $pattern = str_replace('\\', '/', trim($pattern));
+        while (str_starts_with($pattern, './')) $pattern = substr($pattern, 2);
+        return trim($pattern, '/');
+    }
+
+    /** @param list<string> $patterns */
+    private function matchesAny(string $path, array $patterns): bool
+    {
+        foreach ($patterns as $pattern) {
+            $candidate = $path;
+            while (true) {
+                if ($this->globMatches($pattern, $candidate)) return true;
+                $parent = strrpos($candidate, '/');
+                if ($parent === false) break;
+                $candidate = substr($candidate, 0, $parent);
+            }
+        }
+        return false;
+    }
+
+    private function globMatches(string $pattern, string $path): bool
+    {
+        if (fnmatch($pattern, $path, FNM_PATHNAME)) return true;
+        $quoted = preg_quote($pattern, '~');
+        $quoted = str_replace(['\\*\\*/', '\\*\\*', '\\*', '\\?'], ['(?:.*/)?', '.*', '[^/]*', '[^/]'], $quoted);
+        return preg_match('~^' . $quoted . '$~u', $path) === 1;
     }
 
     private function compress(string $tar, string $compressor): string
