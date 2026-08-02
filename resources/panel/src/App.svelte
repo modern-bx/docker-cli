@@ -161,7 +161,7 @@
   let projectSettingsLoading = false;
   let projectSettingsSaving = false;
   let backupLocations = [{ path: '', code: '', default: true }];
-  let backupFileStrategies = [];
+  let backupFileStrategies = [{ name: '', code: '', include: [], exclude: [] }];
   let fileStrategyDialog = null;
   let backupSettingsLoading = false;
   let backupSettingsSaving = false;
@@ -564,8 +564,9 @@
         ? data.locations.map((location) => ({ path: location.path, code: location.code || '', default: location.default === true }))
         : [{ path: '', code: '', default: true }];
       backupFileStrategies = Array.isArray(data.fileStrategies)
+        && data.fileStrategies.length
         ? data.fileStrategies.map((strategy) => ({ name: strategy.name, code: strategy.code || '', include: strategy.include || [], exclude: strategy.exclude || [] }))
-        : [];
+        : [{ name: '', code: '', include: [], exclude: [] }];
     } catch (cause) {
       errorTitle = 'Не удалось загрузить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить расположения бэкапов.';
@@ -711,6 +712,7 @@
 
   function removeFileStrategy(index) {
     backupFileStrategies = backupFileStrategies.filter((_, itemIndex) => itemIndex !== index);
+    if (!backupFileStrategies.length) backupFileStrategies = [{ name: '', code: '', include: [], exclude: [] }];
   }
 
   function openFileStrategySettings(index) {
@@ -2028,8 +2030,6 @@
                       <button class="btn preset-tonal" type="button" title="Добавить стратегию" aria-label="Добавить файловую стратегию" disabled={!strategy.name.trim() || backupSettingsLoading || backupSettingsSaving} onclick={addFileStrategy}><Plus size={16} aria-hidden="true" /></button>
                       <button class="btn preset-tonal location-delete" type="button" title="Удалить стратегию" aria-label="Удалить файловую стратегию" disabled={backupSettingsLoading || backupSettingsSaving} onclick={() => removeFileStrategy(index)}><Trash2 size={16} aria-hidden="true" /></button>
                     </div></div>
-                  {:else}
-                    <button class="btn preset-tonal" type="button" disabled={backupSettingsLoading || backupSettingsSaving} onclick={addFileStrategy}><Plus size={16} aria-hidden="true" />Добавить стратегию</button>
                   {/each}
                 </div>
               </section>

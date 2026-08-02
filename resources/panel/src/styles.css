@@ -400,8 +400,8 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .location-item { display: grid; gap: 0.5rem; }
 .location-row { display: flex; align-items: center; gap: 0.6rem; }
 .locations-card { width: min(100%, 72rem); }
-.location-row > .location-path { min-width: 10rem; flex: 1 1 20rem; }
-.location-row > .location-code { min-width: 9rem; flex: 0 1 12rem; }
+.location-row > .location-path { width: 20rem; min-width: 10rem; flex: 0 0 20rem; }
+.location-row > .location-code { width: 12rem; min-width: 9rem; flex: 0 0 12rem; }
 .location-default { flex: none; cursor: pointer; }
 .location-default-help { flex: none; }
 .location-delete { color: var(--color-error-600); }
