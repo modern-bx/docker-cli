@@ -40,6 +40,7 @@ final class ProjectController
         private readonly ?QueueRepository $queues = null,
         private readonly ?ProjectsSettingsRepository $settings = null,
         private readonly ?TaskRepository $tasks = null,
+        private readonly ?BackupsSettingsRepository $backupSettings = null,
     )
     {
     }
@@ -115,21 +116,30 @@ final class ProjectController
         if (!is_string($root) || $root === '') throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
 
         $items = [];
-        foreach (['mysql' => 'MySQL', 'postgres' => 'PostgreSQL'] as $databaseCode => $databaseName) {
-            $directory = join_path($root, '.docker-cli', 'backups', $databaseCode);
-            foreach (glob(join_path($directory, '*'), GLOB_ONLYDIR) ?: [] as $backup) {
-                $timestamp = filemtime($backup);
-                $metadataFile = join_path($backup, 'docker-cli.json');
-                $metadata = is_file($metadataFile) ? json_decode((string) file_get_contents($metadataFile), true) : null;
-                $createdAt = is_array($metadata) && is_string($metadata['createdAt'] ?? null) ? strtotime($metadata['createdAt']) : false;
-                $items[] = [
-                    'name' => basename($backup),
-                    'date' => gmdate(DATE_ATOM, $createdAt !== false ? $createdAt : ($timestamp === false ? 0 : $timestamp)),
-                    'composition' => 'БД',
-                    'size' => $this->directorySize($backup),
-                    'database' => $databaseName,
-                    'databaseCode' => $databaseCode,
-                ];
+        $locations = [['path' => join_path($root, '.docker-cli', 'backups'), 'code' => '', 'name' => 'Папка проекта']];
+        foreach (($this->backupSettings ?? new BackupsSettingsRepository())->locations() as $location) {
+            $locations[] = ['path' => $location['path'], 'code' => $location['code'], 'name' => $location['code']];
+        }
+        foreach ($locations as $location) {
+            foreach (['mysql' => 'MySQL', 'postgres' => 'PostgreSQL'] as $databaseCode => $databaseName) {
+                $directory = join_path($location['path'], $databaseCode);
+                foreach (glob(join_path($directory, '*'), GLOB_ONLYDIR) ?: [] as $backup) {
+                    $timestamp = filemtime($backup);
+                    $metadataFile = join_path($backup, 'docker-cli.json');
+                    $metadata = is_file($metadataFile) ? json_decode((string) file_get_contents($metadataFile), true) : null;
+                    if ($location['code'] !== '' && (!is_array($metadata) || ($metadata['project'] ?? null) !== $request->name)) continue;
+                    $createdAt = is_array($metadata) && is_string($metadata['createdAt'] ?? null) ? strtotime($metadata['createdAt']) : false;
+                    $items[] = [
+                        'name' => basename($backup),
+                        'date' => gmdate(DATE_ATOM, $createdAt !== false ? $createdAt : ($timestamp === false ? 0 : $timestamp)),
+                        'composition' => 'БД',
+                        'size' => $this->directorySize($backup),
+                        'database' => $databaseName,
+                        'databaseCode' => $databaseCode,
+                        'location' => $location['code'],
+                        'locationName' => $location['name'],
+                    ];
+                }
             }
         }
         $items = array_values(array_filter($items, static function (array $item) use ($request): bool {
@@ -137,6 +147,7 @@ final class ProjectController
             return ($request->backupName === '' || str_contains(mb_strtolower($item['name']), mb_strtolower($request->backupName)))
                 && ($request->composition === 'all' || $request->composition === 'database')
                 && ($request->database === 'all' || $request->database === $item['databaseCode'])
+                && ($request->location === 'all' || ($request->location === 'project' ? $item['location'] === '' : $request->location === $item['location']))
                 && ($request->dateFrom === null || $date >= $request->dateFrom)
                 && ($request->dateTo === null || $date <= $request->dateTo);
         }));
@@ -157,19 +168,22 @@ final class ProjectController
         if (!$request->database && !$request->files) throw new ProjectActionException('Выберите данные для создания бэкапа.', 422);
         if ($request->files) throw new ProjectActionException('Создание бэкапа файлов пока не реализовано.', 422);
         if (!$request->mysql && !$request->postgres) throw new ProjectActionException('Выберите хотя бы одну базу данных.', 422);
+        if ($request->location !== '' && !in_array($request->location, array_column(($this->backupSettings ?? new BackupsSettingsRepository())->locations(), 'code'), true)) {
+            throw new ProjectActionException('Выбранное хранилище бэкапов не найдено.', 422);
+        }
         $backupName = sprintf('%s-%s', $request->name, date('Ymd-His'));
         $tasks = [];
         if ($request->mysql) {
             $tasks[] = [
                 'code' => 'core.mysql.dump',
-                'arguments' => ['backup' => ['value' => $backupName]],
+                'arguments' => ['backup' => ['value' => $backupName], 'location' => ['value' => $request->location]],
                 'project' => $request->name,
             ];
         }
         if ($request->postgres) {
             $tasks[] = [
                 'code' => 'core.postgres.dump',
-                'arguments' => ['backup' => ['value' => $backupName]],
+                'arguments' => ['backup' => ['value' => $backupName], 'location' => ['value' => $request->location]],
                 'project' => $request->name,
             ];
         }

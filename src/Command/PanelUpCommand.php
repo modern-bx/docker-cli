@@ -109,7 +109,7 @@ final class PanelUpCommand extends AbstractCommand
         $backupsSettings = new BackupsSettingsRepository();
         $tokens = new JwtTokenService($jwtSecret, $tokenRepository, $securitySettings);
         $queues = new QueueRepository();
-        $projects = new ProjectController(new ProjectRegistry(), $compose, $queues, new ProjectsSettingsRepository(), new TaskRepository());
+        $projects = new ProjectController(new ProjectRegistry(), $compose, $queues, new ProjectsSettingsRepository(), new TaskRepository(), $backupsSettings);
         $system = new SystemController($compose);
         $queue = new QueueController($queues);
         $notifications = new NotificationController(new NotificationRepository());

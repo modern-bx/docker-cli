@@ -11,9 +11,14 @@ task:
     backup:
       name: Короткое имя бэкапа
       type: string
+    location:
+      name: Код хранилища бэкапов
+      type: string
   action: |
+    options=()
+    [ -n "${location:-}" ] && options+=(--location="$location")
     if [ -n "${backup:-}" ]; then
-      docker-cli mysql:dump --project="$project" --name="$backup"
+      docker-cli mysql:dump --project="$project" --name="$backup" "${options[@]}"
     else
       docker-cli mysql:dump --project="$project"
     fi

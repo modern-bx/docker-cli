@@ -16,6 +16,7 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto
         public bool $files,
         public bool $mysql,
         public bool $postgres,
+        public string $location,
     ) {
     }
 
@@ -26,6 +27,10 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto
                 throw new RequestValidationException('Некорректные параметры создания бэкапа.');
             }
         }
+        $location = $request->body['location'] ?? null;
+        if (!is_string($location) || ($location !== '' && preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $location) !== 1)) {
+            throw new RequestValidationException('Некорректное расположение бэкапа.');
+        }
 
         return new static(
             rawurldecode($request->route['name']),
@@ -33,6 +38,7 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto
             $request->body['files'],
             $request->body['mysql'],
             $request->body['postgres'],
+            $location,
         );
     }
 }

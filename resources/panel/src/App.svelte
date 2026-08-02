@@ -125,6 +125,7 @@
   let backupName = '';
   let backupComposition = 'all';
   let backupDatabase = 'all';
+  let backupLocation = 'all';
   let backupDateFrom = '';
   let backupDateTo = '';
   let backupSort = 'date';
@@ -143,6 +144,10 @@
   const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }, { value: 'postgres', label: 'PostgreSQL' }];
   const backupCompositionCollection = useListCollection({ items: backupCompositionOptions });
   const backupDatabaseCollection = useListCollection({ items: backupDatabaseOptions });
+  let backupStorageOptions = [{ value: '', label: 'Папка проекта' }];
+  let backupStorageCollection = useListCollection({ items: backupStorageOptions });
+  let backupLocationFilterOptions = [{ value: 'all', label: 'Все расположения' }, { value: 'project', label: 'Папка проекта' }];
+  let backupLocationFilterCollection = useListCollection({ items: backupLocationFilterOptions });
   let notesProjectName = '';
   let noteTags = [];
   let noteTagInput = '';
@@ -193,6 +198,10 @@
   $: projectFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectAddDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
   $: projectUpdateFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectUpdateDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
   $: projectDeploymentCollection = useListCollection({ items: [{ value: '', label: 'Не использовать' }, ...projectAddOptions.deploymentScripts.map((item) => ({ value: item.code, label: item.name }))] });
+  $: backupStorageOptions = [{ value: '', label: 'Папка проекта' }, ...backupLocations.filter((item) => item.code && item.path).map((item) => ({ value: item.code, label: item.code }))];
+  $: backupStorageCollection = useListCollection({ items: backupStorageOptions });
+  $: backupLocationFilterOptions = [{ value: 'all', label: 'Все расположения' }, { value: 'project', label: 'Папка проекта' }, ...backupLocations.filter((item) => item.code && item.path).map((item) => ({ value: item.code, label: item.code }))];
+  $: backupLocationFilterCollection = useListCollection({ items: backupLocationFilterOptions });
   $: selectedDeploymentScript = projectAddOptions.deploymentScripts.find((item) => item.code === projectAddDialog?.deploymentScript) || null;
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
@@ -344,7 +353,7 @@
       applyJournalFilters(true);
       loadLogs();
     }
-    if (tab === 'backups') loadProjectBackups();
+    if (tab === 'backups') { loadBackupsSettings(); loadProjectBackups(); }
     if (segments.length !== 3 || !projectDetailTabs.includes(segments[2])) navigateToProject(projectName, tab);
   }
 
@@ -354,7 +363,7 @@
     backupsLoading = true;
     projectsError = '';
     try {
-      const data = await getProjectBackups(api, selectedProjectName, { page: String(backupPage), pageSize: String(backupPageSize), name: backupName, composition: backupComposition, database: backupDatabase, dateFrom: backupDateFrom, dateTo: backupDateTo, sort: backupSort, direction: backupDirection });
+      const data = await getProjectBackups(api, selectedProjectName, { page: String(backupPage), pageSize: String(backupPageSize), name: backupName, composition: backupComposition, database: backupDatabase, location: backupLocation, dateFrom: backupDateFrom, dateTo: backupDateTo, sort: backupSort, direction: backupDirection });
       if (requestId !== backupRequestId) return;
       backupItems = Array.isArray(data.items) ? data.items : [];
       backupTotal = Number(data.total) || 0;
@@ -369,6 +378,7 @@
     if (field === 'name') backupName = value;
     else if (field === 'composition') backupComposition = value;
     else if (field === 'database') backupDatabase = value;
+    else if (field === 'location') backupLocation = value;
     else if (field === 'dateFrom') backupDateFrom = value;
     else backupDateTo = value;
     backupPage = 1;
@@ -416,7 +426,8 @@
   }
 
   function openBackupCreateDialog() {
-    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, filesAlert: false };
+    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, location: '', filesAlert: false };
+    loadBackupsSettings();
   }
 
   function selectBackupFiles(event) {
@@ -433,6 +444,7 @@
         files: backupCreateDialog.files,
         mysql: backupCreateDialog.mysql,
         postgres: backupCreateDialog.postgres,
+        location: backupCreateDialog.location,
       });
       backupCreateDialog = null;
       notifyQueuedOperation(`Создание бэкапа проекта «${selectedProjectName}»`);
@@ -1756,16 +1768,17 @@
                     <label><span>Название</span><span class="log-text-filter"><input type="search" value={backupName} oninput={(event) => changeBackupFilter('name', event.currentTarget.value)} />{#if backupName}<button type="button" aria-label="Сбросить название" onclick={() => changeBackupFilter('name', '')}>×</button>{/if}</span></label>
                     <label><span>Состав</span><Combobox collection={backupCompositionCollection} value={[backupComposition]} openOnClick onValueChange={(details) => changeBackupFilter('composition', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCompositionOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
                     <label><span>Тип СУБД</span><Combobox collection={backupDatabaseCollection} value={[backupDatabase]} openOnClick onValueChange={(details) => changeBackupFilter('database', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupDatabaseOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                    <label><span>Расположение</span><Combobox collection={backupLocationFilterCollection} value={[backupLocation]} openOnClick onValueChange={(details) => changeBackupFilter('location', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupLocationFilterOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
                     <BackupDateFilter label="Дата от" value={backupDateFrom} onchange={(value) => changeBackupFilter('dateFrom', value)} />
                     <BackupDateFilter label="Дата до" value={backupDateTo} onchange={(value) => changeBackupFilter('dateTo', value)} />
                   </div>
                   <div class="log-table-wrap card preset-filled-surface-100-900">
                     <table class="table table-zebra log-table backup-table">
-                      <thead><tr><th class="backup-menu-column"><button class="backup-refresh-trigger" type="button" disabled={backupsLoading} aria-label="Обновить список бэкапов" title="Обновить" onclick={loadProjectBackups}><RotateCw size={17} class={backupsLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th>{#each [['name', 'Название'], ['date', 'Дата'], ['composition', 'Состав'], ['size', 'Размер'], ['database', 'Тип СУБД']] as [field, label]}<th><button type="button" onclick={() => sortBackups(field)}>{label}<span aria-hidden="true">{backupSort === field ? (backupDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
+                      <thead><tr><th class="backup-menu-column"><button class="backup-refresh-trigger" type="button" disabled={backupsLoading} aria-label="Обновить список бэкапов" title="Обновить" onclick={loadProjectBackups}><RotateCw size={17} class={backupsLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th>{#each [['name', 'Название'], ['date', 'Дата'], ['composition', 'Состав'], ['size', 'Размер'], ['database', 'Тип СУБД'], ['location', 'Расположение']] as [field, label]}<th><button type="button" onclick={() => sortBackups(field)}>{label}<span aria-hidden="true">{backupSort === field ? (backupDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead>
                       <tbody>
-                        {#if backupsLoading}<tr><td colspan="6" class="log-empty animate-pulse">Загрузка…</td></tr>
-                        {:else if backupItems.length === 0}<tr><td colspan="6" class="log-empty">Бэкапы не найдены</td></tr>
-                        {:else}{#each backupItems as item}<tr oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td></tr>{/each}{/if}
+                        {#if backupsLoading}<tr><td colspan="7" class="log-empty animate-pulse">Загрузка…</td></tr>
+                        {:else if backupItems.length === 0}<tr><td colspan="7" class="log-empty">Бэкапы не найдены</td></tr>
+                        {:else}{#each backupItems as item}<tr oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBytes(item.size)}</td><td>{item.database || '—'}</td><td>{item.locationName}</td></tr>{/each}{/if}
                       </tbody>
                     </table>
                   </div>
@@ -2262,6 +2275,7 @@
             <p class="backup-create-alert" role="alert">Создание бэкапа файлов пока не реализовано.</p>
           {/if}
           {#if backupCreateDialog.database}
+            <label class="label"><span class="label-text">Хранилище</span><Combobox collection={backupStorageCollection} value={[backupCreateDialog.location]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, location: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Хранилище бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupStorageOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
             <fieldset class="backup-database-options">
               <legend>Базы данных</legend>
               <div class="backup-checkbox-row">
