@@ -136,6 +136,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .backup-database-options { display: grid; gap: 0.65rem; padding: 0.85rem; border: 1px solid var(--color-surface-300); border-radius: var(--radius-container); }
 .dark .backup-database-options { border-color: var(--color-surface-700); }
 .backup-database-options legend { padding: 0 0.3rem; color: var(--color-surface-500); font-size: 0.8rem; font-weight: 600; }
+.backup-files-options { gap: 1rem; }
 .backup-create-alert { padding: 0.7rem 0.8rem; border-radius: var(--radius-base); background: color-mix(in oklab, var(--color-warning-500) 16%, transparent); color: var(--color-warning-700); }
 .dark .backup-create-alert { color: var(--color-warning-300); }
 .backup-create-hint { color: var(--color-surface-500); }

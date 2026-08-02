@@ -147,6 +147,10 @@
   const backupDatabaseCollection = useListCollection({ items: backupDatabaseOptions });
   let backupStrategyFilterOptions = [{ value: 'all', label: 'Любая стратегия' }, { value: 'none', label: 'Без стратегии' }];
   let backupStrategyFilterCollection = useListCollection({ items: backupStrategyFilterOptions });
+  let backupCreateStrategyOptions = [{ value: '', label: 'Без стратегии' }];
+  let backupCreateStrategyCollection = useListCollection({ items: backupCreateStrategyOptions });
+  const backupCompressionOptions = [{ value: '', label: 'Без сжатия' }, { value: 'gzip', label: 'Gzip' }, { value: 'bzip2', label: 'Bzip2' }, { value: 'xz', label: 'XZ' }, { value: 'zstd', label: 'Zstandard' }, { value: 'lz4', label: 'LZ4' }, { value: 'zip', label: 'ZIP' }];
+  const backupCompressionCollection = useListCollection({ items: backupCompressionOptions });
   let backupStorageOptions = [{ value: '', label: 'Папка проекта' }];
   let backupStorageCollection = useListCollection({ items: backupStorageOptions });
   let backupLocationFilterOptions = [{ value: 'all', label: 'Все расположения' }, { value: 'project', label: 'Папка проекта' }];
@@ -209,6 +213,9 @@
   $: backupLocationFilterCollection = useListCollection({ items: backupLocationFilterOptions });
   $: backupStrategyFilterOptions = [{ value: 'all', label: 'Любая стратегия' }, { value: 'none', label: 'Без стратегии' }, ...backupFileStrategies.filter((item) => item.code && item.name).map((item) => ({ value: item.code, label: item.name }))];
   $: backupStrategyFilterCollection = useListCollection({ items: backupStrategyFilterOptions });
+  $: backupCreateStrategyOptions = [{ value: '', label: 'Без стратегии' }, ...backupFileStrategies.filter((item) => item.code && item.name).map((item) => ({ value: item.code, label: item.name }))];
+  $: backupCreateStrategyCollection = useListCollection({ items: backupCreateStrategyOptions });
+  $: selectedBackupCreateStrategy = backupFileStrategies.find((item) => item.code === backupCreateDialog?.strategy) || null;
   $: selectedDeploymentScript = projectAddOptions.deploymentScripts.find((item) => item.code === projectAddDialog?.deploymentScript) || null;
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
@@ -450,17 +457,12 @@
   }
 
   function openBackupCreateDialog() {
-    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, location: '', filesAlert: false };
+    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, strategy: '', compress: '', location: '' };
     loadBackupsSettings();
   }
 
-  function selectBackupFiles(event) {
-    event.preventDefault();
-    if (backupCreateDialog) backupCreateDialog = { ...backupCreateDialog, files: false, filesAlert: true };
-  }
-
   async function createBackup() {
-    if (!backupCreateDialog || !selectedProjectName || !backupCreateDialog.database || (!backupCreateDialog.mysql && !backupCreateDialog.postgres)) return;
+    if (!backupCreateDialog || !selectedProjectName || (!backupCreateDialog.database && !backupCreateDialog.files) || (backupCreateDialog.database && !backupCreateDialog.mysql && !backupCreateDialog.postgres)) return;
     backupCreatePending = true;
     try {
       await createProjectBackup(api, selectedProjectName, {
@@ -469,6 +471,8 @@
         mysql: backupCreateDialog.mysql,
         postgres: backupCreateDialog.postgres,
         location: backupCreateDialog.location,
+        strategy: backupCreateDialog.strategy,
+        compress: backupCreateDialog.compress,
       });
       backupCreateDialog = null;
       notifyQueuedOperation(`Создание бэкапа проекта «${selectedProjectName}»`);
@@ -2448,13 +2452,9 @@
         <div class="backup-create-content">
           <div class="backup-checkbox-row" aria-label="Состав бэкапа">
             <label><input class="checkbox" type="checkbox" checked={backupCreateDialog.database} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, database: event.currentTarget.checked }; }} />БД</label>
-            <label><input class="checkbox" type="checkbox" checked={false} onclick={selectBackupFiles} />Файлы</label>
+            <label><input class="checkbox" type="checkbox" checked={backupCreateDialog.files} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, files: event.currentTarget.checked }; }} />Файлы</label>
           </div>
-          {#if backupCreateDialog.filesAlert}
-            <p class="backup-create-alert" role="alert">Создание бэкапа файлов пока не реализовано.</p>
-          {/if}
           {#if backupCreateDialog.database}
-            <label class="label"><span class="label-text">Хранилище</span><Combobox collection={backupStorageCollection} value={[backupCreateDialog.location]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, location: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Хранилище бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupStorageOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
             <fieldset class="backup-database-options">
               <legend>Базы данных</legend>
               <div class="backup-checkbox-row">
@@ -2462,17 +2462,32 @@
                 <label><input class="checkbox" type="checkbox" checked={backupCreateDialog.postgres} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, postgres: event.currentTarget.checked }; }} />PostgreSQL</label>
               </div>
             </fieldset>
-          {:else}
+          {/if}
+          {#if backupCreateDialog.files}
+            <fieldset class="backup-database-options backup-files-options">
+              <legend>Файлы</legend>
+              <label class="label"><span class="label-text">Стратегия</span><Combobox collection={backupCreateStrategyCollection} value={[backupCreateDialog.strategy]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, strategy: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Стратегия файлового бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCreateStrategyOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+              <div class="backup-strategy-contents">
+                <p>Бэкап включает:</p>
+                {#if selectedBackupCreateStrategy?.include?.length}<ul>{#each selectedBackupCreateStrategy.include as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Все файлы и каталоги проекта</li></ul>{/if}
+                <p>Из включённого исключены:</p>
+                {#if selectedBackupCreateStrategy?.exclude?.length}<ul>{#each selectedBackupCreateStrategy.exclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<p>Исключений нет.</p>{/if}
+              </div>
+              <label class="label"><span class="label-text">Сжатие</span><Combobox collection={backupCompressionCollection} value={[backupCreateDialog.compress]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, compress: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Сжатие файлового бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCompressionOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+            </fieldset>
+          {/if}
+          {#if !backupCreateDialog.database && !backupCreateDialog.files}
             <p class="backup-create-hint">Выберите хотя бы один тип данных для создания бэкапа.</p>
           {/if}
           {#if backupCreateDialog.database && !backupCreateDialog.mysql && !backupCreateDialog.postgres}
             <p class="backup-create-hint">Выберите хотя бы одну базу данных.</p>
           {/if}
+          <label class="label"><span class="label-text">Хранилище</span><Combobox collection={backupStorageCollection} value={[backupCreateDialog.location]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, location: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Хранилище бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupStorageOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
         </div>
       {/if}
       <div class="login-error-actions system-confirm-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={backupCreatePending}>Отмена</Dialog.CloseTrigger>
-        <button class="btn preset-filled-primary-500" type="button" disabled={backupCreatePending || !backupCreateDialog?.database || (!backupCreateDialog?.mysql && !backupCreateDialog?.postgres)} onclick={createBackup}>{backupCreatePending ? 'Создаём…' : 'Создать'}</button>
+        <button class="btn preset-filled-primary-500" type="button" disabled={backupCreatePending || (!backupCreateDialog?.database && !backupCreateDialog?.files) || (backupCreateDialog?.database && !backupCreateDialog?.mysql && !backupCreateDialog?.postgres)} onclick={createBackup}>{backupCreatePending ? 'Создаём…' : 'Создать'}</button>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>

@@ -219,29 +219,43 @@ final class ProjectController
     {
         if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
         if (!$request->database && !$request->files) throw new ProjectActionException('Выберите данные для создания бэкапа.', 422);
-        if ($request->files) throw new ProjectActionException('Создание бэкапа файлов пока не реализовано.', 422);
-        if (!$request->mysql && !$request->postgres) throw new ProjectActionException('Выберите хотя бы одну базу данных.', 422);
+        if ($request->database && !$request->mysql && !$request->postgres) throw new ProjectActionException('Выберите хотя бы одну базу данных.', 422);
         if ($request->location !== '' && !in_array($request->location, array_column(($this->backupSettings ?? new BackupsSettingsRepository())->locations(), 'code'), true)) {
             throw new ProjectActionException('Выбранное хранилище бэкапов не найдено.', 422);
         }
+        if ($request->files && $request->strategy !== '' && !in_array($request->strategy, array_column(($this->backupSettings ?? new BackupsSettingsRepository())->fileStrategies(), 'code'), true)) {
+            throw new ProjectActionException('Выбранная файловая стратегия не найдена.', 422);
+        }
         $backupName = sprintf('%s-%s', $request->name, date('Ymd-His'));
         $tasks = [];
-        if ($request->mysql) {
+        if ($request->database && $request->mysql) {
             $tasks[] = [
                 'code' => 'core.mysql.dump',
                 'arguments' => ['backup' => ['value' => $backupName], 'location' => ['value' => $request->location]],
                 'project' => $request->name,
             ];
         }
-        if ($request->postgres) {
+        if ($request->database && $request->postgres) {
             $tasks[] = [
                 'code' => 'core.postgres.dump',
                 'arguments' => ['backup' => ['value' => $backupName], 'location' => ['value' => $request->location]],
                 'project' => $request->name,
             ];
         }
+        if ($request->files) {
+            $tasks[] = [
+                'code' => 'core.tree.dump',
+                'arguments' => [
+                    'backup' => ['value' => $backupName],
+                    'location' => ['value' => $request->location],
+                    'strategy' => ['value' => $request->strategy],
+                    'compress' => ['value' => $request->compress],
+                ],
+                'project' => $request->name,
+            ];
+        }
         $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => $tasks]];
-        $operationCode = $request->mysql ? 'core.mysql.dump' : 'core.postgres.dump';
+        $operationCode = $request->database ? ($request->mysql ? 'core.mysql.dump' : 'core.postgres.dump') : 'core.tree.dump';
         try {
             $file = ($this->queues ?? new QueueRepository())->create('default', $operationCode, $item);
         } catch (\InvalidArgumentException|\RuntimeException $exception) {
