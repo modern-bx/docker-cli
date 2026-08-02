@@ -6,7 +6,7 @@ namespace DockerCli\Panel\Dto;
 
 final readonly class ProjectBackupListDto implements \JsonSerializable
 {
-    /** @param list<array{name: string, date: string, composition: string, size: int, database: string|null, databaseCode: string, location: string, locationName: string}> $items */
+    /** @param list<array{name: string, date: string, composition: string, size: int, database: string|null, databaseCode: string, strategy: string|null, strategyCode: string, location: string, locationName: string}> $items */
     public function __construct(public array $items, public int $total, public int $page, public int $pageSize)
     {
     }

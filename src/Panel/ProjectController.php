@@ -116,6 +116,7 @@ final class ProjectController
         if (!is_string($root) || $root === '') throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
 
         $items = [];
+        $strategies = array_column(($this->backupSettings ?? new BackupsSettingsRepository())->fileStrategies(), 'name', 'code');
         $locations = [['path' => join_path($root, '.docker-cli', 'backups'), 'code' => '', 'name' => 'Папка проекта']];
         foreach (($this->backupSettings ?? new BackupsSettingsRepository())->locations() as $location) {
             $locations[] = ['path' => $location['path'], 'code' => $location['code'], 'name' => $location['code']];
@@ -136,17 +137,43 @@ final class ProjectController
                         'size' => $this->directorySize($backup),
                         'database' => $databaseName,
                         'databaseCode' => $databaseCode,
+                        'strategy' => null,
+                        'strategyCode' => '',
                         'location' => $location['code'],
                         'locationName' => $location['name'],
                     ];
                 }
             }
+            $directory = join_path($location['path'], 'tree');
+            foreach (glob(join_path($directory, '*'), GLOB_ONLYDIR) ?: [] as $backup) {
+                $metadataFile = join_path($backup, 'docker-cli.json');
+                $metadata = is_file($metadataFile) ? json_decode((string) file_get_contents($metadataFile), true) : null;
+                if (!is_array($metadata) || ($metadata['project'] ?? null) !== $request->name) continue;
+                $archive = $metadata['archive'] ?? null;
+                if (!is_string($archive) || !is_file(join_path($backup, basename($archive)))) continue;
+                $timestamp = filemtime($backup);
+                $createdAt = is_string($metadata['createdAt'] ?? null) ? strtotime($metadata['createdAt']) : false;
+                $strategyCode = is_string($metadata['strategy'] ?? null) ? $metadata['strategy'] : '';
+                $items[] = [
+                    'name' => basename($backup),
+                    'date' => gmdate(DATE_ATOM, $createdAt !== false ? $createdAt : ($timestamp === false ? 0 : $timestamp)),
+                    'composition' => 'Файлы',
+                    'size' => $this->directorySize($backup),
+                    'database' => null,
+                    'databaseCode' => '',
+                    'strategy' => $strategyCode !== '' ? ($strategies[$strategyCode] ?? null) : null,
+                    'strategyCode' => $strategyCode,
+                    'location' => $location['code'],
+                    'locationName' => $location['name'],
+                ];
+            }
         }
         $items = array_values(array_filter($items, static function (array $item) use ($request): bool {
             $date = substr($item['date'], 0, 10);
             return ($request->backupName === '' || str_contains(mb_strtolower($item['name']), mb_strtolower($request->backupName)))
-                && ($request->composition === 'all' || $request->composition === 'database')
+                && ($request->composition === 'all' || ($request->composition === 'database' && $item['composition'] === 'БД') || ($request->composition === 'files' && $item['composition'] === 'Файлы'))
                 && ($request->database === 'all' || $request->database === $item['databaseCode'])
+                && ($request->strategy === 'all' || ($request->strategy === 'none' ? $item['strategyCode'] === '' : $request->strategy === $item['strategyCode']))
                 && ($request->location === 'all' || ($request->location === 'project' ? $item['location'] === '' : $request->location === $item['location']))
                 && ($request->dateFrom === null || $date >= $request->dateFrom)
                 && ($request->dateTo === null || $date <= $request->dateTo);
