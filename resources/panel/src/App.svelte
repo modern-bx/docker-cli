@@ -540,15 +540,19 @@
     return `${count} ${noun}`;
   }
 
+  function formatVolumeSuffix(value) {
+    return Number(value) > 1 ? ` (${formatVolumeCount(value)})` : '';
+  }
+
   function formatBackupSize(backup) {
     const parts = Array.isArray(backup?.sizeParts) ? backup.sizeParts : [];
     if (parts.length === 0) return formatBytes(backup?.size);
     if (parts.length === 1) {
       const part = parts[0];
-      return part.type === 'files' ? `${formatBytes(part.size)} (${formatVolumeCount(part.volumeCount)})` : formatBytes(part.size);
+      return part.type === 'files' ? `${formatBytes(part.size)}${formatVolumeSuffix(part.volumeCount)}` : formatBytes(part.size);
     }
     return parts.map((part) => part.type === 'files'
-      ? `Файлы: ${formatBytes(part.size)} [${formatVolumeCount(part.volumeCount)}]`
+      ? `Файлы: ${formatBytes(part.size)}${formatVolumeSuffix(part.volumeCount)}`
       : `${part.name}: ${formatBytes(part.size)}`).join(', ');
   }
 
@@ -2401,7 +2405,7 @@
         <div class="backup-restore-content">
           {#if backupRestoreConfirmation.hasDatabase}
             <section class="backup-restore-section">
-              {#if backupRestoreConfirmation.hasFiles}<h3>БД</h3>{/if}
+              <h3>БД</h3>
               <div class="backup-restore-options">
                 {#each backupRestoreConfirmation.databaseCodes as database}
                   <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.restoreDatabases.includes(database)} onchange={(event) => toggleRestoreDatabase(database, event.currentTarget.checked)} />{database === 'mysql' ? 'MySQL' : 'PostgreSQL'}</label>
@@ -2420,7 +2424,7 @@
           {/if}
           {#if backupRestoreConfirmation.hasFiles}
             <section class="backup-restore-section">
-              {#if backupRestoreConfirmation.hasDatabase}<h3>Файлы</h3>{/if}
+              <h3>Файлы</h3>
               <div class="backup-restore-options">
                 {#if backupRestoreConfirmation.hasDatabase}<label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.restoreFiles} disabled={backupRestoreConfirmation.filesValid === false} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, restoreFiles: event.currentTarget.checked }; }} />Восстановить файлы</label>{/if}
                 <label><input class="checkbox" type="checkbox" checked={backupRestoreConfirmation.force} disabled={!backupRestoreConfirmation.restoreFiles} onchange={(event) => { backupRestoreConfirmation = { ...backupRestoreConfirmation, force: event.currentTarget.checked }; }} />Перезаписывать файлы</label>
