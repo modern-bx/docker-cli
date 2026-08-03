@@ -37,7 +37,7 @@ bin/docker-cli config:seed --yes
 
 ### `bin/docker-cli shell:bash`
 
-Открывает интерактивный Bash в контейнере `php-fpm-8.2` от имени пользователя
+Открывает интерактивный Bash в контейнере PHP-FPM выбранной для проекта версии от имени пользователя
 `docker-cli`. Короткий алиас команды — `bash`.
 
 ```bash
@@ -57,7 +57,7 @@ bin/docker-cli bash --project=my-project
 
 ### `bin/docker-cli shell:run [--project=project] <args>...`
 
-Выполняет команду в контейнере `php-fpm-8.2` от имени пользователя `docker-cli`.
+Выполняет команду в контейнере PHP-FPM выбранной для проекта версии от имени пользователя `docker-cli`.
 Короткий алиас — `run`; это также команда `docker-cli` по умолчанию. Рабочая
 директория выбирается по тем же правилам, что и у `shell:bash`.
 
@@ -125,15 +125,15 @@ bin/docker-cli project:clone --to=my-project-copy --here
 DNS-алиасы через Traefik и Dnsdock и выполняет reload OpenResty, поэтому новый
 проект сразу открывается на собственном хосте.
 
-### `bin/docker-cli project:update [--name] [--language] [--framework]`
+### `bin/docker-cli project:update [--name] [--language] [--framework] [--language-version]`
 
-Изменяет имя, язык и фреймворк проекта. Команду нужно запускать из директории
+Изменяет имя, язык, фреймворк и версию PHP проекта. `--language-version` принимает `8.2`, `8.3`, `8.4` или `8.5`. Команду нужно запускать из директории
 зарегистрированного проекта. Если язык или фреймворк изменились, команда пересобирает
 конфигурацию OpenResty и перезагружает связанные сервисы. Вызов без опций выводит
 предупреждение и завершается успешно.
 
 ```bash
-bin/docker-cli project:update --name=new-project --language=php --framework=symfony
+bin/docker-cli project:update --name=new-project --language=php --framework=symfony --language-version=8.4
 ```
 
 ### `bin/docker-cli project:disable [project]` / `bin/docker-cli project:enable [project]`
@@ -295,6 +295,8 @@ bin/docker-cli data:apply --dbms=mysql ./backup.sql.zip
 bin/docker-cli data:apply --dbms=mysql './backups/*'
 ```
 
+Подробное описание локальных и централизованных хранилищ, составных копий и файловых стратегий приведено в [руководстве по бэкапам](/guide/backups).
+
 ## Быстрые параллельные дампы MySQL
 
 ### `bin/docker-cli mysql:dump [--name=<имя> | --path=<путь>]`
@@ -314,7 +316,7 @@ bin/docker-cli mysql:dump --project=my-project --threads=8 --path=/mnt/fast/back
 `--threads` (`-j`, по умолчанию `4`) управляет числом потоков mydumper. Каталог
 назначения должен быть пустым. `--name` задаёт короткое имя внутри стандартного
 каталога `.docker-cli/backups/mysql`, а `--path` — полный путь к каталогу конкретного
-бэкапа. Эти опции взаимоисключающие. MySQL продолжает обслуживать запросы во время
+бэкапа. Эти опции взаимоисключающие. `--location=<код>` вместе с `--name` выбирает общее хранилище из настроек панели. MySQL продолжает обслуживать запросы во время
 создания дампа.
 
 ### `bin/docker-cli mysql:backup-delete <backup>`
@@ -326,6 +328,7 @@ bin/docker-cli mysql:dump --project=my-project --threads=8 --path=/mnt/fast/back
 
 ```bash
 bin/docker-cli mysql:backup-delete my-project-20260728-120000
+bin/docker-cli mysql:backup-delete --location=nas release-42
 ```
 
 ### `bin/docker-cli mysql:load <path> --force`
@@ -371,7 +374,7 @@ bin/docker-cli postgres:dump --project=my-project --jobs=8 --path=/mnt/fast/back
 задаёт короткое имя внутри стандартного каталога `.docker-cli/backups/postgres`, а
 `--path` — полный путь к каталогу конкретного бэкапа. Эти опции взаимоисключающие.
 В бэкап записывается `docker-cli.json` с кодом проекта и именем базы для проверки
-при восстановлении.
+при восстановлении. `--location=<код>` вместе с `--name` выбирает общее хранилище из настроек панели.
 
 ### `bin/docker-cli postgres:load <path>`
 
@@ -387,6 +390,29 @@ bin/docker-cli postgres:load --project=my-project --jobs=8 /mnt/fast/backups/my-
 `--jobs` (`-j`, по умолчанию `4`) управляет параллелизмом `pg_restore`. Перед
 загрузкой команда проверяет наличие `toc.dat`, а при наличии `docker-cli.json` —
 соответствие проекта и базы данных.
+
+### `bin/docker-cli postgres:backup-delete <backup>`
+
+Безвозвратно удаляет каталог PostgreSQL-бэкапа текущего проекта. Для копии в общем хранилище передайте его код:
+
+```bash
+bin/docker-cli postgres:backup-delete my-project-20260731-120000
+bin/docker-cli postgres:backup-delete --location=nas release-42
+```
+
+## Файловые бэкапы
+
+### `bin/docker-cli tree:dump`
+
+Создаёт tar- или ZIP-архив файлов проекта. Поддерживает `--project`, `--name`, `--location`, `--strategy`, `--compress`, а также взаимоисключающие `--chunk-size` и `--chunk-count` для многотомных архивов.
+
+### `bin/docker-cli tree:load`
+
+Восстанавливает файловую копию, выбранную через `--name` (при необходимости вместе с `--location`) или прямой `--path`. `--force` разрешает перезапись, `--wipe` предварительно очищает проект с сохранением `.docker-cli`.
+
+### `bin/docker-cli tree:backup-delete <backup>`
+
+Удаляет файловую копию текущего проекта; `--location` выбирает общее хранилище. Примеры и правила безопасности приведены в [руководстве по бэкапам](/guide/backups).
 
 ## Пользовательские задачи
 

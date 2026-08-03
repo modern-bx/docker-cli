@@ -19,6 +19,8 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto
         public string $location,
         public string $strategy = '',
         public string $compress = '',
+        public string $chunkSize = '',
+        public string $chunkCount = '',
     ) {
     }
 
@@ -32,12 +34,19 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto
         $location = $request->body['location'] ?? null;
         $strategy = $request->body['strategy'] ?? '';
         $compress = $request->body['compress'] ?? '';
+        $chunkSize = $request->body['chunkSize'] ?? '';
+        $chunkCount = $request->body['chunkCount'] ?? '';
         if (!is_string($location) || ($location !== '' && preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $location) !== 1)) {
             throw new RequestValidationException('Некорректное расположение бэкапа.');
         }
         if (!is_string($strategy) || ($strategy !== '' && preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $strategy) !== 1)
             || !is_string($compress) || !in_array($compress, ['', 'gzip', 'bzip2', 'xz', 'zstd', 'lz4', 'zip'], true)) {
             throw new RequestValidationException('Некорректные параметры файлового бэкапа.');
+        }
+        if (!is_string($chunkSize) || !is_string($chunkCount) || ($chunkSize !== '' && $chunkCount !== '')
+            || ($chunkSize !== '' && preg_match('/^\d+(?:\.\d+)?(?:B|K|M|G)?$/i', $chunkSize) !== 1)
+            || ($chunkCount !== '' && (preg_match('/^\d+$/', $chunkCount) !== 1 || (int) $chunkCount < 2))) {
+            throw new RequestValidationException('Укажите либо корректный размер тома, либо количество томов не меньше двух.');
         }
 
         return new static(
@@ -49,6 +58,8 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto
             $location,
             $strategy,
             $compress,
+            $chunkSize,
+            $chunkCount,
         );
     }
 }

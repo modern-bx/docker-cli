@@ -10,6 +10,7 @@
 - Системный compose-стек с Traefik, dnsdock, Dockhand, MySQL, PostgreSQL, Adminer, Mailpit и OpenResty.
 - Сборка и публикация кастомных образов.
 - Настройка Xdebug с отдельным IDE-портом на каждый проект.
+- Файловые бэкапы и параллельные дампы MySQL/PostgreSQL с восстановлением из панели или CLI.
 
 ## Быстрый старт
 
@@ -24,3 +25,5 @@ bin/docker-cli system:start
 После запуска Dockhand будет доступен по адресу `https://dockhand.<ваш-домен>`, а Adminer — по адресу `https://adminer.<ваш-домен>`.
 
 Дальше перейдите к разделу [Быстрый старт](./guide/getting-started.md) или откройте [справочник команд](./reference/commands.md).
+
+Для работы с копиями данных смотрите [руководство по бэкапам](./guide/backups.md), а краткий обзор новых возможностей собран в [последних изменениях](./guide/recent-changes.md).

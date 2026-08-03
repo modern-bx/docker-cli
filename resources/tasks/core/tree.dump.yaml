@@ -12,9 +12,13 @@ task:
     location: { name: Расположение, type: string }
     strategy: { name: Файловая стратегия, type: string }
     compress: { name: Сжатие, type: string }
+    chunk-size: { name: Размер тома, type: string }
+    chunk-count: { name: Количество томов, type: string }
   action: |
     options=()
     [ -n "${location:-}" ] && options+=(--location="$location")
     [ -n "${strategy:-}" ] && options+=(--strategy="$strategy")
     [ -n "${compress:-}" ] && options+=(--compress="$compress")
+    [ -n "${chunk_size:-}" ] && options+=(--chunk-size="$chunk_size")
+    [ -n "${chunk_count:-}" ] && options+=(--chunk-count="$chunk_count")
     docker-cli tree:dump --project="$project" --name="$backup" "${options[@]}"

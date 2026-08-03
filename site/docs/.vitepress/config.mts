@@ -38,6 +38,8 @@ export default defineConfig({
           { text: 'Xdebug', link: '/guide/xdebug' },
           { text: 'Задачи', link: '/guide/tasks' },
           { text: 'Очереди', link: '/guide/queues' },
+          { text: 'Бэкапы', link: '/guide/backups' },
+          { text: 'Последние изменения', link: '/guide/recent-changes' },
           { text: 'Образы', link: '/guide/images' },
           { text: 'PHAR', link: '/guide/phar' }
         ]
