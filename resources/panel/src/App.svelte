@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Combobox, Dialog, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
+  import { Combobox, Dialog, Tabs, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Settings, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
@@ -9,6 +9,7 @@
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
   const FONT_KEY = 'docker-cli-panel-font';
+  const strategyTabs = [{ value: 'files', sections: [['include', 'Включить', 'Относительные пути или glob-маски, которые нужно включить в файловый бэкап'], ['exclude', 'Исключить', 'Относительные пути или glob-маски, которые нужно исключить из бэкапа']] }, { value: 'database', sections: [['databaseInclude', 'Включить', 'Точные имена таблиц или glob-маски (например, public.*), которые нужно включить в дамп'], ['databaseExclude', 'Исключить', 'Точные имена таблиц или glob-маски, которые нужно исключить из дампа']] }];
   const themes = [
     ['vox', 'Vox'], ['cerberus', 'Cerberus'], ['concord', 'Concord'],
     ['crimson', 'Crimson'], ['dracula', 'Dracula'], ['fennec', 'Fennec'],
@@ -2372,23 +2373,16 @@
     <Dialog.Content class="login-error-dialog file-strategy-dialog card preset-filled-surface-100-900 shadow-2xl">
       <Dialog.Title class="login-error-title">Настройки стратегии</Dialog.Title>
       {#if fileStrategyDialog}
-        <div class="backup-checkbox-row" role="tablist" aria-label="Раздел стратегии"><button class={`btn ${fileStrategyDialog.tab === 'files' ? 'preset-filled-primary-500' : 'preset-tonal'}`} type="button" role="tab" aria-selected={fileStrategyDialog.tab === 'files'} onclick={() => { fileStrategyDialog = { ...fileStrategyDialog, tab: 'files' }; }}>Файлы</button><button class={`btn ${fileStrategyDialog.tab === 'database' ? 'preset-filled-primary-500' : 'preset-tonal'}`} type="button" role="tab" aria-selected={fileStrategyDialog.tab === 'database'} onclick={() => { fileStrategyDialog = { ...fileStrategyDialog, tab: 'database' }; }}>БД</button></div>
-        <div class="file-strategy-fields">
-          {#each fileStrategyDialog.tab === 'database' ? [['databaseInclude', 'Включить', 'Точные имена таблиц или glob-маски (например, public.*), которые нужно включить в дамп'], ['databaseExclude', 'Исключить', 'Точные имена таблиц или glob-маски, которые нужно исключить из дампа']] : [['include', 'Включить', 'Относительные пути или glob-маски, которые нужно включить в файловый бэкап'], ['exclude', 'Исключить', 'Относительные пути или glob-маски, которые нужно исключить из бэкапа']] as [kind, title, hint]}
-            <section class="strategy-pattern-section">
-              <h3>{title}<Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" aria-label={`О блоке ${title}`}><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">{hint}</Tooltip.Content></Tooltip.Positioner></Tooltip></h3>
-              <div class="strategy-pattern-list">
-                {#each fileStrategyDialog[kind] as pattern, index}
-                  <div class="strategy-pattern-row">
-                    <input class="input" type="text" value={pattern} placeholder={fileStrategyDialog.tab === 'database' ? 'таблица или glob-маска' : 'путь или паттерн'} aria-label={`${title}: шаблон ${index + 1}`} oninput={(event) => updateStrategyPattern(kind, index, event.currentTarget.value)} />
-                    <button class="btn preset-tonal" type="button" title="Добавить" aria-label={`Добавить паттерн в ${title.toLocaleLowerCase()}`} onclick={() => addStrategyPattern(kind)}><Plus size={16} aria-hidden="true" /></button>
-                    <button class="btn preset-tonal location-delete" type="button" title="Удалить" aria-label={`Удалить паттерн из ${title.toLocaleLowerCase()}`} onclick={() => removeStrategyPattern(kind, index)}>−</button>
-                  </div>
-                {/each}
-              </div>
-            </section>
+        <Tabs class="strategy-tabs" value={fileStrategyDialog.tab} onValueChange={(details) => { fileStrategyDialog = { ...fileStrategyDialog, tab: details.value }; }}>
+          <Tabs.List class="strategy-tabs-list"><Tabs.Trigger class="strategy-tab" value="files">Файлы</Tabs.Trigger><Tabs.Trigger class="strategy-tab" value="database">БД</Tabs.Trigger><Tabs.Indicator class="strategy-tabs-indicator" /></Tabs.List>
+          {#each strategyTabs as strategyTab}
+            <Tabs.Content class="file-strategy-fields" value={strategyTab.value}>
+              {#each strategyTab.sections as [kind, title, hint]}
+                <section class="strategy-pattern-section"><h3>{title}<Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" aria-label={`О блоке ${title}`}><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">{hint}</Tooltip.Content></Tooltip.Positioner></Tooltip></h3><div class="strategy-pattern-list">{#each fileStrategyDialog[kind] as pattern, index}<div class="strategy-pattern-row"><input class="input" type="text" value={pattern} placeholder={strategyTab.value === 'database' ? 'таблица или glob-маска' : 'путь или glob-маска'} aria-label={`${title}: шаблон ${index + 1}`} oninput={(event) => updateStrategyPattern(kind, index, event.currentTarget.value)} /><button class="btn preset-tonal" type="button" title="Добавить" aria-label={`Добавить паттерн в ${title.toLocaleLowerCase()}`} onclick={() => addStrategyPattern(kind)}><Plus size={16} aria-hidden="true" /></button><button class="btn preset-tonal location-delete" type="button" title="Удалить" aria-label={`Удалить паттерн из ${title.toLocaleLowerCase()}`} onclick={() => removeStrategyPattern(kind, index)}>−</button></div>{/each}</div></section>
+              {/each}
+            </Tabs.Content>
           {/each}
-        </div>
+        </Tabs>
       {/if}
       <div class="login-error-actions">
         <Dialog.CloseTrigger class="btn preset-tonal" type="button">Отменить</Dialog.CloseTrigger>
@@ -2498,41 +2492,21 @@
       <Dialog.Title class="login-error-title">Создать бэкап</Dialog.Title>
       {#if backupCreateDialog}
         <div class="backup-create-content">
-          <div class="backup-checkbox-row" aria-label="Состав бэкапа">
-            <label><input class="checkbox" type="checkbox" checked={backupCreateDialog.database} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, database: event.currentTarget.checked }; }} />БД</label>
-            <label><input class="checkbox" type="checkbox" checked={backupCreateDialog.files} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, files: event.currentTarget.checked }; }} />Файлы</label>
+          <div class="backup-checkbox-row" aria-label="Состав бэкапа"><label><input class="checkbox" type="checkbox" checked={backupCreateDialog.database} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, database: event.currentTarget.checked }; }} />БД</label><label><input class="checkbox" type="checkbox" checked={backupCreateDialog.files} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, files: event.currentTarget.checked }; }} />Файлы</label></div>
+          <div class="backup-create-columns">
+            <div class="backup-create-left">
+              <label class="label"><span class="label-text">Хранилище</span><Combobox collection={backupStorageCollection} value={[backupCreateDialog.location]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, location: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Хранилище бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupStorageOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+              <label class="label"><span class="label-text">Стратегия</span><Combobox collection={backupCreateStrategyCollection} value={[backupCreateDialog.strategy]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, strategy: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Стратегия бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCreateStrategyOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+              {#if backupCreateDialog.files}<div class="backup-strategy-contents"><p>Файлы включают:</p>{#if selectedBackupCreateStrategy?.include?.length}<ul>{#each selectedBackupCreateStrategy.include as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Все файлы и каталоги проекта</li></ul>{/if}<p>Из включённого исключены:</p>{#if selectedBackupCreateStrategy?.exclude?.length}<ul>{#each selectedBackupCreateStrategy.exclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Исключений нет</li></ul>{/if}</div>{/if}
+              {#if backupCreateDialog.database}<div class="backup-strategy-contents"><p>БД включает:</p>{#if selectedBackupCreateStrategy?.databaseInclude?.length}<ul>{#each selectedBackupCreateStrategy.databaseInclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Все таблицы</li></ul>{/if}<p>Из включённого исключены:</p>{#if selectedBackupCreateStrategy?.databaseExclude?.length}<ul>{#each selectedBackupCreateStrategy.databaseExclude as pattern}<li><code>{pattern}</code></li>{/each}</ul>{:else}<ul><li>Исключений нет</li></ul>{/if}</div>{/if}
+            </div>
+            <div class="backup-create-right">
+              {#if backupCreateDialog.database}<fieldset class="backup-database-options"><legend>Базы данных</legend><div class="backup-checkbox-row"><label><input class="checkbox" type="checkbox" checked={backupCreateDialog.mysql} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, mysql: event.currentTarget.checked }; }} />MySQL</label><label><input class="checkbox" type="checkbox" checked={backupCreateDialog.postgres} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, postgres: event.currentTarget.checked }; }} />PostgreSQL</label></div></fieldset>{/if}
+              {#if backupCreateDialog.files}<fieldset class="backup-database-options"><legend>Файлы</legend><div class="backup-files-column"><label class="label"><span class="label-text">Сжатие</span><Combobox collection={backupCompressionCollection} value={[backupCreateDialog.compress]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, compress: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Сжатие файлового бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCompressionOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label><label class="label"><span class="label-text">Размер тома <Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" aria-label="О размере тома"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Максимальный размер части архива. Не заполняйте одновременно с количеством томов.</Tooltip.Content></Tooltip.Positioner></Tooltip></span><input class="input" type="text" placeholder="например, 10K" value={backupCreateDialog.chunkSize} disabled={backupCreateDialog.chunkCount !== ''} oninput={(event) => { backupCreateDialog = { ...backupCreateDialog, chunkSize: event.currentTarget.value }; }} /></label><label class="label"><span class="label-text">Количество томов</span><input class="input" type="number" min="2" step="1" placeholder="не задано" value={backupCreateDialog.chunkCount} disabled={backupCreateDialog.chunkSize !== ''} oninput={(event) => { backupCreateDialog = { ...backupCreateDialog, chunkCount: event.currentTarget.value }; }} /></label></div></fieldset>{/if}
+              {#if !backupCreateDialog.database && !backupCreateDialog.files}<p class="backup-create-hint">Выберите хотя бы один тип данных для создания бэкапа.</p>{/if}
+              {#if backupCreateDialog.database && !backupCreateDialog.mysql && !backupCreateDialog.postgres}<p class="backup-create-hint">Выберите хотя бы одну базу данных.</p>{/if}
+            </div>
           </div>
-          <div class="backup-files-column backup-files-strategy">
-            <label class="label"><span class="label-text">Стратегия</span><Combobox collection={backupCreateStrategyCollection} value={[backupCreateDialog.strategy]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, strategy: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Стратегия бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCreateStrategyOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
-            {#if backupCreateDialog.files}<div class="backup-strategy-contents"><p><strong>Файлы:</strong> включены {selectedBackupCreateStrategy?.include?.length ? selectedBackupCreateStrategy.include.join(', ') : 'все файлы и каталоги'}; исключения: {selectedBackupCreateStrategy?.exclude?.length ? selectedBackupCreateStrategy.exclude.join(', ') : 'нет'}.</p></div>{/if}
-            {#if backupCreateDialog.database}<div class="backup-strategy-contents"><p><strong>БД:</strong> включены {selectedBackupCreateStrategy?.databaseInclude?.length ? selectedBackupCreateStrategy.databaseInclude.join(', ') : 'все таблицы'}; исключения: {selectedBackupCreateStrategy?.databaseExclude?.length ? selectedBackupCreateStrategy.databaseExclude.join(', ') : 'нет'}.</p></div>{/if}
-          </div>
-          {#if backupCreateDialog.database}
-            <fieldset class="backup-database-options">
-              <legend>Базы данных</legend>
-              <div class="backup-checkbox-row">
-                <label><input class="checkbox" type="checkbox" checked={backupCreateDialog.mysql} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, mysql: event.currentTarget.checked }; }} />MySQL</label>
-                <label><input class="checkbox" type="checkbox" checked={backupCreateDialog.postgres} onchange={(event) => { backupCreateDialog = { ...backupCreateDialog, postgres: event.currentTarget.checked }; }} />PostgreSQL</label>
-              </div>
-            </fieldset>
-          {/if}
-          {#if backupCreateDialog.files}
-            <fieldset class="backup-database-options backup-files-options">
-              <legend>Файлы</legend>
-              <div class="backup-files-column backup-files-volumes">
-              <label class="label"><span class="label-text">Сжатие</span><Combobox collection={backupCompressionCollection} value={[backupCreateDialog.compress]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, compress: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Сжатие файлового бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupCompressionOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
-              <label class="label"><span class="label-text">Размер тома <Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" aria-label="О размере тома"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Максимальный размер каждой части архива. Допустимы байты и суффиксы B, K, M, G, например 1024, 10K или 1.5M. Не заполняйте одновременно с количеством томов.</Tooltip.Content></Tooltip.Positioner></Tooltip></span><input class="input" type="text" placeholder="например, 10K" value={backupCreateDialog.chunkSize} disabled={backupCreateDialog.chunkCount !== ''} oninput={(event) => { backupCreateDialog = { ...backupCreateDialog, chunkSize: event.currentTarget.value }; }} /></label>
-              <label class="label"><span class="label-text">Количество томов <Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" aria-label="О количестве томов"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Желаемое количество равных частей архива, целое число не меньше двух. Не заполняйте одновременно с размером тома.</Tooltip.Content></Tooltip.Positioner></Tooltip></span><input class="input" type="number" min="2" step="1" placeholder="не задано" value={backupCreateDialog.chunkCount} disabled={backupCreateDialog.chunkSize !== ''} oninput={(event) => { backupCreateDialog = { ...backupCreateDialog, chunkCount: event.currentTarget.value }; }} /></label>
-              </div>
-            </fieldset>
-          {/if}
-          {#if !backupCreateDialog.database && !backupCreateDialog.files}
-            <p class="backup-create-hint">Выберите хотя бы один тип данных для создания бэкапа.</p>
-          {/if}
-          {#if backupCreateDialog.database && !backupCreateDialog.mysql && !backupCreateDialog.postgres}
-            <p class="backup-create-hint">Выберите хотя бы одну базу данных.</p>
-          {/if}
-          <label class="label"><span class="label-text">Хранилище</span><Combobox collection={backupStorageCollection} value={[backupCreateDialog.location]} openOnClick onValueChange={(details) => { backupCreateDialog = { ...backupCreateDialog, location: details.value[0] ?? '' }; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Хранилище бэкапа" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each backupStorageOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
         </div>
       {/if}
       <div class="login-error-actions system-confirm-actions">
