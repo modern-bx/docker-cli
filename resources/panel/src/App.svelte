@@ -2378,7 +2378,7 @@
       <Dialog.Title class="login-error-title">Настройки стратегии</Dialog.Title>
       {#if fileStrategyDialog}
         <Tabs class="strategy-tabs" value={fileStrategyDialog.tab} onValueChange={(details) => { fileStrategyDialog = { ...fileStrategyDialog, tab: details.value }; }}>
-          <Tabs.List class="strategy-tabs-list"><Tabs.Trigger class="strategy-tab" value="files">Файлы</Tabs.Trigger><Tabs.Trigger class="strategy-tab" value="database">БД</Tabs.Trigger><Tabs.Indicator class="strategy-tabs-indicator" /></Tabs.List>
+          <Tabs.List class="strategy-tabs-list"><Tabs.Trigger class="strategy-tab" value="files">Файлы</Tabs.Trigger><Tabs.Trigger class="strategy-tab" value="database">БД</Tabs.Trigger></Tabs.List>
           {#each strategyTabs as strategyTab}
             <Tabs.Content class="file-strategy-fields" value={strategyTab.value}>
               {#each strategyTab.sections as [kind, title, hint]}

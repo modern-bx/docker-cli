@@ -147,7 +147,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .backup-create-alert { padding: 0.7rem 0.8rem; border-radius: var(--radius-base); background: color-mix(in oklab, var(--color-warning-500) 16%, transparent); color: var(--color-warning-700); }
 .dark .backup-create-alert { color: var(--color-warning-300); }
 .backup-create-hint { color: var(--color-surface-500); }
-.backup-restore-dialog { width: min(60rem, calc(100vw - 2rem)); }
+.login-error-dialog.backup-restore-dialog { width: min(60rem, calc(100vw - 2rem)); }
 .backup-restore-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr)); gap: 1.25rem; align-items: start; margin-top: 1rem; }
 .backup-restore-section { display: grid; gap: 0.75rem; }
 .backup-restore-section + .backup-restore-section { padding-left: 1.25rem; border-left: 1px solid var(--color-surface-300); }
@@ -432,12 +432,11 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .dark .location-delete { color: var(--color-error-400); }
 .file-strategy-dialog { width: min(42rem, calc(100vw - 2rem)); }
 .strategy-tabs { margin-top: 1rem; }
-.strategy-tabs-list { position: relative; display: flex; gap: 1.5rem; border-bottom: 1px solid var(--color-surface-300); }
+.strategy-tabs-list { display: flex; height: 3.25rem; align-items: end; border-bottom: 1px solid var(--color-surface-300); }
 .dark .strategy-tabs-list { border-color: var(--color-surface-700); }
-.strategy-tab { padding: 0.65rem 0.25rem; color: var(--color-surface-500); font-weight: 700; }
-.strategy-tab[data-selected] { color: var(--color-primary-600); }
-.dark .strategy-tab[data-selected] { color: var(--color-primary-400); }
-.strategy-tabs-indicator { position: absolute; bottom: -1px; height: 2px; background: var(--color-primary-500); }
+.strategy-tab { display: flex; height: 100%; align-items: center; padding: 0 1rem; border-bottom: 2px solid transparent; color: var(--color-surface-500); font-weight: 600; }
+.strategy-tab[data-selected] { border-color: var(--color-primary-500); color: var(--color-primary-700); }
+.dark .strategy-tab[data-selected] { color: var(--color-primary-300); }
 .file-strategy-fields { display: grid; gap: 1.25rem; margin-top: 1rem; }
 .strategy-pattern-section h3 { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.6rem; font-weight: 700; }
 .strategy-pattern-list { display: grid; gap: 0.45rem; }
