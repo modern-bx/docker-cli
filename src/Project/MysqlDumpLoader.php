@@ -12,7 +12,8 @@ final class MysqlDumpLoader
 {
     public function __construct(private readonly ?SystemCompose $compose = null) {}
 
-    public function dump(string $database, string $directory, int $threads, OutputInterface $output): int
+    /** @param list<string> $include @param list<string> $exclude */
+    public function dump(string $database, string $directory, int $threads, OutputInterface $output, array $include = [], array $exclude = []): int
     {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
@@ -30,12 +31,23 @@ final class MysqlDumpLoader
             return Command::FAILURE;
         }
 
+        $regex = $this->strategyRegex($database, $include, $exclude);
         return $this->run(array_merge($compose->dockerComposeCommand('run'), [
             '--rm', '-T', '--no-deps', '--user', 'root', '--entrypoint', 'sh',
             '--volume', $directory . ':/dump', 'mydumper', '-ec',
-            'mydumper --host=mysql --user=root --password="${MYSQL_ROOT_PASSWORD:?}" --database="$1" --outputdir=/dump --threads="$2" && chown -R "$3:$4" /dump',
-            'sh', $database, (string) $threads, (string) $this->uid(), (string) $this->gid(),
+            'mydumper --host=mysql --user=root --password="${MYSQL_ROOT_PASSWORD:?}" --database="$1" --outputdir=/dump --threads="$2" ${5:+--regex="$5"} && chown -R "$3:$4" /dump',
+            'sh', $database, (string) $threads, (string) $this->uid(), (string) $this->gid(), $regex,
         ]), $compose, $output);
+    }
+
+    /** @param list<string> $include @param list<string> $exclude */
+    private function strategyRegex(string $database, array $include, array $exclude): string
+    {
+        $glob = static fn (string $value): string => str_replace(['\\*', '\\?'], ['.*', '.'], preg_quote($value, '/'));
+        $prefix = '^' . preg_quote($database, '/') . '\\.';
+        $allowed = $include === [] ? '.*' : '(?:' . implode('|', array_map($glob, $include)) . ')';
+        $denied = $exclude === [] ? '' : '(?!(?:' . implode('|', array_map($glob, $exclude)) . ')$)';
+        return $include === [] && $exclude === [] ? '' : $prefix . $denied . $allowed . '$';
     }
 
     public function load(string $database, string $directory, int $threads, bool $disableRedoLog, OutputInterface $output): int

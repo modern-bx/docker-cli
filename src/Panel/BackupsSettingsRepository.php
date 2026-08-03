@@ -119,6 +119,16 @@ final class BackupsSettingsRepository
             && is_string($item['name'] ?? null) && is_string($item['code'] ?? null)
             && is_array($item['include'] ?? null) && array_is_list($item['include']) && !array_filter($item['include'], static fn ($value): bool => !is_string($value))
             && is_array($item['exclude'] ?? null) && array_is_list($item['exclude']) && !array_filter($item['exclude'], static fn ($value): bool => !is_string($value))));
+        foreach ($strategies as &$strategy) {
+            $strategy['databaseInclude'] = self::patterns($strategy['databaseInclude'] ?? []);
+            $strategy['databaseExclude'] = self::patterns($strategy['databaseExclude'] ?? []);
+        }
         return ['locations' => $locations, 'fileStrategies' => $strategies];
+    }
+
+    /** @return list<string> */
+    private static function patterns(mixed $value): array
+    {
+        return is_array($value) && array_is_list($value) && !array_filter($value, static fn ($item): bool => !is_string($item)) ? $value : [];
     }
 }

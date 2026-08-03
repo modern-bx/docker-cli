@@ -12,7 +12,8 @@ final class PostgresDumpLoader
 {
     public function __construct(private readonly ?SystemCompose $compose = null) {}
 
-    public function dump(string $database, string $directory, int $jobs, OutputInterface $output): int
+    /** @param list<string> $include @param list<string> $exclude */
+    public function dump(string $database, string $directory, int $jobs, OutputInterface $output, array $include = [], array $exclude = []): int
     {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
@@ -30,11 +31,14 @@ final class PostgresDumpLoader
             return Command::FAILURE;
         }
 
+        $filters = [];
+        foreach ($include as $pattern) $filters[] = '--table=' . $pattern;
+        foreach ($exclude as $pattern) $filters[] = '--exclude-table=' . $pattern;
         return $this->run(array_merge($compose->dockerComposeCommand('run'), [
             '--rm', '-T', '--no-deps', '--user', 'root', '--entrypoint', 'sh',
             '--volume', $directory . ':/dump', 'postgres', '-ec',
-            'export PGPASSWORD="${POSTGRES_PASSWORD:?}"; pg_dump --host=postgres --username="${POSTGRES_USER:-system}" --format=directory --jobs="$2" --file=/dump "$1"; chown -R "$3:$4" /dump',
-            'sh', $database, (string) $jobs, (string) $this->uid(), (string) $this->gid(),
+            'export PGPASSWORD="${POSTGRES_PASSWORD:?}"; database="$1"; jobs="$2"; uid="$3"; gid="$4"; shift 4; pg_dump --host=postgres --username="${POSTGRES_USER:-system}" --format=directory --jobs="$jobs" --file=/dump "$database" "$@"; chown -R "$uid:$gid" /dump',
+            'sh', $database, (string) $jobs, (string) $this->uid(), (string) $this->gid(), ...$filters,
         ]), $compose, $output);
     }
 

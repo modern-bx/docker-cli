@@ -50,34 +50,42 @@ final readonly class BackupsSettingsRequestDto implements RequestDto
         if ($defaults !== 1) {
             throw new RequestValidationException('Выберите одно расположение по умолчанию.');
         }
-        $strategies = $request->body['fileStrategies'] ?? null;
+        $validatedStrategies = self::validateStrategies($request->body['fileStrategies'] ?? null);
+        return new static($validated, $validatedStrategies);
+    }
+
+    /** @return list<array{name: string, code: string, include: list<string>, exclude: list<string>}> */
+    private static function validateStrategies(mixed $strategies): array
+    {
         if (!is_array($strategies) || !array_is_list($strategies)) {
-            throw new RequestValidationException('Некорректные файловые стратегии.');
+            throw new RequestValidationException('Некорректные стратегии.');
         }
         $validatedStrategies = [];
         foreach ($strategies as $strategy) {
-            if (!is_array($strategy) || array_keys($strategy) !== ['name', 'code', 'include', 'exclude']
+            if (!is_array($strategy) || array_keys($strategy) !== ['name', 'code', 'include', 'exclude', 'databaseInclude', 'databaseExclude']
                 || !is_string($strategy['name']) || trim($strategy['name']) === '' || strlen($strategy['name']) > 255
                 || !is_string($strategy['code']) || !is_array($strategy['include']) || !array_is_list($strategy['include'])
-                || !is_array($strategy['exclude']) || !array_is_list($strategy['exclude'])) {
-                throw new RequestValidationException('Некорректная файловая стратегия.');
+                || !is_array($strategy['exclude']) || !array_is_list($strategy['exclude'])
+                || !is_array($strategy['databaseInclude']) || !array_is_list($strategy['databaseInclude'])
+                || !is_array($strategy['databaseExclude']) || !array_is_list($strategy['databaseExclude'])) {
+                throw new RequestValidationException('Некорректная стратегия.');
             }
             $code = trim($strategy['code']);
             if ($code !== '' && preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $code) !== 1) {
-                throw new RequestValidationException('Некорректное кодовое имя файловой стратегии.');
+                throw new RequestValidationException('Некорректное кодовое имя стратегии.');
             }
             if ($code !== '' && in_array($code, array_column($validatedStrategies, 'code'), true)) {
                 throw new RequestValidationException(sprintf('Код стратегии «%s» указан несколько раз.', $code));
             }
             $patterns = [];
-            foreach (['include', 'exclude'] as $key) {
+            foreach (['include', 'exclude', 'databaseInclude', 'databaseExclude'] as $key) {
                 if (array_filter($strategy[$key], static fn ($value): bool => !is_string($value) || trim($value) === '' || strlen($value) > 4096)) {
-                    throw new RequestValidationException('Некорректный путь или паттерн файловой стратегии.');
+                    throw new RequestValidationException('Некорректный путь, имя или glob-шаблон стратегии.');
                 }
                 $patterns[$key] = array_map(trim(...), $strategy[$key]);
             }
             $validatedStrategies[] = ['name' => trim($strategy['name']), 'code' => $code, ...$patterns];
         }
-        return new static($validated, $validatedStrategies);
+        return $validatedStrategies;
     }
 }

@@ -14,9 +14,13 @@ task:
     location:
       name: Код хранилища бэкапов
       type: string
+    strategy:
+      name: Стратегия БД
+      type: string
   action: |
     options=()
     [ -n "${location:-}" ] && options+=(--location="$location")
+    [ -n "${strategy:-}" ] && options+=(--strategy="$strategy")
     if [ -n "${backup:-}" ]; then
       docker-cli mysql:dump --project="$project" --name="$backup" "${options[@]}"
     else

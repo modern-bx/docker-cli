@@ -131,6 +131,8 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .backup-menu-trigger:disabled { cursor: not-allowed; opacity: 0.4; }
 .login-error-dialog.backup-create-dialog { width: min(48rem, calc(100vw - 2rem)); }
 .backup-create-content { display: grid; gap: 1rem; margin-top: 1rem; }
+.backup-create-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+.backup-create-left, .backup-create-right { display: grid; align-content: start; gap: 1rem; min-width: 0; }
 .backup-create-content .label { position: relative; }
 .backup-create-content .label:focus-within { z-index: 40; }
 .backup-checkbox-row { display: flex; align-items: center; gap: 1.5rem; }
@@ -141,15 +143,16 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .backup-files-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .backup-files-options legend { grid-column: 1 / -1; }
 .backup-files-column { display: grid; align-content: start; gap: 1rem; }
-@media (max-width: 720px) { .backup-files-options { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 720px) { .backup-files-options, .backup-create-columns { grid-template-columns: minmax(0, 1fr); } }
 .backup-create-alert { padding: 0.7rem 0.8rem; border-radius: var(--radius-base); background: color-mix(in oklab, var(--color-warning-500) 16%, transparent); color: var(--color-warning-700); }
 .dark .backup-create-alert { color: var(--color-warning-300); }
 .backup-create-hint { color: var(--color-surface-500); }
-.backup-restore-dialog { width: min(42rem, calc(100vw - 2rem)); }
-.backup-restore-content { display: grid; gap: 1.25rem; margin-top: 1rem; }
+.login-error-dialog.backup-restore-dialog { width: min(60rem, calc(100vw - 2rem)); }
+.backup-restore-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr)); gap: 1.25rem; align-items: start; margin-top: 1rem; }
 .backup-restore-section { display: grid; gap: 0.75rem; }
-.backup-restore-section + .backup-restore-section { padding-top: 1.25rem; border-top: 1px solid var(--color-surface-300); }
+.backup-restore-section + .backup-restore-section { padding-left: 1.25rem; border-left: 1px solid var(--color-surface-300); }
 .dark .backup-restore-section + .backup-restore-section { border-color: var(--color-surface-700); }
+@media (max-width: 760px) { .backup-restore-section + .backup-restore-section { padding-top: 1.25rem; padding-left: 0; border-top: 1px solid var(--color-surface-300); border-left: 0; } }
 .backup-restore-section h3 { font-weight: 700; }
 .backup-restore-options { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
 .backup-restore-options label { display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
@@ -428,6 +431,12 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .location-delete { color: var(--color-error-600); }
 .dark .location-delete { color: var(--color-error-400); }
 .file-strategy-dialog { width: min(42rem, calc(100vw - 2rem)); }
+.strategy-tabs { margin-top: 1rem; }
+.strategy-tabs-list { display: flex; height: 3.25rem; align-items: end; border-bottom: 1px solid var(--color-surface-300); }
+.dark .strategy-tabs-list { border-color: var(--color-surface-700); }
+.strategy-tab { display: flex; height: 100%; align-items: center; padding: 0 1rem; border-bottom: 2px solid transparent; color: var(--color-surface-500); font-weight: 600; }
+.strategy-tab[data-selected] { border-color: var(--color-primary-500); color: var(--color-primary-700); }
+.dark .strategy-tab[data-selected] { color: var(--color-primary-300); }
 .file-strategy-fields { display: grid; gap: 1.25rem; margin-top: 1rem; }
 .strategy-pattern-section h3 { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.6rem; font-weight: 700; }
 .strategy-pattern-list { display: grid; gap: 0.45rem; }
@@ -455,7 +464,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .project-add-button { width: 125px; margin: 0 1.5rem .75rem; justify-content: center; }
 .project-add-form { display: grid; gap: 1rem; margin-top: 1rem; }
 .project-clone-form { grid-template-columns: minmax(0, 1fr); }
-.login-error-dialog.project-clone-dialog { width: min(18.667rem, calc(100vw - 2rem)); }
+.login-error-dialog.project-clone-dialog { width: min(28.667rem, calc(100vw - 2rem)); }
 .project-clone-dbms .project-deployment-checkboxes { display: flex; align-items: center; gap: 1.5rem; margin-top: .375rem; }
 .project-add-form .label { position: relative; }
 .project-add-form .label:focus-within, .project-add-form .font-combobox-positioner { z-index: 60; }
