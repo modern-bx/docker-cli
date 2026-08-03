@@ -2252,7 +2252,7 @@
       {#if projectCloneDialog}
         <form class="project-add-form project-clone-form" onsubmit={(event) => { event.preventDefault(); submitProjectClone(); }}>
           <label class="label"><span class="label-text">Имя проекта (опционально)</span><input class="input" bind:value={projectCloneDialog.to} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
-          <fieldset class="project-clone-dbms"><legend class="label-text">СУБД</legend><div class="project-deployment-checkboxes"><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.mysql} /><span>MySQL</span></label><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.postgres} /><span>PostgreSQL</span></label></div></fieldset>
+          <fieldset class="project-clone-dbms"><legend class="label-text">Выбрать БД для клонирования</legend><div class="project-deployment-checkboxes"><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.mysql} /><span>MySQL</span></label><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.postgres} /><span>PostgreSQL</span></label></div></fieldset>
           <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectCloning} onclick={() => { projectCloneDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectCloning}>{projectCloning ? 'Добавляем…' : 'Добавить'}</button></div>
         </form>
       {/if}
