@@ -4,7 +4,9 @@
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Settings, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
+  import HttpRefreshBoundary from './HttpRefreshBoundary.svelte';
   import { cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, getBackupsSettings, getLogs, getProjectBackups, getProjectOptions, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, updateProject, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { createRefreshCoordinator } from './refresh.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
@@ -189,6 +191,7 @@
   let panelSocket = null;
   let panelReconnectTimer = null;
   let panelChannelEnabled = false;
+  const pageRefresh = createRefreshCoordinator();
 
   $: hasRunningServices = systemServices.some((service) => service.running);
   $: hasStoppedServices = systemServices.some((service) => !service.running);
@@ -389,6 +392,10 @@
     } finally {
       if (requestId === backupRequestId) backupsLoading = false;
     }
+  }
+
+  function refreshProjectBackups() {
+    return Promise.all([loadBackupsSettings(), loadProjectBackups()]);
   }
 
   function changeBackupFilter(field, value) {
@@ -1287,7 +1294,9 @@
     }
     const newNotifications = receivedNotifications.filter((notification) => !knownNotificationFiles.has(notification.file));
     newNotifications.forEach((notification) => knownNotificationFiles.add(notification.file));
-    if (newNotifications.length === 0 || !('Notification' in window)) return;
+    if (newNotifications.length === 0) return;
+    void pageRefresh.refresh();
+    if (!('Notification' in window)) return;
     let permission = Notification.permission;
     if (permission === 'default') {
       try {
@@ -1880,6 +1889,7 @@
                   </Tooltip>
                 </section>
                 {:else if projectDetailTab === 'backups'}
+                  <HttpRefreshBoundary coordinator={pageRefresh} refresh={refreshProjectBackups} />
                 <section class="project-log-view backup-view" aria-label={`Бэкапы проекта ${selectedProject.name}`}>
                   <div class="backup-actions-toolbar">
                     <button class="btn preset-filled-primary-500" type="button" onclick={openBackupCreateDialog}><Plus size={16} aria-hidden="true" />Добавить</button>
@@ -1910,6 +1920,7 @@
                   </footer>
                 </section>
                 {:else}
+                  <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadLogs} />
                 <section class="project-log-view" aria-label={`Журнал проекта ${selectedProject.name}`}>
                   <div class="log-toolbar card preset-filled-surface-100-900">
                     <label>
@@ -1957,6 +1968,7 @@
           </div>
         </div>
         {:else if activeSection === 'logs'}
+          <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadLogs} />
           <section class="log-view" aria-label="Журнал">
             <div class="log-toolbar card preset-filled-surface-100-900">
               <label>
@@ -2019,6 +2031,7 @@
               <a class:active={settingsTab === 'security'} class="project-detail-tab" href="#/settings/security" aria-current={settingsTab === 'security' ? 'page' : undefined}>Безопасность</a>
             </nav>
             {#if settingsTab === 'projects'}
+              <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadProjectsSettings} />
             <div class="settings-scroll">
               <div class="project-toolbar">
                 <button class="btn preset-filled-primary-500" type="button" disabled={projectSettingsLoading || projectSettingsSaving || projectLocations.some((location) => !location.path.trim())} onclick={saveProjectLocations}>
@@ -2052,6 +2065,7 @@
               </section>
             </div>
             {:else if settingsTab === 'backups'}
+              <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadBackupsSettings} />
             <div class="settings-scroll">
               <div class="project-toolbar">
                 <button class="btn preset-filled-primary-500" type="button" disabled={backupSettingsLoading || backupSettingsSaving || backupLocations.some((location) => !location.path.trim()) || backupFileStrategies.some((strategy) => !strategy.name.trim())} onclick={saveBackupLocations}>
@@ -2104,6 +2118,7 @@
               </section>
             </div>
             {:else if settingsTab === 'users'}
+              <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadUsersSettings} />
             <div class="settings-scroll users-settings-scroll">
               <div class="project-toolbar">
                 <button class="btn preset-filled-primary-500" type="button" onclick={() => { userDialog = { create: true, login: '', comments: '' }; }}><Plus size={16} aria-hidden="true" />Добавить</button>
@@ -2130,6 +2145,7 @@
               </footer>
             </div>
             {:else}
+              <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadSecuritySettings} />
             <div class="settings-scroll">
               <div class="project-toolbar">
                 <button class="btn preset-filled-primary-500" type="button" disabled={settingsLoading || settingsSaving} onclick={saveAuthorizationSettings}>
