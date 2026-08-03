@@ -123,19 +123,6 @@ final class BackupsSettingsRepository
             $strategy['databaseInclude'] = self::patterns($strategy['databaseInclude'] ?? []);
             $strategy['databaseExclude'] = self::patterns($strategy['databaseExclude'] ?? []);
         }
-        $databaseStrategies = array_values(array_filter(is_array($settings['databaseStrategies'] ?? null) ? $settings['databaseStrategies'] : [], static fn ($item): bool => is_array($item)
-            && is_string($item['name'] ?? null) && is_string($item['code'] ?? null)
-            && is_array($item['include'] ?? null) && array_is_list($item['include']) && !array_filter($item['include'], static fn ($value): bool => !is_string($value))
-            && is_array($item['exclude'] ?? null) && array_is_list($item['exclude']) && !array_filter($item['exclude'], static fn ($value): bool => !is_string($value))));
-        foreach ($databaseStrategies as $databaseStrategy) {
-            $index = array_search($databaseStrategy['code'], array_column($strategies, 'code'), true);
-            if ($index === false) {
-                $strategies[] = ['name' => $databaseStrategy['name'], 'code' => $databaseStrategy['code'], 'include' => [], 'exclude' => [], 'databaseInclude' => $databaseStrategy['include'], 'databaseExclude' => $databaseStrategy['exclude']];
-            } else {
-                $strategies[$index]['databaseInclude'] = $databaseStrategy['include'];
-                $strategies[$index]['databaseExclude'] = $databaseStrategy['exclude'];
-            }
-        }
         return ['locations' => $locations, 'fileStrategies' => $strategies];
     }
 
