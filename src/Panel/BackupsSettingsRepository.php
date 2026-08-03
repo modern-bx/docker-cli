@@ -17,7 +17,7 @@ final class BackupsSettingsRepository
     {
         if ($file === null) {
             $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
-            $file = join_path($home, '.docker-cli', 'state', 'panel', 'settings', 'backups.yaml');
+            $file = join_path($home, '.config', 'docker-cli', 'state', 'panel', 'settings', 'backups.yaml');
         }
         $this->file = $file;
     }
