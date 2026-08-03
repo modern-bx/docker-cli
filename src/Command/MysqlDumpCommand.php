@@ -76,14 +76,14 @@ final class MysqlDumpCommand extends AbstractCommand
         $strategy = $this->resolveStrategy($input, $output);
         if ($strategy === false) return Command::INVALID;
         try {
-            $code = ($this->dumpLoader ?? new MysqlDumpLoader())->dump($database, $path, $threads, $output, $strategy['include'] ?? [], $strategy['exclude'] ?? []);
+            $code = ($this->dumpLoader ?? new MysqlDumpLoader())->dump($database, $path, $threads, $output, $strategy['databaseInclude'] ?? [], $strategy['databaseExclude'] ?? []);
         } catch (MissingConfigException) {
             $this->writeMessage($output, '<error>Системная конфигурация не инициализирована.</error>');
             return Command::FAILURE;
         }
         if ($code === Command::SUCCESS) {
             $metadata = ['project' => $project, 'database' => $database, 'createdAt' => date(DATE_ATOM)];
-            if (is_array($strategy)) { $metadata['databaseStrategy'] = $strategy['code']; $metadata['databaseStrategyTables'] = ['include' => $strategy['include'], 'exclude' => $strategy['exclude']]; }
+            if (is_array($strategy)) { $metadata['databaseStrategy'] = $strategy['code']; $metadata['databaseStrategyTables'] = ['include' => $strategy['databaseInclude'], 'exclude' => $strategy['databaseExclude']]; }
             file_put_contents($path . '/docker-cli.json', json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
             CommandContext::fromEnvironment($this, $output)->addMessage(new Message(
                 sprintf('Бэкап MySQL-базы "%s" проекта "%s" создан: "%s".', $database, $project, basename($path)),
@@ -99,7 +99,7 @@ final class MysqlDumpCommand extends AbstractCommand
         $code = $input->getOption('strategy');
         if ($code === null) return null;
         if (!is_string($code) || $code === '') { $this->writeMessage($output, '<error>Опция --strategy должна содержать код стратегии БД.</error>'); return false; }
-        foreach (($this->backupsSettings ?? new BackupsSettingsRepository())->databaseStrategies() as $strategy) if ($strategy['code'] === $code) return $strategy;
+        foreach (($this->backupsSettings ?? new BackupsSettingsRepository())->fileStrategies() as $strategy) if ($strategy['code'] === $code) return $strategy;
         $this->writeMessage($output, sprintf('<error>Стратегия БД с кодом «%s» не найдена.</error>', $code));
         return false;
     }

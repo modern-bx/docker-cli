@@ -157,10 +157,12 @@ final class ProjectController
                         'locationName' => $location['name'],
                     ];
                     $databaseStrategyCode = is_array($metadata) && is_string($metadata['databaseStrategy'] ?? null) ? $metadata['databaseStrategy'] : '';
-                    $databaseStrategyNames = array_column(($this->backupSettings ?? new BackupsSettingsRepository())->databaseStrategies(), 'name', 'code');
+                    $databaseStrategyNames = array_column(($this->backupSettings ?? new BackupsSettingsRepository())->fileStrategies(), 'name', 'code');
                     $grouped[$key]['databaseStrategyCode'] = $databaseStrategyCode;
                     $grouped[$key]['databaseStrategy'] = $databaseStrategyCode !== '' ? ($databaseStrategyNames[$databaseStrategyCode] ?? null) : null;
                     $grouped[$key]['databaseStrategyTables'] = is_array($metadata['databaseStrategyTables'] ?? null) ? $metadata['databaseStrategyTables'] : ['include' => [], 'exclude' => []];
+                    $grouped[$key]['strategyCode'] = $databaseStrategyCode;
+                    $grouped[$key]['strategy'] = $grouped[$key]['databaseStrategy'];
                     $grouped[$key]['databaseCodes'][] = $databaseCode;
                     $grouped[$key]['database'] = implode(', ', array_map(static fn (string $code): string => ['mysql' => 'MySQL', 'postgres' => 'PostgreSQL'][$code], $grouped[$key]['databaseCodes']));
                     $grouped[$key]['databaseCode'] = $grouped[$key]['databaseCodes'][0];
@@ -226,7 +228,6 @@ final class ProjectController
                 && ($request->composition === 'all' || ($request->composition === 'database' && $item['composition'] === 'БД') || ($request->composition === 'files' && $item['composition'] === 'Файлы') || ($request->composition === 'database-files' && $item['composition'] === 'БД и файлы'))
                 && ($request->database === 'all' || in_array($request->database, $item['databaseCodes'], true))
                 && ($request->strategy === 'all' || ($request->strategy === 'none' ? $item['strategyCode'] === '' : $request->strategy === $item['strategyCode']))
-                && ($request->databaseStrategy === 'all' || ($request->databaseStrategy === 'none' ? $item['databaseStrategyCode'] === '' : $request->databaseStrategy === $item['databaseStrategyCode']))
                 && ($request->location === 'all' || ($request->location === 'project' ? $item['location'] === '' : $request->location === $item['location']))
                 && ($request->dateFrom === null || $date >= $request->dateFrom)
                 && ($request->dateTo === null || $date <= $request->dateTo);
@@ -250,25 +251,22 @@ final class ProjectController
         if ($request->location !== '' && !in_array($request->location, array_column(($this->backupSettings ?? new BackupsSettingsRepository())->locations(), 'code'), true)) {
             throw new ProjectActionException('Выбранное хранилище бэкапов не найдено.', 422);
         }
-        if ($request->files && $request->strategy !== '' && !in_array($request->strategy, array_column(($this->backupSettings ?? new BackupsSettingsRepository())->fileStrategies(), 'code'), true)) {
-            throw new ProjectActionException('Выбранная файловая стратегия не найдена.', 422);
-        }
-        if ($request->database && $request->databaseStrategy !== '' && !in_array($request->databaseStrategy, array_column(($this->backupSettings ?? new BackupsSettingsRepository())->databaseStrategies(), 'code'), true)) {
-            throw new ProjectActionException('Выбранная стратегия БД не найдена.', 422);
+        if (($request->files || $request->database) && $request->strategy !== '' && !in_array($request->strategy, array_column(($this->backupSettings ?? new BackupsSettingsRepository())->fileStrategies(), 'code'), true)) {
+            throw new ProjectActionException('Выбранная стратегия не найдена.', 422);
         }
         $backupName = sprintf('%s-%s', $request->name, date('Ymd-His'));
         $tasks = [];
         if ($request->database && $request->mysql) {
             $tasks[] = [
                 'code' => 'core.mysql.dump',
-                'arguments' => ['backup' => ['value' => $backupName], 'location' => ['value' => $request->location], 'strategy' => ['value' => $request->databaseStrategy]],
+                'arguments' => ['backup' => ['value' => $backupName], 'location' => ['value' => $request->location], 'strategy' => ['value' => $request->strategy]],
                 'project' => $request->name,
             ];
         }
         if ($request->database && $request->postgres) {
             $tasks[] = [
                 'code' => 'core.postgres.dump',
-                'arguments' => ['backup' => ['value' => $backupName], 'location' => ['value' => $request->location], 'strategy' => ['value' => $request->databaseStrategy]],
+                'arguments' => ['backup' => ['value' => $backupName], 'location' => ['value' => $request->location], 'strategy' => ['value' => $request->strategy]],
                 'project' => $request->name,
             ];
         }
