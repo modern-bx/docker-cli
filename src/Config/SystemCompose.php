@@ -322,6 +322,12 @@ final class SystemCompose
             join_path($this->directory(), 'config', 'panel'),
             join_path($this->directory(), 'config', 'php-fpm-8.2', 'php', 'conf.d'),
             join_path($this->directory(), 'config', 'php-fpm-8.2', 'php-fpm.d'),
+            join_path($this->directory(), 'config', 'php-fpm-8.3', 'php', 'conf.d'),
+            join_path($this->directory(), 'config', 'php-fpm-8.3', 'php-fpm.d'),
+            join_path($this->directory(), 'config', 'php-fpm-8.4', 'php', 'conf.d'),
+            join_path($this->directory(), 'config', 'php-fpm-8.4', 'php-fpm.d'),
+            join_path($this->directory(), 'config', 'php-fpm-8.5', 'php', 'conf.d'),
+            join_path($this->directory(), 'config', 'php-fpm-8.5', 'php-fpm.d'),
             $this->playwrightScriptsDirectory(),
         ];
     }
@@ -372,6 +378,9 @@ final class SystemCompose
             $this->composeFile() => join_path($composeResources, self::COMPOSE_FILE),
             join_path($this->directory(), 'config', 'playwright') => join_path($composeResources, 'config', 'playwright'),
             join_path($this->directory(), 'config', 'php-fpm-8.2') => join_path($composeResources, 'config', 'php-fpm-8.2'),
+            join_path($this->directory(), 'config', 'php-fpm-8.3') => join_path($composeResources, 'config', 'php-fpm-8.3'),
+            join_path($this->directory(), 'config', 'php-fpm-8.4') => join_path($composeResources, 'config', 'php-fpm-8.4'),
+            join_path($this->directory(), 'config', 'php-fpm-8.5') => join_path($composeResources, 'config', 'php-fpm-8.5'),
             join_path($this->directory(), 'config', 'panel') => join_path($composeResources, 'config', 'panel'),
             $this->playwrightScriptsDirectory() => join_path($resources, 'playwright', 'scripts'),
             $this->coreTasksDirectory() => join_path($resources, 'tasks', 'core'),

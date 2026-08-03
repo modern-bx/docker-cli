@@ -7,13 +7,14 @@ namespace DockerCli\Panel\Dto;
 /**
  * Public project representation used by the panel API.
  *
- * @phpstan-type ProjectPayload array{name: string, language: ConceptDto|null, framework: ConceptDto|null, enabled: bool, protected: bool, url: string|null, tags: list<string>, description: string}
+ * @phpstan-type ProjectPayload array{name: string, language: ConceptDto|null, languageVersion: string|null, framework: ConceptDto|null, enabled: bool, protected: bool, url: string|null, tags: list<string>, description: string}
  */
 final readonly class ProjectDto implements \JsonSerializable
 {
     public function __construct(
         public string $name,
         public ?ConceptDto $language,
+        public ?string $languageVersion,
         public ?ConceptDto $framework,
         public bool $enabled,
         public bool $protected,
@@ -24,12 +25,13 @@ final readonly class ProjectDto implements \JsonSerializable
     ) {
     }
 
-    /** @return array{name: string, language: ConceptDto|null, framework: ConceptDto|null, enabled: bool, protected: bool, url: string|null, tags: list<string>, description: string} */
+    /** @return array{name: string, language: ConceptDto|null, languageVersion: string|null, framework: ConceptDto|null, enabled: bool, protected: bool, url: string|null, tags: list<string>, description: string} */
     public function jsonSerialize(): array
     {
         return [
             'name' => $this->name,
             'language' => $this->language,
+            'languageVersion' => $this->languageVersion,
             'framework' => $this->framework,
             'enabled' => $this->enabled,
             'protected' => $this->protected,

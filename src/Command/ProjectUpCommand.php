@@ -14,6 +14,7 @@ use DockerCli\Project\DataInitializer;
 use DockerCli\Project\ProjectDatabaseConfig;
 use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Project\PhpLanguageVersion;
 use DockerCli\Project\XdebugPortManager;
 use DockerCli\Service\TranslatorFactory;
 use Symfony\Component\Console\Input\InputArgument;
@@ -104,7 +105,7 @@ final class ProjectUpCommand extends AbstractCommand
                     'enabled' => true,
                     'framework' => $frameworkCode,
                     'language' => $languageCode ?? 'php',
-                    ...$this->languageVersionConfig($projectRoot),
+                    'language_version' => PhpLanguageVersion::default(),
                     'root' => $projectRoot,
                     'document_root' => $documentRoot,
                     'xdebug' => [
@@ -173,43 +174,6 @@ final class ProjectUpCommand extends AbstractCommand
         );
 
         return Command::SUCCESS;
-    }
-
-    /** @return array{version?: string} */
-    private function languageVersionConfig(string $projectRoot): array
-    {
-        $version = $this->detectPhpVersion($projectRoot);
-
-        return $version === null ? [] : ['version' => $version];
-    }
-
-    private function detectPhpVersion(string $projectRoot): ?string
-    {
-        $composerJson = join_path($projectRoot, 'composer.json');
-        if (!is_file($composerJson)) {
-            return null;
-        }
-
-        $contents = file_get_contents($composerJson);
-        if ($contents === false) {
-            return null;
-        }
-
-        $composer = json_decode($contents, true);
-        if (!is_array($composer)) {
-            return null;
-        }
-
-        $constraint = $composer['require']['php'] ?? null;
-        if (!is_string($constraint)) {
-            return null;
-        }
-
-        if (preg_match('/(?<!\d)([78]\.\d+)(?!\d)/', $constraint, $matches) !== 1) {
-            return null;
-        }
-
-        return $matches[1];
     }
 
     private function resolveProjectName(
