@@ -1,0 +1,13 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Перезапуск системных сервисов
+  code: core.system.restart
+  type: shell
+  context: system
+  description: Перезапускает один или несколько системных сервисов docker-cli.
+  parameters:
+    service: { type: string, required: true }
+  action: |
+    docker-cli system:restart --service="{{ service }}"

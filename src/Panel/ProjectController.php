@@ -29,6 +29,8 @@ use DockerCli\Panel\Dto\Request\ProjectScheduleItemRequestDto;
 use DockerCli\Panel\Enum\ProjectActionEnum;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Project\OpenRestyHostRenderer;
+use DockerCli\Project\OfeliaConfigRenderer;
+use DockerCli\Project\OfeliaReloadScheduler;
 use DockerCli\Project\PhpLanguageVersion;
 use DockerCli\Project\ProjectRegistry;
 use DockerCli\Project\TreeArchiveVolumes;
@@ -195,7 +197,8 @@ final class ProjectController
             $repositoryConfig['data']['project']['schedule'] = $items;
             file_put_contents($repositoryConfigFile, Yaml::dump($repositoryConfig, 6, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
         }
-
+        (new OfeliaConfigRenderer($this->projects, $this->compose))->render();
+        (new OfeliaReloadScheduler($this->queues))->enqueue();
     }
 
     #[Route('GET', '/api/projects/{name}/backups', ProjectBackupListRequestDto::class, ProjectBackupListDto::class)]
