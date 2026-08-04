@@ -154,6 +154,8 @@
   let schedulePage = 1;
   let schedulePageSize = 25;
   let scheduleContextMenu = null;
+  let scheduleDeleteConfirmation = null;
+  let scheduleDeleting = false;
   const backupCompositionOptions = [{ value: 'all', label: 'Любой состав' }, { value: 'database', label: 'БД' }, { value: 'files', label: 'Файлы' }, { value: 'database-files', label: 'БД и файлы' }];
   const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }, { value: 'postgres', label: 'PostgreSQL' }];
   const backupCompositionCollection = useListCollection({ items: backupCompositionOptions });
@@ -438,8 +440,13 @@
 
   async function deleteScheduleItem(item) {
     scheduleContextMenu = null;
-    try { scheduleItems = (await deleteProjectSchedule(api, selectedProjectName, item.index)).items; }
+    scheduleDeleting = true;
+    try {
+      scheduleItems = (await deleteProjectSchedule(api, selectedProjectName, item.index)).items;
+      scheduleDeleteConfirmation = null;
+    }
     catch (requestError) { errorTitle = 'Не удалось удалить команду'; error = requestError instanceof Error ? requestError.message : errorTitle; }
+    finally { scheduleDeleting = false; }
   }
 
   async function loadProjectBackups() {
@@ -2272,7 +2279,7 @@
 {#if scheduleContextMenu}
   <div class="schedule-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${scheduleContextMenu.x}px;top:${scheduleContextMenu.y}px`} role="menu" aria-label={`Действия с командой ${scheduleContextMenu.item.command}`}>
     <button type="button" role="menuitem" onclick={() => editScheduleItem(scheduleContextMenu.item)}><Pencil size={16} aria-hidden="true" />Изменить</button>
-    <button class="danger" type="button" role="menuitem" onclick={() => deleteScheduleItem(scheduleContextMenu.item)}><Trash2 size={16} aria-hidden="true" />Удалить</button>
+    <button class="danger" type="button" role="menuitem" onclick={() => { scheduleDeleteConfirmation = scheduleContextMenu.item; scheduleContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
 
@@ -2640,6 +2647,20 @@
         <label class="label"><span class="label-text">Рабочая папка</span><input class="input" placeholder="Например, app (необязательно)" bind:value={scheduleDialog.workingDirectory} /></label>
         <div class="login-error-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={scheduleSaving}>Отмена</Dialog.CloseTrigger><button class="btn preset-filled-primary-500" type="submit" disabled={scheduleSaving || scheduleDialog.cron.some((value) => !value.trim()) || !scheduleDialog.command.trim()}>{scheduleSaving ? 'Сохраняем…' : 'Сохранить'}</button></div>
       </form>{/if}
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(scheduleDeleteConfirmation)} onOpenChange={({ open }) => { if (!open && !scheduleDeleting) scheduleDeleteConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Удалить команду?</Dialog.Title>
+      {#if scheduleDeleteConfirmation}<Dialog.Description class="login-error-description">Команда «{scheduleDeleteConfirmation.command}» будет удалена из расписания проекта. Это действие нельзя отменить.</Dialog.Description>{/if}
+      <div class="login-error-actions system-confirm-actions">
+        <Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={scheduleDeleting}>Отмена</Dialog.CloseTrigger>
+        <button class="btn preset-filled-error-500" type="button" disabled={scheduleDeleting} onclick={() => deleteScheduleItem(scheduleDeleteConfirmation)}>{scheduleDeleting ? 'Удаляем…' : 'Удалить'}</button>
+      </div>
     </Dialog.Content>
   </Dialog.Positioner>
 </Dialog>

@@ -472,9 +472,10 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .dark .backup-invalid > td { color: var(--color-error-200); }
 .backup-error-help { display: inline-flex; margin-left: 0.4rem; vertical-align: middle; color: var(--color-error-600); }
 .scheduler-view { padding: 0; }
+.scheduler-actions, .scheduler-filter, .scheduler-table-wrap { width: 100%; margin-right: 0; margin-left: 0; align-self: stretch; }
 .scheduler-filter { display: flex; padding: .75rem; }
 .scheduler-filter label { display: grid; width: min(24rem, 100%); gap: .3rem; font-size: .8rem; font-weight: 600; }
-.scheduler-table-wrap { flex: 1; overflow: auto; border: 1px solid var(--color-surface-200); }
+.scheduler-table-wrap { box-sizing: border-box; flex: 1; overflow: auto; border: 1px solid var(--color-surface-200); }
 .dark .scheduler-table-wrap { border-color: var(--color-surface-800); }
 .scheduler-table { width: 100%; }
 .scheduler-table th { padding: .75rem; background: var(--color-surface-200); text-align: left; }
