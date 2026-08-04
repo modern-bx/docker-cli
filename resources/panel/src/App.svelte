@@ -406,7 +406,10 @@
   function openScheduleContextMenu(event, item) {
     if (event.ctrlKey) { scheduleContextMenu = null; return; }
     event.preventDefault();
-    const x = event.clientX; const y = event.clientY;
+    event.stopPropagation();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
+    const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.bottom;
     scheduleContextMenu = { item, x: Math.max(8, Math.min(x, window.innerWidth - 180)), y: Math.max(8, Math.min(y, window.innerHeight - 110)) };
   }
 
@@ -1992,7 +1995,7 @@
                     <table class="table table-zebra scheduler-table"><thead><tr><th class="scheduler-menu-column"></th><th>Расписание</th><th>Команда</th><th>Рабочая папка</th></tr></thead><tbody>
                       {#if scheduleLoading}<tr><td colspan="4" class="log-empty animate-pulse">Загрузка…</td></tr>
                       {:else if filteredScheduleItems.length === 0}<tr><td colspan="4" class="log-empty">{scheduleQuery ? 'Команды не найдены' : 'Запланированных команд пока нет'}</td></tr>
-                      {:else}{#each pagedScheduleItems as item}<tr oncontextmenu={(event) => openScheduleContextMenu(event, item)}><td class="scheduler-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с командой ${item.command}`} onclick={(event) => openScheduleContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td><code>{item.schedule}</code></td><td><code>{item.command}</code></td><td>{item.workingDirectory || '—'}</td></tr>{/each}{/if}
+                      {:else}{#each pagedScheduleItems as item}<tr oncontextmenu={(event) => openScheduleContextMenu(event, item)}><td class="scheduler-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с командой ${item.command}`} aria-haspopup="menu" onclick={(event) => openScheduleContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td><code>{item.schedule}</code></td><td><code>{item.command}</code></td><td>{item.workingDirectory || '—'}</td></tr>{/each}{/if}
                     </tbody></table>
                   </div>
                   <footer class="log-pagination scheduler-pagination"><span>{filteredScheduleItems.length ? `${(schedulePage - 1) * schedulePageSize + 1}–${Math.min(schedulePage * schedulePageSize, filteredScheduleItems.length)} из ${filteredScheduleItems.length}` : '0 команд'}</span><div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={schedulePage === 1 || scheduleLoading} onclick={() => schedulePage -= 1}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={schedulePage >= schedulePageCount || scheduleLoading} onclick={() => schedulePage += 1}>Вперёд</button></div><div class="log-page-size" aria-label="Количество команд на странице"><Combobox collection={pageSizeCollection} value={[String(schedulePageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { schedulePageSize = Number(details.value[0]); schedulePage = 1; } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество команд на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div></footer>
