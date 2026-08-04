@@ -34,10 +34,13 @@ final class OfeliaConfigRenderer
                 $workingDirectory = is_string($item['workingDirectory'] ?? null) ? trim($item['workingDirectory']) : '';
                 $directory = $workingDirectory === '' ? $root : (str_starts_with($workingDirectory, '/') ? $workingDirectory : join_path($root, $workingDirectory));
                 $shellCommand = sprintf('cd %s && exec %s', escapeshellarg($directory), $command);
+                $encodedCommand = base64_encode($shellCommand);
                 $lines[] = sprintf('[job-exec "%s-%d"]', preg_replace('/[^A-Za-z0-9_-]+/', '-', $projectName), $index);
                 $lines[] = 'schedule = 0 ' . $schedule;
                 $lines[] = 'container = docker-cli-php-fpm-' . $version;
-                $lines[] = 'command = /bin/sh -lc ' . escapeshellarg($shellCommand);
+                // gcfg only accepts a backslash before a double quote in unquoted values.
+                // Passing the actual script as base64 keeps quotes and apostrophes out of the INI value.
+                $lines[] = sprintf('command = /bin/sh -lc \"echo %s | base64 -d | /bin/sh\"', $encodedCommand);
                 $lines[] = '';
             }
         }
