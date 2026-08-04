@@ -471,11 +471,11 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .backup-invalid > td { background: color-mix(in oklab, var(--color-error-500) 18%, transparent) !important; color: var(--color-error-800); }
 .dark .backup-invalid > td { color: var(--color-error-200); }
 .backup-error-help { display: inline-flex; margin-left: 0.4rem; vertical-align: middle; color: var(--color-error-600); }
-.scheduler-view { padding: 1rem 1.5rem; }
-.scheduler-actions { margin-bottom: 1rem; }
-.scheduler-filter { display: flex; margin-bottom: .75rem; padding: .75rem; }
+.scheduler-view { padding: 0; }
+.scheduler-filter { display: flex; padding: .75rem; }
 .scheduler-filter label { display: grid; width: min(24rem, 100%); gap: .3rem; font-size: .8rem; font-weight: 600; }
-.scheduler-table-wrap { overflow-x: auto; }
+.scheduler-table-wrap { flex: 1; overflow: auto; border: 1px solid var(--color-surface-200); }
+.dark .scheduler-table-wrap { border-color: var(--color-surface-800); }
 .scheduler-table { width: 100%; }
 .scheduler-table th { padding: .75rem; background: var(--color-surface-200); text-align: left; }
 .dark .scheduler-table th { background: var(--color-surface-800); }
@@ -483,7 +483,6 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .scheduler-table .scheduler-menu-column { width: 3rem; padding: .35rem; text-align: center; }
 .dark .scheduler-table td { border-color: var(--color-surface-800); }
 .scheduler-dialog { width: min(38rem, calc(100vw - 2rem)); }
-.scheduler-pagination { margin-top: .75rem; }
 .schedule-context-menu { position: fixed; }
 .scheduler-form { display: grid; gap: 1rem; margin-top: 1rem; }
 .cron-heading { display: flex; align-items: center; gap: .4rem; font-weight: 600; }

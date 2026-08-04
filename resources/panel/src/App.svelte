@@ -1988,7 +1988,7 @@
                   </footer>
                 </section>
                 {:else if projectDetailTab === 'scheduler'}
-                <section class="scheduler-view" aria-label={`Планировщик проекта ${selectedProject.name}`}>
+                <section class="project-log-view scheduler-view" aria-label={`Планировщик проекта ${selectedProject.name}`}>
                   <div class="backup-actions-toolbar scheduler-actions"><button class="btn preset-filled-primary-500" type="button" onclick={openScheduleDialog}><Plus size={16} aria-hidden="true" />Добавить</button></div>
                   <div class="scheduler-filter card preset-filled-surface-100-900"><label><span>Команда</span><span class="log-text-filter"><input type="search" placeholder="Поиск по команде" value={scheduleQuery} oninput={(event) => { scheduleQuery = event.currentTarget.value; schedulePage = 1; }} />{#if scheduleQuery}<button type="button" aria-label="Сбросить поиск команды" onclick={() => { scheduleQuery = ''; schedulePage = 1; }}>×</button>{/if}</span></label></div>
                   <div class="scheduler-table-wrap card preset-filled-surface-100-900">
