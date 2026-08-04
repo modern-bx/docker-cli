@@ -6,7 +6,7 @@ namespace DockerCli\Panel\Dto;
 
 final readonly class ScheduleListDto implements \JsonSerializable
 {
-    /** @param list<array{schedule: string, command: string, workingDirectory: string}> $items */
+    /** @param list<array{enabled: bool, schedule: string, command: string, workingDirectory: string}> $items */
     public function __construct(public array $items)
     {
     }

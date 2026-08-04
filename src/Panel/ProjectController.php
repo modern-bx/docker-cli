@@ -125,7 +125,10 @@ final class ProjectController
         $items = $config['data']['project']['schedule'] ?? [];
         if (!is_array($items)) $items = [];
 
-        return new ScheduleListDto(array_values(array_filter($items, static fn (mixed $item): bool => is_array($item))));
+        return new ScheduleListDto(array_values(array_map(static function (array $item): array {
+            $item['enabled'] = ($item['enabled'] ?? true) !== false;
+            return $item;
+        }, array_filter($items, static fn (mixed $item): bool => is_array($item)))));
     }
 
     #[Route('POST', '/api/projects/{name}/schedule', ProjectScheduleRequestDto::class, ScheduleListDto::class)]
@@ -139,7 +142,7 @@ final class ProjectController
         if (!is_array($config['data']['project'] ?? null)) throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
         $items = $config['data']['project']['schedule'] ?? [];
         if (!is_array($items)) $items = [];
-        $items[] = ['schedule' => $request->schedule, 'command' => $request->command, 'workingDirectory' => $request->workingDirectory];
+        $items[] = ['enabled' => $request->enabled, 'schedule' => $request->schedule, 'command' => $request->command, 'workingDirectory' => $request->workingDirectory];
         $this->writeSchedule($request->name, $config, $items);
 
         return new ScheduleListDto($items);
@@ -151,7 +154,7 @@ final class ProjectController
         [$config, $items] = $this->scheduleConfig($request->name);
         if ($request->index === null || !isset($items[$request->index])) throw new ProjectActionException('Запись расписания не найдена.', 404);
         if (count(preg_split('/\s+/', $request->schedule) ?: []) !== 5) throw new ProjectActionException('Расписание должно состоять из пяти полей cron.', 422);
-        $items[$request->index] = ['schedule' => $request->schedule, 'command' => $request->command, 'workingDirectory' => $request->workingDirectory];
+        $items[$request->index] = ['enabled' => $request->enabled, 'schedule' => $request->schedule, 'command' => $request->command, 'workingDirectory' => $request->workingDirectory];
         $this->writeSchedule($request->name, $config, $items);
 
         return new ScheduleListDto($items);

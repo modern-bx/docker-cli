@@ -27,6 +27,8 @@
   ];
   const projectDetailTabs = ['info', 'notes', 'security', 'backups', 'scheduler', 'journal'];
   const cronTemplates = [['* * * * *', 'Каждую минуту'], ['0 * * * *', 'Каждый час'], ['0 0 * * *', 'Каждый день в полночь'], ['0 9 * * 1-5', 'По будням в 09:00'], ['0 0 * * 0', 'Каждое воскресенье'], ['0 0 1 * *', 'Первого числа месяца']];
+  const scheduleStatusOptions = [{ value: 'all', label: 'Все статусы' }, { value: 'enabled', label: 'Включена' }, { value: 'disabled', label: 'Выключена' }];
+  const scheduleStatusCollection = useListCollection({ items: scheduleStatusOptions });
   const fonts = [
     { value: 'ubuntu', label: 'Ubuntu Regular' },
     { value: 'noto', label: 'Noto Sans' },
@@ -151,11 +153,14 @@
   let scheduleDialog = null;
   let scheduleSaving = false;
   let scheduleQuery = '';
+  let scheduleStatus = 'all';
   let schedulePage = 1;
   let schedulePageSize = 25;
   let scheduleContextMenu = null;
   let scheduleDeleteConfirmation = null;
   let scheduleDeleting = false;
+  let scheduleToggleConfirmation = null;
+  let scheduleToggling = false;
   const backupCompositionOptions = [{ value: 'all', label: 'Любой состав' }, { value: 'database', label: 'БД' }, { value: 'files', label: 'Файлы' }, { value: 'database-files', label: 'БД и файлы' }];
   const backupDatabaseOptions = [{ value: 'all', label: 'Любая СУБД' }, { value: 'mysql', label: 'MySQL' }, { value: 'postgres', label: 'PostgreSQL' }];
   const backupCompositionCollection = useListCollection({ items: backupCompositionOptions });
@@ -234,7 +239,7 @@
   $: backupCreateStrategyCollection = useListCollection({ items: backupCreateStrategyOptions });
   $: selectedBackupCreateStrategy = backupFileStrategies.find((item) => item.code === backupCreateDialog?.strategy) || null;
   $: selectedDeploymentScript = projectAddOptions.deploymentScripts.find((item) => item.code === projectAddDialog?.deploymentScript) || null;
-  $: filteredScheduleItems = scheduleItems.map((item, index) => ({ ...item, index })).filter((item) => item.command.toLocaleLowerCase().includes(scheduleQuery.trim().toLocaleLowerCase()));
+  $: filteredScheduleItems = scheduleItems.map((item, index) => ({ ...item, enabled: item.enabled !== false, index })).filter((item) => item.command.toLocaleLowerCase().includes(scheduleQuery.trim().toLocaleLowerCase()) && (scheduleStatus === 'all' || item.enabled === (scheduleStatus === 'enabled')));
   $: schedulePageCount = Math.max(1, Math.ceil(filteredScheduleItems.length / schedulePageSize));
   $: if (schedulePage > schedulePageCount) schedulePage = schedulePageCount;
   $: pagedScheduleItems = filteredScheduleItems.slice((schedulePage - 1) * schedulePageSize, schedulePage * schedulePageSize);
@@ -402,7 +407,7 @@
   }
 
   function openScheduleDialog() {
-    scheduleDialog = { index: null, cron: ['*', '*', '*', '*', '*'], command: '', workingDirectory: '' };
+    scheduleDialog = { index: null, enabled: true, cron: ['*', '*', '*', '*', '*'], command: '', workingDirectory: '' };
   }
 
   function openScheduleContextMenu(event, item) {
@@ -412,11 +417,11 @@
     const bounds = event.currentTarget.getBoundingClientRect();
     const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
     const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.bottom;
-    scheduleContextMenu = { item, x: Math.max(8, Math.min(x, window.innerWidth - 180)), y: Math.max(8, Math.min(y, window.innerHeight - 110)) };
+    scheduleContextMenu = { item, x: Math.max(8, Math.min(x, window.innerWidth - 180)), y: Math.max(8, Math.min(y, window.innerHeight - 152)) };
   }
 
   function editScheduleItem(item) {
-    scheduleDialog = { index: item.index, cron: item.schedule.split(/\s+/), command: item.command, workingDirectory: item.workingDirectory || '' };
+    scheduleDialog = { index: item.index, enabled: item.enabled !== false, cron: item.schedule.split(/\s+/), command: item.command, workingDirectory: item.workingDirectory || '' };
     scheduleContextMenu = null;
   }
 
@@ -428,7 +433,7 @@
     if (!scheduleDialog) return;
     scheduleSaving = true;
     try {
-      const item = { schedule: scheduleDialog.cron.join(' '), command: scheduleDialog.command.trim(), workingDirectory: scheduleDialog.workingDirectory.trim() };
+      const item = { enabled: scheduleDialog.enabled, schedule: scheduleDialog.cron.join(' '), command: scheduleDialog.command.trim(), workingDirectory: scheduleDialog.workingDirectory.trim() };
       const data = scheduleDialog.index === null
         ? await addProjectSchedule(api, selectedProjectName, item)
         : await updateProjectSchedule(api, selectedProjectName, scheduleDialog.index, item);
@@ -447,6 +452,17 @@
     }
     catch (requestError) { errorTitle = 'Не удалось удалить команду'; error = requestError instanceof Error ? requestError.message : errorTitle; }
     finally { scheduleDeleting = false; }
+  }
+
+  async function toggleScheduleItem(item) {
+    scheduleContextMenu = null;
+    scheduleToggling = true;
+    try {
+      const changes = { enabled: !item.enabled, schedule: item.schedule, command: item.command, workingDirectory: item.workingDirectory || '' };
+      scheduleItems = (await updateProjectSchedule(api, selectedProjectName, item.index, changes)).items;
+      scheduleToggleConfirmation = null;
+    } catch (requestError) { errorTitle = `Не удалось ${item.enabled ? 'выключить' : 'включить'} команду`; error = requestError instanceof Error ? requestError.message : errorTitle; }
+    finally { scheduleToggling = false; }
   }
 
   async function loadProjectBackups() {
@@ -1997,12 +2013,12 @@
                 {:else if projectDetailTab === 'scheduler'}
                 <section class="project-log-view scheduler-view" aria-label={`Планировщик проекта ${selectedProject.name}`}>
                   <div class="backup-actions-toolbar scheduler-actions"><button class="btn preset-filled-primary-500" type="button" onclick={openScheduleDialog}><Plus size={16} aria-hidden="true" />Добавить</button></div>
-                  <div class="scheduler-filter card preset-filled-surface-100-900"><label><span>Команда</span><span class="log-text-filter"><input type="search" placeholder="Поиск по команде" value={scheduleQuery} oninput={(event) => { scheduleQuery = event.currentTarget.value; schedulePage = 1; }} />{#if scheduleQuery}<button type="button" aria-label="Сбросить поиск команды" onclick={() => { scheduleQuery = ''; schedulePage = 1; }}>×</button>{/if}</span></label></div>
+                  <div class="scheduler-filter card preset-filled-surface-100-900"><label><span>Команда</span><span class="log-text-filter"><input type="search" placeholder="Поиск по команде" value={scheduleQuery} oninput={(event) => { scheduleQuery = event.currentTarget.value; schedulePage = 1; }} />{#if scheduleQuery}<button type="button" aria-label="Сбросить поиск команды" onclick={() => { scheduleQuery = ''; schedulePage = 1; }}>×</button>{/if}</span></label><label><span>Статус</span><Combobox collection={scheduleStatusCollection} value={[scheduleStatus]} openOnClick onValueChange={(details) => { scheduleStatus = details.value[0] || 'all'; schedulePage = 1; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each scheduleStatusOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label></div>
                   <div class="scheduler-table-wrap card preset-filled-surface-100-900">
-                    <table class="table table-zebra scheduler-table"><thead><tr><th class="scheduler-menu-column"></th><th>Расписание</th><th>Команда</th><th>Рабочая папка</th></tr></thead><tbody>
-                      {#if scheduleLoading}<tr><td colspan="4" class="log-empty animate-pulse">Загрузка…</td></tr>
-                      {:else if filteredScheduleItems.length === 0}<tr><td colspan="4" class="log-empty">{scheduleQuery ? 'Команды не найдены' : 'Запланированных команд пока нет'}</td></tr>
-                      {:else}{#each pagedScheduleItems as item}<tr oncontextmenu={(event) => openScheduleContextMenu(event, item)}><td class="scheduler-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с командой ${item.command}`} aria-haspopup="menu" onclick={(event) => openScheduleContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td><code>{item.schedule}</code></td><td><code>{item.command}</code></td><td>{item.workingDirectory || '—'}</td></tr>{/each}{/if}
+                    <table class="table table-zebra scheduler-table"><thead><tr><th class="scheduler-menu-column"></th><th>Включена</th><th>Расписание</th><th>Команда</th><th>Рабочая папка</th></tr></thead><tbody>
+                      {#if scheduleLoading}<tr><td colspan="5" class="log-empty animate-pulse">Загрузка…</td></tr>
+                      {:else if filteredScheduleItems.length === 0}<tr><td colspan="5" class="log-empty">{scheduleQuery || scheduleStatus !== 'all' ? 'Команды не найдены' : 'Запланированных команд пока нет'}</td></tr>
+                      {:else}{#each pagedScheduleItems as item}<tr class:schedule-disabled={!item.enabled} oncontextmenu={(event) => openScheduleContextMenu(event, item)}><td class="scheduler-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с командой ${item.command}`} aria-haspopup="menu" onclick={(event) => openScheduleContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td class="scheduler-enabled">{item.enabled ? '✓' : '—'}</td><td><code>{item.schedule}</code></td><td><code>{item.command}</code></td><td>{item.workingDirectory || '—'}</td></tr>{/each}{/if}
                     </tbody></table>
                   </div>
                   <footer class="log-pagination scheduler-pagination"><span>{filteredScheduleItems.length ? `${(schedulePage - 1) * schedulePageSize + 1}–${Math.min(schedulePage * schedulePageSize, filteredScheduleItems.length)} из ${filteredScheduleItems.length}` : '0 команд'}</span><div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={schedulePage === 1 || scheduleLoading} onclick={() => schedulePage -= 1}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={schedulePage >= schedulePageCount || scheduleLoading} onclick={() => schedulePage += 1}>Вперёд</button></div><div class="log-page-size" aria-label="Количество команд на странице"><Combobox collection={pageSizeCollection} value={[String(schedulePageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { schedulePageSize = Number(details.value[0]); schedulePage = 1; } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество команд на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div></footer>
@@ -2279,6 +2295,7 @@
 {#if scheduleContextMenu}
   <div class="schedule-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${scheduleContextMenu.x}px;top:${scheduleContextMenu.y}px`} role="menu" aria-label={`Действия с командой ${scheduleContextMenu.item.command}`}>
     <button type="button" role="menuitem" onclick={() => editScheduleItem(scheduleContextMenu.item)}><Pencil size={16} aria-hidden="true" />Изменить</button>
+    <button type="button" role="menuitem" onclick={() => { scheduleToggleConfirmation = scheduleContextMenu.item; scheduleContextMenu = null; }}><Power size={16} aria-hidden="true" />{scheduleContextMenu.item.enabled ? 'Выключить' : 'Включить'}</button>
     <button class="danger" type="button" role="menuitem" onclick={() => { scheduleDeleteConfirmation = scheduleContextMenu.item; scheduleContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
@@ -2638,6 +2655,7 @@
     <Dialog.Content class="login-error-dialog scheduler-dialog card preset-filled-surface-100-900 shadow-2xl">
       <Dialog.Title class="login-error-title">{scheduleDialog?.index === null ? 'Добавить команду' : 'Изменить команду'}</Dialog.Title>
       {#if scheduleDialog}<form class="scheduler-form" onsubmit={(event) => { event.preventDefault(); saveScheduleItem(); }}>
+        <label class="scheduler-enabled-option"><input class="checkbox" type="checkbox" bind:checked={scheduleDialog.enabled} />Включена</label>
         <div class="cron-heading"><span>Расписание</span>
           <Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" type="button" aria-label="Синтаксис cron"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip cron-tooltip card preset-filled-surface-900-100 shadow-xl">Пять полей: минута (0–59), час (0–23), день месяца (1–31), месяц (1–12), день недели (0–7). Используйте * для любого значения, запятые для списка, дефис для диапазона и / для шага.</Tooltip.Content></Tooltip.Positioner></Tooltip>
           <details class="cron-templates"><summary class="btn btn-sm preset-tonal">Шаблоны</summary><div class="cron-template-menu card preset-filled-surface-100-900 shadow-xl">{#each cronTemplates as [value, label]}<button type="button" onclick={() => applyCronTemplate(value)}><span>{label}</span><code>{value}</code></button>{/each}</div></details>
@@ -2647,6 +2665,17 @@
         <label class="label"><span class="label-text">Рабочая папка</span><input class="input" placeholder="Например, app (необязательно)" bind:value={scheduleDialog.workingDirectory} /></label>
         <div class="login-error-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={scheduleSaving}>Отмена</Dialog.CloseTrigger><button class="btn preset-filled-primary-500" type="submit" disabled={scheduleSaving || scheduleDialog.cron.some((value) => !value.trim()) || !scheduleDialog.command.trim()}>{scheduleSaving ? 'Сохраняем…' : 'Сохранить'}</button></div>
       </form>{/if}
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(scheduleToggleConfirmation)} onOpenChange={({ open }) => { if (!open && !scheduleToggling) scheduleToggleConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">{scheduleToggleConfirmation?.enabled ? 'Выключить команду?' : 'Включить команду?'}</Dialog.Title>
+      {#if scheduleToggleConfirmation}<Dialog.Description class="login-error-description">Команда «{scheduleToggleConfirmation.command}» будет {scheduleToggleConfirmation.enabled ? 'выключена и перестанет запускаться по расписанию' : 'включена для запуска по расписанию'}.</Dialog.Description>{/if}
+      <div class="login-error-actions system-confirm-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={scheduleToggling}>Отмена</Dialog.CloseTrigger><button class="btn preset-filled-primary-500" type="button" disabled={scheduleToggling} onclick={() => toggleScheduleItem(scheduleToggleConfirmation)}>{scheduleToggling ? 'Сохраняем…' : (scheduleToggleConfirmation?.enabled ? 'Выключить' : 'Включить')}</button></div>
     </Dialog.Content>
   </Dialog.Positioner>
 </Dialog>
