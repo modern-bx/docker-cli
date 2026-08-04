@@ -1,6 +1,17 @@
 name: docker-cli
 
 services:
+  ofelia:
+    image: mcuadros/ofelia:0.3.22
+    container_name: docker-cli-ofelia
+    command: ["daemon", "--config=/etc/ofelia/config.ini"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/ofelia/config.ini:/etc/ofelia/config.ini:ro
+    networks:
+      docker-cli:
+    restart: unless-stopped
+
   dnsdock:
     image: aacebedo/dnsdock:v1.18.0-rc2-amd64
     container_name: docker-cli-dnsdock

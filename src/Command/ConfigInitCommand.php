@@ -6,6 +6,8 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\SystemCompose;
 use DockerCli\Project\OpenRestyHostRenderer;
+use DockerCli\Project\OfeliaConfigRenderer;
+use DockerCli\Project\OfeliaReloadScheduler;
 use DockerCli\Project\XdebugPortManager;
 use DockerCli\Service\TranslatorFactory;
 use Symfony\Component\Console\Command\Command;
@@ -49,6 +51,7 @@ final class ConfigInitCommand extends AbstractCommand
 
         $compose = new SystemCompose();
         $created = $compose->init($update, $migrate);
+        (new OfeliaConfigRenderer())->render();
         if ($this->ensureBitrixWizardPassword($compose)) {
             $created = true;
         }
@@ -61,6 +64,7 @@ final class ConfigInitCommand extends AbstractCommand
         if ($rebuild) {
             (new XdebugPortManager())->rebuildProjectPorts($this->projectsDirectory());
             (new OpenRestyHostRenderer())->render();
+            (new OfeliaReloadScheduler())->enqueue();
             $this->writeMessage($output, '<info>' . $this->translator->trans('config.rebuilt') . '</info>');
         }
 
