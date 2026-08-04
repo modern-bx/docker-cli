@@ -20,7 +20,16 @@ final class OfeliaConfigRenderer
             throw new \RuntimeException(sprintf('Не удалось создать директорию конфигурации Ofelia "%s".', dirname($file)));
         }
 
-        $lines = ['[global]', ''];
+        // Ofelia exits when its configuration contains no jobs. Keep one harmless
+        // local job so a fresh installation remains healthy before users add tasks.
+        $lines = [
+            '[global]',
+            '',
+            '[job-local "docker-cli-keepalive"]',
+            'schedule = 0 0 0 1 1 *',
+            'command = /bin/true',
+            '',
+        ];
         foreach ($projects->registeredProjectNames() as $projectName) {
             $config = $projects->readProjectConfig($projectName);
             $project = is_array($config['data']['project'] ?? null) ? $config['data']['project'] : [];
