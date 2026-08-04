@@ -483,7 +483,9 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .scheduler-table td { padding: .75rem; border-top: 1px solid var(--color-surface-200); overflow-wrap: anywhere; }
 .scheduler-table .scheduler-menu-column { width: 3rem; padding: .35rem; text-align: center; }
 .scheduler-enabled { width: 6rem; color: var(--color-success-600); text-align: center; font-weight: 700; }
-.schedule-disabled > td { background: color-mix(in oklab, var(--color-surface-500) 13%, transparent) !important; color: var(--color-surface-500); }
+.schedule-disabled > td { background: color-mix(in oklab, var(--color-warning-500) 22%, transparent) !important; color: var(--color-warning-800); }
+.schedule-disabled .scheduler-enabled { color: inherit; }
+.dark .schedule-disabled > td { color: var(--color-warning-200); }
 .scheduler-enabled-option { display: flex; align-items: center; gap: .55rem; cursor: pointer; font-weight: 600; }
 .dark .scheduler-table td { border-color: var(--color-surface-800); }
 .scheduler-dialog { width: min(38rem, calc(100vw - 2rem)); }
