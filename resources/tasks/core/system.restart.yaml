@@ -8,6 +8,8 @@ task:
   context: system
   description: Перезапускает один или несколько системных сервисов docker-cli.
   parameters:
-    service: { type: string, required: true }
+    service: { type: string, required: false }
   action: |
-    docker-cli system:restart --service="{{ service }}"
+    options=()
+    [ -n "${service+x}" ] && options+=(--service="$service")
+    docker-cli system:restart "${options[@]}"
