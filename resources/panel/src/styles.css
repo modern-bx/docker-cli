@@ -471,3 +471,24 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .backup-invalid > td { background: color-mix(in oklab, var(--color-error-500) 18%, transparent) !important; color: var(--color-error-800); }
 .dark .backup-invalid > td { color: var(--color-error-200); }
 .backup-error-help { display: inline-flex; margin-left: 0.4rem; vertical-align: middle; color: var(--color-error-600); }
+.scheduler-view { padding: 1rem 1.5rem; }
+.scheduler-table-wrap { overflow-x: auto; }
+.scheduler-table { width: 100%; }
+.scheduler-table th { padding: .75rem; background: var(--color-surface-200); text-align: left; }
+.dark .scheduler-table th { background: var(--color-surface-800); }
+.scheduler-table td { padding: .75rem; border-top: 1px solid var(--color-surface-200); overflow-wrap: anywhere; }
+.dark .scheduler-table td { border-color: var(--color-surface-800); }
+.scheduler-dialog { width: min(38rem, calc(100vw - 2rem)); }
+.scheduler-form { display: grid; gap: 1rem; margin-top: 1rem; }
+.cron-heading { display: flex; align-items: center; gap: .4rem; font-weight: 600; }
+.cron-templates { position: relative; margin-left: auto; font-weight: 400; }
+.cron-templates summary { list-style: none; cursor: pointer; }
+.cron-templates summary::-webkit-details-marker { display: none; }
+.cron-template-menu { position: absolute; z-index: 80; top: calc(100% + .3rem); right: 0; width: 19rem; padding: .3rem; }
+.cron-template-menu button { display: flex; justify-content: space-between; width: 100%; gap: 1rem; padding: .55rem; border-radius: var(--radius-base); text-align: left; }
+.cron-template-menu button:hover { background: var(--color-surface-200); }
+.dark .cron-template-menu button:hover { background: var(--color-surface-800); }
+.cron-fields { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .5rem; }
+.cron-fields input { min-width: 0; padding-inline: .45rem; text-align: center; }
+.cron-tooltip { max-width: 28rem; }
+@media (max-width: 600px) { .cron-fields { grid-template-columns: repeat(2, 1fr); } }

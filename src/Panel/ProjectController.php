@@ -12,6 +12,7 @@ use DockerCli\Panel\Dto\DeploymentScriptDto;
 use DockerCli\Panel\Dto\ProjectOptionsDto;
 use DockerCli\Panel\Dto\ProjectBackupListDto;
 use DockerCli\Panel\Dto\QueuedOperationDto;
+use DockerCli\Panel\Dto\ScheduleListDto;
 use DockerCli\Panel\Dto\Request\ProjectBackupListRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectBackupCreateRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectBackupRestoreRequestDto;
@@ -22,6 +23,8 @@ use DockerCli\Panel\Dto\Request\ProjectActionRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectNotesRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectUpdateRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectSecurityRequestDto;
+use DockerCli\Panel\Dto\Request\ProjectScheduleRequestDto;
+use DockerCli\Panel\Dto\Request\ProjectNameRequestDto;
 use DockerCli\Panel\Enum\ProjectActionEnum;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Project\OpenRestyHostRenderer;
@@ -32,6 +35,7 @@ use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Queue\QueueRepository;
 use DockerCli\Queue\QueueItemValidator;
 use DockerCli\Task\TaskRepository;
+use Symfony\Component\Yaml\Yaml;
 use function DockerCli\Util\join_path;
 
 final class ProjectController
@@ -110,6 +114,43 @@ final class ProjectController
         }
 
         return new ProjectListDto($projects);
+    }
+
+    #[Route('GET', '/api/projects/{name}/schedule', ProjectNameRequestDto::class, ScheduleListDto::class)]
+    public function schedule(ProjectNameRequestDto $request): ScheduleListDto
+    {
+        if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
+        $config = $this->projects->readProjectConfig($request->name);
+        $items = $config['data']['project']['schedule'] ?? [];
+        if (!is_array($items)) $items = [];
+
+        return new ScheduleListDto(array_values(array_filter($items, static fn (mixed $item): bool => is_array($item))));
+    }
+
+    #[Route('POST', '/api/projects/{name}/schedule', ProjectScheduleRequestDto::class, ScheduleListDto::class)]
+    public function addSchedule(ProjectScheduleRequestDto $request): ScheduleListDto
+    {
+        if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
+        if (count(preg_split('/\s+/', $request->schedule) ?: []) !== 5) {
+            throw new ProjectActionException('Расписание должно состоять из пяти полей cron.', 422);
+        }
+        $config = $this->projects->readProjectConfig($request->name);
+        if (!is_array($config['data']['project'] ?? null)) throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
+        $items = $config['data']['project']['schedule'] ?? [];
+        if (!is_array($items)) $items = [];
+        $items[] = ['schedule' => $request->schedule, 'command' => $request->command, 'workingDirectory' => $request->workingDirectory];
+        $config['data']['project']['schedule'] = $items;
+        $this->projects->writeProjectConfig($request->name, $config);
+        $root = $config['data']['project']['root'] ?? null;
+        if (is_string($root) && $root !== '') {
+            $repositoryConfigFile = join_path($root, '.docker-cli', 'project.yaml');
+            $repositoryConfig = is_file($repositoryConfigFile) ? Yaml::parseFile($repositoryConfigFile) : [];
+            if (!is_array($repositoryConfig)) $repositoryConfig = [];
+            $repositoryConfig['data']['project']['schedule'] = $items;
+            file_put_contents($repositoryConfigFile, Yaml::dump($repositoryConfig, 6, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+        }
+
+        return new ScheduleListDto($items);
     }
 
     #[Route('GET', '/api/projects/{name}/backups', ProjectBackupListRequestDto::class, ProjectBackupListDto::class)]
