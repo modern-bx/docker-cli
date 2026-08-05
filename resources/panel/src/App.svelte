@@ -280,7 +280,7 @@
       && (!nameQuery || hook.hook.toLocaleLowerCase().includes(nameQuery));
   });
   $: sortedHooks = [...filteredHooks].sort((left, right) => {
-    const result = (left[hookSort] ?? '').localeCompare(right[hookSort] ?? '', 'ru', { numeric: true });
+    const result = compareHookSortValue(left[hookSort], right[hookSort]);
     return hookDirection === 'asc' ? result : -result;
   });
   $: hookPageCount = Math.max(1, Math.ceil(filteredHooks.length / hookPageSize));
@@ -542,6 +542,13 @@
     if (hookSort === field) hookDirection = hookDirection === 'asc' ? 'desc' : 'asc';
     else { hookSort = field; hookDirection = 'asc'; }
     hookPage = 1;
+  }
+
+  function compareHookSortValue(left, right) {
+    if (typeof left === 'boolean' || typeof right === 'boolean') {
+      return Number(Boolean(left)) - Number(Boolean(right));
+    }
+    return String(left ?? '').localeCompare(String(right ?? ''), 'ru', { numeric: true });
   }
 
   function openHookContextMenu(event, hook) {
