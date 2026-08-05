@@ -5,7 +5,7 @@
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
   import HttpRefreshBoundary from './HttpRefreshBoundary.svelte';
-  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, getBackupsSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
   import { createRefreshCoordinator } from './refresh.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -29,12 +29,18 @@
   const cronTemplates = [['* * * * *', 'Каждую минуту'], ['0 * * * *', 'Каждый час'], ['0 0 * * *', 'Каждый день в полночь'], ['0 9 * * 1-5', 'По будням в 09:00'], ['0 0 * * 0', 'Каждое воскресенье'], ['0 0 1 * *', 'Первого числа месяца']];
   const scheduleStatusOptions = [{ value: 'all', label: 'Все статусы' }, { value: 'enabled', label: 'Включена' }, { value: 'disabled', label: 'Выключена' }];
   const scheduleStatusCollection = useListCollection({ items: scheduleStatusOptions });
+  const hookLevelOptions = [{ value: 'all', label: 'Все уровни' }, { value: 'command', label: 'Команда' }];
+  const hookTimingOptions = [{ value: 'all', label: 'Любое время' }, { value: 'before', label: 'before' }, { value: 'after', label: 'after' }];
+  const hookEnabledOptions = [{ value: 'all', label: 'Все' }, { value: 'enabled', label: 'Да' }, { value: 'disabled', label: 'Нет' }];
+  const hookLevelCollection = useListCollection({ items: hookLevelOptions });
+  const hookTimingCollection = useListCollection({ items: hookTimingOptions });
+  const hookEnabledCollection = useListCollection({ items: hookEnabledOptions });
   const fonts = [
     { value: 'ubuntu', label: 'Ubuntu Regular' },
     { value: 'noto', label: 'Noto Sans' },
   ];
   const fontCollection = useListCollection({ items: fonts });
-  const logTypes = [{ value: 'queue', label: 'Очередь' }];
+  const logTypes = [{ value: 'queue', label: 'Очередь' }, { value: 'hook', label: 'Хук' }];
   const logTypeCollection = useListCollection({ items: logTypes });
   const logStatuses = [
     { value: 'all', label: 'Все статусы' },
@@ -47,7 +53,7 @@
   ];
   const logStatusCollection = useListCollection({ items: logStatuses });
   const logLevels = [{ value: 'all', label: 'Все уровни' }, { value: 'debug', label: 'Отладка' }, { value: 'info', label: 'Информация' }, { value: 'warning', label: 'Предупреждение' }, { value: 'error', label: 'Ошибка' }];
-  const logContexts = [{ value: 'all', label: 'Все контексты' }, { value: 'command', label: 'Команда' }, { value: 'task', label: 'Задача' }, { value: 'queue', label: 'Очередь' }];
+  const logContexts = [{ value: 'all', label: 'Все контексты' }, { value: 'command', label: 'Команда' }, { value: 'task', label: 'Задача' }, { value: 'queue', label: 'Очередь' }, { value: 'hook', label: 'Хук' }];
   const logLevelCollection = useListCollection({ items: logLevels });
   const logContextCollection = useListCollection({ items: logContexts });
   const logCategoryFilters = [{ field: 'level', label: 'Уровень', items: logLevels, collection: logLevelCollection }, { field: 'context', label: 'Контекст', items: logContexts, collection: logContextCollection }];
@@ -86,6 +92,10 @@
   let logQueueItem = '';
   let logItemCode = '';
   let logTaskCode = '';
+  let logHook = '';
+  let logCommand = '';
+  let logTiming = '';
+  let logHookLevel = '';
   let logPage = 1;
   let logPageSize = 25;
   let logTotal = 0;
@@ -192,6 +202,22 @@
   let fileStrategyDialog = null;
   let backupSettingsLoading = false;
   let backupSettingsSaving = false;
+  let hooks = [];
+  let hooksLoading = false;
+  let hookLevel = 'all';
+  let hookTiming = 'all';
+  let hookEnabled = 'all';
+  let hookCommandQuery = '';
+  let hookNameQuery = '';
+  let hookPage = 1;
+  let hookPageSize = 25;
+  let hookSort = 'level';
+  let hookDirection = 'asc';
+  let hookContextMenu = null;
+  let hookToggleConfirmation = null;
+  let hookToggling = false;
+  let hookDeleteConfirmation = null;
+  let hookDeleting = false;
   let users = [];
   let usersTotal = 0;
   let usersPage = 1;
@@ -243,6 +269,23 @@
   $: schedulePageCount = Math.max(1, Math.ceil(filteredScheduleItems.length / schedulePageSize));
   $: if (schedulePage > schedulePageCount) schedulePage = schedulePageCount;
   $: pagedScheduleItems = filteredScheduleItems.slice((schedulePage - 1) * schedulePageSize, schedulePage * schedulePageSize);
+  $: isHookLog = specificSelections(logType).length === 1 && specificSelections(logType)[0] === 'hook';
+  $: filteredHooks = hooks.filter((hook) => {
+    const commandQuery = hookCommandQuery.trim().toLocaleLowerCase();
+    const nameQuery = hookNameQuery.trim().toLocaleLowerCase();
+    return (hookLevel === 'all' || hook.level === hookLevel)
+      && (hookTiming === 'all' || hook.timing === hookTiming)
+      && (hookEnabled === 'all' || hook.enabled === (hookEnabled === 'enabled'))
+      && (!commandQuery || hook.command.toLocaleLowerCase().includes(commandQuery))
+      && (!nameQuery || hook.hook.toLocaleLowerCase().includes(nameQuery));
+  });
+  $: sortedHooks = [...filteredHooks].sort((left, right) => {
+    const result = compareHookSortValue(left[hookSort], right[hookSort]);
+    return hookDirection === 'asc' ? result : -result;
+  });
+  $: hookPageCount = Math.max(1, Math.ceil(filteredHooks.length / hookPageSize));
+  $: if (hookPage > hookPageCount) hookPage = hookPageCount;
+  $: pagedHooks = sortedHooks.slice((hookPage - 1) * hookPageSize, hookPage * hookPageSize);
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
   $: if (selectedProject && selectedProject.name !== notesProjectName) {
@@ -302,7 +345,7 @@
   function journalFilterHash(projectJournal = false) {
     const path = projectJournal ? projectHash(selectedProjectName, 'journal') : '#/journal';
     const parameters = new URLSearchParams();
-    appendFilterValues(parameters, 'type', logType);
+    parameters.set('type', specificSelections(logType)[0] || 'queue');
     if (!projectJournal) appendFilterValues(parameters, 'project', logProject);
     appendFilterValues(parameters, 'status', logStatus);
     appendFilterValues(parameters, 'level', logLevel);
@@ -310,6 +353,10 @@
     if (logQueueItem) parameters.set('queue_item', logQueueItem);
     if (logItemCode) parameters.set('item_code', logItemCode);
     if (logTaskCode) parameters.set('task_code', logTaskCode);
+    if (logHook) parameters.set('hook', logHook);
+    if (logCommand) parameters.set('command', logCommand);
+    if (logTiming) parameters.set('timing', logTiming);
+    if (logHookLevel) parameters.set('hookLevel', logHookLevel);
     const query = parameters.toString();
     return query ? `${path}?${query}` : path;
   }
@@ -334,6 +381,10 @@
     const queueItem = scalar('queue_item');
     const itemCode = scalar('item_code');
     const taskCode = scalar('task_code');
+    const hook = scalar('hook');
+    const command = scalar('command');
+    const timing = scalar('timing');
+    const hookLevel = scalar('hookLevel');
 
     logType = validSelections('type', logTypes, ['queue']);
     logProject = projectJournal ? ['all'] : validSelections('project', [{ value: 'all' }, ...projects.map((item) => ({ value: item.name }))]);
@@ -343,6 +394,10 @@
     logQueueItem = queueItem && validText(queueItem) ? queueItem : '';
     logItemCode = itemCode && validText(itemCode) ? itemCode : '';
     logTaskCode = taskCode && validText(taskCode) ? taskCode : '';
+    logHook = hook && validText(hook) ? hook : '';
+    logCommand = command && validText(command) ? command : '';
+    logTiming = ['before', 'after'].includes(timing) ? timing : '';
+    logHookLevel = hookLevel === 'command' ? hookLevel : '';
     logPage = 1;
     syncJournalFilters(projectJournal);
   }
@@ -358,13 +413,14 @@
       loadLogs();
       return;
     }
-    if (segments.length === 2 && segments[0] === 'settings' && ['projects', 'backups', 'users', 'security'].includes(segments[1])) {
+    if (segments.length === 2 && segments[0] === 'settings' && ['projects', 'backups', 'users', 'hooks', 'security'].includes(segments[1])) {
       activeSection = 'settings';
       settingsTab = segments[1];
       selectedProjectName = '';
       if (settingsTab === 'projects') loadProjectsSettings();
       else if (settingsTab === 'backups') loadBackupsSettings();
       else if (settingsTab === 'users') loadUsersSettings();
+      else if (settingsTab === 'hooks') loadHooksSettings();
       else loadSecuritySettings();
       return;
     }
@@ -463,6 +519,66 @@
       scheduleToggleConfirmation = null;
     } catch (requestError) { errorTitle = `Не удалось ${item.enabled ? 'выключить' : 'включить'} команду`; error = requestError instanceof Error ? requestError.message : errorTitle; }
     finally { scheduleToggling = false; }
+  }
+
+  async function loadHooksSettings() {
+    if (!authenticated) return;
+    hooksLoading = true;
+    try { hooks = (await getHooksSettings(api)).hooks; }
+    catch (requestError) { errorTitle = 'Не удалось загрузить хуки'; error = requestError instanceof Error ? requestError.message : errorTitle; }
+    finally { hooksLoading = false; }
+  }
+
+  function changeHookFilter(field, value) {
+    if (field === 'level') hookLevel = value;
+    else if (field === 'timing') hookTiming = value;
+    else if (field === 'enabled') hookEnabled = value;
+    else if (field === 'command') hookCommandQuery = value;
+    else if (field === 'hook') hookNameQuery = value;
+    hookPage = 1;
+  }
+
+  function sortHooks(field) {
+    if (hookSort === field) hookDirection = hookDirection === 'asc' ? 'desc' : 'asc';
+    else { hookSort = field; hookDirection = 'asc'; }
+    hookPage = 1;
+  }
+
+  function compareHookSortValue(left, right) {
+    if (typeof left === 'boolean' || typeof right === 'boolean') {
+      return Number(Boolean(left)) - Number(Boolean(right));
+    }
+    return String(left ?? '').localeCompare(String(right ?? ''), 'ru', { numeric: true });
+  }
+
+  function openHookContextMenu(event, hook) {
+    if (event.ctrlKey) { hookContextMenu = null; return; }
+    event.preventDefault();
+    event.stopPropagation();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
+    const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.bottom;
+    hookContextMenu = { hook, x: Math.max(8, Math.min(x, window.innerWidth - 180)), y: Math.max(8, Math.min(y, window.innerHeight - 120)) };
+  }
+
+  async function toggleHookItem(hook) {
+    hookContextMenu = null;
+    hookToggling = true;
+    try {
+      hooks = (await toggleHookSettings(api, hook.id)).hooks;
+      hookToggleConfirmation = null;
+    } catch (requestError) { errorTitle = `Не удалось ${hook.enabled ? 'выключить' : 'включить'} хук`; error = requestError instanceof Error ? requestError.message : errorTitle; }
+    finally { hookToggling = false; }
+  }
+
+  async function deleteHookItem(hook) {
+    hookContextMenu = null;
+    hookDeleting = true;
+    try {
+      hooks = (await deleteHookSettings(api, hook.id)).hooks;
+      hookDeleteConfirmation = null;
+    } catch (requestError) { errorTitle = 'Не удалось удалить хук'; error = requestError instanceof Error ? requestError.message : errorTitle; }
+    finally { hookDeleting = false; }
   }
 
   async function loadProjectBackups() {
@@ -659,7 +775,7 @@
     try {
       const projectJournal = activeSection === 'projects' && projectDetailTab === 'journal';
       const data = await getLogs(api, {
-        page: String(logPage), pageSize: String(logPageSize), sort: logSort, direction: logDirection,
+        page: String(logPage), pageSize: String(logPageSize), sort: logSort, direction: logDirection, type: specificSelections(logType)[0] || 'queue',
         ...(projectJournal ? { project: selectedProjectName } : specificSelections(logProject).length ? { project: specificSelections(logProject).join(',') } : {}),
         ...(specificSelections(logStatus).length ? { status: specificSelections(logStatus).join(',') } : {}),
         ...(specificSelections(logLevel).length ? { level: specificSelections(logLevel).join(',') } : {}),
@@ -667,6 +783,10 @@
         ...(logQueueItem ? { queueItem: logQueueItem } : {}),
         ...(logItemCode ? { itemCode: logItemCode } : {}),
         ...(logTaskCode ? { taskCode: logTaskCode } : {}),
+        ...(logHook ? { hook: logHook } : {}),
+        ...(logCommand ? { command: logCommand } : {}),
+        ...(logTiming ? { timing: logTiming } : {}),
+        ...(logHookLevel ? { hookLevel: logHookLevel } : {}),
       });
       if (requestId !== logRequestId) return;
       logItems = Array.isArray(data.items) ? data.items : [];
@@ -959,7 +1079,22 @@
     else if (field === 'status') logStatus = normalizeFilterSelection(logStatus, next);
     else if (field === 'level') logLevel = normalizeFilterSelection(logLevel, next);
     else if (field === 'context') logContext = normalizeFilterSelection(logContext, next);
-    else logType = normalizeFilterSelection(logType, next);
+    else {
+      const value = Array.isArray(next) ? next[0] : next;
+      logType = value === 'hook' ? ['hook'] : ['queue'];
+      logStatus = ['all'];
+      logLevel = ['all'];
+      logContext = ['all'];
+      logQueueItem = '';
+      logItemCode = '';
+      logTaskCode = '';
+      logHook = '';
+      logCommand = '';
+      logTiming = '';
+      logHookLevel = '';
+      logSort = 'timestamp';
+      logDirection = 'desc';
+    }
     logPage = 1;
     syncJournalFilters();
     loadLogs();
@@ -988,7 +1123,10 @@
   function changeTextLogFilter(field, value) {
     if (field === 'queueItem') logQueueItem = value;
     else if (field === 'itemCode') logItemCode = value;
-    else logTaskCode = value;
+    else if (field === 'taskCode') logTaskCode = value;
+    else if (field === 'hook') logHook = value;
+    else if (field === 'command') logCommand = value;
+    else if (field === 'timing') logTiming = ['before', 'after'].includes(value) ? value : '';
     logPage = 1;
     syncJournalFilters();
     clearTimeout(logFilterTimer);
@@ -1117,10 +1255,12 @@
     if (event.target instanceof Element && event.target.closest('.user-context-menu')) return;
     if (event.target instanceof Element && event.target.closest('.backup-context-menu')) return;
     if (event.target instanceof Element && event.target.closest('.schedule-context-menu')) return;
+    if (event.target instanceof Element && event.target.closest('.hook-context-menu')) return;
     projectContextMenu = null;
     userContextMenu = null;
     backupContextMenu = null;
     scheduleContextMenu = null;
+    hookContextMenu = null;
     if (event.target instanceof Element && event.target.closest('.header-menu')) return;
     themeOpen = false;
     notificationsOpen = false;
@@ -2013,9 +2153,9 @@
                 {:else if projectDetailTab === 'scheduler'}
                 <section class="project-log-view scheduler-view" aria-label={`Планировщик проекта ${selectedProject.name}`}>
                   <div class="backup-actions-toolbar scheduler-actions"><button class="btn preset-filled-primary-500" type="button" onclick={openScheduleDialog}><Plus size={16} aria-hidden="true" />Добавить</button></div>
-                  <div class="scheduler-filter card preset-filled-surface-100-900"><label><span>Команда</span><span class="log-text-filter"><input type="search" placeholder="Поиск по команде" value={scheduleQuery} oninput={(event) => { scheduleQuery = event.currentTarget.value; schedulePage = 1; }} />{#if scheduleQuery}<button type="button" aria-label="Сбросить поиск команды" onclick={() => { scheduleQuery = ''; schedulePage = 1; }}>×</button>{/if}</span></label><label><span>Статус</span><Combobox collection={scheduleStatusCollection} value={[scheduleStatus]} openOnClick onValueChange={(details) => { scheduleStatus = details.value[0] || 'all'; schedulePage = 1; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each scheduleStatusOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label></div>
-                  <div class="scheduler-table-wrap card preset-filled-surface-100-900">
-                    <table class="table table-zebra scheduler-table"><thead><tr><th class="scheduler-menu-column"><button class="backup-refresh-trigger" type="button" disabled={scheduleLoading} aria-label="Обновить список команд" title="Обновить" onclick={loadSchedule}><RotateCw size={17} class={scheduleLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th><th>Включено</th><th>Расписание</th><th>Команда</th><th>Рабочая папка</th></tr></thead><tbody>
+                  <div class="log-toolbar scheduler-filter card preset-filled-surface-100-900"><label><span>Команда</span><span class="log-text-filter"><input type="search" placeholder="Поиск по команде" value={scheduleQuery} oninput={(event) => { scheduleQuery = event.currentTarget.value; schedulePage = 1; }} />{#if scheduleQuery}<button type="button" aria-label="Сбросить поиск команды" onclick={() => { scheduleQuery = ''; schedulePage = 1; }}>×</button>{/if}</span></label><label><span>Статус</span><Combobox collection={scheduleStatusCollection} value={[scheduleStatus]} openOnClick onValueChange={(details) => { scheduleStatus = details.value[0] || 'all'; schedulePage = 1; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each scheduleStatusOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label></div>
+                  <div class="log-table-wrap scheduler-table-wrap card preset-filled-surface-100-900">
+                    <table class="table table-zebra log-table scheduler-table"><thead><tr><th class="scheduler-menu-column"><button class="backup-refresh-trigger" type="button" disabled={scheduleLoading} aria-label="Обновить список команд" title="Обновить" onclick={loadSchedule}><RotateCw size={17} class={scheduleLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th><th>Включено</th><th>Расписание</th><th>Команда</th><th>Рабочая папка</th></tr></thead><tbody>
                       {#if scheduleLoading}<tr><td colspan="5" class="log-empty animate-pulse">Загрузка…</td></tr>
                       {:else if filteredScheduleItems.length === 0}<tr><td colspan="5" class="log-empty">{scheduleQuery || scheduleStatus !== 'all' ? 'Команды не найдены' : 'Запланированных команд пока нет'}</td></tr>
                       {:else}{#each pagedScheduleItems as item}<tr class:schedule-disabled={!item.enabled} oncontextmenu={(event) => openScheduleContextMenu(event, item)}><td class="scheduler-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с командой ${item.command}`} aria-haspopup="menu" onclick={(event) => openScheduleContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td class="scheduler-enabled">{item.enabled ? 'Да' : 'Нет'}</td><td><code>{item.schedule}</code></td><td><code>{item.command}</code></td><td>{item.workingDirectory || '—'}</td></tr>{/each}{/if}
@@ -2029,7 +2169,7 @@
                   <div class="log-toolbar card preset-filled-surface-100-900">
                     <label>
                       <span>Тип записи</span>
-                      <Combobox collection={logTypeCollection} value={logType} multiple openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
+                      <Combobox collection={logTypeCollection} value={[specificSelections(logType)[0] || 'queue']} openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
                         <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" value={logSelectionLabel(logTypes, logType)} readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                         <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logTypes as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                       </Combobox>
@@ -2077,7 +2217,7 @@
             <div class="log-toolbar card preset-filled-surface-100-900">
               <label>
                 <span>Тип записи</span>
-                <Combobox collection={logTypeCollection} value={logType} multiple openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
+                <Combobox collection={logTypeCollection} value={[specificSelections(logType)[0] || 'queue']} openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
                   <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" value={logSelectionLabel(logTypes, logType)} readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                   <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logTypes as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                 </Combobox>
@@ -2089,30 +2229,30 @@
                   <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: 'all', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                 </Combobox>
               </label>
-              <label>
-                <span>Статус</span>
-                <Combobox collection={logStatusCollection} value={logStatus} multiple openOnClick onValueChange={(details) => applyLogSelection('status', details.value)}>
-                  <Combobox.Control class="font-combobox-control status-combobox-control">{#if specificSelections(logStatus).length === 1}<span class={`queue-dot status-${specificSelections(logStatus)[0]}`} aria-hidden="true"></span>{/if}<Combobox.Input class="font-combobox-input" value={logSelectionLabel(logStatuses, logStatus)} readonly />{#if specificSelections(logStatus).length}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); applyLogSelection('status', ['all']); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
-                  <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logStatuses as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class="log-status-option">{#if item.value !== 'all'}<span class={`queue-dot status-${item.value}`} aria-hidden="true"></span>{/if}{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
-                </Combobox>
-              </label>
-              {#each logCategoryFilters as filter}
-                      <label><span>{filter.label}</span><Combobox collection={filter.collection} value={filter.field === 'level' ? logLevel : logContext} multiple openOnClick onValueChange={(details) => applyLogSelection(filter.field, details.value)}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" value={logSelectionLabel(filter.items, filter.field === 'level' ? logLevel : logContext)} readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each filter.items as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class={filter.field === 'level' && item.value !== 'all' ? `log-level level-${item.value}` : ''}>{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
-                    {/each}
-                    {#each [['queueItem', 'Элемент очереди', logQueueItem], ['itemCode', 'Код элемента', logItemCode], ['taskCode', 'Задача', logTaskCode]] as [field, label, value]}
-                <label><span>{label}</span><span class="log-text-filter"><input value={value} oninput={(event) => changeTextLogFilter(field, event.currentTarget.value)} />{#if value}<button type="button" aria-label={`Сбросить фильтр «${label}»`} onclick={() => changeTextLogFilter(field, '')}>×</button>{/if}</span></label>
-              {/each}
+              {#if isHookLog}
+                <label><span>Уровень</span><Combobox collection={logLevelCollection} value={logLevel} multiple openOnClick onValueChange={(details) => applyLogSelection('level', details.value)}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" value={logSelectionLabel(logLevels, logLevel)} readonly />{#if specificSelections(logLevel).length}<button class="log-filter-clear" type="button" aria-label="Сбросить уровень" onclick={(event) => { event.stopPropagation(); applyLogSelection('level', ['all']); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logLevels as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class={item.value !== 'all' ? `log-level level-${item.value}` : ''}>{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                <label><span>Уровень хука</span><Combobox collection={hookLevelCollection} value={[logHookLevel || 'all']} openOnClick onValueChange={(details) => { logHookLevel = details.value[0] === 'command' ? 'command' : ''; logPage = 1; syncJournalFilters(false); loadLogs(); }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookLevelOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                <label><span>Время выполнения</span><Combobox collection={hookTimingCollection} value={[logTiming || 'all']} openOnClick onValueChange={(details) => { logTiming = ['before', 'after'].includes(details.value[0]) ? details.value[0] : ''; logPage = 1; syncJournalFilters(false); loadLogs(); }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookTimingOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                {#each [['command', 'Команда', logCommand], ['hook', 'Хук', logHook]] as [field, label, value]}
+                  <label><span>{label}</span><span class="log-text-filter"><input value={value} oninput={(event) => changeTextLogFilter(field, event.currentTarget.value)} />{#if value}<button type="button" aria-label={`Сбросить фильтр «${label}»`} onclick={() => changeTextLogFilter(field, '')}>×</button>{/if}</span></label>
+                {/each}
+              {:else}
+                <label><span>Статус</span><Combobox collection={logStatusCollection} value={logStatus} multiple openOnClick onValueChange={(details) => applyLogSelection('status', details.value)}><Combobox.Control class="font-combobox-control status-combobox-control">{#if specificSelections(logStatus).length === 1}<span class={`queue-dot status-${specificSelections(logStatus)[0]}`} aria-hidden="true"></span>{/if}<Combobox.Input class="font-combobox-input" value={logSelectionLabel(logStatuses, logStatus)} readonly />{#if specificSelections(logStatus).length}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); applyLogSelection('status', ['all']); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logStatuses as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class="log-status-option">{#if item.value !== 'all'}<span class={`queue-dot status-${item.value}`} aria-hidden="true"></span>{/if}{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                {#each logCategoryFilters as filter}<label><span>{filter.label}</span><Combobox collection={filter.collection} value={filter.field === 'level' ? logLevel : logContext} multiple openOnClick onValueChange={(details) => applyLogSelection(filter.field, details.value)}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" value={logSelectionLabel(filter.items, filter.field === 'level' ? logLevel : logContext)} readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each filter.items as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class={filter.field === 'level' && item.value !== 'all' ? `log-level level-${item.value}` : ''}>{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>{/each}
+                {#each [['queueItem', 'Элемент очереди', logQueueItem], ['itemCode', 'Код элемента', logItemCode], ['taskCode', 'Задача', logTaskCode]] as [field, label, value]}<label><span>{label}</span><span class="log-text-filter"><input value={value} oninput={(event) => changeTextLogFilter(field, event.currentTarget.value)} />{#if value}<button type="button" aria-label={`Сбросить фильтр «${label}»`} onclick={() => changeTextLogFilter(field, '')}>×</button>{/if}</span></label>{/each}
+              {/if}
             </div>
             <div class="log-table-wrap card preset-filled-surface-100-900">
               <table class="table table-zebra log-table">
                 <thead><tr>
-                  {#each [['timestamp', 'Время'], ['queueItem', 'Элемент очереди'], ['itemCode', 'Код элемента'], ['project', 'Проект'], ['queueCode', 'Очередь'], ['status', 'Статус'], ['taskCode', 'Задача'], ['level', 'Уровень'], ['context', 'Контекст'], ['result', 'Результат'], ['message', 'Сообщение']] as [field, label]}
+                  {#each (isHookLog ? [['project', 'Проект'], ['timestamp', 'Время'], ['hook', 'Хук'], ['command', 'Код команды'], ['timing', 'Время выполнения'], ['hookLevel', 'Уровень хука'], ['level', 'Уровень'], ['message', 'Сообщение']] : [['timestamp', 'Время'], ['queueItem', 'Элемент очереди'], ['itemCode', 'Код элемента'], ['project', 'Проект'], ['queueCode', 'Очередь'], ['status', 'Статус'], ['taskCode', 'Задача'], ['level', 'Уровень'], ['context', 'Контекст'], ['result', 'Результат'], ['message', 'Сообщение']]) as [field, label]}
                     <th><button type="button" onclick={() => sortLogs(field)}>{label}<span aria-hidden="true">{logSort === field ? (logDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>
                   {/each}
                 </tr></thead>
                 <tbody>
-                  {#if logsLoading}<tr><td colspan="11" class="log-empty animate-pulse">Загрузка…</td></tr>
-                  {:else if logItems.length === 0}<tr><td colspan="11" class="log-empty">Записей нет</td></tr>
+                  {#if logsLoading}<tr><td colspan={isHookLog ? 8 : 11} class="log-empty animate-pulse">Загрузка…</td></tr>
+                  {:else if logItems.length === 0}<tr><td colspan={isHookLog ? 8 : 11} class="log-empty">Записей нет</td></tr>
+                  {:else if isHookLog}{#each logItems as item}<tr><td>{#if logRecordProjects(item).length}{#each logRecordProjects(item) as project, index}{#if index}, {/if}<button class="log-filter-link" type="button" onclick={() => changeLogProject(project)}>{project}</button>{/each}{:else}—{/if}</td><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('hook', item.hook)}>{formatLogValue(item.hook)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('command', item.command)}>{formatLogValue(item.command)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('timing', item.timing)}>{formatLogValue(item.timing)}</button></td><td>{item.hookLevel === 'command' ? 'Команда' : formatLogValue(item.hookLevel)}</td><td class="log-nowrap">{#if item.level}<button class={`log-filter-link log-level level-${item.level}`} type="button" onclick={() => changeLogCategory('level', item.level)}>{logCategoryLabel(logLevels, item.level)}</button>{:else}—{/if}</td><td>{formatLogValue(item.message)}</td></tr>{/each}
                   {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('queueItem', item.queueItem)}>{formatLogValue(item.queueItem)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('itemCode', item.itemCode)}>{formatLogValue(item.itemCode)}</button></td><td>{#if logRecordProjects(item).length}{#each logRecordProjects(item) as project, index}{#if index}, {/if}<button class="log-filter-link" type="button" onclick={() => changeLogProject(project)}>{project}</button>{/each}{:else}—{/if}</td><td>{formatLogValue(item.queueCode)}</td><td class="log-nowrap">{#if item.status}<button class="log-filter-link log-status-link" type="button" onclick={() => changeLogStatus(item.status)}><span class={`queue-dot status-${item.status}`} aria-hidden="true"></span>{logStatusLabel(item.status)}</button>{:else}—{/if}</td><td>{#if item.taskCode}<button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('taskCode', item.taskCode)}>{item.taskCode}</button>{:else}—{/if}</td><td class="log-nowrap">{#if item.level}<button class={`log-filter-link log-level level-${item.level}`} type="button" onclick={() => changeLogCategory('level', item.level)}>{logCategoryLabel(logLevels, item.level)}</button>{:else}—{/if}</td><td class="log-nowrap">{#if item.context}<button class="log-filter-link" type="button" onclick={() => changeLogCategory('context', item.context)}>{logCategoryLabel(logContexts, item.context)}</button>{:else}—{/if}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
                 </tbody>
               </table>
@@ -2132,6 +2272,7 @@
               <a class:active={settingsTab === 'projects'} class="project-detail-tab" href="#/settings/projects" aria-current={settingsTab === 'projects' ? 'page' : undefined}>Проекты</a>
               <a class:active={settingsTab === 'backups'} class="project-detail-tab" href="#/settings/backups" aria-current={settingsTab === 'backups' ? 'page' : undefined}>Бэкапы</a>
               <a class:active={settingsTab === 'users'} class="project-detail-tab" href="#/settings/users" aria-current={settingsTab === 'users' ? 'page' : undefined}>Пользователи</a>
+              <a class:active={settingsTab === 'hooks'} class="project-detail-tab" href="#/settings/hooks" aria-current={settingsTab === 'hooks' ? 'page' : undefined}>Хуки</a>
               <a class:active={settingsTab === 'security'} class="project-detail-tab" href="#/settings/security" aria-current={settingsTab === 'security' ? 'page' : undefined}>Безопасность</a>
             </nav>
             {#if settingsTab === 'projects'}
@@ -2248,6 +2389,25 @@
                 <div class="log-page-size"><Combobox collection={pageSizeCollection} value={[String(usersPageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { usersPageSize = Number(details.value[0]); usersPage = 1; loadUsersSettings(); } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество пользователей на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
               </footer>
             </div>
+            {:else if settingsTab === 'hooks'}
+              <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadHooksSettings} />
+            <div class="settings-scroll hooks-settings-scroll">
+              <div class="log-toolbar hooks-filter card preset-filled-surface-100-900">
+                <label><span>Уровень</span><Combobox collection={hookLevelCollection} value={[hookLevel]} openOnClick onValueChange={(details) => changeHookFilter('level', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookLevelOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                <label><span>Время выполнения</span><Combobox collection={hookTimingCollection} value={[hookTiming]} openOnClick onValueChange={(details) => changeHookFilter('timing', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookTimingOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                <label><span>Включен</span><Combobox collection={hookEnabledCollection} value={[hookEnabled]} openOnClick onValueChange={(details) => changeHookFilter('enabled', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookEnabledOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                <label><span>Команда</span><input class="input" type="text" value={hookCommandQuery} placeholder="project:up" oninput={(event) => changeHookFilter('command', event.currentTarget.value)} /></label>
+                <label><span>Хук</span><input class="input" type="text" value={hookNameQuery} placeholder="имя файла" oninput={(event) => changeHookFilter('hook', event.currentTarget.value)} /></label>
+              </div>
+              <div class="log-table-wrap hooks-table-wrap card preset-filled-surface-100-900">
+                <table class="table table-zebra log-table hooks-table"><thead><tr><th class="scheduler-menu-column"><button class="backup-refresh-trigger" type="button" disabled={hooksLoading} aria-label="Обновить список хуков" title="Обновить" onclick={loadHooksSettings}><RotateCw size={17} class={hooksLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th>{#each [['level', 'Уровень'], ['command', 'Код команды'], ['timing', 'Время выполнения'], ['enabled', 'Включен'], ['hook', 'Хук']] as [field, label]}<th><button type="button" onclick={() => sortHooks(field)}>{label}<span aria-hidden="true">{hookSort === field ? (hookDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead><tbody>
+                  {#if hooksLoading}<tr><td colspan="6" class="log-empty animate-pulse">Загрузка…</td></tr>
+                  {:else if filteredHooks.length === 0}<tr><td colspan="6" class="log-empty">Хуки не найдены</td></tr>
+                  {:else}{#each pagedHooks as hook (hook.id)}<tr class:schedule-disabled={!hook.enabled} oncontextmenu={(event) => openHookContextMenu(event, hook)}><td class="scheduler-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с хуком ${hook.hook}`} aria-haspopup="menu" onclick={(event) => openHookContextMenu(event, hook)}><Menu size={18} aria-hidden="true" /></button></td><td>{hook.level === 'command' ? 'Команда' : hook.level}</td><td><code>{hook.command}</code></td><td><code>{hook.timing}</code></td><td class="scheduler-enabled">{hook.enabled ? 'Да' : 'Нет'}</td><td><code>{hook.hook}</code></td></tr>{/each}{/if}
+                </tbody></table>
+              </div>
+              <footer class="log-pagination scheduler-pagination hooks-pagination"><span>{filteredHooks.length ? `${(hookPage - 1) * hookPageSize + 1}–${Math.min(hookPage * hookPageSize, filteredHooks.length)} из ${filteredHooks.length}` : '0 хуков'}</span><div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={hookPage === 1 || hooksLoading} onclick={() => hookPage -= 1}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={hookPage >= hookPageCount || hooksLoading} onclick={() => hookPage += 1}>Вперёд</button></div><div class="log-page-size" aria-label="Количество хуков на странице"><Combobox collection={pageSizeCollection} value={[String(hookPageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { hookPageSize = Number(details.value[0]); hookPage = 1; } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество хуков на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div></footer>
+            </div>
             {:else}
               <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadSecuritySettings} />
             <div class="settings-scroll">
@@ -2289,6 +2449,13 @@
   <div class="backup-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${backupContextMenu.x}px;top:${backupContextMenu.y}px`} role="menu" aria-label={`Действия с бэкапом ${backupContextMenu.backup.name}`}>
     <button type="button" role="menuitem" onclick={() => openBackupRestoreDialog(backupContextMenu.backup)}><Undo2 size={16} aria-hidden="true" />Восстановить</button>
     <button class="danger" type="button" role="menuitem" onclick={() => openBackupDeleteDialog(backupContextMenu.backup)}><Trash2 size={16} aria-hidden="true" />Удалить</button>
+  </div>
+{/if}
+
+{#if hookContextMenu}
+  <div class="hook-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${hookContextMenu.x}px;top:${hookContextMenu.y}px`} role="menu" aria-label={`Действия с хуком ${hookContextMenu.hook.hook}`}>
+    <button type="button" role="menuitem" onclick={() => { hookToggleConfirmation = hookContextMenu.hook; hookContextMenu = null; }}><Power size={16} aria-hidden="true" />{hookContextMenu.hook.enabled ? 'Выключить' : 'Включить'}</button>
+    <button class="danger" type="button" role="menuitem" onclick={() => { hookDeleteConfirmation = hookContextMenu.hook; hookContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
 
@@ -2665,6 +2832,28 @@
         <label class="label"><span class="label-text">Рабочая папка</span><input class="input" placeholder="Например, app (необязательно)" bind:value={scheduleDialog.workingDirectory} /></label>
         <div class="login-error-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={scheduleSaving}>Отмена</Dialog.CloseTrigger><button class="btn preset-filled-primary-500" type="submit" disabled={scheduleSaving || scheduleDialog.cron.some((value) => !value.trim()) || !scheduleDialog.command.trim()}>{scheduleSaving ? 'Сохраняем…' : 'Сохранить'}</button></div>
       </form>{/if}
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(hookToggleConfirmation)} onOpenChange={({ open }) => { if (!open && !hookToggling) hookToggleConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">{hookToggleConfirmation?.enabled ? 'Выключить хук?' : 'Включить хук?'}</Dialog.Title>
+      {#if hookToggleConfirmation}<Dialog.Description class="login-error-description">Хук «{hookToggleConfirmation.hook}» будет {hookToggleConfirmation.enabled ? 'выключен: к имени файла будет добавлена точка' : 'включен: точка будет убрана из имени файла'}.</Dialog.Description>{/if}
+      <div class="login-error-actions system-confirm-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={hookToggling}>Отмена</Dialog.CloseTrigger><button class="btn preset-filled-primary-500" type="button" disabled={hookToggling} onclick={() => toggleHookItem(hookToggleConfirmation)}>{hookToggling ? 'Сохраняем…' : (hookToggleConfirmation?.enabled ? 'Выключить' : 'Включить')}</button></div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(hookDeleteConfirmation)} onOpenChange={({ open }) => { if (!open && !hookDeleting) hookDeleteConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Удалить хук?</Dialog.Title>
+      {#if hookDeleteConfirmation}<Dialog.Description class="login-error-description">Хук «{hookDeleteConfirmation.hook}» будет удалён с диска. Это действие необратимо.</Dialog.Description>{/if}
+      <div class="login-error-actions system-confirm-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={hookDeleting}>Отмена</Dialog.CloseTrigger><button class="btn preset-filled-error-500" type="button" disabled={hookDeleting} onclick={() => deleteHookItem(hookDeleteConfirmation)}>{hookDeleting ? 'Удаляем…' : 'Удалить'}</button></div>
     </Dialog.Content>
   </Dialog.Positioner>
 </Dialog>

@@ -51,7 +51,7 @@ final class SystemCompose
         return join_path($home, '.config', 'docker-cli', 'actions', 'tasks', 'core');
     }
 
-    public function init(bool $updateStatic = false, bool $migrateEditable = false): bool
+    public function init(bool $updateStatic = false, bool $migrateEditable = false, bool $copyExamples = false): bool
     {
         $directory = $this->directory();
         if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
@@ -74,6 +74,13 @@ final class SystemCompose
         if ($updateStatic) {
             foreach ($this->staticTemplateMap() as $target => $template) {
                 $this->copyTemplate($template, $target, true);
+                $created = true;
+            }
+        }
+
+        if ($copyExamples) {
+            foreach ($this->exampleTemplateMap() as $target => $template) {
+                $this->copyTemplate($template, $target, true, true);
                 $created = true;
             }
         }
@@ -339,7 +346,7 @@ final class SystemCompose
         return $this->editableTemplateMap() + $this->staticTemplateMap() + $this->playwrightDataTemplateMap();
     }
 
-    private function copyTemplate(string $source, string $target, bool $overwrite = false): void
+    private function copyTemplate(string $source, string $target, bool $overwrite = false, bool $preservePermissions = false): void
     {
         if (is_dir($source)) {
             if (!is_dir($target) && !mkdir($target, 0755, true) && !is_dir($target)) {
@@ -351,7 +358,7 @@ final class SystemCompose
                     continue;
                 }
 
-                $this->copyTemplate(join_path($source, $entry), join_path($target, $entry), $overwrite);
+                $this->copyTemplate(join_path($source, $entry), join_path($target, $entry), $overwrite, $preservePermissions);
             }
 
             return;
@@ -367,6 +374,9 @@ final class SystemCompose
         }
 
         copy($source, $target);
+        if ($preservePermissions) {
+            chmod($target, fileperms($source) & 0777);
+        }
     }
 
     /** @return array<string, string> */
@@ -396,6 +406,23 @@ final class SystemCompose
         return [
             $this->playwrightDataDirectory() => join_path($resources, 'playwright', 'data'),
         ];
+    }
+
+    /** @return array<string, string> */
+    private function exampleTemplateMap(): array
+    {
+        $resources = join_path(dirname(__DIR__, 2), 'resources');
+
+        return [
+            $this->hooksDirectory() => join_path($resources, 'actions', 'hooks'),
+        ];
+    }
+
+    public function hooksDirectory(): string
+    {
+        $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
+
+        return join_path($home, '.config', 'docker-cli', 'actions', 'hooks');
     }
 
     /** @return array<string, string> */

@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace DockerCli\Command;
 
+use DockerCli\Hook\CommandHookRunner;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 final class ProjectWipeCommand extends AbstractCommand
 {
-    public function __construct(private readonly ?CommandContext $context = null, private readonly ?ProjectRegistry $registry = null)
-    {
+    public function __construct(
+        private readonly ?CommandContext $context = null,
+        private readonly ?ProjectRegistry $registry = null,
+        private readonly ?CommandHookRunner $hookRunner = null,
+    ) {
         parent::__construct('project:wipe');
         $this->setDescription('Удалить все файлы проекта, кроме директории .docker-cli.');
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Кодовое имя зарегистрированного проекта.');
@@ -58,6 +63,12 @@ final class ProjectWipeCommand extends AbstractCommand
             return Command::FAILURE;
         }
 
+        $hookArguments = $input instanceof ArgvInput ? $input->getRawTokens(true) : [];
+        $beforeHookCode = ($this->hookRunner ?? new CommandHookRunner())->run('project:wipe', 'before', $hookArguments);
+        if ($beforeHookCode !== Command::SUCCESS) {
+            return $beforeHookCode;
+        }
+
         try {
             foreach (scandir($projectRoot) ?: [] as $entry) {
                 if ($entry === '.' || $entry === '..' || $entry === '.docker-cli') {
@@ -74,7 +85,7 @@ final class ProjectWipeCommand extends AbstractCommand
             new Message(sprintf("Файлы проекта **%s** успешно удалены. Служебная директория `.docker-cli` сохранена.", $projectName), notify: true),
         );
 
-        return Command::SUCCESS;
+        return ($this->hookRunner ?? new CommandHookRunner())->run('project:wipe', 'after', $hookArguments);
     }
 
     private function removePath(string $path): void

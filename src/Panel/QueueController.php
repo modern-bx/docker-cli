@@ -13,12 +13,13 @@ use DockerCli\Panel\Dto\Request\QueueActionRequestDto;
 use DockerCli\Panel\Dto\Request\LogRequestDto;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Queue\QueueRepository;
+use DockerCli\Hook\HookJournal;
 
 final readonly class QueueController
 {
     private const QUEUE = 'default';
 
-    public function __construct(private QueueRepository $queues)
+    public function __construct(private QueueRepository $queues, private ?HookJournal $hooks = null)
     {
     }
 
@@ -72,6 +73,12 @@ final readonly class QueueController
     #[Route('GET', '/api/logs', LogRequestDto::class, LogListDto::class)]
     public function logs(LogRequestDto $request): LogListDto
     {
+        $types = $request->types === [] ? ['queue'] : $request->types;
+        if (in_array('hook', $types, true)) {
+            $data = ($this->hooks ?? new HookJournal())->logs($request->page, $request->pageSize, $request->sort, $request->direction, $request->projects, $request->levels, $request->command, $request->hook, $request->timing, $request->hookLevel);
+            return new LogListDto($data['items'], $data['total'], $data['projects']);
+        }
+
         $data = $this->queues->logs($request->page, $request->pageSize, $request->sort, $request->direction, $request->projects, $request->statuses, $request->queueItem, $request->itemCode, $request->taskCode, $request->levels, $request->contexts);
         return new LogListDto($data['items'], $data['total'], $data['projects']);
     }

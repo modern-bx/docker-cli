@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace DockerCli\Command;
 
+use DockerCli\Hook\CommandHookRunner;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -18,6 +20,7 @@ abstract class ProjectStateCommand extends AbstractCommand
         string $name,
         private readonly bool $enabled,
         private readonly ?ProjectRegistry $registry = null,
+        private readonly ?CommandHookRunner $hookRunner = null,
     ) {
         parent::__construct($name);
         $this->addArgument('project', InputArgument::OPTIONAL, 'Кодовое имя зарегистрированного проекта.');
@@ -46,6 +49,12 @@ abstract class ProjectStateCommand extends AbstractCommand
             return Command::FAILURE;
         }
 
+        $hookArguments = $input instanceof ArgvInput ? $input->getRawTokens(true) : [];
+        $beforeHookCode = ($this->hookRunner ?? new CommandHookRunner())->run($this->getName() ?? '', 'before', $hookArguments);
+        if ($beforeHookCode !== Command::SUCCESS) {
+            return $beforeHookCode;
+        }
+
         $config['data']['project']['enabled'] = $this->enabled;
         $registry->writeProjectConfig($projectName, $config);
         (new OpenRestyHostRenderer())->render();
@@ -60,6 +69,6 @@ abstract class ProjectStateCommand extends AbstractCommand
             $this->enabled ? 'включен' : 'отключен',
         ));
 
-        return Command::SUCCESS;
+        return ($this->hookRunner ?? new CommandHookRunner())->run($this->getName() ?? '', 'after', $hookArguments);
     }
 }
