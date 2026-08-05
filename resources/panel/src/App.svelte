@@ -345,7 +345,7 @@
   function journalFilterHash(projectJournal = false) {
     const path = projectJournal ? projectHash(selectedProjectName, 'journal') : '#/journal';
     const parameters = new URLSearchParams();
-    appendFilterValues(parameters, 'type', logType);
+    parameters.set('type', specificSelections(logType)[0] || 'queue');
     if (!projectJournal) appendFilterValues(parameters, 'project', logProject);
     appendFilterValues(parameters, 'status', logStatus);
     appendFilterValues(parameters, 'level', logLevel);
@@ -2159,7 +2159,7 @@
                   <div class="log-toolbar card preset-filled-surface-100-900">
                     <label>
                       <span>Тип записи</span>
-                      <Combobox collection={logTypeCollection} value={logType} openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
+                      <Combobox collection={logTypeCollection} value={[specificSelections(logType)[0] || 'queue']} openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
                         <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" value={logSelectionLabel(logTypes, logType)} readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                         <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logTypes as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                       </Combobox>
@@ -2207,7 +2207,7 @@
             <div class="log-toolbar card preset-filled-surface-100-900">
               <label>
                 <span>Тип записи</span>
-                <Combobox collection={logTypeCollection} value={logType} openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
+                <Combobox collection={logTypeCollection} value={[specificSelections(logType)[0] || 'queue']} openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
                   <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" value={logSelectionLabel(logTypes, logType)} readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                   <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logTypes as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                 </Combobox>

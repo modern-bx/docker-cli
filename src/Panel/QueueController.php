@@ -74,7 +74,7 @@ final readonly class QueueController
     public function logs(LogRequestDto $request): LogListDto
     {
         $types = $request->types === [] ? ['queue'] : $request->types;
-        if ($types === ['hook']) {
+        if (in_array('hook', $types, true)) {
             $data = ($this->hooks ?? new HookJournal())->logs($request->page, $request->pageSize, $request->sort, $request->direction, $request->projects, $request->levels, $request->command, $request->hook, $request->timing, $request->hookLevel);
             return new LogListDto($data['items'], $data['total'], $data['projects']);
         }
