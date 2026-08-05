@@ -162,6 +162,14 @@ export async function saveBackupsSettings(request, locations, fileStrategies) {
   });
 }
 
+export async function getHooksSettings(request) {
+  return request('/api/settings/hooks');
+}
+
+export async function toggleHookSettings(request, id) {
+  return request(`/api/settings/hooks/${encodeURIComponent(id)}/toggle`, { method: 'POST', body: JSON.stringify({}) });
+}
+
 export async function getUsersSettings(request, page, pageSize) {
   return request(`/api/settings/users?${new URLSearchParams({ page: String(page), pageSize: String(pageSize) })}`);
 }

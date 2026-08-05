@@ -5,7 +5,7 @@
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
   import HttpRefreshBoundary from './HttpRefreshBoundary.svelte';
-  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, getBackupsSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, getBackupsSettings, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
   import { createRefreshCoordinator } from './refresh.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -29,6 +29,12 @@
   const cronTemplates = [['* * * * *', 'Каждую минуту'], ['0 * * * *', 'Каждый час'], ['0 0 * * *', 'Каждый день в полночь'], ['0 9 * * 1-5', 'По будням в 09:00'], ['0 0 * * 0', 'Каждое воскресенье'], ['0 0 1 * *', 'Первого числа месяца']];
   const scheduleStatusOptions = [{ value: 'all', label: 'Все статусы' }, { value: 'enabled', label: 'Включена' }, { value: 'disabled', label: 'Выключена' }];
   const scheduleStatusCollection = useListCollection({ items: scheduleStatusOptions });
+  const hookLevelOptions = [{ value: 'all', label: 'Все уровни' }, { value: 'command', label: 'Команда' }];
+  const hookTimingOptions = [{ value: 'all', label: 'Любое время' }, { value: 'before', label: 'before' }, { value: 'after', label: 'after' }];
+  const hookEnabledOptions = [{ value: 'all', label: 'Все' }, { value: 'enabled', label: 'Да' }, { value: 'disabled', label: 'Нет' }];
+  const hookLevelCollection = useListCollection({ items: hookLevelOptions });
+  const hookTimingCollection = useListCollection({ items: hookTimingOptions });
+  const hookEnabledCollection = useListCollection({ items: hookEnabledOptions });
   const fonts = [
     { value: 'ubuntu', label: 'Ubuntu Regular' },
     { value: 'noto', label: 'Noto Sans' },
@@ -192,6 +198,18 @@
   let fileStrategyDialog = null;
   let backupSettingsLoading = false;
   let backupSettingsSaving = false;
+  let hooks = [];
+  let hooksLoading = false;
+  let hookLevel = 'all';
+  let hookTiming = 'all';
+  let hookEnabled = 'all';
+  let hookCommandQuery = '';
+  let hookNameQuery = '';
+  let hookPage = 1;
+  let hookPageSize = 25;
+  let hookContextMenu = null;
+  let hookToggleConfirmation = null;
+  let hookToggling = false;
   let users = [];
   let usersTotal = 0;
   let usersPage = 1;
@@ -243,6 +261,18 @@
   $: schedulePageCount = Math.max(1, Math.ceil(filteredScheduleItems.length / schedulePageSize));
   $: if (schedulePage > schedulePageCount) schedulePage = schedulePageCount;
   $: pagedScheduleItems = filteredScheduleItems.slice((schedulePage - 1) * schedulePageSize, schedulePage * schedulePageSize);
+  $: filteredHooks = hooks.filter((hook) => {
+    const commandQuery = hookCommandQuery.trim().toLocaleLowerCase();
+    const nameQuery = hookNameQuery.trim().toLocaleLowerCase();
+    return (hookLevel === 'all' || hook.level === hookLevel)
+      && (hookTiming === 'all' || hook.timing === hookTiming)
+      && (hookEnabled === 'all' || hook.enabled === (hookEnabled === 'enabled'))
+      && (!commandQuery || hook.command.toLocaleLowerCase().includes(commandQuery))
+      && (!nameQuery || hook.hook.toLocaleLowerCase().includes(nameQuery));
+  });
+  $: hookPageCount = Math.max(1, Math.ceil(filteredHooks.length / hookPageSize));
+  $: if (hookPage > hookPageCount) hookPage = hookPageCount;
+  $: pagedHooks = filteredHooks.slice((hookPage - 1) * hookPageSize, hookPage * hookPageSize);
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
   $: if (selectedProject && selectedProject.name !== notesProjectName) {
@@ -358,13 +388,14 @@
       loadLogs();
       return;
     }
-    if (segments.length === 2 && segments[0] === 'settings' && ['projects', 'backups', 'users', 'security'].includes(segments[1])) {
+    if (segments.length === 2 && segments[0] === 'settings' && ['projects', 'backups', 'users', 'hooks', 'security'].includes(segments[1])) {
       activeSection = 'settings';
       settingsTab = segments[1];
       selectedProjectName = '';
       if (settingsTab === 'projects') loadProjectsSettings();
       else if (settingsTab === 'backups') loadBackupsSettings();
       else if (settingsTab === 'users') loadUsersSettings();
+      else if (settingsTab === 'hooks') loadHooksSettings();
       else loadSecuritySettings();
       return;
     }
@@ -463,6 +494,43 @@
       scheduleToggleConfirmation = null;
     } catch (requestError) { errorTitle = `Не удалось ${item.enabled ? 'выключить' : 'включить'} команду`; error = requestError instanceof Error ? requestError.message : errorTitle; }
     finally { scheduleToggling = false; }
+  }
+
+  async function loadHooksSettings() {
+    if (!authenticated) return;
+    hooksLoading = true;
+    try { hooks = (await getHooksSettings(api)).hooks; }
+    catch (requestError) { errorTitle = 'Не удалось загрузить хуки'; error = requestError instanceof Error ? requestError.message : errorTitle; }
+    finally { hooksLoading = false; }
+  }
+
+  function changeHookFilter(field, value) {
+    if (field === 'level') hookLevel = value;
+    else if (field === 'timing') hookTiming = value;
+    else if (field === 'enabled') hookEnabled = value;
+    else if (field === 'command') hookCommandQuery = value;
+    else if (field === 'hook') hookNameQuery = value;
+    hookPage = 1;
+  }
+
+  function openHookContextMenu(event, hook) {
+    if (event.ctrlKey) { hookContextMenu = null; return; }
+    event.preventDefault();
+    event.stopPropagation();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
+    const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.bottom;
+    hookContextMenu = { hook, x: Math.max(8, Math.min(x, window.innerWidth - 180)), y: Math.max(8, Math.min(y, window.innerHeight - 120)) };
+  }
+
+  async function toggleHookItem(hook) {
+    hookContextMenu = null;
+    hookToggling = true;
+    try {
+      hooks = (await toggleHookSettings(api, hook.id)).hooks;
+      hookToggleConfirmation = null;
+    } catch (requestError) { errorTitle = `Не удалось ${hook.enabled ? 'выключить' : 'включить'} хук`; error = requestError instanceof Error ? requestError.message : errorTitle; }
+    finally { hookToggling = false; }
   }
 
   async function loadProjectBackups() {
@@ -1117,10 +1185,12 @@
     if (event.target instanceof Element && event.target.closest('.user-context-menu')) return;
     if (event.target instanceof Element && event.target.closest('.backup-context-menu')) return;
     if (event.target instanceof Element && event.target.closest('.schedule-context-menu')) return;
+    if (event.target instanceof Element && event.target.closest('.hook-context-menu')) return;
     projectContextMenu = null;
     userContextMenu = null;
     backupContextMenu = null;
     scheduleContextMenu = null;
+    hookContextMenu = null;
     if (event.target instanceof Element && event.target.closest('.header-menu')) return;
     themeOpen = false;
     notificationsOpen = false;
@@ -2132,6 +2202,7 @@
               <a class:active={settingsTab === 'projects'} class="project-detail-tab" href="#/settings/projects" aria-current={settingsTab === 'projects' ? 'page' : undefined}>Проекты</a>
               <a class:active={settingsTab === 'backups'} class="project-detail-tab" href="#/settings/backups" aria-current={settingsTab === 'backups' ? 'page' : undefined}>Бэкапы</a>
               <a class:active={settingsTab === 'users'} class="project-detail-tab" href="#/settings/users" aria-current={settingsTab === 'users' ? 'page' : undefined}>Пользователи</a>
+              <a class:active={settingsTab === 'hooks'} class="project-detail-tab" href="#/settings/hooks" aria-current={settingsTab === 'hooks' ? 'page' : undefined}>Хуки</a>
               <a class:active={settingsTab === 'security'} class="project-detail-tab" href="#/settings/security" aria-current={settingsTab === 'security' ? 'page' : undefined}>Безопасность</a>
             </nav>
             {#if settingsTab === 'projects'}
@@ -2248,6 +2319,25 @@
                 <div class="log-page-size"><Combobox collection={pageSizeCollection} value={[String(usersPageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { usersPageSize = Number(details.value[0]); usersPage = 1; loadUsersSettings(); } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество пользователей на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
               </footer>
             </div>
+            {:else if settingsTab === 'hooks'}
+              <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadHooksSettings} />
+            <div class="settings-scroll hooks-settings-scroll">
+              <div class="scheduler-filter hooks-filter">
+                <label><span>Уровень</span><Combobox collection={hookLevelCollection} value={[hookLevel]} openOnClick onValueChange={(details) => changeHookFilter('level', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookLevelOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                <label><span>Время выполнения</span><Combobox collection={hookTimingCollection} value={[hookTiming]} openOnClick onValueChange={(details) => changeHookFilter('timing', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookTimingOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                <label><span>Включен</span><Combobox collection={hookEnabledCollection} value={[hookEnabled]} openOnClick onValueChange={(details) => changeHookFilter('enabled', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookEnabledOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                <label><span>Команда</span><input class="input" type="text" value={hookCommandQuery} placeholder="project:up" oninput={(event) => changeHookFilter('command', event.currentTarget.value)} /></label>
+                <label><span>Хук</span><input class="input" type="text" value={hookNameQuery} placeholder="имя файла" oninput={(event) => changeHookFilter('hook', event.currentTarget.value)} /></label>
+              </div>
+              <div class="scheduler-table-wrap hooks-table-wrap card preset-filled-surface-100-900">
+                <table class="table table-zebra scheduler-table hooks-table"><thead><tr><th class="scheduler-menu-column"><button class="backup-refresh-trigger" type="button" disabled={hooksLoading} aria-label="Обновить список хуков" title="Обновить" onclick={loadHooksSettings}><RotateCw size={17} class={hooksLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th><th>Уровень</th><th>Код команды</th><th>Время выполнения</th><th>Включен</th><th>Хук</th></tr></thead><tbody>
+                  {#if hooksLoading}<tr><td colspan="6" class="log-empty animate-pulse">Загрузка…</td></tr>
+                  {:else if filteredHooks.length === 0}<tr><td colspan="6" class="log-empty">Хуки не найдены</td></tr>
+                  {:else}{#each pagedHooks as hook (hook.id)}<tr class:schedule-disabled={!hook.enabled} oncontextmenu={(event) => openHookContextMenu(event, hook)}><td class="scheduler-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с хуком ${hook.hook}`} aria-haspopup="menu" onclick={(event) => openHookContextMenu(event, hook)}><Menu size={18} aria-hidden="true" /></button></td><td>{hook.level === 'command' ? 'Команда' : hook.level}</td><td><code>{hook.command}</code></td><td><code>{hook.timing}</code></td><td class="scheduler-enabled">{hook.enabled ? 'Да' : 'Нет'}</td><td><code>{hook.hook}</code></td></tr>{/each}{/if}
+                </tbody></table>
+              </div>
+              <footer class="log-pagination scheduler-pagination hooks-pagination"><span>{filteredHooks.length ? `${(hookPage - 1) * hookPageSize + 1}–${Math.min(hookPage * hookPageSize, filteredHooks.length)} из ${filteredHooks.length}` : '0 хуков'}</span><div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={hookPage === 1 || hooksLoading} onclick={() => hookPage -= 1}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={hookPage >= hookPageCount || hooksLoading} onclick={() => hookPage += 1}>Вперёд</button></div><div class="log-page-size" aria-label="Количество хуков на странице"><Combobox collection={pageSizeCollection} value={[String(hookPageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { hookPageSize = Number(details.value[0]); hookPage = 1; } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество хуков на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div></footer>
+            </div>
             {:else}
               <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadSecuritySettings} />
             <div class="settings-scroll">
@@ -2289,6 +2379,12 @@
   <div class="backup-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${backupContextMenu.x}px;top:${backupContextMenu.y}px`} role="menu" aria-label={`Действия с бэкапом ${backupContextMenu.backup.name}`}>
     <button type="button" role="menuitem" onclick={() => openBackupRestoreDialog(backupContextMenu.backup)}><Undo2 size={16} aria-hidden="true" />Восстановить</button>
     <button class="danger" type="button" role="menuitem" onclick={() => openBackupDeleteDialog(backupContextMenu.backup)}><Trash2 size={16} aria-hidden="true" />Удалить</button>
+  </div>
+{/if}
+
+{#if hookContextMenu}
+  <div class="hook-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${hookContextMenu.x}px;top:${hookContextMenu.y}px`} role="menu" aria-label={`Действия с хуком ${hookContextMenu.hook.hook}`}>
+    <button type="button" role="menuitem" onclick={() => { hookToggleConfirmation = hookContextMenu.hook; hookContextMenu = null; }}><Power size={16} aria-hidden="true" />{hookContextMenu.hook.enabled ? 'Выключить' : 'Включить'}</button>
   </div>
 {/if}
 
@@ -2665,6 +2761,17 @@
         <label class="label"><span class="label-text">Рабочая папка</span><input class="input" placeholder="Например, app (необязательно)" bind:value={scheduleDialog.workingDirectory} /></label>
         <div class="login-error-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={scheduleSaving}>Отмена</Dialog.CloseTrigger><button class="btn preset-filled-primary-500" type="submit" disabled={scheduleSaving || scheduleDialog.cron.some((value) => !value.trim()) || !scheduleDialog.command.trim()}>{scheduleSaving ? 'Сохраняем…' : 'Сохранить'}</button></div>
       </form>{/if}
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(hookToggleConfirmation)} onOpenChange={({ open }) => { if (!open && !hookToggling) hookToggleConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">{hookToggleConfirmation?.enabled ? 'Выключить хук?' : 'Включить хук?'}</Dialog.Title>
+      {#if hookToggleConfirmation}<Dialog.Description class="login-error-description">Хук «{hookToggleConfirmation.hook}» будет {hookToggleConfirmation.enabled ? 'выключен: к имени файла будет добавлена точка' : 'включен: точка будет убрана из имени файла'}.</Dialog.Description>{/if}
+      <div class="login-error-actions system-confirm-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={hookToggling}>Отмена</Dialog.CloseTrigger><button class="btn preset-filled-primary-500" type="button" disabled={hookToggling} onclick={() => toggleHookItem(hookToggleConfirmation)}>{hookToggling ? 'Сохраняем…' : (hookToggleConfirmation?.enabled ? 'Выключить' : 'Включить')}</button></div>
     </Dialog.Content>
   </Dialog.Positioner>
 </Dialog>
