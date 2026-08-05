@@ -242,12 +242,8 @@
   let hookEditorSaving = false;
   let hookEditorElement = null;
   let hookEditorView = null;
-  let hookProfileView = null;
-  let hookWorkingDirectoryView = null;
   let hookRunResultView = null;
   let hookRunResultElement = null;
-  let hookProfileElement = null;
-  let hookWorkingDirectoryElement = null;
   let hookRunning = false;
   let users = [];
   let usersTotal = 0;
@@ -586,16 +582,6 @@
     localStorage.setItem(EDITOR_THEME_KEY, value);
     editorThemeOpen = false;
     setTimeout(() => { rebuildHookEditor(); rebuildHookRunResultEditor(); }, 0);
-    const profile = hookProfileView ? hookProfileView.state.doc.toString() : hookEditorDialog?.profile || '';
-    const workingDirectory = hookWorkingDirectoryView ? hookWorkingDirectoryView.state.doc.toString() : hookEditorDialog?.workingDirectory || '';
-    if (hookProfileView && hookProfileElement && hookEditorDialog) {
-      hookProfileView.destroy();
-      hookProfileView = createHookEditor(hookProfileElement, profile, 1, (nextProfile) => { if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, profile: nextProfile }; });
-    }
-    if (hookWorkingDirectoryView && hookWorkingDirectoryElement && hookEditorDialog) {
-      hookWorkingDirectoryView.destroy();
-      hookWorkingDirectoryView = createHookEditor(hookWorkingDirectoryElement, workingDirectory, 1, (nextWorkingDirectory) => { if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, workingDirectory: nextWorkingDirectory, project: '' }; });
-    }
   }
 
   function mountHookEditor(node) {
@@ -612,24 +598,6 @@
     });
   }
 
-  function mountHookProfileEditor(node) {
-    hookProfileElement = node;
-    hookProfileView?.destroy();
-    hookProfileView = createHookEditor(node, hookEditorDialog?.profile || '', 1, (profile) => {
-      if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, profile };
-    });
-    return { destroy() { hookProfileElement = null; hookProfileView?.destroy(); hookProfileView = null; } };
-  }
-
-  function mountHookWorkingDirectoryEditor(node) {
-    hookWorkingDirectoryElement = node;
-    hookWorkingDirectoryView?.destroy();
-    hookWorkingDirectoryView = createHookEditor(node, hookEditorDialog?.workingDirectory || '', 1, (workingDirectory) => {
-      if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, workingDirectory, project: '' };
-    });
-    return { destroy() { hookWorkingDirectoryElement = null; hookWorkingDirectoryView?.destroy(); hookWorkingDirectoryView = null; } };
-  }
-
   function mountHookRunResultEditor(node) {
     hookRunResultElement = node;
     rebuildHookRunResultEditor();
@@ -644,11 +612,7 @@
 
   function setHookWorkingDirectory(projectName) {
     const project = projects.find((item) => item.name === projectName);
-    const workingDirectory = project?.root || '';
-    if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, project: project?.name || '', workingDirectory };
-    if (hookWorkingDirectoryView) {
-      hookWorkingDirectoryView.dispatch({ changes: { from: 0, to: hookWorkingDirectoryView.state.doc.length, insert: workingDirectory } });
-    }
+    if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, project: project?.name || '', workingDirectory: project?.root || '' };
   }
 
   async function loadHooksSettings() {
@@ -711,8 +675,8 @@
     if (!hookEditorDialog) return;
     hookRunning = true;
     try {
-      const profile = hookProfileView ? hookProfileView.state.doc.toString() : hookEditorDialog.profile;
-      const workingDirectory = hookWorkingDirectoryView ? hookWorkingDirectoryView.state.doc.toString() : hookEditorDialog.workingDirectory;
+      const profile = hookEditorDialog.profile;
+      const workingDirectory = hookEditorDialog.workingDirectory;
       const result = await runHookSettings(api, hookEditorDialog.hook.id, profile, workingDirectory);
       const output = `Рабочая директория: ${result.workingDirectory || workingDirectory || '—'}\nКод возврата: ${Number(result.exitCode)}\n\n[stdout]\n${result.stdout || ''}\n\n[stderr]\n${result.stderr || ''}`;
       hookEditorDialog = { ...hookEditorDialog, profile, workingDirectory, runResult: output };
@@ -2689,8 +2653,8 @@
           <div class="hook-run-result hook-code-editor" use:mountHookRunResultEditor aria-label="Результат выполнения хука"></div>
         {/if}
         <div class="hook-run-grid">
-          <div class="hook-run-editor hook-code-editor" use:mountHookProfileEditor aria-label="Профиль команды хука"></div>
-          <div class="hook-run-row"><Combobox collection={hookProjectCollection} value={[hookEditorDialog?.project || '']} openOnClick onValueChange={(details) => setHookWorkingDirectory(details.value[0] || '')}><Combobox.Control class="font-combobox-control hook-project-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Проект не выбран' }, ...projects.map((project) => ({ value: project.name, label: project.name }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox><div class="hook-run-editor hook-code-editor" use:mountHookWorkingDirectoryEditor aria-label="Рабочая директория хука"></div><button class="btn preset-filled-primary-500 hook-run-button" type="button" disabled={hookRunning || hookEditorSaving} onclick={runHookEditor}><Play size={16} aria-hidden="true" />{hookRunning ? 'Выполняем…' : 'Выполнить'}</button></div>
+          <input class="input hook-run-input" type="text" aria-label="Профиль команды хука" value={hookEditorDialog?.profile || ''} oninput={(event) => { if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, profile: event.currentTarget.value }; }} />
+          <div class="hook-run-row"><Combobox collection={hookProjectCollection} value={[hookEditorDialog?.project || '']} openOnClick onValueChange={(details) => setHookWorkingDirectory(details.value[0] || '')}><Combobox.Control class="font-combobox-control hook-project-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Проект не выбран' }, ...projects.map((project) => ({ value: project.name, label: project.name }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox><input class="input hook-run-input" type="text" aria-label="Рабочая директория хука" value={hookEditorDialog?.workingDirectory || ''} oninput={(event) => { if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, workingDirectory: event.currentTarget.value, project: '' }; }} /><button class="btn preset-filled-primary-500 hook-run-button" type="button" disabled={hookRunning || hookEditorSaving} onclick={runHookEditor}><Play size={16} aria-hidden="true" />{hookRunning ? 'Выполняем…' : 'Выполнить'}</button></div>
         </div>
       {/if}
       <div class="login-error-actions">
