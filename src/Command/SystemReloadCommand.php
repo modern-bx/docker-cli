@@ -59,7 +59,7 @@ final class SystemReloadCommand extends AbstractCommand
             $this->writeMessage($output, sprintf('<info>Конфигурация сервиса "%s" перезагружена.</info>', $service));
         }
 
-        CommandContext::fromEnvironment(new ContextUser('core.system.reload', 'task'), $output)->addMessage(
+        CommandContext::fromEnvironment($this, $output)->addMessage(
             (new Message('Конфигурация системных сервисов успешно перезагружена.'))->setNotify(true)
         );
 
