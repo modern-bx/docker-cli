@@ -89,7 +89,7 @@ SH,
             return $code;
         }
 
-        [$postgresTerminateSql] = $this->postgresDropSql($projectName);
+        [$postgresTerminateSql, $postgresRoleCleanupSql] = $this->postgresDropSql($projectName);
         return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
             '-T',
             'postgres',
@@ -101,19 +101,16 @@ export PGPASSWORD="${POSTGRES_PASSWORD:?}"
 root_user="${POSTGRES_USER:-system}"
 database="$1"
 terminate_sql="$2"
+role_cleanup_sql="$3"
 
 psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres -c "$terminate_sql"
 dropdb -U "$root_user" --if-exists "$database"
-if psql -v ON_ERROR_STOP=1 -At -U "$root_user" -d postgres -v role="$database" \
-  -c "SELECT 1 FROM pg_roles WHERE rolname = :'role'" | grep -qx 1; then
-  psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres \
-    -v role="$database" -v new_owner="$root_user" \
-    -c 'REASSIGN OWNED BY :"role" TO :"new_owner"; DROP OWNED BY :"role"; DROP ROLE :"role";'
-fi
+psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres -c "$role_cleanup_sql"
 SH,
             'sh',
             $projectName,
             $postgresTerminateSql,
+            $postgresRoleCleanupSql,
         ]), $compose, $output);
     }
 
@@ -299,13 +296,25 @@ SH,
         ];
     }
 
-    /** @return array{string} */
+    /** @return array{string, string} */
     private function postgresDropSql(string $name): array
     {
         $literalName = str_replace("'", "''", $name);
+        $roleCleanupSql = str_replace('<role>', $literalName, <<<'SQL'
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '<role>') THEN
+    EXECUTE format('REASSIGN OWNED BY %I TO %I', '<role>', current_user);
+    EXECUTE format('DROP OWNED BY %I', '<role>');
+    EXECUTE format('DROP ROLE %I', '<role>');
+  END IF;
+END
+$$;
+SQL);
 
         return [
             "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{$literalName}' AND pid <> pg_backend_pid();",
+            $roleCleanupSql,
         ];
     }
 
