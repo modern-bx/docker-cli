@@ -10,7 +10,7 @@
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
   import HttpRefreshBoundary from './HttpRefreshBoundary.svelte';
-  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHookContent, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveHookContent, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHookContent, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, runHookSettings, saveHookContent, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
   import { createRefreshCoordinator } from './refresh.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -40,6 +40,7 @@
   const hookLevelCollection = useListCollection({ items: hookLevelOptions });
   const hookTimingCollection = useListCollection({ items: hookTimingOptions });
   const hookEnabledCollection = useListCollection({ items: hookEnabledOptions });
+  let hookProjectCollection = useListCollection({ items: [{ value: '', label: 'Проект не выбран' }] });
   const fonts = [
     { value: 'ubuntu', label: 'Ubuntu Regular' },
     { value: 'noto', label: 'Noto Sans' },
@@ -230,6 +231,11 @@
   let hookEditorSaving = false;
   let hookEditorElement = null;
   let hookEditorView = null;
+  let hookProfileView = null;
+  let hookWorkingDirectoryView = null;
+  let hookRunResultView = null;
+  let hookRunResultElement = null;
+  let hookRunning = false;
   let users = [];
   let usersTotal = 0;
   let usersPage = 1;
@@ -275,6 +281,7 @@
   $: backupStrategyFilterCollection = useListCollection({ items: backupStrategyFilterOptions });
   $: backupCreateStrategyOptions = [{ value: '', label: 'Без стратегии' }, ...backupFileStrategies.filter((item) => item.code && item.name).map((item) => ({ value: item.code, label: item.name }))];
   $: backupCreateStrategyCollection = useListCollection({ items: backupCreateStrategyOptions });
+  $: hookProjectCollection = useListCollection({ items: [{ value: '', label: 'Проект не выбран' }, ...projects.map((project) => ({ value: project.name, label: project.name }))] });
   $: selectedBackupCreateStrategy = backupFileStrategies.find((item) => item.code === backupCreateDialog?.strategy) || null;
   $: selectedDeploymentScript = projectAddOptions.deploymentScripts.find((item) => item.code === projectAddDialog?.deploymentScript) || null;
   $: filteredScheduleItems = scheduleItems.map((item, index) => ({ ...item, enabled: item.enabled !== false, index })).filter((item) => item.command.toLocaleLowerCase().includes(scheduleQuery.trim().toLocaleLowerCase()) && (scheduleStatus === 'all' || item.enabled === (scheduleStatus === 'enabled')));
@@ -534,6 +541,20 @@
   }
 
 
+  function hookEditorExtensions(lines, onChange) {
+    return [
+      lineNumbers(), highlightActiveLineGutter(), cmHistory(), StreamLanguage.define(shell), syntaxHighlighting(defaultHighlightStyle), highlightActiveLine(),
+      keymap.of([...defaultKeymap, ...historyKeymap]),
+      EditorView.lineWrapping,
+      EditorView.updateListener.of((update) => { if (update.docChanged) onChange(update.state.doc.toString()); }),
+      EditorView.theme({ '&': { height: `${lines * 1.45 + .7}rem` }, '.cm-scroller': { overflow: 'auto' } }),
+    ];
+  }
+
+  function createHookEditor(node, doc, lines, onChange) {
+    return new EditorView({ parent: node, state: EditorState.create({ doc, extensions: hookEditorExtensions(lines, onChange) }) });
+  }
+
   function mountHookEditor(node) {
     hookEditorElement = node;
     rebuildHookEditor();
@@ -543,18 +564,46 @@
   function rebuildHookEditor() {
     if (!hookEditorElement || !hookEditorDialog) return;
     hookEditorView?.destroy();
-    hookEditorView = new EditorView({
-      parent: hookEditorElement,
-      state: EditorState.create({
-        doc: hookEditorDialog.content,
-        extensions: [
-          lineNumbers(), highlightActiveLineGutter(), cmHistory(), StreamLanguage.define(shell), syntaxHighlighting(defaultHighlightStyle), highlightActiveLine(),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
-          EditorView.lineWrapping,
-          EditorView.updateListener.of((update) => { if (update.docChanged && hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, content: update.state.doc.toString() }; }),
-        ],
-      }),
+    hookEditorView = createHookEditor(hookEditorElement, hookEditorDialog.content, hookEditorDialog.runResult ? 17 : 22, (content) => {
+      if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, content };
     });
+  }
+
+  function mountHookProfileEditor(node) {
+    hookProfileView?.destroy();
+    hookProfileView = createHookEditor(node, hookEditorDialog?.profile || '', 2, (profile) => {
+      if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, profile };
+    });
+    return { destroy() { hookProfileView?.destroy(); hookProfileView = null; } };
+  }
+
+  function mountHookWorkingDirectoryEditor(node) {
+    hookWorkingDirectoryView?.destroy();
+    hookWorkingDirectoryView = createHookEditor(node, hookEditorDialog?.workingDirectory || '', 2, (workingDirectory) => {
+      if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, workingDirectory, project: '' };
+    });
+    return { destroy() { hookWorkingDirectoryView?.destroy(); hookWorkingDirectoryView = null; } };
+  }
+
+  function mountHookRunResultEditor(node) {
+    hookRunResultElement = node;
+    rebuildHookRunResultEditor();
+    return { destroy() { hookRunResultElement = null; hookRunResultView?.destroy(); hookRunResultView = null; } };
+  }
+
+  function rebuildHookRunResultEditor() {
+    if (!hookRunResultElement || !hookEditorDialog?.runResult) return;
+    hookRunResultView?.destroy();
+    hookRunResultView = createHookEditor(hookRunResultElement, hookEditorDialog.runResult, 5, () => {});
+  }
+
+  function setHookWorkingDirectory(projectName) {
+    const project = projects.find((item) => item.name === projectName);
+    const workingDirectory = project?.root || '';
+    if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, project: project?.name || '', workingDirectory };
+    if (hookWorkingDirectoryView) {
+      hookWorkingDirectoryView.dispatch({ changes: { from: 0, to: hookWorkingDirectoryView.state.doc.length, insert: workingDirectory } });
+    }
   }
 
   async function loadHooksSettings() {
@@ -600,17 +649,33 @@
 
   async function editHookItem(hook) {
     hookContextMenu = null;
-    hookEditorDialog = { hook, content: '' };
+    hookEditorDialog = { hook, content: '', profile: `hook:command ${hook.command}`, workingDirectory: '', project: '', runResult: '' };
     hookEditorLoading = true;
     try {
       const data = await getHookContent(api, hook.id);
-      hookEditorDialog = { hook, content: typeof data.content === 'string' ? data.content : '' };
+      hookEditorDialog = { ...hookEditorDialog, hook, content: typeof data.content === 'string' ? data.content : '' };
       setTimeout(rebuildHookEditor, 0);
     } catch (requestError) {
       hookEditorDialog = null;
       errorTitle = 'Не удалось открыть хук';
       error = requestError instanceof Error ? requestError.message : errorTitle;
     } finally { hookEditorLoading = false; }
+  }
+
+  async function runHookEditor() {
+    if (!hookEditorDialog) return;
+    hookRunning = true;
+    try {
+      const profile = hookProfileView ? hookProfileView.state.doc.toString() : hookEditorDialog.profile;
+      const workingDirectory = hookWorkingDirectoryView ? hookWorkingDirectoryView.state.doc.toString() : hookEditorDialog.workingDirectory;
+      const result = await runHookSettings(api, hookEditorDialog.hook.id, profile, workingDirectory);
+      const output = `Рабочая директория: ${result.workingDirectory || workingDirectory || '—'}\nКод возврата: ${Number(result.exitCode)}\n\n[stdout]\n${result.stdout || ''}\n\n[stderr]\n${result.stderr || ''}`;
+      hookEditorDialog = { ...hookEditorDialog, profile, workingDirectory, runResult: output };
+      setTimeout(() => { rebuildHookEditor(); rebuildHookRunResultEditor(); }, 0);
+    } catch (requestError) {
+      errorTitle = 'Не удалось выполнить хук';
+      error = requestError instanceof Error ? requestError.message : errorTitle;
+    } finally { hookRunning = false; }
   }
 
   async function saveHookEditor() {
@@ -2558,11 +2623,18 @@
       {#if hookEditorLoading}
         <div class="hook-editor-loading animate-pulse">Загрузка…</div>
       {:else}
-        <div class="hook-code-editor" use:mountHookEditor aria-label="Редактор кода хука"></div>
+        <div class:hook-editor-compact={Boolean(hookEditorDialog?.runResult)} class="hook-code-editor" use:mountHookEditor aria-label="Редактор кода хука"></div>
+        {#if hookEditorDialog?.runResult}
+          <div class="hook-run-result hook-code-editor" use:mountHookRunResultEditor aria-label="Результат выполнения хука"></div>
+        {/if}
+        <div class="hook-run-grid">
+          <div class="hook-run-row"><div class="hook-run-editor hook-code-editor" use:mountHookProfileEditor aria-label="Профиль команды хука"></div><button class="btn preset-filled-primary-500 hook-run-button" type="button" disabled={hookRunning || hookEditorSaving} onclick={runHookEditor}><Play size={16} aria-hidden="true" />{hookRunning ? 'Выполняем…' : 'Выполнить'}</button></div>
+          <div class="hook-run-row"><Combobox collection={hookProjectCollection} value={[hookEditorDialog?.project || '']} openOnClick onValueChange={(details) => setHookWorkingDirectory(details.value[0] || '')}><Combobox.Control class="font-combobox-control hook-project-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Проект не выбран' }, ...projects.map((project) => ({ value: project.name, label: project.name }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox><div class="hook-run-editor hook-code-editor" use:mountHookWorkingDirectoryEditor aria-label="Рабочая директория хука"></div><button class="btn preset-filled-primary-500 hook-run-button" type="button" disabled={hookRunning || hookEditorSaving} onclick={runHookEditor}><Play size={16} aria-hidden="true" />{hookRunning ? 'Выполняем…' : 'Выполнить'}</button></div>
+        </div>
       {/if}
       <div class="login-error-actions">
-        <button class="btn preset-tonal" type="button" disabled={hookEditorSaving} onclick={() => { hookEditorDialog = null; }}>Отмена</button>
-        <button class="btn preset-filled-primary-500" type="button" disabled={hookEditorLoading || hookEditorSaving} onclick={saveHookEditor}><Save size={16} aria-hidden="true" />{hookEditorSaving ? 'Сохраняем…' : 'Сохранить'}</button>
+        <button class="btn preset-tonal" type="button" disabled={hookEditorSaving || hookRunning} onclick={() => { hookEditorDialog = null; }}>Отмена</button>
+        <button class="btn preset-filled-primary-500" type="button" disabled={hookEditorLoading || hookEditorSaving || hookRunning} onclick={saveHookEditor}><Save size={16} aria-hidden="true" />{hookEditorSaving ? 'Сохраняем…' : 'Сохранить'}</button>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>

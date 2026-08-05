@@ -109,14 +109,15 @@ final class PanelUpCommand extends AbstractCommand
         $backupsSettings = new BackupsSettingsRepository();
         $tokens = new JwtTokenService($jwtSecret, $tokenRepository, $securitySettings);
         $queues = new QueueRepository();
-        $projects = new ProjectController(new ProjectRegistry(), $compose, $queues, new ProjectsSettingsRepository(), new TaskRepository(), $backupsSettings);
+        $projectRegistry = new ProjectRegistry();
+        $projects = new ProjectController($projectRegistry, $compose, $queues, new ProjectsSettingsRepository(), new TaskRepository(), $backupsSettings);
         $system = new SystemController($compose);
         $queue = new QueueController($queues);
         $notifications = new NotificationController(new NotificationRepository());
         $responses = new ResponseEmitter($assets);
         $state = new StateController($projects, $system, $queue, $notifications);
         $router = new Router(
-            [new AuthController($users, $tokens, $tokenRepository), new \DockerCli\Panel\SecuritySettingsController($securitySettings), new \DockerCli\Panel\ProjectsSettingsController($projectsSettings), new BackupsSettingsController($backupsSettings), new \DockerCli\Panel\HooksSettingsController(new \DockerCli\Panel\HookRepository()), new \DockerCli\Panel\UsersSettingsController($users, $tokenRepository, new \DockerCli\Panel\PanelPasswordGenerator()), $state, $projects, $system, $queue, $notifications, new AssetController()],
+            [new AuthController($users, $tokens, $tokenRepository), new \DockerCli\Panel\SecuritySettingsController($securitySettings), new \DockerCli\Panel\ProjectsSettingsController($projectsSettings), new BackupsSettingsController($backupsSettings), new \DockerCli\Panel\HooksSettingsController(new \DockerCli\Panel\HookRepository(), $projectsSettings), new \DockerCli\Panel\UsersSettingsController($users, $tokenRepository, new \DockerCli\Panel\PanelPasswordGenerator()), $state, $projects, $system, $queue, $notifications, new AssetController()],
             new ControllerInvoker(),
             new AuthMiddleware($tokens, $responses),
             $responses,

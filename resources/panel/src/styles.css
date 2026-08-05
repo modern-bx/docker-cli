@@ -523,7 +523,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .dark .hook-editor-loading { border-color: var(--color-surface-700); }
 .hook-code-editor { border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); margin-top: 1rem; overflow: hidden; }
 .dark .hook-code-editor { border-color: var(--color-surface-700); }
-.hook-code-editor .cm-editor { height: min(62vh, 34rem); background: var(--color-surface-50); color: var(--color-surface-950); font-size: .85rem; }
+.hook-code-editor .cm-editor { background: var(--color-surface-50); color: var(--color-surface-950); font-size: .85rem; }
 .dark .hook-code-editor .cm-editor { background: var(--color-surface-950); color: var(--color-surface-50); }
 .hook-code-editor .cm-scroller { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 .hook-code-editor .cm-gutters { background: var(--color-surface-100); border-right: 1px solid var(--color-surface-300); color: var(--color-surface-500); }
@@ -531,3 +531,14 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .hook-code-editor .cm-activeLine,
 .hook-code-editor .cm-activeLineGutter { background: rgb(115 115 115 / 12%); }
 .hook-code-editor .cm-content { caret-color: var(--color-primary-500); }
+.hook-run-grid { display: grid; gap: .75rem; margin-top: .75rem; }
+.hook-run-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .75rem; align-items: stretch; }
+.hook-run-row:has(.hook-project-control) { grid-template-columns: minmax(12rem, .35fr) minmax(0, 1fr) auto; }
+.hook-run-editor.hook-code-editor,
+.hook-run-result.hook-code-editor { margin-top: 0; }
+.hook-run-button { align-self: stretch; white-space: nowrap; }
+.hook-project-control { height: 100%; min-height: 3.6rem; }
+@media (max-width: 760px) {
+  .hook-run-row,
+  .hook-run-row:has(.hook-project-control) { grid-template-columns: 1fr; }
+}

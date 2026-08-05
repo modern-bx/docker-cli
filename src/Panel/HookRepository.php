@@ -8,6 +8,8 @@ use function DockerCli\Util\join_path;
 
 final readonly class HookRepository
 {
+    private const OUTPUT_LIMIT = 65536;
+
     public function __construct(private ?string $hooksDirectory = null)
     {
     }
@@ -90,12 +92,65 @@ final readonly class HookRepository
         }
     }
 
+    /** @return array{exitCode: int, stdout: string, stderr: string} */
+    public function run(string $id, string $profile, string $workingDirectory): array
+    {
+        $path = $this->existingHookPath($id);
+        $arguments = $this->profileArguments($profile);
+        $process = proc_open(
+            [$path, ...$arguments],
+            [['file', '/dev/null', 'r'], ['pipe', 'w'], ['pipe', 'w']],
+            $pipes,
+            $workingDirectory,
+        );
+        if (!is_resource($process)) {
+            throw new \RuntimeException('Не удалось запустить хук.');
+        }
+
+        $stdout = $this->readOutput($pipes[1]);
+        $stderr = $this->readOutput($pipes[2]);
+        $exitCode = proc_close($process);
+
+        return ['exitCode' => $exitCode, 'stdout' => $stdout, 'stderr' => $stderr];
+    }
+
     public function delete(string $id): void
     {
         $path = $this->existingHookPath($id);
         if (!unlink($path)) {
             throw new \RuntimeException('Не удалось удалить хук.');
         }
+    }
+
+    /** @return list<string> */
+    private function profileArguments(string $profile): array
+    {
+        $arguments = [];
+        foreach (preg_split('/\s+/', trim($profile)) ?: [] as $argument) {
+            if ($argument !== '') {
+                $arguments[] = $argument;
+            }
+        }
+
+        return $arguments;
+    }
+
+    private function readOutput(mixed $pipe): string
+    {
+        if (!is_resource($pipe)) {
+            return '';
+        }
+
+        $output = stream_get_contents($pipe, self::OUTPUT_LIMIT + 1);
+        fclose($pipe);
+        if ($output === false) {
+            return '';
+        }
+        if (strlen($output) > self::OUTPUT_LIMIT) {
+            return substr($output, 0, self::OUTPUT_LIMIT) . "\n… output truncated …\n";
+        }
+
+        return $output;
     }
 
     private function existingHookPath(string $id): string
