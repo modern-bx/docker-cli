@@ -16,7 +16,16 @@
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
   const FONT_KEY = 'docker-cli-panel-font';
+  const EDITOR_THEME_KEY = 'docker-cli-panel-editor-theme';
   const strategyTabs = [{ value: 'files', sections: [['include', 'Включить', 'Относительные пути или glob-маски, которые нужно включить в файловый бэкап'], ['exclude', 'Исключить', 'Относительные пути или glob-маски, которые нужно исключить из бэкапа']] }, { value: 'database', sections: [['databaseInclude', 'Включить', 'Точные имена таблиц или glob-маски (например, public.*), которые нужно включить в дамп'], ['databaseExclude', 'Исключить', 'Точные имена таблиц или glob-маски, которые нужно исключить из дампа']] }];
+  /** @type {[string, string, { background: string, foreground: string, gutter: string, border: string, line: string, dark: boolean }][]} */
+  const editorThemes = [
+    ['skeleton', 'Skeleton', { background: 'var(--color-surface-50)', foreground: 'var(--color-surface-950)', gutter: 'var(--color-surface-100)', border: 'var(--color-surface-300)', line: 'rgb(115 115 115 / 12%)', dark: false }],
+    ['github-dark', 'GitHub Dark', { background: '#0d1117', foreground: '#e6edf3', gutter: '#161b22', border: '#30363d', line: '#6e76811f', dark: true }],
+    ['nord', 'Nord', { background: '#2e3440', foreground: '#d8dee9', gutter: '#3b4252', border: '#4c566a', line: '#434c5e80', dark: true }],
+    ['solarized-light', 'Solarized Light', { background: '#fdf6e3', foreground: '#586e75', gutter: '#eee8d5', border: '#93a1a1', line: '#eee8d580', dark: false }],
+    ['dracula', 'Dracula', { background: '#282a36', foreground: '#f8f8f2', gutter: '#21222c', border: '#44475a', line: '#44475a66', dark: true }],
+  ];
   const themes = [
     ['vox', 'Vox'], ['cerberus', 'Cerberus'], ['concord', 'Concord'],
     ['crimson', 'Crimson'], ['dracula', 'Dracula'], ['fennec', 'Fennec'],
@@ -75,11 +84,13 @@
   let submitting = false;
   let profileOpen = false;
   let themeOpen = false;
+  let editorThemeOpen = false;
   let notificationsOpen = false;
   let notifications = [];
   let notificationsInitialized = false;
   const knownNotificationFiles = new Set();
   let theme = 'vox';
+  let editorTheme = 'skeleton';
   let mode = 'system';
   let font = 'ubuntu';
   let systemDark = false;
@@ -235,6 +246,8 @@
   let hookWorkingDirectoryView = null;
   let hookRunResultView = null;
   let hookRunResultElement = null;
+  let hookProfileElement = null;
+  let hookWorkingDirectoryElement = null;
   let hookRunning = false;
   let users = [];
   let usersTotal = 0;
@@ -551,8 +564,38 @@
     ];
   }
 
+  function editorThemeExtension() {
+    const [, , colors] = editorThemes.find(([value]) => value === editorTheme) || editorThemes[0];
+    return EditorView.theme({
+      '&': { backgroundColor: colors.background, color: colors.foreground },
+      '.cm-content': { caretColor: 'var(--color-primary-500)' },
+      '.cm-gutters': { backgroundColor: colors.gutter, color: colors.foreground, borderRightColor: colors.border },
+      '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: colors.line },
+      '&.cm-focused .cm-cursor': { borderLeftColor: 'var(--color-primary-500)' },
+      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': { backgroundColor: colors.dark ? '#6ea8fe55' : '#0d6efd33' },
+    }, { dark: colors.dark });
+  }
+
   function createHookEditor(node, doc, lines, onChange) {
-    return new EditorView({ parent: node, state: EditorState.create({ doc, extensions: hookEditorExtensions(lines, onChange) }) });
+    return new EditorView({ parent: node, state: EditorState.create({ doc, extensions: [...hookEditorExtensions(lines, onChange), editorThemeExtension()] }) });
+  }
+
+  function setEditorTheme(value) {
+    if (!editorThemes.some(([themeValue]) => themeValue === value)) return;
+    editorTheme = value;
+    localStorage.setItem(EDITOR_THEME_KEY, value);
+    editorThemeOpen = false;
+    setTimeout(() => { rebuildHookEditor(); rebuildHookRunResultEditor(); }, 0);
+    const profile = hookProfileView ? hookProfileView.state.doc.toString() : hookEditorDialog?.profile || '';
+    const workingDirectory = hookWorkingDirectoryView ? hookWorkingDirectoryView.state.doc.toString() : hookEditorDialog?.workingDirectory || '';
+    if (hookProfileView && hookProfileElement && hookEditorDialog) {
+      hookProfileView.destroy();
+      hookProfileView = createHookEditor(hookProfileElement, profile, 1, (nextProfile) => { if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, profile: nextProfile }; });
+    }
+    if (hookWorkingDirectoryView && hookWorkingDirectoryElement && hookEditorDialog) {
+      hookWorkingDirectoryView.destroy();
+      hookWorkingDirectoryView = createHookEditor(hookWorkingDirectoryElement, workingDirectory, 1, (nextWorkingDirectory) => { if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, workingDirectory: nextWorkingDirectory, project: '' }; });
+    }
   }
 
   function mountHookEditor(node) {
@@ -570,19 +613,21 @@
   }
 
   function mountHookProfileEditor(node) {
+    hookProfileElement = node;
     hookProfileView?.destroy();
     hookProfileView = createHookEditor(node, hookEditorDialog?.profile || '', 1, (profile) => {
       if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, profile };
     });
-    return { destroy() { hookProfileView?.destroy(); hookProfileView = null; } };
+    return { destroy() { hookProfileElement = null; hookProfileView?.destroy(); hookProfileView = null; } };
   }
 
   function mountHookWorkingDirectoryEditor(node) {
+    hookWorkingDirectoryElement = node;
     hookWorkingDirectoryView?.destroy();
     hookWorkingDirectoryView = createHookEditor(node, hookEditorDialog?.workingDirectory || '', 1, (workingDirectory) => {
       if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, workingDirectory, project: '' };
     });
-    return { destroy() { hookWorkingDirectoryView?.destroy(); hookWorkingDirectoryView = null; } };
+    return { destroy() { hookWorkingDirectoryElement = null; hookWorkingDirectoryView?.destroy(); hookWorkingDirectoryView = null; } };
   }
 
   function mountHookRunResultEditor(node) {
@@ -1888,6 +1933,8 @@
     systemDark = media.matches;
     const savedTheme = localStorage.getItem(THEME_KEY);
     theme = themes.some(([value]) => value === savedTheme) ? savedTheme : 'vox';
+    const savedEditorTheme = localStorage.getItem(EDITOR_THEME_KEY);
+    editorTheme = editorThemes.some(([value]) => value === savedEditorTheme) ? savedEditorTheme : 'skeleton';
     const savedMode = localStorage.getItem(MODE_KEY);
     mode = modes.some(([value]) => value === savedMode) ? savedMode : 'system';
     const savedFont = localStorage.getItem(FONT_KEY);
@@ -1918,7 +1965,7 @@
 
 <svelte:window
   onclick={closeMenus}
-  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; notificationsOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; backupContextMenu = null; } }}
+  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; editorThemeOpen = false; notificationsOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; backupContextMenu = null; } }}
 />
 
 <svelte:head><title>{authenticated ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
@@ -2079,7 +2126,7 @@
       </div>
       {#if authenticated}
         <div class="relative header-menu">
-          <button class="btn preset-tonal" type="button" aria-expanded={profileOpen} onclick={() => { profileOpen = !profileOpen; themeOpen = false; notificationsOpen = false; }}>{currentLogin}</button>
+          <button class="btn preset-tonal" type="button" aria-expanded={profileOpen} onclick={() => { profileOpen = !profileOpen; themeOpen = false; editorThemeOpen = false; notificationsOpen = false; }}>{currentLogin}</button>
           {#if profileOpen}
             <div class="card preset-filled-surface-100-900 absolute right-0 mt-2 min-w-44 p-2 shadow-xl z-10">
               <button class="btn w-full justify-start hover:preset-tonal-error" type="button" onclick={logout}>Выйти</button>
@@ -2619,7 +2666,21 @@
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
     <Dialog.Content class="login-error-dialog hook-editor-dialog card preset-filled-surface-100-900 shadow-2xl">
-      <Dialog.Title class="login-error-title">Изменить хук {hookEditorDialog?.hook.hook}</Dialog.Title>
+      <div class="hook-editor-header">
+        <Dialog.Title class="login-error-title">Изменить хук {hookEditorDialog?.hook.hook}</Dialog.Title>
+        <div class="hook-editor-theme-picker">
+          <button class="btn btn-sm preset-tonal theme-trigger" type="button" aria-label="Цветовая схема редактора" aria-haspopup="dialog" aria-expanded={editorThemeOpen} onclick={() => { editorThemeOpen = !editorThemeOpen; }}><span class="editor-theme-dot" aria-hidden="true"></span>{editorThemes.find(([value]) => value === editorTheme)?.[1]}</button>
+          {#if editorThemeOpen}
+            <div class="editor-theme-menu theme-menu card preset-filled-surface-100-900 shadow-2xl" role="dialog" aria-label="Цветовая схема редактора">
+              <div class="theme-grid" role="list" aria-label="Цветовая схема CodeMirror">
+                {#each editorThemes as [value, label, colors]}
+                  <button class:active={editorTheme === value} class="theme-option editor-theme-option" type="button" aria-label={label} aria-pressed={editorTheme === value} title={label} onclick={() => setEditorTheme(value)}><span class="editor-theme-swatch" style={`--editor-bg:${colors.background};--editor-fg:${colors.foreground};--editor-gutter:${colors.gutter}`}></span>{label}</button>
+                {/each}
+              </div>
+            </div>
+          {/if}
+        </div>
+      </div>
       {#if hookEditorLoading}
         <div class="hook-editor-loading animate-pulse">Загрузка…</div>
       {:else}
