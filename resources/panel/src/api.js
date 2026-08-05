@@ -133,10 +133,10 @@ export async function getSecuritySettings(request) {
   return request('/api/settings/security');
 }
 
-export async function saveSecuritySettings(request, maximumSessionHours) {
+export async function saveSecuritySettings(request, maximumSessionHours, httpAuthLogin, httpAuthPassword) {
   return request('/api/settings/security', {
     method: 'POST',
-    body: JSON.stringify({ maximumSessionHours }),
+    body: JSON.stringify({ maximumSessionHours, httpAuthLogin, httpAuthPassword }),
   });
 }
 
