@@ -41,7 +41,7 @@ final readonly class HookJournal
 
         if ($stderr !== '') {
             $this->append(array_merge($base, [
-                'level' => $exitCode === 0 ? 'warning' : 'error',
+                'level' => 'error',
                 'context' => 'hook',
                 'stream' => 'stderr',
                 'message' => $stderr,
