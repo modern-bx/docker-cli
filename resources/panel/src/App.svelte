@@ -1,17 +1,31 @@
 <script>
   import { onMount } from 'svelte';
+  import { EditorState } from '@codemirror/state';
+  import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
+  import { defaultKeymap, history as cmHistory, historyKeymap } from '@codemirror/commands';
+  import { StreamLanguage, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+  import { shell } from '@codemirror/legacy-modes/mode/shell';
   import { Combobox, Dialog, Tabs, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Settings, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
   import HttpRefreshBoundary from './HttpRefreshBoundary.svelte';
-  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHookContent, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, runHookSettings, saveHookContent, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
   import { createRefreshCoordinator } from './refresh.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
   const MODE_KEY = 'docker-cli-panel-theme';
   const FONT_KEY = 'docker-cli-panel-font';
+  const EDITOR_THEME_KEY = 'docker-cli-panel-editor-theme';
   const strategyTabs = [{ value: 'files', sections: [['include', 'Включить', 'Относительные пути или glob-маски, которые нужно включить в файловый бэкап'], ['exclude', 'Исключить', 'Относительные пути или glob-маски, которые нужно исключить из бэкапа']] }, { value: 'database', sections: [['databaseInclude', 'Включить', 'Точные имена таблиц или glob-маски (например, public.*), которые нужно включить в дамп'], ['databaseExclude', 'Исключить', 'Точные имена таблиц или glob-маски, которые нужно исключить из дампа']] }];
+  /** @type {[string, string, { background: string, foreground: string, gutter: string, border: string, line: string, dark: boolean }][]} */
+  const editorThemes = [
+    ['skeleton', 'Skeleton', { background: 'var(--color-surface-50)', foreground: 'var(--color-surface-950)', gutter: 'var(--color-surface-100)', border: 'var(--color-surface-300)', line: 'rgb(115 115 115 / 12%)', dark: false }],
+    ['github-dark', 'GitHub Dark', { background: '#0d1117', foreground: '#e6edf3', gutter: '#161b22', border: '#30363d', line: '#6e76811f', dark: true }],
+    ['nord', 'Nord', { background: '#2e3440', foreground: '#d8dee9', gutter: '#3b4252', border: '#4c566a', line: '#434c5e80', dark: true }],
+    ['solarized-light', 'Solarized Light', { background: '#fdf6e3', foreground: '#586e75', gutter: '#eee8d5', border: '#93a1a1', line: '#eee8d580', dark: false }],
+    ['dracula', 'Dracula', { background: '#282a36', foreground: '#f8f8f2', gutter: '#21222c', border: '#44475a', line: '#44475a66', dark: true }],
+  ];
   const themes = [
     ['vox', 'Vox'], ['cerberus', 'Cerberus'], ['concord', 'Concord'],
     ['crimson', 'Crimson'], ['dracula', 'Dracula'], ['fennec', 'Fennec'],
@@ -35,6 +49,7 @@
   const hookLevelCollection = useListCollection({ items: hookLevelOptions });
   const hookTimingCollection = useListCollection({ items: hookTimingOptions });
   const hookEnabledCollection = useListCollection({ items: hookEnabledOptions });
+  let hookProjectCollection = useListCollection({ items: [{ value: '', label: 'Проект не выбран' }] });
   const fonts = [
     { value: 'ubuntu', label: 'Ubuntu Regular' },
     { value: 'noto', label: 'Noto Sans' },
@@ -69,11 +84,13 @@
   let submitting = false;
   let profileOpen = false;
   let themeOpen = false;
+  let editorThemeOpen = false;
   let notificationsOpen = false;
   let notifications = [];
   let notificationsInitialized = false;
   const knownNotificationFiles = new Set();
   let theme = 'vox';
+  let editorTheme = 'skeleton';
   let mode = 'system';
   let font = 'ubuntu';
   let systemDark = false;
@@ -220,6 +237,14 @@
   let hookToggling = false;
   let hookDeleteConfirmation = null;
   let hookDeleting = false;
+  let hookEditorDialog = null;
+  let hookEditorLoading = false;
+  let hookEditorSaving = false;
+  let hookEditorElement = null;
+  let hookEditorView = null;
+  let hookRunResultView = null;
+  let hookRunResultElement = null;
+  let hookRunning = false;
   let users = [];
   let usersTotal = 0;
   let usersPage = 1;
@@ -265,6 +290,7 @@
   $: backupStrategyFilterCollection = useListCollection({ items: backupStrategyFilterOptions });
   $: backupCreateStrategyOptions = [{ value: '', label: 'Без стратегии' }, ...backupFileStrategies.filter((item) => item.code && item.name).map((item) => ({ value: item.code, label: item.name }))];
   $: backupCreateStrategyCollection = useListCollection({ items: backupCreateStrategyOptions });
+  $: hookProjectCollection = useListCollection({ items: [{ value: '', label: 'Проект не выбран' }, ...projects.map((project) => ({ value: project.name, label: project.name }))] });
   $: selectedBackupCreateStrategy = backupFileStrategies.find((item) => item.code === backupCreateDialog?.strategy) || null;
   $: selectedDeploymentScript = projectAddOptions.deploymentScripts.find((item) => item.code === projectAddDialog?.deploymentScript) || null;
   $: filteredScheduleItems = scheduleItems.map((item, index) => ({ ...item, enabled: item.enabled !== false, index })).filter((item) => item.command.toLocaleLowerCase().includes(scheduleQuery.trim().toLocaleLowerCase()) && (scheduleStatus === 'all' || item.enabled === (scheduleStatus === 'enabled')));
@@ -523,6 +549,72 @@
     finally { scheduleToggling = false; }
   }
 
+
+  function hookEditorExtensions(lines, onChange) {
+    return [
+      lineNumbers(), highlightActiveLineGutter(), cmHistory(), StreamLanguage.define(shell), syntaxHighlighting(defaultHighlightStyle), highlightActiveLine(),
+      keymap.of([...defaultKeymap, ...historyKeymap]),
+      EditorView.lineWrapping,
+      EditorView.updateListener.of((update) => { if (update.docChanged) onChange(update.state.doc.toString()); }),
+      EditorView.theme({ '&': { height: `${lines * 1.45 + .7}rem` }, '.cm-scroller': { overflow: 'auto' } }),
+    ];
+  }
+
+  function editorThemeExtension() {
+    const [, , colors] = editorThemes.find(([value]) => value === editorTheme) || editorThemes[0];
+    return EditorView.theme({
+      '&': { backgroundColor: colors.background, color: colors.foreground },
+      '.cm-content': { caretColor: 'var(--color-primary-500)' },
+      '.cm-gutters': { backgroundColor: colors.gutter, color: colors.foreground, borderRightColor: colors.border },
+      '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: colors.line },
+      '&.cm-focused .cm-cursor': { borderLeftColor: 'var(--color-primary-500)' },
+      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': { backgroundColor: colors.dark ? '#6ea8fe55' : '#0d6efd33' },
+    }, { dark: colors.dark });
+  }
+
+  function createHookEditor(node, doc, lines, onChange) {
+    return new EditorView({ parent: node, state: EditorState.create({ doc, extensions: [...hookEditorExtensions(lines, onChange), editorThemeExtension()] }) });
+  }
+
+  function setEditorTheme(value) {
+    if (!editorThemes.some(([themeValue]) => themeValue === value)) return;
+    editorTheme = value;
+    localStorage.setItem(EDITOR_THEME_KEY, value);
+    editorThemeOpen = false;
+    setTimeout(() => { rebuildHookEditor(); rebuildHookRunResultEditor(); }, 0);
+  }
+
+  function mountHookEditor(node) {
+    hookEditorElement = node;
+    rebuildHookEditor();
+    return { destroy() { hookEditorElement = null; hookEditorView?.destroy(); hookEditorView = null; } };
+  }
+
+  function rebuildHookEditor() {
+    if (!hookEditorElement || !hookEditorDialog) return;
+    hookEditorView?.destroy();
+    hookEditorView = createHookEditor(hookEditorElement, hookEditorDialog.content, hookEditorDialog.runResult ? 10 : 15, (content) => {
+      if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, content };
+    });
+  }
+
+  function mountHookRunResultEditor(node) {
+    hookRunResultElement = node;
+    rebuildHookRunResultEditor();
+    return { destroy() { hookRunResultElement = null; hookRunResultView?.destroy(); hookRunResultView = null; } };
+  }
+
+  function rebuildHookRunResultEditor() {
+    if (!hookRunResultElement || !hookEditorDialog?.runResult) return;
+    hookRunResultView?.destroy();
+    hookRunResultView = createHookEditor(hookRunResultElement, hookEditorDialog.runResult, 5, () => {});
+  }
+
+  function setHookWorkingDirectory(projectName) {
+    const project = projects.find((item) => item.name === projectName);
+    if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, project: project?.name || '', workingDirectory: project?.root || '' };
+  }
+
   async function loadHooksSettings() {
     if (!authenticated) return;
     hooksLoading = true;
@@ -561,6 +653,51 @@
     const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
     const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.bottom;
     hookContextMenu = { hook, x: Math.max(8, Math.min(x, window.innerWidth - 180)), y: Math.max(8, Math.min(y, window.innerHeight - 120)) };
+  }
+
+
+  async function editHookItem(hook) {
+    hookContextMenu = null;
+    hookEditorDialog = { hook, content: '', profile: `hook:command ${hook.command}:${hook.timing}`, workingDirectory: '', project: '', runResult: '' };
+    hookEditorLoading = true;
+    try {
+      const data = await getHookContent(api, hook.id);
+      hookEditorDialog = { ...hookEditorDialog, hook, content: typeof data.content === 'string' ? data.content : '' };
+      setTimeout(rebuildHookEditor, 0);
+    } catch (requestError) {
+      hookEditorDialog = null;
+      errorTitle = 'Не удалось открыть хук';
+      error = requestError instanceof Error ? requestError.message : errorTitle;
+    } finally { hookEditorLoading = false; }
+  }
+
+  async function runHookEditor() {
+    if (!hookEditorDialog) return;
+    hookRunning = true;
+    try {
+      const profile = hookEditorDialog.profile;
+      const workingDirectory = hookEditorDialog.workingDirectory;
+      const result = await runHookSettings(api, hookEditorDialog.hook.id, profile, workingDirectory);
+      const output = `Рабочая директория: ${result.workingDirectory || workingDirectory || '—'}\nКод возврата: ${Number(result.exitCode)}\n\n[stdout]\n${result.stdout || ''}\n\n[stderr]\n${result.stderr || ''}`;
+      hookEditorDialog = { ...hookEditorDialog, profile, workingDirectory, runResult: output };
+      setTimeout(() => { rebuildHookEditor(); rebuildHookRunResultEditor(); }, 0);
+    } catch (requestError) {
+      errorTitle = 'Не удалось выполнить хук';
+      error = requestError instanceof Error ? requestError.message : errorTitle;
+    } finally { hookRunning = false; }
+  }
+
+  async function saveHookEditor() {
+    if (!hookEditorDialog) return;
+    hookEditorSaving = true;
+    try {
+      const content = hookEditorView ? hookEditorView.state.doc.toString() : hookEditorDialog.content;
+      await saveHookContent(api, hookEditorDialog.hook.id, content);
+      hookEditorDialog = null;
+    } catch (requestError) {
+      errorTitle = 'Не удалось сохранить хук';
+      error = requestError instanceof Error ? requestError.message : errorTitle;
+    } finally { hookEditorSaving = false; }
   }
 
   async function toggleHookItem(hook) {
@@ -1760,6 +1897,8 @@
     systemDark = media.matches;
     const savedTheme = localStorage.getItem(THEME_KEY);
     theme = themes.some(([value]) => value === savedTheme) ? savedTheme : 'vox';
+    const savedEditorTheme = localStorage.getItem(EDITOR_THEME_KEY);
+    editorTheme = editorThemes.some(([value]) => value === savedEditorTheme) ? savedEditorTheme : 'skeleton';
     const savedMode = localStorage.getItem(MODE_KEY);
     mode = modes.some(([value]) => value === savedMode) ? savedMode : 'system';
     const savedFont = localStorage.getItem(FONT_KEY);
@@ -1790,7 +1929,7 @@
 
 <svelte:window
   onclick={closeMenus}
-  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; notificationsOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; backupContextMenu = null; } }}
+  onkeydown={(event) => { if (event.key === 'Escape') { themeOpen = false; editorThemeOpen = false; notificationsOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; backupContextMenu = null; } }}
 />
 
 <svelte:head><title>{authenticated ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
@@ -1951,7 +2090,7 @@
       </div>
       {#if authenticated}
         <div class="relative header-menu">
-          <button class="btn preset-tonal" type="button" aria-expanded={profileOpen} onclick={() => { profileOpen = !profileOpen; themeOpen = false; notificationsOpen = false; }}>{currentLogin}</button>
+          <button class="btn preset-tonal" type="button" aria-expanded={profileOpen} onclick={() => { profileOpen = !profileOpen; themeOpen = false; editorThemeOpen = false; notificationsOpen = false; }}>{currentLogin}</button>
           {#if profileOpen}
             <div class="card preset-filled-surface-100-900 absolute right-0 mt-2 min-w-44 p-2 shadow-xl z-10">
               <button class="btn w-full justify-start hover:preset-tonal-error" type="button" onclick={logout}>Выйти</button>
@@ -2473,6 +2612,7 @@
 
 {#if hookContextMenu}
   <div class="hook-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${hookContextMenu.x}px;top:${hookContextMenu.y}px`} role="menu" aria-label={`Действия с хуком ${hookContextMenu.hook.hook}`}>
+    <button type="button" role="menuitem" onclick={() => editHookItem(hookContextMenu.hook)}><Pencil size={16} aria-hidden="true" />Изменить</button>
     <button type="button" role="menuitem" onclick={() => { hookToggleConfirmation = hookContextMenu.hook; hookContextMenu = null; }}><Power size={16} aria-hidden="true" />{hookContextMenu.hook.enabled ? 'Выключить' : 'Включить'}</button>
     <button class="danger" type="button" role="menuitem" onclick={() => { hookDeleteConfirmation = hookContextMenu.hook; hookContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
@@ -2485,6 +2625,45 @@
     <button class="danger" type="button" role="menuitem" onclick={() => { scheduleDeleteConfirmation = scheduleContextMenu.item; scheduleContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
+
+<Dialog open={Boolean(hookEditorDialog)} onOpenChange={({ open }) => { if (!open && !hookEditorSaving) hookEditorDialog = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog hook-editor-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <div class="hook-editor-header">
+        <Dialog.Title class="login-error-title">Изменить хук {hookEditorDialog?.hook.hook}</Dialog.Title>
+        <div class="hook-editor-theme-picker">
+          <button class="btn btn-sm preset-tonal theme-trigger" type="button" aria-label="Цветовая схема редактора" aria-haspopup="dialog" aria-expanded={editorThemeOpen} onclick={() => { editorThemeOpen = !editorThemeOpen; }}><span class="editor-theme-dot" aria-hidden="true"></span>{editorThemes.find(([value]) => value === editorTheme)?.[1]}</button>
+          {#if editorThemeOpen}
+            <div class="editor-theme-menu theme-menu card preset-filled-surface-100-900 shadow-2xl" role="dialog" aria-label="Цветовая схема редактора">
+              <div class="theme-grid" role="list" aria-label="Цветовая схема CodeMirror">
+                {#each editorThemes as [value, label, colors]}
+                  <button class:active={editorTheme === value} class="theme-option editor-theme-option" type="button" aria-label={label} aria-pressed={editorTheme === value} title={label} onclick={() => setEditorTheme(value)}><span class="editor-theme-swatch" style={`--editor-bg:${colors.background};--editor-fg:${colors.foreground};--editor-gutter:${colors.gutter}`}></span>{label}</button>
+                {/each}
+              </div>
+            </div>
+          {/if}
+        </div>
+      </div>
+      {#if hookEditorLoading}
+        <div class="hook-editor-loading animate-pulse">Загрузка…</div>
+      {:else}
+        <div class:hook-editor-compact={Boolean(hookEditorDialog?.runResult)} class="hook-code-editor" use:mountHookEditor aria-label="Редактор кода хука"></div>
+        {#if hookEditorDialog?.runResult}
+          <div class="hook-run-result hook-code-editor" use:mountHookRunResultEditor aria-label="Результат выполнения хука"></div>
+        {/if}
+        <div class="hook-run-grid">
+          <input class="input hook-run-input" type="text" aria-label="Профиль команды хука" value={hookEditorDialog?.profile || ''} oninput={(event) => { if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, profile: event.currentTarget.value }; }} />
+          <div class="hook-run-row"><Combobox collection={hookProjectCollection} value={[hookEditorDialog?.project || '']} openOnClick onValueChange={(details) => setHookWorkingDirectory(details.value[0] || '')}><Combobox.Control class="font-combobox-control hook-project-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Проект не выбран' }, ...projects.map((project) => ({ value: project.name, label: project.name }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox><input class="input hook-run-input" type="text" aria-label="Рабочая директория хука" value={hookEditorDialog?.workingDirectory || ''} oninput={(event) => { if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, workingDirectory: event.currentTarget.value, project: '' }; }} /><button class="btn preset-filled-primary-500 hook-run-button" type="button" disabled={hookRunning || hookEditorSaving} onclick={runHookEditor}><Play size={16} aria-hidden="true" />{hookRunning ? 'Выполняем…' : 'Выполнить'}</button></div>
+        </div>
+      {/if}
+      <div class="login-error-actions">
+        <button class="btn preset-tonal" type="button" disabled={hookEditorSaving || hookRunning} onclick={() => { hookEditorDialog = null; }}>Отмена</button>
+        <button class="btn preset-filled-primary-500" type="button" disabled={hookEditorLoading || hookEditorSaving || hookRunning} onclick={saveHookEditor}><Save size={16} aria-hidden="true" />{hookEditorSaving ? 'Сохраняем…' : 'Сохранить'}</button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
 
 <Dialog open={Boolean(userDialog)} onOpenChange={({ open }) => { if (!open) userDialog = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />

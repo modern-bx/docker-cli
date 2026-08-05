@@ -113,6 +113,7 @@ final class ProjectController
                 url: $baseHost !== '' ? sprintf('https://web-%s.%s', $projectName, $baseHost) : null,
                 tags: $this->tags($project['tags'] ?? []),
                 description: is_string($project['description'] ?? null) ? $project['description'] : '',
+                root: is_string($project['root'] ?? null) ? $project['root'] : '',
             );
         }
 

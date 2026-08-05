@@ -9,6 +9,7 @@
  * @property {string|null} url HTTPS URL of the project's primary host.
  * @property {string[]} tags User-defined project tags.
  * @property {string} description Project notes.
+ * @property {string} root Absolute project root path.
  */
 
 /**
@@ -164,6 +165,18 @@ export async function saveBackupsSettings(request, locations, fileStrategies) {
 
 export async function getHooksSettings(request) {
   return request('/api/settings/hooks');
+}
+
+export async function getHookContent(request, id) {
+  return request(`/api/settings/hooks/${encodeURIComponent(id)}/content`);
+}
+
+export async function saveHookContent(request, id, content) {
+  return request(`/api/settings/hooks/${encodeURIComponent(id)}/content`, { method: 'POST', body: JSON.stringify({ content }) });
+}
+
+export async function runHookSettings(request, id, profile, workingDirectory) {
+  return request(`/api/settings/hooks/${encodeURIComponent(id)}/run`, { method: 'POST', body: JSON.stringify({ profile, workingDirectory }) });
 }
 
 export async function toggleHookSettings(request, id) {
