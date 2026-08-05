@@ -1071,7 +1071,7 @@
       maximumSessionHours = data.maximumSessionHours;
       httpAuthLogin = typeof data.httpAuthLogin === 'string' ? data.httpAuthLogin : '';
       httpAuthPassword = typeof data.httpAuthPassword === 'string' ? data.httpAuthPassword : '';
-      if (data.queuedOperation) showQueuedOperation('Применение настроек HTTP-авторизации');
+      if (data.queuedOperation) notifyQueuedOperation('Применение настроек HTTP-авторизации');
     } catch (cause) {
       errorTitle = 'Не удалось сохранить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось сохранить настройки безопасности.';
