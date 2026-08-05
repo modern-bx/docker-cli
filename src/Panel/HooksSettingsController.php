@@ -33,4 +33,16 @@ final readonly class HooksSettingsController
 
         return new HookListDto($this->hooks->all());
     }
+
+    #[Route('DELETE', '/api/settings/hooks/{id}', HookActionRequestDto::class, HookListDto::class)]
+    public function delete(HookActionRequestDto $request): HookListDto
+    {
+        try {
+            $this->hooks->delete($request->id);
+        } catch (\RuntimeException $exception) {
+            throw new RequestValidationException($exception->getMessage());
+        }
+
+        return new HookListDto($this->hooks->all());
+    }
 }

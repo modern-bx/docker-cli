@@ -55,11 +55,7 @@ final readonly class HookRepository
 
     public function toggle(string $id): void
     {
-        $path = $this->hookPath($id);
-        if (!is_file($path)) {
-            throw new \RuntimeException('Хук не найден.');
-        }
-
+        $path = $this->existingHookPath($id);
         $directory = dirname($path);
         $fileName = basename($path);
         $targetName = str_starts_with($fileName, '.') ? substr($fileName, 1) : '.' . $fileName;
@@ -74,6 +70,24 @@ final readonly class HookRepository
         if (!rename($path, $target)) {
             throw new \RuntimeException('Не удалось переключить хук.');
         }
+    }
+
+    public function delete(string $id): void
+    {
+        $path = $this->existingHookPath($id);
+        if (!unlink($path)) {
+            throw new \RuntimeException('Не удалось удалить хук.');
+        }
+    }
+
+    private function existingHookPath(string $id): string
+    {
+        $path = $this->hookPath($id);
+        if (!is_file($path)) {
+            throw new \RuntimeException('Хук не найден.');
+        }
+
+        return $path;
     }
 
     private function hookPath(string $id): string

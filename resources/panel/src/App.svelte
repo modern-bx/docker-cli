@@ -5,7 +5,7 @@
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
   import HttpRefreshBoundary from './HttpRefreshBoundary.svelte';
-  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, getBackupsSettings, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
   import { createRefreshCoordinator } from './refresh.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -216,6 +216,8 @@
   let hookContextMenu = null;
   let hookToggleConfirmation = null;
   let hookToggling = false;
+  let hookDeleteConfirmation = null;
+  let hookDeleting = false;
   let users = [];
   let usersTotal = 0;
   let usersPage = 1;
@@ -560,6 +562,16 @@
       hookToggleConfirmation = null;
     } catch (requestError) { errorTitle = `Не удалось ${hook.enabled ? 'выключить' : 'включить'} хук`; error = requestError instanceof Error ? requestError.message : errorTitle; }
     finally { hookToggling = false; }
+  }
+
+  async function deleteHookItem(hook) {
+    hookContextMenu = null;
+    hookDeleting = true;
+    try {
+      hooks = (await deleteHookSettings(api, hook.id)).hooks;
+      hookDeleteConfirmation = null;
+    } catch (requestError) { errorTitle = 'Не удалось удалить хук'; error = requestError instanceof Error ? requestError.message : errorTitle; }
+    finally { hookDeleting = false; }
   }
 
   async function loadProjectBackups() {
@@ -1060,7 +1072,22 @@
     else if (field === 'status') logStatus = normalizeFilterSelection(logStatus, next);
     else if (field === 'level') logLevel = normalizeFilterSelection(logLevel, next);
     else if (field === 'context') logContext = normalizeFilterSelection(logContext, next);
-    else logType = normalizeFilterSelection(logType, next);
+    else {
+      const value = Array.isArray(next) ? next[0] : next;
+      logType = value === 'hook' ? ['hook'] : ['queue'];
+      logStatus = ['all'];
+      logLevel = ['all'];
+      logContext = ['all'];
+      logQueueItem = '';
+      logItemCode = '';
+      logTaskCode = '';
+      logHook = '';
+      logCommand = '';
+      logTiming = '';
+      logHookLevel = '';
+      logSort = 'timestamp';
+      logDirection = 'desc';
+    }
     logPage = 1;
     syncJournalFilters();
     loadLogs();
@@ -2116,9 +2143,9 @@
                 {:else if projectDetailTab === 'scheduler'}
                 <section class="project-log-view scheduler-view" aria-label={`Планировщик проекта ${selectedProject.name}`}>
                   <div class="backup-actions-toolbar scheduler-actions"><button class="btn preset-filled-primary-500" type="button" onclick={openScheduleDialog}><Plus size={16} aria-hidden="true" />Добавить</button></div>
-                  <div class="scheduler-filter card preset-filled-surface-100-900"><label><span>Команда</span><span class="log-text-filter"><input type="search" placeholder="Поиск по команде" value={scheduleQuery} oninput={(event) => { scheduleQuery = event.currentTarget.value; schedulePage = 1; }} />{#if scheduleQuery}<button type="button" aria-label="Сбросить поиск команды" onclick={() => { scheduleQuery = ''; schedulePage = 1; }}>×</button>{/if}</span></label><label><span>Статус</span><Combobox collection={scheduleStatusCollection} value={[scheduleStatus]} openOnClick onValueChange={(details) => { scheduleStatus = details.value[0] || 'all'; schedulePage = 1; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each scheduleStatusOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label></div>
-                  <div class="scheduler-table-wrap card preset-filled-surface-100-900">
-                    <table class="table table-zebra scheduler-table"><thead><tr><th class="scheduler-menu-column"><button class="backup-refresh-trigger" type="button" disabled={scheduleLoading} aria-label="Обновить список команд" title="Обновить" onclick={loadSchedule}><RotateCw size={17} class={scheduleLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th><th>Включено</th><th>Расписание</th><th>Команда</th><th>Рабочая папка</th></tr></thead><tbody>
+                  <div class="log-toolbar scheduler-filter card preset-filled-surface-100-900"><label><span>Команда</span><span class="log-text-filter"><input type="search" placeholder="Поиск по команде" value={scheduleQuery} oninput={(event) => { scheduleQuery = event.currentTarget.value; schedulePage = 1; }} />{#if scheduleQuery}<button type="button" aria-label="Сбросить поиск команды" onclick={() => { scheduleQuery = ''; schedulePage = 1; }}>×</button>{/if}</span></label><label><span>Статус</span><Combobox collection={scheduleStatusCollection} value={[scheduleStatus]} openOnClick onValueChange={(details) => { scheduleStatus = details.value[0] || 'all'; schedulePage = 1; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each scheduleStatusOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label></div>
+                  <div class="log-table-wrap scheduler-table-wrap card preset-filled-surface-100-900">
+                    <table class="table table-zebra log-table scheduler-table"><thead><tr><th class="scheduler-menu-column"><button class="backup-refresh-trigger" type="button" disabled={scheduleLoading} aria-label="Обновить список команд" title="Обновить" onclick={loadSchedule}><RotateCw size={17} class={scheduleLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th><th>Включено</th><th>Расписание</th><th>Команда</th><th>Рабочая папка</th></tr></thead><tbody>
                       {#if scheduleLoading}<tr><td colspan="5" class="log-empty animate-pulse">Загрузка…</td></tr>
                       {:else if filteredScheduleItems.length === 0}<tr><td colspan="5" class="log-empty">{scheduleQuery || scheduleStatus !== 'all' ? 'Команды не найдены' : 'Запланированных команд пока нет'}</td></tr>
                       {:else}{#each pagedScheduleItems as item}<tr class:schedule-disabled={!item.enabled} oncontextmenu={(event) => openScheduleContextMenu(event, item)}><td class="scheduler-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с командой ${item.command}`} aria-haspopup="menu" onclick={(event) => openScheduleContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td class="scheduler-enabled">{item.enabled ? 'Да' : 'Нет'}</td><td><code>{item.schedule}</code></td><td><code>{item.command}</code></td><td>{item.workingDirectory || '—'}</td></tr>{/each}{/if}
@@ -2132,7 +2159,7 @@
                   <div class="log-toolbar card preset-filled-surface-100-900">
                     <label>
                       <span>Тип записи</span>
-                      <Combobox collection={logTypeCollection} value={logType} multiple openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
+                      <Combobox collection={logTypeCollection} value={logType} openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
                         <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" value={logSelectionLabel(logTypes, logType)} readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                         <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logTypes as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                       </Combobox>
@@ -2180,7 +2207,7 @@
             <div class="log-toolbar card preset-filled-surface-100-900">
               <label>
                 <span>Тип записи</span>
-                <Combobox collection={logTypeCollection} value={logType} multiple openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
+                <Combobox collection={logTypeCollection} value={logType} openOnClick onValueChange={(details) => applyLogSelection('type', details.value)}>
                   <Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" value={logSelectionLabel(logTypes, logType)} readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
                   <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logTypes as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                 </Combobox>
@@ -2354,15 +2381,15 @@
             {:else if settingsTab === 'hooks'}
               <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadHooksSettings} />
             <div class="settings-scroll hooks-settings-scroll">
-              <div class="scheduler-filter hooks-filter">
+              <div class="log-toolbar hooks-filter card preset-filled-surface-100-900">
                 <label><span>Уровень</span><Combobox collection={hookLevelCollection} value={[hookLevel]} openOnClick onValueChange={(details) => changeHookFilter('level', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookLevelOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
                 <label><span>Время выполнения</span><Combobox collection={hookTimingCollection} value={[hookTiming]} openOnClick onValueChange={(details) => changeHookFilter('timing', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookTimingOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
                 <label><span>Включен</span><Combobox collection={hookEnabledCollection} value={[hookEnabled]} openOnClick onValueChange={(details) => changeHookFilter('enabled', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookEnabledOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
                 <label><span>Команда</span><input class="input" type="text" value={hookCommandQuery} placeholder="project:up" oninput={(event) => changeHookFilter('command', event.currentTarget.value)} /></label>
                 <label><span>Хук</span><input class="input" type="text" value={hookNameQuery} placeholder="имя файла" oninput={(event) => changeHookFilter('hook', event.currentTarget.value)} /></label>
               </div>
-              <div class="scheduler-table-wrap hooks-table-wrap card preset-filled-surface-100-900">
-                <table class="table table-zebra scheduler-table hooks-table"><thead><tr><th class="scheduler-menu-column"><button class="backup-refresh-trigger" type="button" disabled={hooksLoading} aria-label="Обновить список хуков" title="Обновить" onclick={loadHooksSettings}><RotateCw size={17} class={hooksLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th>{#each [['level', 'Уровень'], ['command', 'Код команды'], ['timing', 'Время выполнения'], ['enabled', 'Включен'], ['hook', 'Хук']] as [field, label]}<th><button type="button" onclick={() => sortHooks(field)}>{label}<span aria-hidden="true">{hookSort === field ? (hookDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead><tbody>
+              <div class="log-table-wrap hooks-table-wrap card preset-filled-surface-100-900">
+                <table class="table table-zebra log-table hooks-table"><thead><tr><th class="scheduler-menu-column"><button class="backup-refresh-trigger" type="button" disabled={hooksLoading} aria-label="Обновить список хуков" title="Обновить" onclick={loadHooksSettings}><RotateCw size={17} class={hooksLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th>{#each [['level', 'Уровень'], ['command', 'Код команды'], ['timing', 'Время выполнения'], ['enabled', 'Включен'], ['hook', 'Хук']] as [field, label]}<th><button type="button" onclick={() => sortHooks(field)}>{label}<span aria-hidden="true">{hookSort === field ? (hookDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead><tbody>
                   {#if hooksLoading}<tr><td colspan="6" class="log-empty animate-pulse">Загрузка…</td></tr>
                   {:else if filteredHooks.length === 0}<tr><td colspan="6" class="log-empty">Хуки не найдены</td></tr>
                   {:else}{#each pagedHooks as hook (hook.id)}<tr class:schedule-disabled={!hook.enabled} oncontextmenu={(event) => openHookContextMenu(event, hook)}><td class="scheduler-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с хуком ${hook.hook}`} aria-haspopup="menu" onclick={(event) => openHookContextMenu(event, hook)}><Menu size={18} aria-hidden="true" /></button></td><td>{hook.level === 'command' ? 'Команда' : hook.level}</td><td><code>{hook.command}</code></td><td><code>{hook.timing}</code></td><td class="scheduler-enabled">{hook.enabled ? 'Да' : 'Нет'}</td><td><code>{hook.hook}</code></td></tr>{/each}{/if}
@@ -2417,6 +2444,7 @@
 {#if hookContextMenu}
   <div class="hook-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${hookContextMenu.x}px;top:${hookContextMenu.y}px`} role="menu" aria-label={`Действия с хуком ${hookContextMenu.hook.hook}`}>
     <button type="button" role="menuitem" onclick={() => { hookToggleConfirmation = hookContextMenu.hook; hookContextMenu = null; }}><Power size={16} aria-hidden="true" />{hookContextMenu.hook.enabled ? 'Выключить' : 'Включить'}</button>
+    <button class="danger" type="button" role="menuitem" onclick={() => { hookDeleteConfirmation = hookContextMenu.hook; hookContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
 
@@ -2804,6 +2832,17 @@
       <Dialog.Title class="login-error-title">{hookToggleConfirmation?.enabled ? 'Выключить хук?' : 'Включить хук?'}</Dialog.Title>
       {#if hookToggleConfirmation}<Dialog.Description class="login-error-description">Хук «{hookToggleConfirmation.hook}» будет {hookToggleConfirmation.enabled ? 'выключен: к имени файла будет добавлена точка' : 'включен: точка будет убрана из имени файла'}.</Dialog.Description>{/if}
       <div class="login-error-actions system-confirm-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={hookToggling}>Отмена</Dialog.CloseTrigger><button class="btn preset-filled-primary-500" type="button" disabled={hookToggling} onclick={() => toggleHookItem(hookToggleConfirmation)}>{hookToggling ? 'Сохраняем…' : (hookToggleConfirmation?.enabled ? 'Выключить' : 'Включить')}</button></div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
+<Dialog open={Boolean(hookDeleteConfirmation)} onOpenChange={({ open }) => { if (!open && !hookDeleting) hookDeleteConfirmation = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog error-alert card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Удалить хук?</Dialog.Title>
+      {#if hookDeleteConfirmation}<Dialog.Description class="login-error-description">Хук «{hookDeleteConfirmation.hook}» будет удалён с диска. Это действие необратимо.</Dialog.Description>{/if}
+      <div class="login-error-actions system-confirm-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={hookDeleting}>Отмена</Dialog.CloseTrigger><button class="btn preset-filled-error-500" type="button" disabled={hookDeleting} onclick={() => deleteHookItem(hookDeleteConfirmation)}>{hookDeleting ? 'Удаляем…' : 'Удалить'}</button></div>
     </Dialog.Content>
   </Dialog.Positioner>
 </Dialog>

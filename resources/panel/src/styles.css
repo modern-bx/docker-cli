@@ -509,3 +509,8 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .hooks-filter label { width: min(16rem, 100%); }
 .hooks-table-wrap { min-height: 18rem; }
 .hooks-settings-scroll { padding-top: 1rem; }
+.log-toolbar.scheduler-filter, .log-toolbar.hooks-filter { padding: 1rem 0; background: transparent; }
+.log-toolbar.scheduler-filter label, .log-toolbar.hooks-filter label { min-width: 13rem; width: auto; font-size: inherit; font-weight: inherit; }
+.log-table.scheduler-table th { padding: 0; }
+.log-table.scheduler-table td { padding: 0.7rem 0.75rem; }
+.log-table.scheduler-table .scheduler-menu-column { width: 3rem; padding: 0.35rem; text-align: center; }
