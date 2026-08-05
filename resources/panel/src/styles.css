@@ -532,13 +532,12 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .hook-code-editor .cm-activeLineGutter { background: rgb(115 115 115 / 12%); }
 .hook-code-editor .cm-content { caret-color: var(--color-primary-500); }
 .hook-run-grid { display: grid; gap: .75rem; margin-top: .75rem; }
-.hook-run-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .75rem; align-items: stretch; }
-.hook-run-row:has(.hook-project-control) { grid-template-columns: minmax(12rem, .35fr) minmax(0, 1fr) auto; }
+.hook-run-row { display: grid; grid-template-columns: minmax(12rem, .35fr) minmax(0, 1fr) auto; gap: .75rem; align-items: stretch; }
 .hook-run-editor.hook-code-editor,
 .hook-run-result.hook-code-editor { margin-top: 0; }
-.hook-run-button { align-self: stretch; white-space: nowrap; }
-.hook-project-control { height: 100%; min-height: 3.6rem; }
+.hook-run-button { align-self: stretch; min-height: 2.45rem; white-space: nowrap; }
+.hook-project-control { height: 2.45rem; min-height: 0; }
+.hook-run-editor .cm-editor { min-height: 2.45rem; }
 @media (max-width: 760px) {
-  .hook-run-row,
-  .hook-run-row:has(.hook-project-control) { grid-template-columns: 1fr; }
+  .hook-run-row { grid-template-columns: 1fr; }
 }

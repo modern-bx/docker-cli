@@ -564,14 +564,14 @@
   function rebuildHookEditor() {
     if (!hookEditorElement || !hookEditorDialog) return;
     hookEditorView?.destroy();
-    hookEditorView = createHookEditor(hookEditorElement, hookEditorDialog.content, hookEditorDialog.runResult ? 17 : 22, (content) => {
+    hookEditorView = createHookEditor(hookEditorElement, hookEditorDialog.content, hookEditorDialog.runResult ? 10 : 15, (content) => {
       if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, content };
     });
   }
 
   function mountHookProfileEditor(node) {
     hookProfileView?.destroy();
-    hookProfileView = createHookEditor(node, hookEditorDialog?.profile || '', 2, (profile) => {
+    hookProfileView = createHookEditor(node, hookEditorDialog?.profile || '', 1, (profile) => {
       if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, profile };
     });
     return { destroy() { hookProfileView?.destroy(); hookProfileView = null; } };
@@ -579,7 +579,7 @@
 
   function mountHookWorkingDirectoryEditor(node) {
     hookWorkingDirectoryView?.destroy();
-    hookWorkingDirectoryView = createHookEditor(node, hookEditorDialog?.workingDirectory || '', 2, (workingDirectory) => {
+    hookWorkingDirectoryView = createHookEditor(node, hookEditorDialog?.workingDirectory || '', 1, (workingDirectory) => {
       if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, workingDirectory, project: '' };
     });
     return { destroy() { hookWorkingDirectoryView?.destroy(); hookWorkingDirectoryView = null; } };
@@ -2628,7 +2628,7 @@
           <div class="hook-run-result hook-code-editor" use:mountHookRunResultEditor aria-label="Результат выполнения хука"></div>
         {/if}
         <div class="hook-run-grid">
-          <div class="hook-run-row"><div class="hook-run-editor hook-code-editor" use:mountHookProfileEditor aria-label="Профиль команды хука"></div><button class="btn preset-filled-primary-500 hook-run-button" type="button" disabled={hookRunning || hookEditorSaving} onclick={runHookEditor}><Play size={16} aria-hidden="true" />{hookRunning ? 'Выполняем…' : 'Выполнить'}</button></div>
+          <div class="hook-run-editor hook-code-editor" use:mountHookProfileEditor aria-label="Профиль команды хука"></div>
           <div class="hook-run-row"><Combobox collection={hookProjectCollection} value={[hookEditorDialog?.project || '']} openOnClick onValueChange={(details) => setHookWorkingDirectory(details.value[0] || '')}><Combobox.Control class="font-combobox-control hook-project-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Проект не выбран' }, ...projects.map((project) => ({ value: project.name, label: project.name }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox><div class="hook-run-editor hook-code-editor" use:mountHookWorkingDirectoryEditor aria-label="Рабочая директория хука"></div><button class="btn preset-filled-primary-500 hook-run-button" type="button" disabled={hookRunning || hookEditorSaving} onclick={runHookEditor}><Play size={16} aria-hidden="true" />{hookRunning ? 'Выполняем…' : 'Выполнить'}</button></div>
         </div>
       {/if}
