@@ -1,0 +1,15 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Reload системных сервисов
+  code: core.system.reload
+  type: shell
+  context: system
+  description: Перезагружает конфигурацию системных сервисов без перезапуска контейнеров.
+  parameters:
+    service: { type: string, required: false }
+  action: |
+    options=()
+    [ -n "${service+x}" ] && options+=(--service="$service")
+    docker-cli system:reload "${options[@]}"

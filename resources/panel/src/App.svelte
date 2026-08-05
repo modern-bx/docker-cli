@@ -192,6 +192,8 @@
   let notesSaving = false;
   let securitySaving = false;
   let maximumSessionHours = 8;
+  let httpAuthLogin = '';
+  let httpAuthPassword = '';
   let settingsLoading = false;
   let settingsSaving = false;
   let projectLocations = [{ path: '', default: true }];
@@ -1044,6 +1046,8 @@
     try {
       const data = await getSecuritySettings(api);
       maximumSessionHours = Number(data.maximumSessionHours) || 8;
+      httpAuthLogin = typeof data.httpAuthLogin === 'string' ? data.httpAuthLogin : '';
+      httpAuthPassword = typeof data.httpAuthPassword === 'string' ? data.httpAuthPassword : '';
     } catch (cause) {
       errorTitle = 'Не удалось загрузить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить настройки безопасности.';
@@ -1063,8 +1067,11 @@
     }
     settingsSaving = true;
     try {
-      const data = await saveSecuritySettings(api, hours);
+      const data = await saveSecuritySettings(api, hours, httpAuthLogin.trim(), httpAuthPassword);
       maximumSessionHours = data.maximumSessionHours;
+      httpAuthLogin = typeof data.httpAuthLogin === 'string' ? data.httpAuthLogin : '';
+      httpAuthPassword = typeof data.httpAuthPassword === 'string' ? data.httpAuthPassword : '';
+      if (data.queuedOperation) notifyQueuedOperation('Применение настроек HTTP-авторизации');
     } catch (cause) {
       errorTitle = 'Не удалось сохранить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось сохранить настройки безопасности.';
@@ -2427,6 +2434,18 @@
                   </span>
                   <span class="session-duration-input"><input class="input" type="number" min="1" max="8760" step="1" bind:value={maximumSessionHours} disabled={settingsLoading || settingsSaving} required /><span>часов</span></span>
                 </label>
+              </section>
+              <section class="settings-card card preset-filled-surface-100-900" aria-label="HTTP-авторизация">
+                <h3 class="settings-card-title">HTTP-авторизация
+                  <Tooltip positioning={{ placement: 'right' }}>
+                    <Tooltip.Trigger class="security-help" aria-label="О HTTP-авторизации"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                    <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Дополнительная HTTP Basic Auth-защита для проектных хостов OpenResty и панели. Включается только если заполнены оба поля; после сохранения настройки применяются через очередь.</Tooltip.Content></Tooltip.Positioner>
+                  </Tooltip>
+                </h3>
+                <div class="settings-grid two-columns">
+                  <label class="label"><span class="label-text">Логин</span><input class="input" type="text" bind:value={httpAuthLogin} disabled={settingsLoading || settingsSaving} autocomplete="off" /></label>
+                  <label class="label"><span class="label-text">Пароль</span><input class="input" type="password" bind:value={httpAuthPassword} disabled={settingsLoading || settingsSaving} autocomplete="new-password" /></label>
+                </div>
               </section>
             </div>
             {/if}
