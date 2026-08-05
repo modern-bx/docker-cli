@@ -536,7 +536,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .hook-run-editor.hook-code-editor,
 .hook-run-result.hook-code-editor { margin-top: 0; }
 .hook-run-button { align-self: stretch; min-height: 2.45rem; white-space: nowrap; }
-.hook-project-control { height: 2.45rem; min-height: 0; }
+.hook-project-control { box-sizing: content-box; height: 2.45rem; min-height: 0; }
 .hook-run-editor .cm-editor { min-height: 2.45rem; }
 @media (max-width: 760px) {
   .hook-run-row { grid-template-columns: 1fr; }

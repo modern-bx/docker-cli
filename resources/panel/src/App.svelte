@@ -649,7 +649,7 @@
 
   async function editHookItem(hook) {
     hookContextMenu = null;
-    hookEditorDialog = { hook, content: '', profile: `hook:command ${hook.command}`, workingDirectory: '', project: '', runResult: '' };
+    hookEditorDialog = { hook, content: '', profile: `hook:command ${hook.command}:${hook.timing}`, workingDirectory: '', project: '', runResult: '' };
     hookEditorLoading = true;
     try {
       const data = await getHookContent(api, hook.id);
