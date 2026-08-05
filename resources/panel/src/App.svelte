@@ -1116,7 +1116,10 @@
   function changeTextLogFilter(field, value) {
     if (field === 'queueItem') logQueueItem = value;
     else if (field === 'itemCode') logItemCode = value;
-    else logTaskCode = value;
+    else if (field === 'taskCode') logTaskCode = value;
+    else if (field === 'hook') logHook = value;
+    else if (field === 'command') logCommand = value;
+    else if (field === 'timing') logTiming = ['before', 'after'].includes(value) ? value : '';
     logPage = 1;
     syncJournalFilters();
     clearTimeout(logFilterTimer);
