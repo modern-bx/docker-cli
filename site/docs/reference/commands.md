@@ -92,6 +92,14 @@ bin/docker-cli project:up my-project
 bin/docker-cli project:up my-project --no-restart
 ```
 
+Для команды поддерживаются исполняемые хуки из каталогов
+`~/.config/docker-cli/actions/hooks/commands/project.up.before` и
+`~/.config/docker-cli/actions/hooks/commands/project.up.after`. Файлы запускаются
+в алфавитном порядке из текущего рабочего каталога команды. Каждый хук получает
+аргументы `hook:command`, `project:up:before` или `project:up:after`, а затем все
+исходные аргументы команды в неизменном порядке. Ненулевой код завершения хука
+останавливает выполнение цепочки и возвращается как код завершения команды.
+
 `--no-restart` пропускает перезапуск общего пула проектных сервисов.
 
 ### `bin/docker-cli project:list`
