@@ -28,7 +28,7 @@ final class CommandHookRunner
         $hooks = [];
         foreach (scandir($directory) ?: [] as $name) {
             $file = join_path($directory, $name);
-            if ($name !== '.' && $name !== '..' && is_file($file) && is_executable($file)) {
+            if ($name !== '.' && $name !== '..' && !str_starts_with($name, '.') && is_file($file) && is_executable($file)) {
                 $hooks[] = $file;
             }
         }

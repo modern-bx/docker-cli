@@ -31,6 +31,7 @@ final class ConfigInitCommand extends AbstractCommand
         $this->addOption('migrate', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.migrate_option'));
         $this->addOption('rebuild', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.rebuild_option'));
         $this->addOption('force', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.force_option'));
+        $this->addOption('examples', null, InputOption::VALUE_NONE, $this->translator->trans('command.init.examples_option'));
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -39,6 +40,7 @@ final class ConfigInitCommand extends AbstractCommand
         $migrate = (bool) $input->getOption('migrate');
         $rebuild = (bool) $input->getOption('rebuild');
         $force = (bool) $input->getOption('force');
+        $examples = (bool) $input->getOption('examples');
 
         if ($update && !$force) {
             $question = new ConfirmationQuestion($this->translator->trans('command.init.update_confirm') . ' ', false);
@@ -50,7 +52,7 @@ final class ConfigInitCommand extends AbstractCommand
         }
 
         $compose = new SystemCompose();
-        $created = $compose->init($update, $migrate);
+        $created = $compose->init($update, $migrate, $examples);
         (new OfeliaConfigRenderer())->render();
         if ($this->ensureBitrixWizardPassword($compose)) {
             $created = true;
