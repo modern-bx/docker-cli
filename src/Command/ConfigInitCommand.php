@@ -6,6 +6,7 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\SystemCompose;
 use DockerCli\Project\OpenRestyHostRenderer;
+use DockerCli\Project\PanelGatewayAuthRenderer;
 use DockerCli\Project\OfeliaConfigRenderer;
 use DockerCli\Project\OfeliaReloadScheduler;
 use DockerCli\Project\XdebugPortManager;
@@ -66,6 +67,7 @@ final class ConfigInitCommand extends AbstractCommand
         if ($rebuild) {
             (new XdebugPortManager())->rebuildProjectPorts($this->projectsDirectory());
             (new OpenRestyHostRenderer())->render();
+            (new PanelGatewayAuthRenderer())->render();
             (new OfeliaReloadScheduler())->enqueue();
             $this->writeMessage($output, '<info>' . $this->translator->trans('config.rebuilt') . '</info>');
         }

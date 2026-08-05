@@ -329,7 +329,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./config/panel/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./config/panel/upstream.conf:/etc/nginx/panel/upstream.conf:ro
+      - ./config/panel:/etc/nginx/panel:ro
     labels:
       traefik.enable: "true"
       traefik.http.routers.panel.rule: Host(`panel.${BASE_HOST}`)

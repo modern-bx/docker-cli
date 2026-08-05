@@ -12,6 +12,8 @@ final class OpenRestyHostRenderer
 {
     private const HOSTS_RELATIVE_PATH = 'config/openresty/hosts';
     private const PROJECT_WEB_DNSDOCK_ALIAS = 'PROJECT_WEB_DNSDOCK_ALIAS';
+    private const HTTP_AUTH_CONFIG_FILE = 'http-auth.conf';
+    private const HTTP_AUTH_USER_FILE = '.htpasswd';
 
     public function render(): void
     {
@@ -28,6 +30,7 @@ final class OpenRestyHostRenderer
         $envValues = $this->readEnvValues($compose->envFile());
         $baseHost = $this->requiredEnvValue($envValues, 'BASE_HOST', $compose->envFile());
         $openRestyPort = $this->openRestyPort($envValues, $compose->envFile());
+        $httpAuthConfig = $this->httpAuthConfig($envValues, $hostsDirectory);
         $hostNames = [];
         $disabledHostNames = [];
         foreach ($this->registeredProjects() as $project) {
@@ -56,10 +59,11 @@ final class OpenRestyHostRenderer
                 '{{ php_fpm_upstream }}' => $this->phpFpmUpstream($project),
                 '{{ xdebug_client_port }}' => (string) ($project['xdebug_client_port'] ?? 9003),
                 '{{ openresty_port }}' => (string) $openRestyPort,
+                '{{ http_auth_config }}' => $httpAuthConfig,
             ]));
         }
 
-        $this->renderFallbackHost($hostsDirectory, $openRestyPort, [$baseHost, ...$disabledHostNames]);
+        $this->renderFallbackHost($hostsDirectory, $openRestyPort, [$baseHost, ...$disabledHostNames], $httpAuthConfig);
 
         $this->writeProjectWebDnsdockAliases($compose->envFile(), $hostNames);
     }
@@ -113,7 +117,7 @@ final class OpenRestyHostRenderer
     }
 
     /** @param list<string> $hostNames */
-    private function renderFallbackHost(string $hostsDirectory, int $port, array $hostNames): void
+    private function renderFallbackHost(string $hostsDirectory, int $port, array $hostNames, string $httpAuthConfig): void
     {
         $template = join_path(dirname(__DIR__, 2), 'resources', 'compose', 'system', 'config', 'openresty', 'fallback.conf');
         $contents = file_get_contents($template);
@@ -124,7 +128,25 @@ final class OpenRestyHostRenderer
         file_put_contents(join_path($hostsDirectory, 'fallback.web.conf'), strtr($contents, [
             '{{ openresty_port }}' => (string) $port,
             '{{ host_names }}' => implode(' ', $hostNames),
+            '{{ http_auth_config }}' => $httpAuthConfig,
         ]));
+    }
+
+    /** @param array<string, string> $envValues */
+    private function httpAuthConfig(array $envValues, string $hostsDirectory): string
+    {
+        $legacyConfig = join_path($hostsDirectory, self::HTTP_AUTH_CONFIG_FILE);
+        if (is_file($legacyConfig)) {
+            unlink($legacyConfig);
+        }
+
+        return (new HttpBasicAuthRenderer())->render(
+            $envValues,
+            $hostsDirectory,
+            null,
+            self::HTTP_AUTH_USER_FILE,
+            '/etc/nginx/conf.d/' . self::HTTP_AUTH_USER_FILE
+        );
     }
 
     /** @param array<string, mixed> $project */
