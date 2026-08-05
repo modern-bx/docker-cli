@@ -72,6 +72,24 @@ final readonly class HookRepository
         }
     }
 
+    public function content(string $id): string
+    {
+        $content = file_get_contents($this->existingHookPath($id));
+        if ($content === false) {
+            throw new \RuntimeException('Не удалось прочитать хук.');
+        }
+
+        return $content;
+    }
+
+    public function save(string $id, string $content): void
+    {
+        $path = $this->existingHookPath($id);
+        if (file_put_contents($path, $content, LOCK_EX) === false) {
+            throw new \RuntimeException('Не удалось сохранить хук.');
+        }
+    }
+
     public function delete(string $id): void
     {
         $path = $this->existingHookPath($id);

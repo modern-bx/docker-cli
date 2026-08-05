@@ -518,3 +518,16 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .log-table.scheduler-table th { padding: 0; }
 .log-table.scheduler-table td { padding: 0.7rem 0.75rem; }
 .log-table.scheduler-table .scheduler-menu-column { width: 3rem; padding: 0.35rem; text-align: center; }
+.hook-editor-dialog { width: min(72rem, 100vw - 2rem); }
+.hook-editor-loading { border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); margin-top: 1rem; min-height: 20rem; padding: 1rem; }
+.dark .hook-editor-loading { border-color: var(--color-surface-700); }
+.hook-code-editor { border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); margin-top: 1rem; overflow: hidden; }
+.dark .hook-code-editor { border-color: var(--color-surface-700); }
+.hook-code-editor .cm-editor { height: min(62vh, 34rem); background: var(--color-surface-50); color: var(--color-surface-950); font-size: .85rem; }
+.dark .hook-code-editor .cm-editor { background: var(--color-surface-950); color: var(--color-surface-50); }
+.hook-code-editor .cm-scroller { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+.hook-code-editor .cm-gutters { background: var(--color-surface-100); border-right: 1px solid var(--color-surface-300); color: var(--color-surface-500); }
+.dark .hook-code-editor .cm-gutters { background: var(--color-surface-900); border-color: var(--color-surface-700); }
+.hook-code-editor .cm-activeLine,
+.hook-code-editor .cm-activeLineGutter { background: rgb(115 115 115 / 12%); }
+.hook-code-editor .cm-content { caret-color: var(--color-primary-500); }

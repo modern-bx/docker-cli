@@ -1,11 +1,16 @@
 <script>
   import { onMount } from 'svelte';
+  import { EditorState } from '@codemirror/state';
+  import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
+  import { defaultKeymap, history as cmHistory, historyKeymap } from '@codemirror/commands';
+  import { StreamLanguage, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+  import { shell } from '@codemirror/legacy-modes/mode/shell';
   import { Combobox, Dialog, Tabs, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Settings, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
   import HttpRefreshBoundary from './HttpRefreshBoundary.svelte';
-  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHookContent, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, saveHookContent, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
   import { createRefreshCoordinator } from './refresh.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -220,6 +225,11 @@
   let hookToggling = false;
   let hookDeleteConfirmation = null;
   let hookDeleting = false;
+  let hookEditorDialog = null;
+  let hookEditorLoading = false;
+  let hookEditorSaving = false;
+  let hookEditorElement = null;
+  let hookEditorView = null;
   let users = [];
   let usersTotal = 0;
   let usersPage = 1;
@@ -523,6 +533,30 @@
     finally { scheduleToggling = false; }
   }
 
+
+  function mountHookEditor(node) {
+    hookEditorElement = node;
+    rebuildHookEditor();
+    return { destroy() { hookEditorElement = null; hookEditorView?.destroy(); hookEditorView = null; } };
+  }
+
+  function rebuildHookEditor() {
+    if (!hookEditorElement || !hookEditorDialog) return;
+    hookEditorView?.destroy();
+    hookEditorView = new EditorView({
+      parent: hookEditorElement,
+      state: EditorState.create({
+        doc: hookEditorDialog.content,
+        extensions: [
+          lineNumbers(), highlightActiveLineGutter(), cmHistory(), StreamLanguage.define(shell), syntaxHighlighting(defaultHighlightStyle), highlightActiveLine(),
+          keymap.of([...defaultKeymap, ...historyKeymap]),
+          EditorView.lineWrapping,
+          EditorView.updateListener.of((update) => { if (update.docChanged && hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, content: update.state.doc.toString() }; }),
+        ],
+      }),
+    });
+  }
+
   async function loadHooksSettings() {
     if (!authenticated) return;
     hooksLoading = true;
@@ -561,6 +595,35 @@
     const x = 'clientX' in event && event.clientX > 0 ? event.clientX : bounds.right;
     const y = 'clientY' in event && event.clientY > 0 ? event.clientY : bounds.bottom;
     hookContextMenu = { hook, x: Math.max(8, Math.min(x, window.innerWidth - 180)), y: Math.max(8, Math.min(y, window.innerHeight - 120)) };
+  }
+
+
+  async function editHookItem(hook) {
+    hookContextMenu = null;
+    hookEditorDialog = { hook, content: '' };
+    hookEditorLoading = true;
+    try {
+      const data = await getHookContent(api, hook.id);
+      hookEditorDialog = { hook, content: typeof data.content === 'string' ? data.content : '' };
+      setTimeout(rebuildHookEditor, 0);
+    } catch (requestError) {
+      hookEditorDialog = null;
+      errorTitle = 'Не удалось открыть хук';
+      error = requestError instanceof Error ? requestError.message : errorTitle;
+    } finally { hookEditorLoading = false; }
+  }
+
+  async function saveHookEditor() {
+    if (!hookEditorDialog) return;
+    hookEditorSaving = true;
+    try {
+      const content = hookEditorView ? hookEditorView.state.doc.toString() : hookEditorDialog.content;
+      await saveHookContent(api, hookEditorDialog.hook.id, content);
+      hookEditorDialog = null;
+    } catch (requestError) {
+      errorTitle = 'Не удалось сохранить хук';
+      error = requestError instanceof Error ? requestError.message : errorTitle;
+    } finally { hookEditorSaving = false; }
   }
 
   async function toggleHookItem(hook) {
@@ -2473,6 +2536,7 @@
 
 {#if hookContextMenu}
   <div class="hook-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${hookContextMenu.x}px;top:${hookContextMenu.y}px`} role="menu" aria-label={`Действия с хуком ${hookContextMenu.hook.hook}`}>
+    <button type="button" role="menuitem" onclick={() => editHookItem(hookContextMenu.hook)}><Pencil size={16} aria-hidden="true" />Изменить</button>
     <button type="button" role="menuitem" onclick={() => { hookToggleConfirmation = hookContextMenu.hook; hookContextMenu = null; }}><Power size={16} aria-hidden="true" />{hookContextMenu.hook.enabled ? 'Выключить' : 'Включить'}</button>
     <button class="danger" type="button" role="menuitem" onclick={() => { hookDeleteConfirmation = hookContextMenu.hook; hookContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
@@ -2485,6 +2549,24 @@
     <button class="danger" type="button" role="menuitem" onclick={() => { scheduleDeleteConfirmation = scheduleContextMenu.item; scheduleContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
+
+<Dialog open={Boolean(hookEditorDialog)} onOpenChange={({ open }) => { if (!open && !hookEditorSaving) hookEditorDialog = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog hook-editor-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Изменить хук {hookEditorDialog?.hook.hook}</Dialog.Title>
+      {#if hookEditorLoading}
+        <div class="hook-editor-loading animate-pulse">Загрузка…</div>
+      {:else}
+        <div class="hook-code-editor" use:mountHookEditor aria-label="Редактор кода хука"></div>
+      {/if}
+      <div class="login-error-actions">
+        <button class="btn preset-tonal" type="button" disabled={hookEditorSaving} onclick={() => { hookEditorDialog = null; }}>Отмена</button>
+        <button class="btn preset-filled-primary-500" type="button" disabled={hookEditorLoading || hookEditorSaving} onclick={saveHookEditor}><Save size={16} aria-hidden="true" />{hookEditorSaving ? 'Сохраняем…' : 'Сохранить'}</button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
 
 <Dialog open={Boolean(userDialog)} onOpenChange={({ open }) => { if (!open) userDialog = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
