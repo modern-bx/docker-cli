@@ -6,11 +6,13 @@ namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
 use DockerCli\Framework\FrameworkDetectionService;
+use DockerCli\Hook\CommandHookRunner;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\DataInitializer;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -23,6 +25,7 @@ final class ProjectDownCommand extends AbstractCommand
         private readonly ?FrameworkDetectionService $detectionService = null,
         private readonly ?DataInitializer $dataInitializer = null,
         private readonly ?CommandContext $context = null,
+        private readonly ?CommandHookRunner $hookRunner = null,
     ) {
         parent::__construct('project:down');
         $this->setDescription('Удалить регистрацию проекта docker-cli.');
@@ -68,6 +71,12 @@ final class ProjectDownCommand extends AbstractCommand
         if ($destructive && $registry->hasProject($projectName) && $registry->isProjectProtected($projectName)) {
             $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
             return Command::FAILURE;
+        }
+
+        $hookArguments = $input instanceof ArgvInput ? $input->getRawTokens(true) : [];
+        $beforeHookCode = ($this->hookRunner ?? new CommandHookRunner())->run('project:down', 'before', $hookArguments);
+        if ($beforeHookCode !== Command::SUCCESS) {
+            return $beforeHookCode;
         }
 
         if ($input->getOption('wipe') || $input->getOption('erase')) {
@@ -119,7 +128,7 @@ final class ProjectDownCommand extends AbstractCommand
             new Message(sprintf('Проект **%s** успешно удален из контура.', $projectName), notify: true),
         );
 
-        return Command::SUCCESS;
+        return ($this->hookRunner ?? new CommandHookRunner())->run('project:down', 'after', $hookArguments);
     }
 
     private function projectRootFromContext(ProjectRegistry $registry): ?string

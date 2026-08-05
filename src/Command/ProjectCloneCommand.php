@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
+use DockerCli\Hook\CommandHookRunner;
 use DockerCli\Panel\ProjectsSettingsRepository;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\DataInitializer;
@@ -14,6 +15,7 @@ use DockerCli\Project\ProjectDatabaseConfig;
 use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -28,6 +30,7 @@ final class ProjectCloneCommand extends AbstractCommand
         private readonly ?ProjectsSettingsRepository $settings = null,
         private readonly ?MysqlDumpLoader $mysqlDumpLoader = null,
         private readonly ?DataInitializer $dataInitializer = null,
+        private readonly ?CommandHookRunner $hookRunner = null,
     )
     {
         parent::__construct('project:clone');
@@ -98,6 +101,12 @@ final class ProjectCloneCommand extends AbstractCommand
             return Command::FAILURE;
         }
 
+        $hookArguments = $input instanceof ArgvInput ? $input->getRawTokens(true) : [];
+        $beforeHookCode = ($this->hookRunner ?? new CommandHookRunner())->run('project:clone', 'before', $hookArguments);
+        if ($beforeHookCode !== Command::SUCCESS) {
+            return $beforeHookCode;
+        }
+
         $startedAt = new \DateTimeImmutable();
         $started = microtime(true);
         $this->writeMessage($output, sprintf(
@@ -164,7 +173,7 @@ final class ProjectCloneCommand extends AbstractCommand
             $this->formatDuration($filesDuration),
             $databaseDuration > 0 ? '; копирование БД: ' . $this->formatDuration($databaseDuration) : '',
         ));
-        return Command::SUCCESS;
+        return ($this->hookRunner ?? new CommandHookRunner())->run('project:clone', 'after', $hookArguments);
     }
 
     private function destinationForName(string $name, string $sourceRoot, InputInterface $input): string

@@ -95,10 +95,12 @@ bin/docker-cli project:up my-project --no-restart
 ```
 
 Для команды поддерживаются исполняемые хуки из каталогов
-`~/.config/docker-cli/actions/hooks/commands/project.up.before` и
-`~/.config/docker-cli/actions/hooks/commands/project.up.after`. Файлы, имена которых начинаются с точки, игнорируются. Остальные файлы запускаются
+`~/.config/docker-cli/actions/hooks/commands/<код-команды>.before` и
+`~/.config/docker-cli/actions/hooks/commands/<код-команды>.after`, где двоеточие в коде команды заменяется точкой, например `project.up.before`.
+Сейчас хуки команд включены для `project:up`, `project:clone`, `project:disable`, `project:down`, `project:enable`, `project:update` и `project:wipe`.
+Файлы, имена которых начинаются с точки, игнорируются. Остальные файлы запускаются
 в алфавитном порядке из текущего рабочего каталога команды. Каждый хук получает
-аргументы `hook:command`, `project:up:before` или `project:up:after`, а затем все
+аргументы `hook:command`, `<код-команды>:before` или `<код-команды>:after`, а затем все
 исходные аргументы команды в неизменном порядке. Ненулевой код завершения хука
 останавливает выполнение цепочки и возвращается как код завершения команды. Результат каждого запуска пишется в `~/.config/docker-cli/journal/hooks/default.jsonl`: код возврата `0` и вывод в `stdout` получают уровень `info`, ненулевой код возврата и вывод в `stderr` — уровень `error`; уровни `debug` и `warning` зарезервированы в фильтрах журнала, но пока не используются. Примеры хуков хранятся в `resources/actions/hooks` и копируются только командой `config:init --examples`; их имена начинаются с точки, поэтому после копирования они остаются отключенными, пока пользователь не переименует их.
 
