@@ -508,3 +508,4 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .hooks-filter { flex-wrap: wrap; }
 .hooks-filter label { width: min(16rem, 100%); }
 .hooks-table-wrap { min-height: 18rem; }
+.hooks-settings-scroll { padding-top: 1rem; }

@@ -22,6 +22,11 @@ final readonly class LogRequestDto implements RequestDto
         public ?string $taskCode,
         public array $levels,
         public array $contexts,
+        public array $types,
+        public ?string $hook,
+        public ?string $command,
+        public ?string $timing,
+        public ?string $hookLevel,
     ) {
     }
 
@@ -31,7 +36,7 @@ final readonly class LogRequestDto implements RequestDto
         $pageSize = filter_var($request->query['pageSize'] ?? 25, FILTER_VALIDATE_INT);
         $sort = (string) ($request->query['sort'] ?? 'timestamp');
         $direction = (string) ($request->query['direction'] ?? 'desc');
-        $allowedSort = ['timestamp', 'queueItem', 'itemCode', 'project', 'queueCode', 'status', 'taskCode', 'level', 'context', 'result', 'message'];
+        $allowedSort = ['timestamp', 'queueItem', 'itemCode', 'project', 'queueCode', 'status', 'taskCode', 'level', 'context', 'result', 'message', 'hook', 'command', 'timing', 'hookLevel'];
         if ($page === false || !in_array($pageSize, [25, 50, 100], true) || !in_array($sort, $allowedSort, true) || !in_array($direction, ['asc', 'desc'], true)) {
             throw new RequestValidationException('Некорректные параметры журнала.');
         }
@@ -49,7 +54,8 @@ final readonly class LogRequestDto implements RequestDto
             ? trim($request->query[$field])
             : null;
         $levels = $selection('level', ['debug', 'info', 'warning', 'error']);
-        $contexts = $selection('context', ['command', 'task', 'queue']);
-        return new static($page, $pageSize, $sort, $direction, $projects, $statuses, $text('queueItem'), $text('itemCode'), $text('taskCode'), $levels, $contexts);
+        $contexts = $selection('context', ['command', 'task', 'queue', 'hook']);
+        $types = $selection('type', ['queue', 'hook']);
+        return new static($page, $pageSize, $sort, $direction, $projects, $statuses, $text('queueItem'), $text('itemCode'), $text('taskCode'), $levels, $contexts, $types, $text('hook'), $text('command'), $text('timing'), $text('hookLevel'));
     }
 }

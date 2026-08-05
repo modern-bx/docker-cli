@@ -9,8 +9,10 @@ use function DockerCli\Util\join_path;
 
 final class CommandHookRunner
 {
-    public function __construct(private readonly ?string $hooksDirectory = null)
-    {
+    public function __construct(
+        private readonly ?string $hooksDirectory = null,
+        private readonly ?HookJournal $journal = null,
+    ) {
     }
 
     /** @param list<string> $arguments */
@@ -35,23 +37,110 @@ final class CommandHookRunner
         sort($hooks, SORT_STRING);
 
         foreach ($hooks as $hook) {
-            $process = proc_open(
-                [$hook, 'hook:command', $command . ':' . $timing, ...$arguments],
-                [STDIN, STDOUT, STDERR],
-                $pipes,
-                getcwd() ?: null,
-            );
-            if (!is_resource($process)) {
-                throw new \RuntimeException(sprintf('Не удалось запустить хук "%s".', $hook));
+            [$exitCode, $stdout, $stderr] = $this->runHook($hook, $command, $timing, $arguments);
+            if ($stdout !== '') {
+                fwrite(STDOUT, $stdout);
+            }
+            if ($stderr !== '') {
+                fwrite(STDERR, $stderr);
             }
 
-            $exitCode = proc_close($process);
+            ($this->journal ?? new HookJournal())->record($this->metadata($hook, $command, $timing, $arguments), $exitCode, $stdout, $stderr);
             if ($exitCode !== Command::SUCCESS) {
                 return $exitCode;
             }
         }
 
         return Command::SUCCESS;
+    }
+
+    /** @param list<string> $arguments @return array{int, string, string} */
+    private function runHook(string $hook, string $command, string $timing, array $arguments): array
+    {
+        $process = proc_open(
+            [$hook, 'hook:command', $command . ':' . $timing, ...$arguments],
+            [STDIN, ['pipe', 'w'], ['pipe', 'w']],
+            $pipes,
+            getcwd() ?: null,
+        );
+        if (!is_resource($process)) {
+            throw new \RuntimeException(sprintf('Не удалось запустить хук "%s".', $hook));
+        }
+
+        foreach ([1, 2] as $index) {
+            stream_set_blocking($pipes[$index], false);
+        }
+
+        $stdout = '';
+        $stderr = '';
+        while (true) {
+            $read = array_values(array_filter([$pipes[1], $pipes[2]], static fn ($pipe): bool => is_resource($pipe) && !feof($pipe)));
+            if ($read === []) {
+                break;
+            }
+
+            $write = null;
+            $except = null;
+            if (stream_select($read, $write, $except, 0, 200000) === false) {
+                break;
+            }
+            foreach ($read as $pipe) {
+                $chunk = stream_get_contents($pipe);
+                if ($chunk === false || $chunk === '') {
+                    continue;
+                }
+                if ($pipe === $pipes[1]) {
+                    $stdout .= $chunk;
+                } else {
+                    $stderr .= $chunk;
+                }
+            }
+        }
+
+        foreach ([1, 2] as $index) {
+            fclose($pipes[$index]);
+        }
+
+        return [proc_close($process), $stdout, $stderr];
+    }
+
+    /** @param list<string> $arguments @return array<string, mixed> */
+    private function metadata(string $hook, string $command, string $timing, array $arguments): array
+    {
+        $project = $this->projectName($arguments);
+
+        return [
+            'hook' => basename($hook),
+            'command' => $command,
+            'timing' => $timing,
+            'hookLevel' => 'command',
+            'project' => $project,
+            'projects' => $project === null ? [] : [$project],
+        ];
+    }
+
+    /** @param list<string> $arguments */
+    private function projectName(array $arguments): ?string
+    {
+        $skipNext = false;
+        foreach ($arguments as $argument) {
+            if ($skipNext) {
+                $skipNext = false;
+                continue;
+            }
+            if (in_array($argument, ['--language', '--framework'], true)) {
+                $skipNext = true;
+                continue;
+            }
+            if (str_starts_with($argument, '--')) {
+                continue;
+            }
+
+            return $argument;
+        }
+
+        $cwd = getcwd();
+        return is_string($cwd) && $cwd !== '' ? basename($cwd) : null;
     }
 
     private function directory(): string

@@ -40,7 +40,7 @@
     { value: 'noto', label: 'Noto Sans' },
   ];
   const fontCollection = useListCollection({ items: fonts });
-  const logTypes = [{ value: 'queue', label: 'Очередь' }];
+  const logTypes = [{ value: 'queue', label: 'Очередь' }, { value: 'hook', label: 'Хук' }];
   const logTypeCollection = useListCollection({ items: logTypes });
   const logStatuses = [
     { value: 'all', label: 'Все статусы' },
@@ -53,7 +53,7 @@
   ];
   const logStatusCollection = useListCollection({ items: logStatuses });
   const logLevels = [{ value: 'all', label: 'Все уровни' }, { value: 'debug', label: 'Отладка' }, { value: 'info', label: 'Информация' }, { value: 'warning', label: 'Предупреждение' }, { value: 'error', label: 'Ошибка' }];
-  const logContexts = [{ value: 'all', label: 'Все контексты' }, { value: 'command', label: 'Команда' }, { value: 'task', label: 'Задача' }, { value: 'queue', label: 'Очередь' }];
+  const logContexts = [{ value: 'all', label: 'Все контексты' }, { value: 'command', label: 'Команда' }, { value: 'task', label: 'Задача' }, { value: 'queue', label: 'Очередь' }, { value: 'hook', label: 'Хук' }];
   const logLevelCollection = useListCollection({ items: logLevels });
   const logContextCollection = useListCollection({ items: logContexts });
   const logCategoryFilters = [{ field: 'level', label: 'Уровень', items: logLevels, collection: logLevelCollection }, { field: 'context', label: 'Контекст', items: logContexts, collection: logContextCollection }];
@@ -92,6 +92,10 @@
   let logQueueItem = '';
   let logItemCode = '';
   let logTaskCode = '';
+  let logHook = '';
+  let logCommand = '';
+  let logTiming = '';
+  let logHookLevel = '';
   let logPage = 1;
   let logPageSize = 25;
   let logTotal = 0;
@@ -207,6 +211,8 @@
   let hookNameQuery = '';
   let hookPage = 1;
   let hookPageSize = 25;
+  let hookSort = 'level';
+  let hookDirection = 'asc';
   let hookContextMenu = null;
   let hookToggleConfirmation = null;
   let hookToggling = false;
@@ -261,6 +267,7 @@
   $: schedulePageCount = Math.max(1, Math.ceil(filteredScheduleItems.length / schedulePageSize));
   $: if (schedulePage > schedulePageCount) schedulePage = schedulePageCount;
   $: pagedScheduleItems = filteredScheduleItems.slice((schedulePage - 1) * schedulePageSize, schedulePage * schedulePageSize);
+  $: isHookLog = specificSelections(logType).length === 1 && specificSelections(logType)[0] === 'hook';
   $: filteredHooks = hooks.filter((hook) => {
     const commandQuery = hookCommandQuery.trim().toLocaleLowerCase();
     const nameQuery = hookNameQuery.trim().toLocaleLowerCase();
@@ -270,9 +277,13 @@
       && (!commandQuery || hook.command.toLocaleLowerCase().includes(commandQuery))
       && (!nameQuery || hook.hook.toLocaleLowerCase().includes(nameQuery));
   });
+  $: sortedHooks = [...filteredHooks].sort((left, right) => {
+    const result = (left[hookSort] ?? '').localeCompare(right[hookSort] ?? '', 'ru', { numeric: true });
+    return hookDirection === 'asc' ? result : -result;
+  });
   $: hookPageCount = Math.max(1, Math.ceil(filteredHooks.length / hookPageSize));
   $: if (hookPage > hookPageCount) hookPage = hookPageCount;
-  $: pagedHooks = filteredHooks.slice((hookPage - 1) * hookPageSize, hookPage * hookPageSize);
+  $: pagedHooks = sortedHooks.slice((hookPage - 1) * hookPageSize, hookPage * hookPageSize);
 
   $: selectedProject = projects.find((project) => project.name === selectedProjectName) || null;
   $: if (selectedProject && selectedProject.name !== notesProjectName) {
@@ -340,6 +351,10 @@
     if (logQueueItem) parameters.set('queue_item', logQueueItem);
     if (logItemCode) parameters.set('item_code', logItemCode);
     if (logTaskCode) parameters.set('task_code', logTaskCode);
+    if (logHook) parameters.set('hook', logHook);
+    if (logCommand) parameters.set('command', logCommand);
+    if (logTiming) parameters.set('timing', logTiming);
+    if (logHookLevel) parameters.set('hookLevel', logHookLevel);
     const query = parameters.toString();
     return query ? `${path}?${query}` : path;
   }
@@ -364,6 +379,10 @@
     const queueItem = scalar('queue_item');
     const itemCode = scalar('item_code');
     const taskCode = scalar('task_code');
+    const hook = scalar('hook');
+    const command = scalar('command');
+    const timing = scalar('timing');
+    const hookLevel = scalar('hookLevel');
 
     logType = validSelections('type', logTypes, ['queue']);
     logProject = projectJournal ? ['all'] : validSelections('project', [{ value: 'all' }, ...projects.map((item) => ({ value: item.name }))]);
@@ -373,6 +392,10 @@
     logQueueItem = queueItem && validText(queueItem) ? queueItem : '';
     logItemCode = itemCode && validText(itemCode) ? itemCode : '';
     logTaskCode = taskCode && validText(taskCode) ? taskCode : '';
+    logHook = hook && validText(hook) ? hook : '';
+    logCommand = command && validText(command) ? command : '';
+    logTiming = ['before', 'after'].includes(timing) ? timing : '';
+    logHookLevel = hookLevel === 'command' ? hookLevel : '';
     logPage = 1;
     syncJournalFilters(projectJournal);
   }
@@ -510,6 +533,12 @@
     else if (field === 'enabled') hookEnabled = value;
     else if (field === 'command') hookCommandQuery = value;
     else if (field === 'hook') hookNameQuery = value;
+    hookPage = 1;
+  }
+
+  function sortHooks(field) {
+    if (hookSort === field) hookDirection = hookDirection === 'asc' ? 'desc' : 'asc';
+    else { hookSort = field; hookDirection = 'asc'; }
     hookPage = 1;
   }
 
@@ -735,6 +764,10 @@
         ...(logQueueItem ? { queueItem: logQueueItem } : {}),
         ...(logItemCode ? { itemCode: logItemCode } : {}),
         ...(logTaskCode ? { taskCode: logTaskCode } : {}),
+        ...(logHook ? { hook: logHook } : {}),
+        ...(logCommand ? { command: logCommand } : {}),
+        ...(logTiming ? { timing: logTiming } : {}),
+        ...(logHookLevel ? { hookLevel: logHookLevel } : {}),
       });
       if (requestId !== logRequestId) return;
       logItems = Array.isArray(data.items) ? data.items : [];
@@ -2159,30 +2192,29 @@
                   <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: 'all', label: 'Все проекты' }, ...logProjects.map((value) => ({ value, label: value }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
                 </Combobox>
               </label>
-              <label>
-                <span>Статус</span>
-                <Combobox collection={logStatusCollection} value={logStatus} multiple openOnClick onValueChange={(details) => applyLogSelection('status', details.value)}>
-                  <Combobox.Control class="font-combobox-control status-combobox-control">{#if specificSelections(logStatus).length === 1}<span class={`queue-dot status-${specificSelections(logStatus)[0]}`} aria-hidden="true"></span>{/if}<Combobox.Input class="font-combobox-input" value={logSelectionLabel(logStatuses, logStatus)} readonly />{#if specificSelections(logStatus).length}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); applyLogSelection('status', ['all']); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control>
-                  <Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logStatuses as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class="log-status-option">{#if item.value !== 'all'}<span class={`queue-dot status-${item.value}`} aria-hidden="true"></span>{/if}{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner>
-                </Combobox>
-              </label>
-              {#each logCategoryFilters as filter}
-                      <label><span>{filter.label}</span><Combobox collection={filter.collection} value={filter.field === 'level' ? logLevel : logContext} multiple openOnClick onValueChange={(details) => applyLogSelection(filter.field, details.value)}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" value={logSelectionLabel(filter.items, filter.field === 'level' ? logLevel : logContext)} readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each filter.items as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class={filter.field === 'level' && item.value !== 'all' ? `log-level level-${item.value}` : ''}>{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
-                    {/each}
-                    {#each [['queueItem', 'Элемент очереди', logQueueItem], ['itemCode', 'Код элемента', logItemCode], ['taskCode', 'Задача', logTaskCode]] as [field, label, value]}
-                <label><span>{label}</span><span class="log-text-filter"><input value={value} oninput={(event) => changeTextLogFilter(field, event.currentTarget.value)} />{#if value}<button type="button" aria-label={`Сбросить фильтр «${label}»`} onclick={() => changeTextLogFilter(field, '')}>×</button>{/if}</span></label>
-              {/each}
+              {#if isHookLog}
+                <label><span>Уровень</span><Combobox collection={hookLevelCollection} value={[logHookLevel || 'all']} openOnClick onValueChange={(details) => { logHookLevel = details.value[0] === 'command' ? 'command' : ''; logPage = 1; syncJournalFilters(false); loadLogs(); }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookLevelOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                <label><span>Время выполнения</span><Combobox collection={hookTimingCollection} value={[logTiming || 'all']} openOnClick onValueChange={(details) => { logTiming = ['before', 'after'].includes(details.value[0]) ? details.value[0] : ''; logPage = 1; syncJournalFilters(false); loadLogs(); }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookTimingOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                {#each [['command', 'Команда', logCommand], ['hook', 'Хук', logHook]] as [field, label, value]}
+                  <label><span>{label}</span><span class="log-text-filter"><input value={value} oninput={(event) => changeTextLogFilter(field, event.currentTarget.value)} />{#if value}<button type="button" aria-label={`Сбросить фильтр «${label}»`} onclick={() => changeTextLogFilter(field, '')}>×</button>{/if}</span></label>
+                {/each}
+              {:else}
+                <label><span>Статус</span><Combobox collection={logStatusCollection} value={logStatus} multiple openOnClick onValueChange={(details) => applyLogSelection('status', details.value)}><Combobox.Control class="font-combobox-control status-combobox-control">{#if specificSelections(logStatus).length === 1}<span class={`queue-dot status-${specificSelections(logStatus)[0]}`} aria-hidden="true"></span>{/if}<Combobox.Input class="font-combobox-input" value={logSelectionLabel(logStatuses, logStatus)} readonly />{#if specificSelections(logStatus).length}<button class="log-filter-clear" type="button" aria-label="Сбросить статус" onclick={(event) => { event.stopPropagation(); applyLogSelection('status', ['all']); }}>×</button>{/if}<Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each logStatuses as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class="log-status-option">{#if item.value !== 'all'}<span class={`queue-dot status-${item.value}`} aria-hidden="true"></span>{/if}{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+                {#each logCategoryFilters as filter}<label><span>{filter.label}</span><Combobox collection={filter.collection} value={filter.field === 'level' ? logLevel : logContext} multiple openOnClick onValueChange={(details) => applyLogSelection(filter.field, details.value)}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" value={logSelectionLabel(filter.items, filter.field === 'level' ? logLevel : logContext)} readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each filter.items as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText><span class={filter.field === 'level' && item.value !== 'all' ? `log-level level-${item.value}` : ''}>{item.label}</span></Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>{/each}
+                {#each [['queueItem', 'Элемент очереди', logQueueItem], ['itemCode', 'Код элемента', logItemCode], ['taskCode', 'Задача', logTaskCode]] as [field, label, value]}<label><span>{label}</span><span class="log-text-filter"><input value={value} oninput={(event) => changeTextLogFilter(field, event.currentTarget.value)} />{#if value}<button type="button" aria-label={`Сбросить фильтр «${label}»`} onclick={() => changeTextLogFilter(field, '')}>×</button>{/if}</span></label>{/each}
+              {/if}
             </div>
             <div class="log-table-wrap card preset-filled-surface-100-900">
               <table class="table table-zebra log-table">
                 <thead><tr>
-                  {#each [['timestamp', 'Время'], ['queueItem', 'Элемент очереди'], ['itemCode', 'Код элемента'], ['project', 'Проект'], ['queueCode', 'Очередь'], ['status', 'Статус'], ['taskCode', 'Задача'], ['level', 'Уровень'], ['context', 'Контекст'], ['result', 'Результат'], ['message', 'Сообщение']] as [field, label]}
+                  {#each (isHookLog ? [['project', 'Проект'], ['timestamp', 'Время'], ['hook', 'Хук'], ['command', 'Код команды'], ['timing', 'Время выполнения'], ['hookLevel', 'Уровень'], ['message', 'Сообщение']] : [['timestamp', 'Время'], ['queueItem', 'Элемент очереди'], ['itemCode', 'Код элемента'], ['project', 'Проект'], ['queueCode', 'Очередь'], ['status', 'Статус'], ['taskCode', 'Задача'], ['level', 'Уровень'], ['context', 'Контекст'], ['result', 'Результат'], ['message', 'Сообщение']]) as [field, label]}
                     <th><button type="button" onclick={() => sortLogs(field)}>{label}<span aria-hidden="true">{logSort === field ? (logDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>
                   {/each}
                 </tr></thead>
                 <tbody>
-                  {#if logsLoading}<tr><td colspan="11" class="log-empty animate-pulse">Загрузка…</td></tr>
-                  {:else if logItems.length === 0}<tr><td colspan="11" class="log-empty">Записей нет</td></tr>
+                  {#if logsLoading}<tr><td colspan={isHookLog ? 7 : 11} class="log-empty animate-pulse">Загрузка…</td></tr>
+                  {:else if logItems.length === 0}<tr><td colspan={isHookLog ? 7 : 11} class="log-empty">Записей нет</td></tr>
+                  {:else if isHookLog}{#each logItems as item}<tr><td>{#if logRecordProjects(item).length}{#each logRecordProjects(item) as project, index}{#if index}, {/if}<button class="log-filter-link" type="button" onclick={() => changeLogProject(project)}>{project}</button>{/each}{:else}—{/if}</td><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('hook', item.hook)}>{formatLogValue(item.hook)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('command', item.command)}>{formatLogValue(item.command)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('timing', item.timing)}>{formatLogValue(item.timing)}</button></td><td>{item.hookLevel === 'command' ? 'Команда' : formatLogValue(item.hookLevel)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}
                   {:else}{#each logItems as item}<tr><td>{formatQueueDate(item.timestamp)}</td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('queueItem', item.queueItem)}>{formatLogValue(item.queueItem)}</button></td><td><button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('itemCode', item.itemCode)}>{formatLogValue(item.itemCode)}</button></td><td>{#if logRecordProjects(item).length}{#each logRecordProjects(item) as project, index}{#if index}, {/if}<button class="log-filter-link" type="button" onclick={() => changeLogProject(project)}>{project}</button>{/each}{:else}—{/if}</td><td>{formatLogValue(item.queueCode)}</td><td class="log-nowrap">{#if item.status}<button class="log-filter-link log-status-link" type="button" onclick={() => changeLogStatus(item.status)}><span class={`queue-dot status-${item.status}`} aria-hidden="true"></span>{logStatusLabel(item.status)}</button>{:else}—{/if}</td><td>{#if item.taskCode}<button class="log-filter-link" type="button" onclick={() => changeTextLogFilter('taskCode', item.taskCode)}>{item.taskCode}</button>{:else}—{/if}</td><td class="log-nowrap">{#if item.level}<button class={`log-filter-link log-level level-${item.level}`} type="button" onclick={() => changeLogCategory('level', item.level)}>{logCategoryLabel(logLevels, item.level)}</button>{:else}—{/if}</td><td class="log-nowrap">{#if item.context}<button class="log-filter-link" type="button" onclick={() => changeLogCategory('context', item.context)}>{logCategoryLabel(logContexts, item.context)}</button>{:else}—{/if}</td><td>{formatLogValue(item.result)}</td><td>{formatLogValue(item.message)}</td></tr>{/each}{/if}
                 </tbody>
               </table>
@@ -2330,7 +2362,7 @@
                 <label><span>Хук</span><input class="input" type="text" value={hookNameQuery} placeholder="имя файла" oninput={(event) => changeHookFilter('hook', event.currentTarget.value)} /></label>
               </div>
               <div class="scheduler-table-wrap hooks-table-wrap card preset-filled-surface-100-900">
-                <table class="table table-zebra scheduler-table hooks-table"><thead><tr><th class="scheduler-menu-column"><button class="backup-refresh-trigger" type="button" disabled={hooksLoading} aria-label="Обновить список хуков" title="Обновить" onclick={loadHooksSettings}><RotateCw size={17} class={hooksLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th><th>Уровень</th><th>Код команды</th><th>Время выполнения</th><th>Включен</th><th>Хук</th></tr></thead><tbody>
+                <table class="table table-zebra scheduler-table hooks-table"><thead><tr><th class="scheduler-menu-column"><button class="backup-refresh-trigger" type="button" disabled={hooksLoading} aria-label="Обновить список хуков" title="Обновить" onclick={loadHooksSettings}><RotateCw size={17} class={hooksLoading ? 'animate-spin' : ''} aria-hidden="true" /></button></th>{#each [['level', 'Уровень'], ['command', 'Код команды'], ['timing', 'Время выполнения'], ['enabled', 'Включен'], ['hook', 'Хук']] as [field, label]}<th><button type="button" onclick={() => sortHooks(field)}>{label}<span aria-hidden="true">{hookSort === field ? (hookDirection === 'asc' ? ' ↑' : ' ↓') : ' ↕'}</span></button></th>{/each}</tr></thead><tbody>
                   {#if hooksLoading}<tr><td colspan="6" class="log-empty animate-pulse">Загрузка…</td></tr>
                   {:else if filteredHooks.length === 0}<tr><td colspan="6" class="log-empty">Хуки не найдены</td></tr>
                   {:else}{#each pagedHooks as hook (hook.id)}<tr class:schedule-disabled={!hook.enabled} oncontextmenu={(event) => openHookContextMenu(event, hook)}><td class="scheduler-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с хуком ${hook.hook}`} aria-haspopup="menu" onclick={(event) => openHookContextMenu(event, hook)}><Menu size={18} aria-hidden="true" /></button></td><td>{hook.level === 'command' ? 'Команда' : hook.level}</td><td><code>{hook.command}</code></td><td><code>{hook.timing}</code></td><td class="scheduler-enabled">{hook.enabled ? 'Да' : 'Нет'}</td><td><code>{hook.hook}</code></td></tr>{/each}{/if}
