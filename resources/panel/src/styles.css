@@ -527,11 +527,11 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .hook-code-editor .cm-scroller { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 .hook-code-editor .cm-gutters { border-right: 1px solid; }
 .hook-run-grid { display: grid; gap: .75rem; margin-top: .75rem; }
-.hook-run-row { display: grid; grid-template-columns: minmax(12rem, .35fr) minmax(0, 1fr) auto; gap: .75rem; align-items: stretch; }
+.hook-run-row { display: grid; grid-template-columns: minmax(12rem, .35fr) minmax(0, 1fr) auto; gap: .75rem; align-items: center; }
 .hook-run-result.hook-code-editor { margin-top: 0; }
 .hook-run-button { white-space: nowrap; }
 .hook-project-control { min-height: 0; }
-.hook-run-input { min-width: 0; }
+.hook-run-input { min-width: 0; width: 100%; }
 @media (max-width: 760px) {
   .hook-run-row { grid-template-columns: 1fr; }
 }
