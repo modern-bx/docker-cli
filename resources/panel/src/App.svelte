@@ -768,7 +768,7 @@
     try {
       const projectJournal = activeSection === 'projects' && projectDetailTab === 'journal';
       const data = await getLogs(api, {
-        page: String(logPage), pageSize: String(logPageSize), sort: logSort, direction: logDirection,
+        page: String(logPage), pageSize: String(logPageSize), sort: logSort, direction: logDirection, type: specificSelections(logType)[0] || 'queue',
         ...(projectJournal ? { project: selectedProjectName } : specificSelections(logProject).length ? { project: specificSelections(logProject).join(',') } : {}),
         ...(specificSelections(logStatus).length ? { status: specificSelections(logStatus).join(',') } : {}),
         ...(specificSelections(logLevel).length ? { level: specificSelections(logLevel).join(',') } : {}),
