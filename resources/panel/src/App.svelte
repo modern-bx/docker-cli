@@ -10,7 +10,7 @@
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
   import HttpRefreshBoundary from './HttpRefreshBoundary.svelte';
-  import { addProjectSchedule, cloneProject, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHookContent, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, runHookSettings, saveHookContent, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { addProjectSchedule, cloneProject, createHookSettings, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHookContent, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, runHookSettings, saveHookContent, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
   import { createRefreshCoordinator } from './refresh.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -222,6 +222,10 @@
   let backupSettingsLoading = false;
   let backupSettingsSaving = false;
   let hooks = [];
+  let hookCommands = [];
+  let hookCommandCollection = useListCollection({ items: [] });
+  let hookCreateDialog = null;
+  let hookCreating = false;
   let hooksLoading = false;
   let hookLevel = 'all';
   let hookTiming = 'all';
@@ -291,6 +295,7 @@
   $: backupCreateStrategyOptions = [{ value: '', label: 'Без стратегии' }, ...backupFileStrategies.filter((item) => item.code && item.name).map((item) => ({ value: item.code, label: item.name }))];
   $: backupCreateStrategyCollection = useListCollection({ items: backupCreateStrategyOptions });
   $: hookProjectCollection = useListCollection({ items: [{ value: '', label: 'Проект не выбран' }, ...projects.map((project) => ({ value: project.name, label: project.name }))] });
+  $: hookCommandCollection = useListCollection({ items: hookCommands.map((value) => ({ value, label: value })) });
   $: selectedBackupCreateStrategy = backupFileStrategies.find((item) => item.code === backupCreateDialog?.strategy) || null;
   $: selectedDeploymentScript = projectAddOptions.deploymentScripts.find((item) => item.code === projectAddDialog?.deploymentScript) || null;
   $: filteredScheduleItems = scheduleItems.map((item, index) => ({ ...item, enabled: item.enabled !== false, index })).filter((item) => item.command.toLocaleLowerCase().includes(scheduleQuery.trim().toLocaleLowerCase()) && (scheduleStatus === 'all' || item.enabled === (scheduleStatus === 'enabled')));
@@ -618,9 +623,32 @@
   async function loadHooksSettings() {
     if (!authenticated) return;
     hooksLoading = true;
-    try { hooks = (await getHooksSettings(api)).hooks; }
+    try {
+      const data = await getHooksSettings(api);
+      hooks = data.hooks;
+      hookCommands = Array.isArray(data.commands) ? data.commands : [];
+    }
     catch (requestError) { errorTitle = 'Не удалось загрузить хуки'; error = requestError instanceof Error ? requestError.message : errorTitle; }
     finally { hooksLoading = false; }
+  }
+
+  function openHookCreateDialog() {
+    hookCreateDialog = { name: '', enabled: false, level: 'command', command: hookCommands[0] || '', timing: 'before' };
+  }
+
+  async function createHookItem() {
+    if (!hookCreateDialog) return;
+    hookCreating = true;
+    try {
+      const data = await createHookSettings(api, hookCreateDialog);
+      const hook = data.hook;
+      hooks = [...hooks, hook];
+      hookCreateDialog = null;
+      await editHookItem(hook);
+    } catch (requestError) {
+      errorTitle = 'Не удалось добавить хук';
+      error = requestError instanceof Error ? requestError.message : errorTitle;
+    } finally { hookCreating = false; }
   }
 
   function changeHookFilter(field, value) {
@@ -2538,6 +2566,7 @@
             {:else if settingsTab === 'hooks'}
               <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadHooksSettings} />
             <div class="settings-scroll hooks-settings-scroll">
+              <div class="project-toolbar"><button class="btn preset-filled-primary-500" type="button" disabled={hooksLoading} onclick={openHookCreateDialog}><Plus size={16} aria-hidden="true" />Добавить</button></div>
               <div class="log-toolbar hooks-filter card preset-filled-surface-100-900">
                 <label><span>Уровень</span><Combobox collection={hookLevelCollection} value={[hookLevel]} openOnClick onValueChange={(details) => changeHookFilter('level', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookLevelOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
                 <label><span>Время выполнения</span><Combobox collection={hookTimingCollection} value={[hookTiming]} openOnClick onValueChange={(details) => changeHookFilter('timing', details.value[0] || 'all')}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookTimingOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
@@ -2625,6 +2654,25 @@
     <button class="danger" type="button" role="menuitem" onclick={() => { scheduleDeleteConfirmation = scheduleContextMenu.item; scheduleContextMenu = null; }}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
 {/if}
+
+<Dialog open={Boolean(hookCreateDialog)} onOpenChange={({ open }) => { if (!open && !hookCreating) hookCreateDialog = null; }}>
+  <Dialog.Backdrop class="fixed inset-0 z-40 bg-black/50" />
+  <Dialog.Positioner class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <Dialog.Content class="login-error-dialog hook-create-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Добавить хук</Dialog.Title>
+      {#if hookCreateDialog}
+        <div class="hook-create-grid">
+          <label class="label"><span>Название</span><input class="input" type="text" bind:value={hookCreateDialog.name} placeholder="10-project-up.sh" /></label>
+          <label class="scheduler-enabled-option"><input class="checkbox" type="checkbox" bind:checked={hookCreateDialog.enabled} />Включен</label>
+          <label class="label"><span>Уровень</span><input class="input" value="Команда" readonly /></label>
+          <label class="label"><span>Команда</span><Combobox collection={hookCommandCollection} value={[hookCreateDialog.command]} openOnClick onValueChange={(details) => { if (details.value[0] && hookCreateDialog) hookCreateDialog.command = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookCommands as value}<Combobox.Item item={{ value, label: value }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          <label class="label"><span>Время выполнения</span><select class="select" bind:value={hookCreateDialog.timing}><option value="before">before</option><option value="after">after</option></select></label>
+        </div>
+      {/if}
+      <div class="login-error-actions system-confirm-actions"><button class="btn preset-tonal" type="button" disabled={hookCreating} onclick={() => hookCreateDialog = null}>Отмена</button><button class="btn preset-filled-primary-500" type="button" disabled={hookCreating || !hookCreateDialog?.name.trim() || !hookCreateDialog?.command} onclick={createHookItem}><Save size={16} aria-hidden="true" />{hookCreating ? 'Сохраняем…' : 'Сохранить'}</button></div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
 
 <Dialog open={Boolean(hookEditorDialog)} onOpenChange={({ open }) => { if (!open && !hookEditorSaving) hookEditorDialog = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />

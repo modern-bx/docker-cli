@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+import sys
+
+hook_type = sys.argv[1] if len(sys.argv) > 1 else ""
+event = sys.argv[2] if len(sys.argv) > 2 else ""
+
+if event == "{{COMMAND}}:{{TIMING}}":
+    print(f"Хук {hook_type} выполняется для команды {event}.")

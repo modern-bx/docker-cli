@@ -1,0 +1,8 @@
+#!/bin/sh
+hook_type=${1:-}
+event=${2:-}
+shift 2 2>/dev/null || true
+
+if [ "$event" = "{{COMMAND}}:{{TIMING}}" ]; then
+  printf 'Хук %s выполняется для команды %s.\n' "$hook_type" "$event"
+fi
