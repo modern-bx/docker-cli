@@ -46,9 +46,13 @@
   const hookLevelOptions = [{ value: 'all', label: 'Все уровни' }, { value: 'command', label: 'Команда' }];
   const hookTimingOptions = [{ value: 'all', label: 'Любое время' }, { value: 'before', label: 'before' }, { value: 'after', label: 'after' }];
   const hookEnabledOptions = [{ value: 'all', label: 'Все' }, { value: 'enabled', label: 'Да' }, { value: 'disabled', label: 'Нет' }];
+  const hookCreateLevelOptions = [{ value: 'command', label: 'Команда' }];
+  const hookCreateTimingOptions = [{ value: 'before', label: 'before' }, { value: 'after', label: 'after' }];
   const hookLevelCollection = useListCollection({ items: hookLevelOptions });
   const hookTimingCollection = useListCollection({ items: hookTimingOptions });
   const hookEnabledCollection = useListCollection({ items: hookEnabledOptions });
+  const hookCreateLevelCollection = useListCollection({ items: hookCreateLevelOptions });
+  const hookCreateTimingCollection = useListCollection({ items: hookCreateTimingOptions });
   let hookProjectCollection = useListCollection({ items: [{ value: '', label: 'Проект не выбран' }] });
   const fonts = [
     { value: 'ubuntu', label: 'Ubuntu Regular' },
@@ -2664,9 +2668,9 @@
         <div class="hook-create-grid">
           <label class="label"><span>Название</span><input class="input" type="text" bind:value={hookCreateDialog.name} placeholder="10-project-up.sh" /></label>
           <label class="scheduler-enabled-option"><input class="checkbox" type="checkbox" bind:checked={hookCreateDialog.enabled} />Включен</label>
-          <label class="label"><span>Уровень</span><input class="input" value="Команда" readonly /></label>
+          <label class="label"><span>Уровень</span><Combobox collection={hookCreateLevelCollection} value={[hookCreateDialog.level]} openOnClick onValueChange={(details) => { if (details.value[0] && hookCreateDialog) hookCreateDialog.level = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookCreateLevelOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <label class="label"><span>Команда</span><Combobox collection={hookCommandCollection} value={[hookCreateDialog.command]} openOnClick onValueChange={(details) => { if (details.value[0] && hookCreateDialog) hookCreateDialog.command = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookCommands as value}<Combobox.Item item={{ value, label: value }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
-          <label class="label"><span>Время выполнения</span><select class="select" bind:value={hookCreateDialog.timing}><option value="before">before</option><option value="after">after</option></select></label>
+          <label class="label"><span>Время выполнения</span><Combobox collection={hookCreateTimingCollection} value={[hookCreateDialog.timing]} openOnClick onValueChange={(details) => { if (details.value[0] && hookCreateDialog) hookCreateDialog.timing = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookCreateTimingOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
         </div>
       {/if}
       <div class="login-error-actions system-confirm-actions"><button class="btn preset-tonal" type="button" disabled={hookCreating} onclick={() => hookCreateDialog = null}>Отмена</button><button class="btn preset-filled-primary-500" type="button" disabled={hookCreating || !hookCreateDialog?.name.trim() || !hookCreateDialog?.command} onclick={createHookItem}><Save size={16} aria-hidden="true" />{hookCreating ? 'Сохраняем…' : 'Сохранить'}</button></div>
