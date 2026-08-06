@@ -17,10 +17,14 @@ task:
     strategy:
       name: Стратегия БД
       type: string
+    comment:
+      name: Комментарий
+      type: string
   action: |
     options=()
     [ -n "${location:-}" ] && options+=(--location="$location")
     [ -n "${strategy:-}" ] && options+=(--strategy="$strategy")
+    [ -n "${comment:-}" ] && options+=(--comment="$comment")
     if [ -n "${backup:-}" ]; then
       docker-cli mysql:dump --project="$project" --name="$backup" "${options[@]}"
     else

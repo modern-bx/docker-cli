@@ -71,6 +71,10 @@ export async function deleteProjectBackup(request, project, backup, options) {
   return request(`/api/projects/${encodeURIComponent(project)}/backups/${encodeURIComponent(backup)}/delete`, { method: 'POST', body: JSON.stringify(options) });
 }
 
+export async function updateProjectBackupComment(request, project, backup, options) {
+  return request(`/api/projects/${encodeURIComponent(project)}/backups/${encodeURIComponent(backup)}/comment`, { method: 'POST', body: JSON.stringify(options) });
+}
+
 export async function createProject(request, project) {
   return request('/api/projects', { method: 'POST', body: JSON.stringify(project) });
 }

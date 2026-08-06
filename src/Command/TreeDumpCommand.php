@@ -33,6 +33,7 @@ final class TreeDumpCommand extends AbstractCommand
         $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
         $this->addOption('chunk-size', null, InputOption::VALUE_REQUIRED, 'Максимальный размер тома: например 10K, 1.5M или 2.25G.');
         $this->addOption('chunk-count', null, InputOption::VALUE_REQUIRED, 'Количество томов (не меньше двух).');
+        $this->addOption('comment', null, InputOption::VALUE_REQUIRED, 'Комментарий к бэкапу.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -109,6 +110,7 @@ final class TreeDumpCommand extends AbstractCommand
                 $strategy['exclude'] ?? [],
             );
             $metadata = ['project' => $project, 'createdAt' => date(DATE_ATOM), 'archive' => $archive];
+            if (is_string($input->getOption('comment')) && trim($input->getOption('comment')) !== '') $metadata['comment'] = trim($input->getOption('comment'));
             if ($chunkSize !== null || $chunkCount !== null) $metadata['volumes'] = (new TreeArchiveVolumes())->split($backupDirectory, $archive, $chunkSize, $chunkCount === false ? null : $chunkCount);
             if ($strategy !== null) {
                 $metadata['strategy'] = $strategy['code'];

@@ -25,6 +25,7 @@ final class PostgresDumpCommand extends AbstractCommand
         $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Короткое имя директории бэкапа.');
         $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код централизованного хранилища бэкапов.');
         $this->addOption('strategy', null, InputOption::VALUE_REQUIRED, 'Код стратегии БД.');
+        $this->addOption('comment', null, InputOption::VALUE_REQUIRED, 'Комментарий к бэкапу.');
         $this->addOption('jobs', 'j', InputOption::VALUE_REQUIRED, 'Число параллельных процессов.', '4');
     }
 
@@ -83,6 +84,7 @@ final class PostgresDumpCommand extends AbstractCommand
         }
         if ($code === Command::SUCCESS) {
             $metadata = ['project' => $project, 'database' => $database, 'createdAt' => date(DATE_ATOM)];
+            if (is_string($input->getOption('comment')) && trim($input->getOption('comment')) !== '') $metadata['comment'] = trim($input->getOption('comment'));
             if (is_array($strategy)) { $metadata['databaseStrategy'] = $strategy['code']; $metadata['databaseStrategyTables'] = ['include' => $strategy['databaseInclude'], 'exclude' => $strategy['databaseExclude']]; }
             file_put_contents($path . '/docker-cli.json', json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
             CommandContext::fromEnvironment($this, $output)->addMessage(new Message(

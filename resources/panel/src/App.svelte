@@ -10,7 +10,7 @@
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
   import HttpRefreshBoundary from './HttpRefreshBoundary.svelte';
-  import { addProjectSchedule, cloneProject, createHookSettings, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHookContent, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, runHookSettings, saveHookContent, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { addProjectSchedule, cloneProject, createHookSettings, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHookContent, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectBackupComment, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, runHookSettings, saveHookContent, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
   import { createRefreshCoordinator } from './refresh.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -177,6 +177,8 @@
   let backupRestorePending = false;
   let backupCreateDialog = null;
   let backupCreatePending = false;
+  let backupCommentDialog = null;
+  let backupCommentPending = false;
   let backupDeleteConfirmation = null;
   let backupDeletePending = false;
   let scheduleItems = [];
@@ -842,7 +844,7 @@
   }
 
   function openBackupCreateDialog() {
-    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, strategy: '', compress: '', chunkSize: '', chunkCount: '', location: '' };
+    backupCreateDialog = { database: true, files: false, mysql: true, postgres: false, strategy: '', compress: '', chunkSize: '', chunkCount: '', location: '', comment: '' };
     loadBackupsSettings();
   }
 
@@ -860,6 +862,7 @@
         compress: backupCreateDialog.compress,
         chunkSize: backupCreateDialog.chunkSize,
         chunkCount: backupCreateDialog.chunkCount,
+        comment: backupCreateDialog.comment,
       });
       backupCreateDialog = null;
       notifyQueuedOperation(`Создание бэкапа проекта «${selectedProjectName}»`);
@@ -869,6 +872,27 @@
       errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
     } finally {
       backupCreatePending = false;
+    }
+  }
+
+  function openBackupCommentDialog(backup) {
+    backupContextMenu = null;
+    backupCommentDialog = { ...backup, comment: backup.comment || '' };
+  }
+
+  async function saveBackupComment() {
+    if (!backupCommentDialog || !selectedProjectName) return;
+    backupCommentPending = true;
+    try {
+      await updateProjectBackupComment(api, selectedProjectName, backupCommentDialog.name, { location: backupCommentDialog.location, comment: backupCommentDialog.comment });
+      backupCommentDialog = null;
+      await loadProjectBackups();
+    } catch (cause) {
+      errorTitle = 'Не удалось изменить бэкап';
+      error = cause instanceof Error ? cause.message : 'Не удалось сохранить комментарий.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      backupCommentPending = false;
     }
   }
 
@@ -2318,7 +2342,7 @@
                       <tbody>
                         {#if backupsLoading}<tr><td colspan="8" class="log-empty animate-pulse">Загрузка…</td></tr>
                         {:else if backupItems.length === 0}<tr><td colspan="8" class="log-empty">Бэкапы не найдены</td></tr>
-                        {:else}{#each backupItems as item}<tr class:backup-invalid={item.filesValid === false} oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}{#if item.filesValid === false}<Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help backup-error-help" aria-label="Почему бэкап повреждён"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">{item.filesError}</Tooltip.Content></Tooltip.Positioner></Tooltip>{/if}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBackupSize(item)}</td><td>{item.database || '—'}</td><td>{item.strategy || '—'}</td><td>{item.locationName}</td></tr>{/each}{/if}
+                        {:else}{#each backupItems as item}<tr class:backup-invalid={item.filesValid === false} oncontextmenu={(event) => openBackupContextMenu(event, item)}><td class="backup-menu-column"><button class="backup-menu-trigger" type="button" title="Действия" aria-label={`Действия с бэкапом ${item.name}`} aria-haspopup="menu" onclick={(event) => openBackupContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td>{item.name}{#if item.comment}<Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help backup-comment-help" aria-label="Комментарий к бэкапу"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">{item.comment}</Tooltip.Content></Tooltip.Positioner></Tooltip>{/if}{#if item.filesValid === false}<Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help backup-error-help" aria-label="Почему бэкап повреждён"><CircleHelp size={17} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">{item.filesError}</Tooltip.Content></Tooltip.Positioner></Tooltip>{/if}</td><td>{formatQueueDate(item.date)}</td><td>{item.composition}</td><td>{formatBackupSize(item)}</td><td>{item.database || '—'}</td><td>{item.strategy || '—'}</td><td>{item.locationName}</td></tr>{/each}{/if}
                       </tbody>
                     </table>
                   </div>
@@ -2638,6 +2662,7 @@
 
 {#if backupContextMenu}
   <div class="backup-context-menu project-context-menu card preset-filled-surface-100-900 shadow-xl" style={`left:${backupContextMenu.x}px;top:${backupContextMenu.y}px`} role="menu" aria-label={`Действия с бэкапом ${backupContextMenu.backup.name}`}>
+    <button type="button" role="menuitem" onclick={() => openBackupCommentDialog(backupContextMenu.backup)}><Pencil size={16} aria-hidden="true" />Изменить</button>
     <button type="button" role="menuitem" onclick={() => openBackupRestoreDialog(backupContextMenu.backup)}><Undo2 size={16} aria-hidden="true" />Восстановить</button>
     <button class="danger" type="button" role="menuitem" onclick={() => openBackupDeleteDialog(backupContextMenu.backup)}><Trash2 size={16} aria-hidden="true" />Удалить</button>
   </div>
@@ -3034,6 +3059,17 @@
   </Dialog.Positioner>
 </Dialog>
 
+<Dialog open={Boolean(backupCommentDialog)} onOpenChange={({ open }) => { if (!open && !backupCommentPending) backupCommentDialog = null; }}>
+  <Dialog.Backdrop class="login-error-backdrop" />
+  <Dialog.Positioner class="login-error-positioner">
+    <Dialog.Content class="login-error-dialog card preset-filled-surface-100-900 shadow-2xl">
+      <Dialog.Title class="login-error-title">Изменить бэкап</Dialog.Title>
+      {#if backupCommentDialog}<label class="label backup-comment-edit"><span class="label-text">Комментарий</span><textarea class="textarea" rows="2" bind:value={backupCommentDialog.comment}></textarea></label>{/if}
+      <div class="login-error-actions"><Dialog.CloseTrigger class="btn preset-tonal" type="button" disabled={backupCommentPending}>Отмена</Dialog.CloseTrigger><button class="btn preset-filled-primary-500" type="button" disabled={backupCommentPending} onclick={saveBackupComment}>{backupCommentPending ? 'Сохраняем…' : 'Сохранить'}</button></div>
+    </Dialog.Content>
+  </Dialog.Positioner>
+</Dialog>
+
 <Dialog open={Boolean(backupCreateDialog)} onOpenChange={({ open }) => { if (!open && !backupCreatePending) backupCreateDialog = null; }}>
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
@@ -3056,6 +3092,7 @@
               {#if backupCreateDialog.database && !backupCreateDialog.mysql && !backupCreateDialog.postgres}<p class="backup-create-hint">Выберите хотя бы одну базу данных.</p>{/if}
             </div>
           </div>
+          <label class="label backup-comment-field"><span class="label-text">Комментарий</span><textarea class="textarea" rows="2" bind:value={backupCreateDialog.comment}></textarea></label>
         </div>
       {/if}
       <div class="login-error-actions system-confirm-actions">
