@@ -21,6 +21,7 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto
         public string $compress = '',
         public string $chunkSize = '',
         public string $chunkCount = '',
+        public string $comment = '',
     ) {
     }
 
@@ -36,6 +37,10 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto
         $compress = $request->body['compress'] ?? '';
         $chunkSize = $request->body['chunkSize'] ?? '';
         $chunkCount = $request->body['chunkCount'] ?? '';
+        $comment = $request->body['comment'] ?? '';
+        if (!is_string($comment)) {
+            throw new RequestValidationException('Некорректный комментарий к бэкапу.');
+        }
         if (!is_string($location) || ($location !== '' && preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $location) !== 1)) {
             throw new RequestValidationException('Некорректное расположение бэкапа.');
         }
@@ -60,6 +65,7 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto
             $compress,
             $chunkSize,
             $chunkCount,
+            trim($comment),
         );
     }
 }

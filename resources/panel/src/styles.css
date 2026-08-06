@@ -131,6 +131,10 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .backup-menu-trigger:disabled { cursor: not-allowed; opacity: 0.4; }
 .login-error-dialog.backup-create-dialog { width: min(48rem, calc(100vw - 2rem)); }
 .backup-create-content { display: grid; gap: 1rem; margin-top: 1rem; }
+.backup-comment-field { display: grid; gap: 0.4rem; }
+.backup-comment-field textarea, .backup-comment-edit textarea { min-height: 4.5rem; resize: vertical; }
+.backup-comment-edit { display: grid; gap: 0.4rem; margin-top: 1rem; }
+.backup-comment-help { margin-left: 0.35rem; vertical-align: middle; }
 .backup-create-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
 .backup-create-left, .backup-create-right { display: grid; align-content: start; gap: 1rem; min-width: 0; }
 .backup-create-content .label { position: relative; }

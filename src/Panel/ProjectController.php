@@ -12,9 +12,11 @@ use DockerCli\Panel\Dto\DeploymentScriptDto;
 use DockerCli\Panel\Dto\ProjectOptionsDto;
 use DockerCli\Panel\Dto\ProjectBackupListDto;
 use DockerCli\Panel\Dto\QueuedOperationDto;
+use DockerCli\Panel\Dto\BackupCommentDto;
 use DockerCli\Panel\Dto\ScheduleListDto;
 use DockerCli\Panel\Dto\Request\ProjectBackupListRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectBackupCreateRequestDto;
+use DockerCli\Panel\Dto\Request\ProjectBackupCommentRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectBackupRestoreRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectCreateRequestDto;
 use DockerCli\Panel\Dto\Request\ProjectCloneRequestDto;
@@ -245,6 +247,7 @@ final class ProjectController
                         'hasFiles' => false,
                         'location' => $location['code'],
                         'locationName' => $location['name'],
+                        'comment' => is_array($metadata) && is_string($metadata['comment'] ?? null) ? $metadata['comment'] : '',
                     ];
                     $databaseStrategyCode = is_array($metadata) && is_string($metadata['databaseStrategy'] ?? null) ? $metadata['databaseStrategy'] : '';
                     $databaseStrategyNames = array_column(($this->backupSettings ?? new BackupsSettingsRepository())->fileStrategies(), 'name', 'code');
@@ -259,6 +262,7 @@ final class ProjectController
                     $databaseSize = $this->directorySize($backup);
                     $grouped[$key]['size'] += $databaseSize;
                     $grouped[$key]['sizeParts'][] = ['type' => $databaseCode, 'name' => $databaseName, 'size' => $databaseSize];
+                    if ($grouped[$key]['comment'] === '' && is_array($metadata) && is_string($metadata['comment'] ?? null)) $grouped[$key]['comment'] = $metadata['comment'];
                 }
             }
             $directory = join_path($location['path'], 'tree');
@@ -293,6 +297,7 @@ final class ProjectController
                     'filesError' => $volumeErrors === [] ? null : implode(' ', $volumeErrors),
                     'location' => $location['code'],
                     'locationName' => $location['name'],
+                    'comment' => is_string($metadata['comment'] ?? null) ? $metadata['comment'] : '',
                 ];
                 $key = $location['code'] . "\0" . basename($backup);
                 if (isset($grouped[$key])) {
@@ -305,6 +310,7 @@ final class ProjectController
                     $grouped[$key]['hasFiles'] = true;
                     $grouped[$key]['filesValid'] = $fileData['filesValid'];
                     $grouped[$key]['filesError'] = $fileData['filesError'];
+                    if ($fileData['comment'] !== '') $grouped[$key]['comment'] = $fileData['comment'];
                 } else {
                     $fileData['databaseCodes'] = [];
                     $grouped[$key] = $fileData;
@@ -352,6 +358,7 @@ final class ProjectController
                 'arguments' => ['backup' => ['value' => $backupName], 'location' => ['value' => $request->location], 'strategy' => ['value' => $request->strategy]],
                 'project' => $request->name,
             ];
+            $tasks[array_key_last($tasks)]['arguments']['comment'] = ['value' => $request->comment];
         }
         if ($request->database && $request->postgres) {
             $tasks[] = [
@@ -359,6 +366,7 @@ final class ProjectController
                 'arguments' => ['backup' => ['value' => $backupName], 'location' => ['value' => $request->location], 'strategy' => ['value' => $request->strategy]],
                 'project' => $request->name,
             ];
+            $tasks[array_key_last($tasks)]['arguments']['comment'] = ['value' => $request->comment];
         }
         if ($request->files) {
             $tasks[] = [
@@ -370,6 +378,7 @@ final class ProjectController
                     'compress' => ['value' => $request->compress],
                     'chunk-size' => ['value' => $request->chunkSize],
                     'chunk-count' => ['value' => $request->chunkCount],
+                    'comment' => ['value' => $request->comment],
                 ],
                 'project' => $request->name,
             ];
@@ -382,6 +391,36 @@ final class ProjectController
             throw new ProjectActionException($exception->getMessage(), 500);
         }
         return new QueuedOperationDto($file);
+    }
+
+    #[Route('POST', '/api/projects/{name}/backups/{backup}/comment', ProjectBackupCommentRequestDto::class, BackupCommentDto::class)]
+    public function updateBackupComment(ProjectBackupCommentRequestDto $request): BackupCommentDto
+    {
+        if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
+        $config = $this->projects->readProjectConfig($request->name);
+        $root = $config['data']['project']['root'] ?? null;
+        if (!is_string($root) || $root === '') throw new ProjectActionException('Конфигурация проекта повреждена.', 422);
+        $backupDirectory = join_path($root, '.docker-cli', 'backups');
+        if ($request->location !== '') {
+            $location = current(array_filter(($this->backupSettings ?? new BackupsSettingsRepository())->locations(), static fn (array $item): bool => $item['code'] === $request->location));
+            if (!is_array($location)) throw new ProjectActionException('Хранилище бэкапов не найдено.', 404);
+            $backupDirectory = $location['path'];
+        }
+        $updated = false;
+        foreach (['mysql', 'postgres', 'tree'] as $type) {
+            $directory = join_path($backupDirectory, $type, $request->backup);
+            $metadataFile = join_path($directory, 'docker-cli.json');
+            if (!is_file($metadataFile)) continue;
+            $metadata = json_decode((string) file_get_contents($metadataFile), true);
+            if (!is_array($metadata) || ($metadata['project'] ?? null) !== $request->name) continue;
+            if ($request->comment === '') unset($metadata['comment']); else $metadata['comment'] = $request->comment;
+            if (file_put_contents($metadataFile, json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL, LOCK_EX) === false) {
+                throw new ProjectActionException('Не удалось сохранить комментарий к бэкапу.', 500);
+            }
+            $updated = true;
+        }
+        if (!$updated) throw new ProjectActionException('Бэкап не найден.', 404);
+        return new BackupCommentDto($request->comment);
     }
 
     #[Route('POST', '/api/projects/{name}/backups/{backup}/restore', ProjectBackupRestoreRequestDto::class, QueuedOperationDto::class)]
