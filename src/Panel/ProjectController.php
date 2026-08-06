@@ -590,7 +590,9 @@ final class ProjectController
     public function clone(ProjectCloneRequestDto $request): QueuedOperationDto
     {
         if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
-        $arguments = ['from' => ['value' => $request->name], 'here' => ['value' => true]];
+        $arguments = ['from' => ['value' => $request->name]];
+        if ($request->location === null) $arguments['here'] = ['value' => true];
+        else $arguments['location'] = ['value' => $request->location];
         if ($request->to !== null) $arguments['to'] = ['value' => $request->to];
         if ($request->skipDb || $request->dbms === []) $arguments['skip-db'] = ['value' => true];
         else $arguments['dbms'] = ['value' => implode(',', $request->dbms)];

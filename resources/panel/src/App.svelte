@@ -163,6 +163,7 @@
   let projectUpdating = false;
   let projectAddOptions = { locations: [], languages: [], languageVersions: [], defaultLanguageVersion: '8.2', frameworks: {}, deploymentScripts: [] };
   let projectLocationCollection = useListCollection({ items: [] });
+  let projectCloneLocationCollection = useListCollection({ items: [] });
   let projectLanguageCollection = useListCollection({ items: [] });
   let projectLanguageVersionCollection = useListCollection({ items: [] });
   let projectFrameworkCollection = useListCollection({ items: [] });
@@ -299,6 +300,7 @@
       ? 'warn'
       : notifications.some((item) => item.level === 'info') ? 'info' : 'debug';
   $: projectLocationCollection = useListCollection({ items: projectAddOptions.locations.map((item) => ({ value: item.code, label: item.code })) });
+  $: projectCloneLocationCollection = useListCollection({ items: [{ value: '', label: 'Рядом с исходным проектом' }, ...projectAddOptions.locations.map((item) => ({ value: item.code, label: item.code }))] });
   $: projectLanguageCollection = useListCollection({ items: projectAddOptions.languages.map((item) => ({ value: item.code, label: item.name })) });
   $: projectLanguageVersionCollection = useListCollection({ items: projectAddOptions.languageVersions.map((version) => ({ value: version, label: version })) });
   $: projectFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectAddDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
@@ -1498,9 +1500,16 @@
     if (project) requestProjectAction(action, project);
   }
 
-  function openProjectCloneDialog(project) {
+  async function openProjectCloneDialog(project) {
     projectContextMenu = null;
-    projectCloneDialog = { project: project.name, to: '', mysql: true, postgres: true };
+    try {
+      projectAddOptions = await getProjectOptions(api);
+      const location = projectAddOptions.locations.find((item) => item.default);
+      projectCloneDialog = { project: project.name, to: '', location: location?.code || '', mysql: true, postgres: true };
+    } catch (cause) {
+      errorTitle = 'Не удалось открыть клонирование проекта';
+      error = cause instanceof Error ? cause.message : 'Не удалось загрузить параметры проекта.';
+    }
   }
 
   async function submitProjectClone() {
@@ -1509,7 +1518,7 @@
     try {
       const dialog = projectCloneDialog;
       const dbms = [dialog.mysql && 'mysql', dialog.postgres && 'postgres'].filter(Boolean);
-      await cloneProject(api, dialog.project, { to: dialog.to, dbms });
+      await cloneProject(api, dialog.project, { to: dialog.to, location: dialog.location, dbms });
       projectCloneDialog = null;
       notifyQueuedOperation(`Клонирование проекта «${dialog.project}»`);
     } catch (cause) {
@@ -2828,6 +2837,7 @@
       {#if projectCloneDialog}
         <form class="project-add-form project-clone-form" onsubmit={(event) => { event.preventDefault(); submitProjectClone(); }}>
           <label class="label"><span class="label-text">Имя проекта (опционально)</span><input class="input" bind:value={projectCloneDialog.to} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
+          <label class="label"><span class="label-text">Расположение (опционально)</span><Combobox collection={projectCloneLocationCollection} value={[projectCloneDialog.location]} openOnClick onValueChange={(details) => { projectCloneDialog.location = details.value[0] ?? ''; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Рядом с исходным проектом' }, ...projectAddOptions.locations.map((location) => ({ value: location.code, label: location.code }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <fieldset class="project-clone-dbms"><legend class="label-text">Выбрать БД для клонирования</legend><div class="project-deployment-checkboxes"><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.mysql} /><span>MySQL</span></label><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.postgres} /><span>PostgreSQL</span></label></div></fieldset>
           <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectCloning} onclick={() => { projectCloneDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectCloning}>{projectCloning ? 'Добавляем…' : 'Добавить'}</button></div>
         </form>
