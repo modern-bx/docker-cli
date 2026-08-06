@@ -509,6 +509,13 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .cron-tooltip { max-width: 28rem; }
 @media (max-width: 600px) { .cron-fields { grid-template-columns: repeat(2, 1fr); } }
 .hooks-settings-scroll { display: flex; flex-direction: column; gap: 1rem; }
+.hooks-settings-scroll > .project-toolbar { margin: 0; }
+.hook-create-dialog { width: min(34rem, 100vw - 2rem); }
+.hook-create-grid { display: grid; gap: 1rem; margin-top: 1rem; }
+.hook-create-grid .label { position: relative; z-index: 1; }
+.hook-create-grid .label:focus-within { z-index: 110; }
+.hook-create-grid .font-combobox-positioner { z-index: 120; }
+.hook-create-dialog .login-error-actions { position: relative; z-index: 1; }
 .hooks-filter { flex-wrap: wrap; }
 .hooks-filter label { width: min(16rem, 100%); }
 .hooks-table-wrap { min-height: 18rem; }

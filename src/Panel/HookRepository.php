@@ -9,6 +9,7 @@ use function DockerCli\Util\join_path;
 final readonly class HookRepository
 {
     private const OUTPUT_LIMIT = 65536;
+    private const COMMANDS = ['project:clone', 'project:disable', 'project:down', 'project:enable', 'project:update', 'project:up', 'project:wipe'];
 
     public function __construct(private ?string $hooksDirectory = null)
     {
@@ -53,6 +54,46 @@ final readonly class HookRepository
         usort($hooks, static fn (array $left, array $right): int => [$left['level'], $left['command'], $left['timing'], $left['hook']] <=> [$right['level'], $right['command'], $right['timing'], $right['hook']]);
 
         return $hooks;
+    }
+
+    /** @return list<string> */
+    public function commands(): array
+    {
+        return self::COMMANDS;
+    }
+
+    /** @return array{id: string, level: string, command: string, timing: string, enabled: bool, hook: string} */
+    public function create(string $name, bool $enabled, string $level, string $command, string $timing): array
+    {
+        $name = trim($name);
+        if ($name === '' || $name === '.' || $name === '..' || basename($name) !== $name || str_contains($name, "\0")) {
+            throw new \RuntimeException('Некорректное имя хука.');
+        }
+        if ($level !== 'command' || !in_array($command, self::COMMANDS, true) || !in_array($timing, ['before', 'after'], true)) {
+            throw new \RuntimeException('Некорректные параметры хука.');
+        }
+
+        $name = ltrim($name, '.');
+        if ($name === '') {
+            throw new \RuntimeException('Некорректное имя хука.');
+        }
+        $fileName = $enabled ? $name : '.' . $name;
+        $directoryName = str_replace(':', '.', $command) . '.' . $timing;
+        $directory = join_path($this->directory(), 'commands', $directoryName);
+        if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
+            throw new \RuntimeException('Не удалось создать каталог хука.');
+        }
+        $path = join_path($directory, $fileName);
+        if (file_exists($path)) {
+            throw new \RuntimeException(sprintf('Файл "%s" уже существует.', $fileName));
+        }
+        $content = $this->templateContent(pathinfo($name, PATHINFO_EXTENSION), $command, $timing);
+        if (file_put_contents($path, $content, LOCK_EX) === false || !chmod($path, 0755)) {
+            @unlink($path);
+            throw new \RuntimeException('Не удалось создать хук.');
+        }
+
+        return ['id' => 'commands/' . $directoryName . '/' . $fileName, 'level' => $level, 'command' => $command, 'timing' => $timing, 'enabled' => $enabled, 'hook' => $fileName];
     }
 
     public function toggle(string $id): void
@@ -161,6 +202,20 @@ final readonly class HookRepository
         }
 
         return $path;
+    }
+
+    private function templateContent(string $extension, string $command, string $timing): string
+    {
+        $template = join_path(dirname(__DIR__, 2), 'resources', 'hooks', 'templates', strtolower($extension));
+        if (!is_file($template)) {
+            return '';
+        }
+        $content = file_get_contents($template);
+        if ($content === false) {
+            throw new \RuntimeException('Не удалось прочитать шаблон хука.');
+        }
+
+        return str_replace(['{{COMMAND}}', '{{TIMING}}'], [$command, $timing], $content);
     }
 
     private function hookPath(string $id): string

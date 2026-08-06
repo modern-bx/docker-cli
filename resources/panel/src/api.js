@@ -167,6 +167,10 @@ export async function getHooksSettings(request) {
   return request('/api/settings/hooks');
 }
 
+export async function createHookSettings(request, hook) {
+  return request('/api/settings/hooks', { method: 'POST', body: JSON.stringify(hook) });
+}
+
 export async function getHookContent(request, id) {
   return request(`/api/settings/hooks/${encodeURIComponent(id)}/content`);
 }

@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace DockerCli\Panel;
 
 use DockerCli\Panel\Dto\HookContentDto;
+use DockerCli\Panel\Dto\HookDto;
 use DockerCli\Panel\Dto\HookListDto;
 use DockerCli\Panel\Dto\HookRunResultDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\HookActionRequestDto;
 use DockerCli\Panel\Dto\Request\HookContentRequestDto;
+use DockerCli\Panel\Dto\Request\HookCreateRequestDto;
 use DockerCli\Panel\Dto\Request\HookRunRequestDto;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Panel\Http\RequestValidationException;
@@ -25,7 +27,17 @@ final readonly class HooksSettingsController
     #[Route('GET', '/api/settings/hooks', EmptyRequestDto::class, HookListDto::class)]
     public function list(EmptyRequestDto $request): HookListDto
     {
-        return new HookListDto($this->hooks->all());
+        return new HookListDto($this->hooks->all(), $this->hooks->commands());
+    }
+
+    #[Route('POST', '/api/settings/hooks', HookCreateRequestDto::class, HookDto::class)]
+    public function create(HookCreateRequestDto $request): HookDto
+    {
+        try {
+            return new HookDto($this->hooks->create($request->name, $request->enabled, $request->level, $request->command, $request->timing));
+        } catch (\RuntimeException $exception) {
+            throw new RequestValidationException($exception->getMessage());
+        }
     }
 
     #[Route('GET', '/api/settings/hooks/{id}/content', HookActionRequestDto::class, HookContentDto::class)]
@@ -72,7 +84,7 @@ final readonly class HooksSettingsController
             throw new RequestValidationException($exception->getMessage());
         }
 
-        return new HookListDto($this->hooks->all());
+        return new HookListDto($this->hooks->all(), $this->hooks->commands());
     }
 
     #[Route('DELETE', '/api/settings/hooks/{id}', HookActionRequestDto::class, HookListDto::class)]
@@ -84,7 +96,7 @@ final readonly class HooksSettingsController
             throw new RequestValidationException($exception->getMessage());
         }
 
-        return new HookListDto($this->hooks->all());
+        return new HookListDto($this->hooks->all(), $this->hooks->commands());
     }
 
     private function workingDirectory(string $workingDirectory): string
