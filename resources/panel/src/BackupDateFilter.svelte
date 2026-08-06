@@ -11,6 +11,7 @@
   <DatePicker locale="ru-RU" value={value ? [parseDate(value)] : []} onValueChange={(details) => onchange(details.value[0]?.toString() || '')}>
     <DatePicker.Control class="backup-date-control">
       <DatePicker.Input class="backup-date-input" placeholder="дд.мм.гггг" />
+      {#if value}<button class="backup-date-clear" type="button" aria-label={`Сбросить фильтр «${label}»`} onclick={() => onchange('')}>×</button>{/if}
       <DatePicker.Trigger class="backup-date-trigger" aria-label={`Открыть календарь «${label}»`}><CalendarDays size={16} aria-hidden="true" /></DatePicker.Trigger>
     </DatePicker.Control>
     <Portal>
