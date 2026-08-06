@@ -3,8 +3,15 @@
   import { EditorState } from '@codemirror/state';
   import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
   import { defaultKeymap, history as cmHistory, historyKeymap } from '@codemirror/commands';
-  import { StreamLanguage, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+  import { StreamLanguage } from '@codemirror/language';
   import { shell } from '@codemirror/legacy-modes/mode/shell';
+  import { aura } from '@uiw/codemirror-theme-aura';
+  import { eclipse } from '@uiw/codemirror-theme-eclipse';
+  import { githubDark, githubLight } from '@uiw/codemirror-theme-github';
+  import { materialDark, materialLight } from '@uiw/codemirror-theme-material';
+  import { monokai } from '@uiw/codemirror-theme-monokai';
+  import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
+  import { vscodeDark, vscodeLight } from '@uiw/codemirror-theme-vscode';
   import { Combobox, Dialog, Tabs, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
   import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Settings, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
@@ -18,13 +25,18 @@
   const FONT_KEY = 'docker-cli-panel-font';
   const EDITOR_THEME_KEY = 'docker-cli-panel-editor-theme';
   const strategyTabs = [{ value: 'files', sections: [['include', 'Включить', 'Относительные пути или glob-маски, которые нужно включить в файловый бэкап'], ['exclude', 'Исключить', 'Относительные пути или glob-маски, которые нужно исключить из бэкапа']] }, { value: 'database', sections: [['databaseInclude', 'Включить', 'Точные имена таблиц или glob-маски (например, public.*), которые нужно включить в дамп'], ['databaseExclude', 'Исключить', 'Точные имена таблиц или glob-маски, которые нужно исключить из дампа']] }];
-  /** @type {[string, string, { background: string, foreground: string, gutter: string, border: string, line: string, dark: boolean }][]} */
+  /** @type {[string, string, import('@codemirror/state').Extension, { background: string, foreground: string, gutter: string }][]} */
   const editorThemes = [
-    ['skeleton', 'Skeleton', { background: 'var(--color-surface-50)', foreground: 'var(--color-surface-950)', gutter: 'var(--color-surface-100)', border: 'var(--color-surface-300)', line: 'rgb(115 115 115 / 12%)', dark: false }],
-    ['github-dark', 'GitHub Dark', { background: '#0d1117', foreground: '#e6edf3', gutter: '#161b22', border: '#30363d', line: '#6e76811f', dark: true }],
-    ['nord', 'Nord', { background: '#2e3440', foreground: '#d8dee9', gutter: '#3b4252', border: '#4c566a', line: '#434c5e80', dark: true }],
-    ['solarized-light', 'Solarized Light', { background: '#fdf6e3', foreground: '#586e75', gutter: '#eee8d5', border: '#93a1a1', line: '#eee8d580', dark: false }],
-    ['dracula', 'Dracula', { background: '#282a36', foreground: '#f8f8f2', gutter: '#21222c', border: '#44475a', line: '#44475a66', dark: true }],
+    ['github-light', 'GitHub Light', githubLight, { background: '#fff', foreground: '#24292e', gutter: '#fff' }],
+    ['github-dark', 'GitHub Dark', githubDark, { background: '#0d1117', foreground: '#c9d1d9', gutter: '#0d1117' }],
+    ['vscode-light', 'VS Code Light', vscodeLight, { background: '#fff', foreground: '#9c4668', gutter: '#fff' }],
+    ['vscode-dark', 'VS Code Dark', vscodeDark, { background: '#1e1e1e', foreground: '#9cdcfe', gutter: '#1e1e1e' }],
+    ['material-light', 'Material Light', materialLight, { background: '#fafafa', foreground: '#90a4ae', gutter: '#fafafa' }],
+    ['material-dark', 'Material Dark', materialDark, { background: '#263238', foreground: '#eeffff', gutter: '#263238' }],
+    ['eclipse', 'Eclipse', eclipse, { background: '#fff', foreground: '#000', gutter: '#fff' }],
+    ['aura', 'Aura', aura, { background: '#21202e', foreground: '#edecee', gutter: '#21202e' }],
+    ['monokai', 'Monokai', monokai, { background: '#272822', foreground: '#f8f8f2', gutter: '#272822' }],
+    ['tokyo-night', 'Tokyo Night', tokyoNight, { background: '#24283b', foreground: '#a9b1d6', gutter: '#24283b' }],
   ];
   const themes = [
     ['vox', 'Vox'], ['cerberus', 'Cerberus'], ['concord', 'Concord'],
@@ -94,7 +106,7 @@
   let notificationsInitialized = false;
   const knownNotificationFiles = new Set();
   let theme = 'vox';
-  let editorTheme = 'skeleton';
+  let editorTheme = 'github-light';
   let mode = 'system';
   let font = 'ubuntu';
   let systemDark = false;
@@ -563,7 +575,7 @@
 
   function hookEditorExtensions(lines, onChange) {
     return [
-      lineNumbers(), highlightActiveLineGutter(), cmHistory(), StreamLanguage.define(shell), syntaxHighlighting(defaultHighlightStyle), highlightActiveLine(),
+      lineNumbers(), highlightActiveLineGutter(), cmHistory(), StreamLanguage.define(shell), highlightActiveLine(),
       keymap.of([...defaultKeymap, ...historyKeymap]),
       EditorView.lineWrapping,
       EditorView.updateListener.of((update) => { if (update.docChanged) onChange(update.state.doc.toString()); }),
@@ -572,15 +584,8 @@
   }
 
   function editorThemeExtension() {
-    const [, , colors] = editorThemes.find(([value]) => value === editorTheme) || editorThemes[0];
-    return EditorView.theme({
-      '&': { backgroundColor: colors.background, color: colors.foreground },
-      '.cm-content': { caretColor: 'var(--color-primary-500)' },
-      '.cm-gutters': { backgroundColor: colors.gutter, color: colors.foreground, borderRightColor: colors.border },
-      '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: colors.line },
-      '&.cm-focused .cm-cursor': { borderLeftColor: 'var(--color-primary-500)' },
-      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': { backgroundColor: colors.dark ? '#6ea8fe55' : '#0d6efd33' },
-    }, { dark: colors.dark });
+    const [, , extension] = editorThemes.find(([value]) => value === editorTheme) || editorThemes[0];
+    return extension;
   }
 
   function createHookEditor(node, doc, lines, onChange) {
@@ -1954,7 +1959,7 @@
     const savedTheme = localStorage.getItem(THEME_KEY);
     theme = themes.some(([value]) => value === savedTheme) ? savedTheme : 'vox';
     const savedEditorTheme = localStorage.getItem(EDITOR_THEME_KEY);
-    editorTheme = editorThemes.some(([value]) => value === savedEditorTheme) ? savedEditorTheme : 'skeleton';
+    editorTheme = editorThemes.some(([value]) => value === savedEditorTheme) ? savedEditorTheme : 'github-light';
     const savedMode = localStorage.getItem(MODE_KEY);
     mode = modes.some(([value]) => value === savedMode) ? savedMode : 'system';
     const savedFont = localStorage.getItem(FONT_KEY);
@@ -2714,7 +2719,7 @@
           {#if editorThemeOpen}
             <div class="editor-theme-menu theme-menu card preset-filled-surface-100-900 shadow-2xl" role="dialog" aria-label="Цветовая схема редактора">
               <div class="theme-grid" role="list" aria-label="Цветовая схема CodeMirror">
-                {#each editorThemes as [value, label, colors]}
+                {#each editorThemes as [value, label, , colors]}
                   <button class:active={editorTheme === value} class="theme-option editor-theme-option" type="button" aria-label={label} aria-pressed={editorTheme === value} title={label} onclick={() => setEditorTheme(value)}><span class="editor-theme-swatch" style={`--editor-bg:${colors.background};--editor-fg:${colors.foreground};--editor-gutter:${colors.gutter}`}></span>{label}</button>
                 {/each}
               </div>
