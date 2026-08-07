@@ -125,10 +125,33 @@ final readonly class HookRepository
         return $content;
     }
 
-    public function save(string $id, string $content): void
+    public function save(string $id, string $content, string $name, bool $enabled, string $command, string $timing): void
     {
         $path = $this->existingHookPath($id);
-        if (file_put_contents($path, $content, LOCK_EX) === false) {
+        $name = ltrim(trim($name), '.');
+        if ($name === '' || basename($name) !== $name || str_contains($name, "\0")) {
+            throw new \RuntimeException('Некорректное имя хука.');
+        }
+        if (!in_array($command, self::COMMANDS, true) || !in_array($timing, ['before', 'after'], true)) {
+            throw new \RuntimeException('Некорректные параметры хука.');
+        }
+
+        $fileName = $enabled ? $name : '.' . $name;
+        $directory = join_path($this->directory(), 'commands', str_replace(':', '.', $command) . '.' . $timing);
+        if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
+            throw new \RuntimeException('Не удалось создать каталог хука.');
+        }
+        $target = join_path($directory, $fileName);
+        if ($target !== $path && file_exists($target)) {
+            throw new \RuntimeException(sprintf('Файл "%s" уже существует.', $fileName));
+        }
+        if ($target !== $path && !rename($path, $target)) {
+            throw new \RuntimeException('Не удалось переместить хук.');
+        }
+        if (file_put_contents($target, $content, LOCK_EX) === false) {
+            if ($target !== $path) {
+                @rename($target, $path);
+            }
             throw new \RuntimeException('Не удалось сохранить хук.');
         }
     }

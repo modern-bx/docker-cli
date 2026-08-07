@@ -700,7 +700,7 @@
 
   async function editHookItem(hook) {
     hookContextMenu = null;
-    hookEditorDialog = { hook, content: '', profile: `hook:command ${hook.command}:${hook.timing}`, workingDirectory: '', project: '', runResult: '' };
+    hookEditorDialog = { hook, content: '', name: hook.hook.replace(/^\.+/, ''), enabled: hook.enabled, command: hook.command, timing: hook.timing, profile: `hook:command ${hook.command}:${hook.timing}`, workingDirectory: '', project: '', runResult: '' };
     hookEditorLoading = true;
     try {
       const data = await getHookContent(api, hook.id);
@@ -734,8 +734,9 @@
     hookEditorSaving = true;
     try {
       const content = hookEditorView ? hookEditorView.state.doc.toString() : hookEditorDialog.content;
-      await saveHookContent(api, hookEditorDialog.hook.id, content);
+      await saveHookContent(api, hookEditorDialog.hook.id, { content, name: hookEditorDialog.name, enabled: hookEditorDialog.enabled, command: hookEditorDialog.command, timing: hookEditorDialog.timing });
       hookEditorDialog = null;
+      await loadHooksSettings();
     } catch (requestError) {
       errorTitle = 'Не удалось сохранить хук';
       error = requestError instanceof Error ? requestError.message : errorTitle;
@@ -2740,6 +2741,12 @@
       {#if hookEditorLoading}
         <div class="hook-editor-loading animate-pulse">Загрузка…</div>
       {:else}
+        <div class="hook-editor-fields">
+          <label class="scheduler-enabled-option hook-editor-enabled"><input class="checkbox" type="checkbox" bind:checked={hookEditorDialog.enabled} />Включен</label>
+          <label class="label"><span class="label-text">Название файла</span><input class="input" type="text" bind:value={hookEditorDialog.name} /></label>
+          <label class="label"><span class="label-text">Команда</span><Combobox collection={hookCommandCollection} value={[hookEditorDialog.command]} openOnClick onValueChange={(details) => { if (details.value[0]) hookEditorDialog.command = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookCommands as value}<Combobox.Item item={{ value, label: value }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          <label class="label"><span class="label-text">Время выполнения</span><Combobox collection={hookCreateTimingCollection} value={[hookEditorDialog.timing]} openOnClick onValueChange={(details) => { if (details.value[0]) hookEditorDialog.timing = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookCreateTimingOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+        </div>
         <div class:hook-editor-compact={Boolean(hookEditorDialog?.runResult)} class="hook-code-editor" use:mountHookEditor aria-label="Редактор кода хука"></div>
         {#if hookEditorDialog?.runResult}
           <div class="hook-run-result hook-code-editor" use:mountHookRunResultEditor aria-label="Результат выполнения хука"></div>
@@ -2751,7 +2758,7 @@
       {/if}
       <div class="login-error-actions">
         <button class="btn preset-tonal" type="button" disabled={hookEditorSaving || hookRunning} onclick={() => { hookEditorDialog = null; }}>Отмена</button>
-        <button class="btn preset-filled-primary-500" type="button" disabled={hookEditorLoading || hookEditorSaving || hookRunning} onclick={saveHookEditor}><Save size={16} aria-hidden="true" />{hookEditorSaving ? 'Сохраняем…' : 'Сохранить'}</button>
+        <button class="btn preset-filled-primary-500" type="button" disabled={hookEditorLoading || hookEditorSaving || hookRunning || !hookEditorDialog?.name.trim() || !hookEditorDialog?.command || !hookEditorDialog?.timing} onclick={saveHookEditor}><Save size={16} aria-hidden="true" />{hookEditorSaving ? 'Сохраняем…' : 'Сохранить'}</button>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>
