@@ -531,7 +531,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .log-table.scheduler-table .scheduler-menu-column { width: 3rem; padding: 0.35rem; text-align: center; }
 .hook-editor-dialog { width: min(72rem, 100vw - 2rem); }
 .hook-editor-enabled { margin-top: 1rem; white-space: nowrap; }
-.hook-editor-fields { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(14rem, 1fr) minmax(12rem, .7fr); gap: .75rem; align-items: end; margin-top: .75rem; }
+.hook-editor-fields { position: relative; z-index: 40; display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(14rem, 1fr) minmax(12rem, .7fr); gap: .75rem; align-items: end; margin-top: .75rem; }
 .hook-editor-fields .input, .hook-editor-fields .font-combobox-control { height: 2.75rem; min-height: 2.75rem; }
 .hook-editor-loading { border: 1px solid var(--color-surface-300); border-radius: var(--radius-base); margin-top: 1rem; min-height: 20rem; padding: 1rem; }
 .dark .hook-editor-loading { border-color: var(--color-surface-700); }
