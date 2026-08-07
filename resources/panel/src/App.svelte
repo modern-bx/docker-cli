@@ -612,7 +612,7 @@
   function rebuildHookEditor() {
     if (!hookEditorElement || !hookEditorDialog) return;
     hookEditorView?.destroy();
-    hookEditorView = createHookEditor(hookEditorElement, hookEditorDialog.content, hookEditorDialog.runResult ? 10 : 15, (content) => {
+    hookEditorView = createHookEditor(hookEditorElement, hookEditorDialog.content, hookEditorDialog.runResult ? 5 : 10, (content) => {
       if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, content };
     });
   }
@@ -2741,8 +2741,8 @@
       {#if hookEditorLoading}
         <div class="hook-editor-loading animate-pulse">Загрузка…</div>
       {:else if hookEditorDialog}
+        <label class="scheduler-enabled-option hook-editor-enabled"><input class="checkbox" type="checkbox" bind:checked={hookEditorDialog.enabled} />Включен</label>
         <div class="hook-editor-fields">
-          <label class="scheduler-enabled-option hook-editor-enabled"><input class="checkbox" type="checkbox" bind:checked={hookEditorDialog.enabled} />Включен</label>
           <label class="label"><span class="label-text">Название файла</span><input class="input" type="text" bind:value={hookEditorDialog.name} /></label>
           <label class="label"><span class="label-text">Команда</span><Combobox collection={hookCommandCollection} value={[hookEditorDialog.command]} openOnClick onValueChange={(details) => { if (details.value[0]) hookEditorDialog.command = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookCommands as value}<Combobox.Item item={{ value, label: value }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <label class="label"><span class="label-text">Время выполнения</span><Combobox collection={hookCreateTimingCollection} value={[hookEditorDialog.timing]} openOnClick onValueChange={(details) => { if (details.value[0]) hookEditorDialog.timing = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookCreateTimingOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
