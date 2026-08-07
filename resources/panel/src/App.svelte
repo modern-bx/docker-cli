@@ -2740,7 +2740,7 @@
       </div>
       {#if hookEditorLoading}
         <div class="hook-editor-loading animate-pulse">Загрузка…</div>
-      {:else}
+      {:else if hookEditorDialog}
         <div class="hook-editor-fields">
           <label class="scheduler-enabled-option hook-editor-enabled"><input class="checkbox" type="checkbox" bind:checked={hookEditorDialog.enabled} />Включен</label>
           <label class="label"><span class="label-text">Название файла</span><input class="input" type="text" bind:value={hookEditorDialog.name} /></label>
