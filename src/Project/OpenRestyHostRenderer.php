@@ -13,6 +13,7 @@ final class OpenRestyHostRenderer
     private const HOSTS_RELATIVE_PATH = 'config/openresty/hosts';
     private const PROJECT_WEB_DNSDOCK_ALIAS = 'PROJECT_WEB_DNSDOCK_ALIAS';
     private const HTTP_AUTH_CONFIG_FILE = 'http-auth.conf';
+    private const HTTP_AUTH_MAP_FILE = '00-http-auth-map.conf';
     private const HTTP_AUTH_USER_FILE = '.htpasswd';
 
     public function render(): void
@@ -31,6 +32,7 @@ final class OpenRestyHostRenderer
         $baseHost = $this->requiredEnvValue($envValues, 'BASE_HOST', $compose->envFile());
         $openRestyPort = $this->openRestyPort($envValues, $compose->envFile());
         $httpAuthConfig = $this->httpAuthConfig($envValues, $hostsDirectory);
+        $this->renderHttpAuthMap($envValues, $hostsDirectory, $httpAuthConfig !== '');
         $hostNames = [];
         $disabledHostNames = [];
         foreach ($this->registeredProjects() as $project) {
@@ -147,6 +149,21 @@ final class OpenRestyHostRenderer
             self::HTTP_AUTH_USER_FILE,
             '/etc/nginx/conf.d/' . self::HTTP_AUTH_USER_FILE
         );
+    }
+
+    /** @param array<string, string> $envValues */
+    private function renderHttpAuthMap(array $envValues, string $hostsDirectory, bool $enabled): void
+    {
+        $mapPath = join_path($hostsDirectory, self::HTTP_AUTH_MAP_FILE);
+        if (!$enabled) {
+            if (is_file($mapPath)) {
+                unlink($mapPath);
+            }
+
+            return;
+        }
+
+        file_put_contents($mapPath, (new HttpBasicAuthRenderer())->renderPlaywrightBypassMap($envValues));
     }
 
     /** @param array<string, mixed> $project */

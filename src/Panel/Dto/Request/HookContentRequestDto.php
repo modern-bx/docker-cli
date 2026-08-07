@@ -10,7 +10,14 @@ use DockerCli\Panel\Http\RequestValidationException;
 
 final readonly class HookContentRequestDto implements RequestDto
 {
-    public function __construct(public string $id, public string $content)
+    public function __construct(
+        public string $id,
+        public string $content,
+        public string $name,
+        public bool $enabled,
+        public string $command,
+        public string $timing,
+    )
     {
     }
 
@@ -18,10 +25,14 @@ final readonly class HookContentRequestDto implements RequestDto
     {
         $action = HookActionRequestDto::fromRequest($request);
         $content = $request->body['content'] ?? null;
-        if (!is_string($content)) {
+        $name = $request->body['name'] ?? null;
+        $enabled = $request->body['enabled'] ?? null;
+        $command = $request->body['command'] ?? null;
+        $timing = $request->body['timing'] ?? null;
+        if (!is_string($content) || !is_string($name) || !is_bool($enabled) || !is_string($command) || !is_string($timing)) {
             throw new RequestValidationException('Некорректное содержимое хука.');
         }
 
-        return new static($action->id, $content);
+        return new static($action->id, $content, $name, $enabled, $command, $timing);
     }
 }

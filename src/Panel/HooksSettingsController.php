@@ -54,7 +54,7 @@ final readonly class HooksSettingsController
     public function save(HookContentRequestDto $request): HookContentDto
     {
         try {
-            $this->hooks->save($request->id, $request->content);
+            $this->hooks->save($request->id, $request->content, $request->name, $request->enabled, $request->command, $request->timing);
 
             return new HookContentDto($request->content);
         } catch (\RuntimeException $exception) {

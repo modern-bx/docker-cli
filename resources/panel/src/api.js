@@ -179,8 +179,8 @@ export async function getHookContent(request, id) {
   return request(`/api/settings/hooks/${encodeURIComponent(id)}/content`);
 }
 
-export async function saveHookContent(request, id, content) {
-  return request(`/api/settings/hooks/${encodeURIComponent(id)}/content`, { method: 'POST', body: JSON.stringify({ content }) });
+export async function saveHookContent(request, id, parameters) {
+  return request(`/api/settings/hooks/${encodeURIComponent(id)}/content`, { method: 'POST', body: JSON.stringify(parameters) });
 }
 
 export async function runHookSettings(request, id, profile, workingDirectory) {

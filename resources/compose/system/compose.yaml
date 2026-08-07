@@ -381,6 +381,7 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       docker-cli:
+        ipv4_address: ${PLAYWRIGHT_IP:-172.30.0.254}
     ipc: host
     profiles:
       - tools
@@ -390,6 +391,9 @@ networks:
   docker-cli:
     name: docker-cli
     driver: bridge
+    ipam:
+      config:
+        - subnet: ${DOCKER_CLI_NETWORK_SUBNET:-172.30.0.0/24}
 
 volumes:
   traefik-letsencrypt:

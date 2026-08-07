@@ -127,6 +127,8 @@ final class ConfigSeedCommand extends AbstractCommand
             'OPENRESTY_PORT',
             'HTTP_AUTH_LOGIN',
             'HTTP_AUTH_PASSWORD',
+            'PLAYWRIGHT_IP',
+            'DOCKER_CLI_NETWORK_SUBNET',
             'HOST_UID',
             'HOST_GID',
             'SOURCE_IMAGE_REGISTRY',

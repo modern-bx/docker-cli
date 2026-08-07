@@ -11,6 +11,7 @@ final class PanelGatewayAuthRenderer
 {
     private const PANEL_RELATIVE_PATH = 'config/panel';
     private const HTTP_AUTH_CONFIG_FILE = 'http-auth.conf';
+    private const HTTP_AUTH_MAP_FILE = 'playwright-auth-map.conf';
     private const HTTP_AUTH_USER_FILE = '.htpasswd';
 
     public function render(): void
@@ -21,13 +22,24 @@ final class PanelGatewayAuthRenderer
             throw new \RuntimeException(sprintf('Unable to create panel config directory "%s".', $panelDirectory));
         }
 
-        (new HttpBasicAuthRenderer())->render(
-            $this->readEnvValues($compose->envFile()),
+        $envValues = $this->readEnvValues($compose->envFile());
+        $renderer = new HttpBasicAuthRenderer();
+        $httpAuthConfig = $renderer->render(
+            $envValues,
             $panelDirectory,
             self::HTTP_AUTH_CONFIG_FILE,
             self::HTTP_AUTH_USER_FILE,
             '/etc/nginx/panel/' . self::HTTP_AUTH_USER_FILE
         );
+
+        $mapPath = join_path($panelDirectory, self::HTTP_AUTH_MAP_FILE);
+        if ($httpAuthConfig === '') {
+            if (is_file($mapPath)) {
+                unlink($mapPath);
+            }
+        } else {
+            file_put_contents($mapPath, $renderer->renderPlaywrightBypassMap($envValues));
+        }
     }
 
     /** @return array<string, string> */

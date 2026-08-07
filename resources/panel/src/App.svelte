@@ -163,6 +163,7 @@
   let projectUpdating = false;
   let projectAddOptions = { locations: [], languages: [], languageVersions: [], defaultLanguageVersion: '8.2', frameworks: {}, deploymentScripts: [] };
   let projectLocationCollection = useListCollection({ items: [] });
+  let projectCloneLocationCollection = useListCollection({ items: [] });
   let projectLanguageCollection = useListCollection({ items: [] });
   let projectLanguageVersionCollection = useListCollection({ items: [] });
   let projectFrameworkCollection = useListCollection({ items: [] });
@@ -299,6 +300,7 @@
       ? 'warn'
       : notifications.some((item) => item.level === 'info') ? 'info' : 'debug';
   $: projectLocationCollection = useListCollection({ items: projectAddOptions.locations.map((item) => ({ value: item.code, label: item.code })) });
+  $: projectCloneLocationCollection = useListCollection({ items: [{ value: '', label: 'Рядом с исходным проектом' }, ...projectAddOptions.locations.map((item) => ({ value: item.code, label: item.code }))] });
   $: projectLanguageCollection = useListCollection({ items: projectAddOptions.languages.map((item) => ({ value: item.code, label: item.name })) });
   $: projectLanguageVersionCollection = useListCollection({ items: projectAddOptions.languageVersions.map((version) => ({ value: version, label: version })) });
   $: projectFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectAddDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
@@ -610,7 +612,7 @@
   function rebuildHookEditor() {
     if (!hookEditorElement || !hookEditorDialog) return;
     hookEditorView?.destroy();
-    hookEditorView = createHookEditor(hookEditorElement, hookEditorDialog.content, hookEditorDialog.runResult ? 10 : 15, (content) => {
+    hookEditorView = createHookEditor(hookEditorElement, hookEditorDialog.content, hookEditorDialog.runResult ? 5 : 10, (content) => {
       if (hookEditorDialog) hookEditorDialog = { ...hookEditorDialog, content };
     });
   }
@@ -698,7 +700,7 @@
 
   async function editHookItem(hook) {
     hookContextMenu = null;
-    hookEditorDialog = { hook, content: '', profile: `hook:command ${hook.command}:${hook.timing}`, workingDirectory: '', project: '', runResult: '' };
+    hookEditorDialog = { hook, content: '', name: hook.hook.replace(/^\.+/, ''), enabled: hook.enabled, command: hook.command, timing: hook.timing, profile: `hook:command ${hook.command}:${hook.timing}`, workingDirectory: '', project: '', runResult: '' };
     hookEditorLoading = true;
     try {
       const data = await getHookContent(api, hook.id);
@@ -732,8 +734,9 @@
     hookEditorSaving = true;
     try {
       const content = hookEditorView ? hookEditorView.state.doc.toString() : hookEditorDialog.content;
-      await saveHookContent(api, hookEditorDialog.hook.id, content);
+      await saveHookContent(api, hookEditorDialog.hook.id, { content, name: hookEditorDialog.name, enabled: hookEditorDialog.enabled, command: hookEditorDialog.command, timing: hookEditorDialog.timing });
       hookEditorDialog = null;
+      await loadHooksSettings();
     } catch (requestError) {
       errorTitle = 'Не удалось сохранить хук';
       error = requestError instanceof Error ? requestError.message : errorTitle;
@@ -1498,9 +1501,16 @@
     if (project) requestProjectAction(action, project);
   }
 
-  function openProjectCloneDialog(project) {
+  async function openProjectCloneDialog(project) {
     projectContextMenu = null;
-    projectCloneDialog = { project: project.name, to: '', mysql: true, postgres: true };
+    try {
+      projectAddOptions = await getProjectOptions(api);
+      const location = projectAddOptions.locations.find((item) => item.default);
+      projectCloneDialog = { project: project.name, to: '', location: location?.code || '', mysql: true, postgres: true };
+    } catch (cause) {
+      errorTitle = 'Не удалось открыть клонирование проекта';
+      error = cause instanceof Error ? cause.message : 'Не удалось загрузить параметры проекта.';
+    }
   }
 
   async function submitProjectClone() {
@@ -1509,7 +1519,7 @@
     try {
       const dialog = projectCloneDialog;
       const dbms = [dialog.mysql && 'mysql', dialog.postgres && 'postgres'].filter(Boolean);
-      await cloneProject(api, dialog.project, { to: dialog.to, dbms });
+      await cloneProject(api, dialog.project, { to: dialog.to, location: dialog.location, dbms });
       projectCloneDialog = null;
       notifyQueuedOperation(`Клонирование проекта «${dialog.project}»`);
     } catch (cause) {
@@ -2730,7 +2740,13 @@
       </div>
       {#if hookEditorLoading}
         <div class="hook-editor-loading animate-pulse">Загрузка…</div>
-      {:else}
+      {:else if hookEditorDialog}
+        <label class="scheduler-enabled-option hook-editor-enabled"><input class="checkbox" type="checkbox" bind:checked={hookEditorDialog.enabled} />Включен</label>
+        <div class="hook-editor-fields">
+          <label class="label"><span class="label-text">Название файла</span><input class="input" type="text" bind:value={hookEditorDialog.name} /></label>
+          <label class="label"><span class="label-text">Команда</span><Combobox collection={hookCommandCollection} value={[hookEditorDialog.command]} openOnClick onValueChange={(details) => { if (details.value[0]) hookEditorDialog.command = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookCommands as value}<Combobox.Item item={{ value, label: value }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          <label class="label"><span class="label-text">Время выполнения</span><Combobox collection={hookCreateTimingCollection} value={[hookEditorDialog.timing]} openOnClick onValueChange={(details) => { if (details.value[0]) hookEditorDialog.timing = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each hookCreateTimingOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+        </div>
         <div class:hook-editor-compact={Boolean(hookEditorDialog?.runResult)} class="hook-code-editor" use:mountHookEditor aria-label="Редактор кода хука"></div>
         {#if hookEditorDialog?.runResult}
           <div class="hook-run-result hook-code-editor" use:mountHookRunResultEditor aria-label="Результат выполнения хука"></div>
@@ -2742,7 +2758,7 @@
       {/if}
       <div class="login-error-actions">
         <button class="btn preset-tonal" type="button" disabled={hookEditorSaving || hookRunning} onclick={() => { hookEditorDialog = null; }}>Отмена</button>
-        <button class="btn preset-filled-primary-500" type="button" disabled={hookEditorLoading || hookEditorSaving || hookRunning} onclick={saveHookEditor}><Save size={16} aria-hidden="true" />{hookEditorSaving ? 'Сохраняем…' : 'Сохранить'}</button>
+        <button class="btn preset-filled-primary-500" type="button" disabled={hookEditorLoading || hookEditorSaving || hookRunning || !hookEditorDialog?.name.trim() || !hookEditorDialog?.command || !hookEditorDialog?.timing} onclick={saveHookEditor}><Save size={16} aria-hidden="true" />{hookEditorSaving ? 'Сохраняем…' : 'Сохранить'}</button>
       </div>
     </Dialog.Content>
   </Dialog.Positioner>
@@ -2828,6 +2844,7 @@
       {#if projectCloneDialog}
         <form class="project-add-form project-clone-form" onsubmit={(event) => { event.preventDefault(); submitProjectClone(); }}>
           <label class="label"><span class="label-text">Имя проекта (опционально)</span><input class="input" bind:value={projectCloneDialog.to} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
+          <label class="label"><span class="label-text">Расположение (опционально)</span><Combobox collection={projectCloneLocationCollection} value={[projectCloneDialog.location]} openOnClick onValueChange={(details) => { projectCloneDialog.location = details.value[0] ?? ''; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Рядом с исходным проектом' }, ...projectAddOptions.locations.map((location) => ({ value: location.code, label: location.code }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <fieldset class="project-clone-dbms"><legend class="label-text">Выбрать БД для клонирования</legend><div class="project-deployment-checkboxes"><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.mysql} /><span>MySQL</span></label><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.postgres} /><span>PostgreSQL</span></label></div></fieldset>
           <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectCloning} onclick={() => { projectCloneDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectCloning}>{projectCloning ? 'Добавляем…' : 'Добавить'}</button></div>
         </form>
