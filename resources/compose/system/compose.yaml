@@ -393,7 +393,7 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: ${PLAYWRIGHT_NETWORK_SUBNET:-172.30.0.0/24}
+        - subnet: ${DOCKER_CLI_NETWORK_SUBNET:-172.30.0.0/24}
 
 volumes:
   traefik-letsencrypt:

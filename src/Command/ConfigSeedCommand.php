@@ -128,7 +128,7 @@ final class ConfigSeedCommand extends AbstractCommand
             'HTTP_AUTH_LOGIN',
             'HTTP_AUTH_PASSWORD',
             'PLAYWRIGHT_IP',
-            'PLAYWRIGHT_NETWORK_SUBNET',
+            'DOCKER_CLI_NETWORK_SUBNET',
             'HOST_UID',
             'HOST_GID',
             'SOURCE_IMAGE_REGISTRY',
