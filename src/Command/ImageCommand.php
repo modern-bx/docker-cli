@@ -17,27 +17,27 @@ abstract class ImageCommand extends AbstractCommand
     private const IMAGES = [
         [
             'name' => 'php-fpm-8.2',
-            'context' => 'resources/compose/system/config/php-fpm-8.2',
+            'context' => 'config/php-fpm-8.2',
             'service' => 'php-fpm-8.2',
         ],
         [
             'name' => 'php-fpm-8.3',
-            'context' => 'resources/compose/system/config/php-fpm-8.3',
+            'context' => 'config/php-fpm-8.3',
             'service' => 'php-fpm-8.3',
         ],
         [
             'name' => 'php-fpm-8.4',
-            'context' => 'resources/compose/system/config/php-fpm-8.4',
+            'context' => 'config/php-fpm-8.4',
             'service' => 'php-fpm-8.4',
         ],
         [
             'name' => 'php-fpm-8.5',
-            'context' => 'resources/compose/system/config/php-fpm-8.5',
+            'context' => 'config/php-fpm-8.5',
             'service' => 'php-fpm-8.5',
         ],
         [
             'name' => 'playwright',
-            'context' => 'resources/compose/system/config/playwright',
+            'context' => 'config/playwright',
             'service' => 'playwright',
         ],
     ];
@@ -269,12 +269,7 @@ abstract class ImageCommand extends AbstractCommand
 
     private function composeEnvFile(): string
     {
-        $composeEnv = (new SystemCompose())->envFile();
-        if (is_file($composeEnv)) {
-            return $composeEnv;
-        }
-
-        return join_path($this->repositoryRoot(), 'resources', 'compose', 'system', SystemCompose::ENV_FILE);
+        return (new SystemCompose())->envFile();
     }
 
     private function repositoryRoot(): string
