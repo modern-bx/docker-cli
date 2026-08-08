@@ -21,6 +21,7 @@ docker-cli image:publish
 ```dotenv
 SOURCE_IMAGE_REGISTRY=ghcr.io
 SOURCE_IMAGE_NAMESPACE=<ваш-vendor-or-namespace>
+SOURCE_IMAGE_NAME=docker-cli
 ```
 
 `SOURCE_IMAGE_NAMESPACE` обязателен. Если он не задан, команды сборки и публикации завершаются ошибкой, чтобы не публиковать и не тегировать образы в чужой namespace.
@@ -28,8 +29,8 @@ SOURCE_IMAGE_NAMESPACE=<ваш-vendor-or-namespace>
 Публикуемый ref выглядит так:
 
 ```text
-<SOURCE_IMAGE_REGISTRY>/<SOURCE_IMAGE_NAMESPACE>/docker-cli/php-fpm-8.2:<tag>
-<SOURCE_IMAGE_REGISTRY>/<SOURCE_IMAGE_NAMESPACE>/docker-cli/playwright:<tag>
+<SOURCE_IMAGE_REGISTRY>/<SOURCE_IMAGE_NAMESPACE>/<SOURCE_IMAGE_NAME>/php-fpm-8.2:<tag>
+<SOURCE_IMAGE_REGISTRY>/<SOURCE_IMAGE_NAMESPACE>/<SOURCE_IMAGE_NAME>/playwright:<tag>
 ```
 
 Тег выбирается так:
@@ -58,6 +59,7 @@ docker-cli image:publish --tag=1.0.0
 
 - `SOURCE_IMAGE_REGISTRY` — registry для образов, например `ghcr.io`;
 - `SOURCE_IMAGE_NAMESPACE` — ваш vendor, GitHub namespace или organization;
+- `SOURCE_IMAGE_NAME` — имя приложения в пути образа, по умолчанию `docker-cli`;
 - `SOURCE_IMAGE_TAG`;
 - `SOURCE_IMAGE_DOCKER_BUILDKIT`.
 

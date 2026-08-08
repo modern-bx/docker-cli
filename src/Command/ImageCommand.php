@@ -145,6 +145,7 @@ abstract class ImageCommand extends AbstractCommand
         return [
             'SOURCE_IMAGE_REGISTRY' => $this->imageRegistry(),
             'SOURCE_IMAGE_NAMESPACE' => $this->imageNamespace(),
+            'SOURCE_IMAGE_NAME' => $this->sourceImageName(),
             'SOURCE_IMAGE_TAG' => $tag,
         ];
     }
@@ -168,7 +169,14 @@ abstract class ImageCommand extends AbstractCommand
 
     private function imageName(string $serviceName): string
     {
-        return 'docker-cli/' . $serviceName;
+        return $this->sourceImageName() . '/' . $serviceName;
+    }
+
+    private function sourceImageName(): string
+    {
+        $name = trim((string) ($this->imageEnv()['SOURCE_IMAGE_NAME'] ?? ''), '/');
+
+        return $name !== '' ? $name : 'docker-cli';
     }
 
     /** @return array<string, string> */
