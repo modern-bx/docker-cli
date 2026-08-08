@@ -51,7 +51,7 @@ abstract class ImageCommand extends AbstractCommand
     /** @return list<array{name: string, context: string, service: string}> */
     protected function images(): array
     {
-        $root = $this->repositoryRoot();
+        $root = (new SystemCompose())->directory();
 
         return array_map(
             static fn (array $image): array => [
@@ -206,13 +206,18 @@ abstract class ImageCommand extends AbstractCommand
 
     private function latestGitTag(): ?string
     {
+        $repositoryRoot = $this->repositoryRoot();
+        if (!is_dir(join_path($repositoryRoot, '.git'))) {
+            return null;
+        }
+
         $command = ['git', 'tag', '--merged', 'HEAD', '--sort=-v:refname'];
         $descriptors = [
             0 => ['file', '/dev/null', 'r'],
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
-        $process = proc_open($command, $descriptors, $pipes, $this->repositoryRoot());
+        $process = proc_open($command, $descriptors, $pipes, $repositoryRoot);
         if (!is_resource($process)) {
             return null;
         }
@@ -251,7 +256,7 @@ abstract class ImageCommand extends AbstractCommand
 
     private function composeFile(): string
     {
-        return join_path($this->repositoryRoot(), 'resources', 'compose', 'system', SystemCompose::COMPOSE_FILE);
+        return (new SystemCompose())->composeFile();
     }
 
     private function composeEnvFile(): string
