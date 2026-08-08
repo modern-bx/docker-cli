@@ -120,7 +120,7 @@ services:
       context: ./config/php-fpm-8.2
       dockerfile: Dockerfile
       network: host
-    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/docker-cli/php-fpm-8.2:${SOURCE_IMAGE_TAG:-default}
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/php-fpm-8.2:${SOURCE_IMAGE_TAG:-default}
     container_name: docker-cli-php-fpm-8.2
     environment:
       DNSDOCK_NAME: php-fpm-8.2
@@ -150,7 +150,7 @@ services:
       context: ./config/php-fpm-8.3
       dockerfile: Dockerfile
       network: host
-    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/docker-cli/php-fpm-8.3:${SOURCE_IMAGE_TAG:-default}
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/php-fpm-8.3:${SOURCE_IMAGE_TAG:-default}
     container_name: docker-cli-php-fpm-8.3
     environment:
       DNSDOCK_NAME: php-fpm-8.3
@@ -180,7 +180,7 @@ services:
       context: ./config/php-fpm-8.4
       dockerfile: Dockerfile
       network: host
-    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/docker-cli/php-fpm-8.4:${SOURCE_IMAGE_TAG:-default}
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/php-fpm-8.4:${SOURCE_IMAGE_TAG:-default}
     container_name: docker-cli-php-fpm-8.4
     environment:
       DNSDOCK_NAME: php-fpm-8.4
@@ -210,7 +210,7 @@ services:
       context: ./config/php-fpm-8.5
       dockerfile: Dockerfile
       network: host
-    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/docker-cli/php-fpm-8.5:${SOURCE_IMAGE_TAG:-default}
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/php-fpm-8.5:${SOURCE_IMAGE_TAG:-default}
     container_name: docker-cli-php-fpm-8.5
     environment:
       DNSDOCK_NAME: php-fpm-8.5
@@ -369,7 +369,7 @@ services:
       context: ./config/playwright
       args:
         PLAYWRIGHT_IMAGE: ${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright:v1.61.0-noble}
-    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/docker-cli/playwright:${SOURCE_IMAGE_TAG:-default}
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/playwright:${SOURCE_IMAGE_TAG:-default}
     container_name: docker-cli-playwright
     environment:
       HOME: /root

@@ -17,27 +17,27 @@ abstract class ImageCommand extends AbstractCommand
     private const IMAGES = [
         [
             'name' => 'php-fpm-8.2',
-            'context' => 'resources/compose/system/config/php-fpm-8.2',
+            'context' => 'config/php-fpm-8.2',
             'service' => 'php-fpm-8.2',
         ],
         [
             'name' => 'php-fpm-8.3',
-            'context' => 'resources/compose/system/config/php-fpm-8.3',
+            'context' => 'config/php-fpm-8.3',
             'service' => 'php-fpm-8.3',
         ],
         [
             'name' => 'php-fpm-8.4',
-            'context' => 'resources/compose/system/config/php-fpm-8.4',
+            'context' => 'config/php-fpm-8.4',
             'service' => 'php-fpm-8.4',
         ],
         [
             'name' => 'php-fpm-8.5',
-            'context' => 'resources/compose/system/config/php-fpm-8.5',
+            'context' => 'config/php-fpm-8.5',
             'service' => 'php-fpm-8.5',
         ],
         [
             'name' => 'playwright',
-            'context' => 'resources/compose/system/config/playwright',
+            'context' => 'config/playwright',
             'service' => 'playwright',
         ],
     ];
@@ -51,7 +51,7 @@ abstract class ImageCommand extends AbstractCommand
     /** @return list<array{name: string, context: string, service: string}> */
     protected function images(): array
     {
-        $root = $this->repositoryRoot();
+        $root = (new SystemCompose())->directory();
 
         return array_map(
             static fn (array $image): array => [
@@ -145,6 +145,7 @@ abstract class ImageCommand extends AbstractCommand
         return [
             'SOURCE_IMAGE_REGISTRY' => $this->imageRegistry(),
             'SOURCE_IMAGE_NAMESPACE' => $this->imageNamespace(),
+            'SOURCE_IMAGE_NAME' => $this->sourceImageName(),
             'SOURCE_IMAGE_TAG' => $tag,
         ];
     }
@@ -168,7 +169,14 @@ abstract class ImageCommand extends AbstractCommand
 
     private function imageName(string $serviceName): string
     {
-        return 'docker-cli/' . $serviceName;
+        return $this->sourceImageName() . '/' . $serviceName;
+    }
+
+    private function sourceImageName(): string
+    {
+        $name = trim((string) ($this->imageEnv()['SOURCE_IMAGE_NAME'] ?? ''), '/');
+
+        return $name !== '' ? $name : 'docker-cli';
     }
 
     /** @return array<string, string> */
@@ -206,13 +214,18 @@ abstract class ImageCommand extends AbstractCommand
 
     private function latestGitTag(): ?string
     {
+        $repositoryRoot = $this->repositoryRoot();
+        if (!is_dir(join_path($repositoryRoot, '.git'))) {
+            return null;
+        }
+
         $command = ['git', 'tag', '--merged', 'HEAD', '--sort=-v:refname'];
         $descriptors = [
             0 => ['file', '/dev/null', 'r'],
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
-        $process = proc_open($command, $descriptors, $pipes, $this->repositoryRoot());
+        $process = proc_open($command, $descriptors, $pipes, $repositoryRoot);
         if (!is_resource($process)) {
             return null;
         }
@@ -251,17 +264,12 @@ abstract class ImageCommand extends AbstractCommand
 
     private function composeFile(): string
     {
-        return join_path($this->repositoryRoot(), 'resources', 'compose', 'system', SystemCompose::COMPOSE_FILE);
+        return (new SystemCompose())->composeFile();
     }
 
     private function composeEnvFile(): string
     {
-        $composeEnv = (new SystemCompose())->envFile();
-        if (is_file($composeEnv)) {
-            return $composeEnv;
-        }
-
-        return join_path($this->repositoryRoot(), 'resources', 'compose', 'system', SystemCompose::ENV_FILE);
+        return (new SystemCompose())->envFile();
     }
 
     private function repositoryRoot(): string
