@@ -16,6 +16,12 @@ final readonly class AssetController
         return new FileResponseDto('index.html');
     }
 
+    #[Route('GET', '/favicon.svg', AssetRequestDto::class, FileResponseDto::class, authenticated: false)]
+    public function favicon(AssetRequestDto $request): FileResponseDto
+    {
+        return new FileResponseDto('favicon.svg');
+    }
+
     #[Route('GET', '/assets/{path:.+}', AssetRequestDto::class, FileResponseDto::class, authenticated: false)]
     public function asset(AssetRequestDto $request): FileResponseDto
     {

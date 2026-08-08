@@ -248,6 +248,7 @@ services:
       traefik.enable: "true"
       traefik.http.routers.mailpit.rule: Host(`mailpit.${BASE_HOST}`)
       traefik.http.routers.mailpit.entrypoints: websecure
+      traefik.http.routers.mailpit.middlewares: system-http-auth
       traefik.http.routers.mailpit.tls: "true"
       traefik.http.routers.mailpit.tls.certresolver: cloudflare
       traefik.http.services.mailpit.loadbalancer.server.port: "8025"
@@ -315,6 +316,7 @@ services:
       traefik.enable: "true"
       traefik.http.routers.adminer.rule: Host(`adminer.${BASE_HOST}`)
       traefik.http.routers.adminer.entrypoints: websecure
+      traefik.http.routers.adminer.middlewares: system-http-auth
       traefik.http.routers.adminer.tls: "true"
       traefik.http.routers.adminer.tls.certresolver: cloudflare
       traefik.http.services.adminer.loadbalancer.server.port: "8080"
@@ -332,6 +334,7 @@ services:
       - ./config/panel:/etc/nginx/panel:ro
     labels:
       traefik.enable: "true"
+      traefik.http.middlewares.system-http-auth.forwardauth.address: http://panel-gateway:8080/http-auth
       traefik.http.routers.panel.rule: Host(`panel.${BASE_HOST}`)
       traefik.http.routers.panel.entrypoints: websecure
       traefik.http.routers.panel.tls: "true"
@@ -354,6 +357,7 @@ services:
       traefik.enable: "true"
       traefik.http.routers.dockhand.rule: Host(`dockhand.${BASE_HOST}`)
       traefik.http.routers.dockhand.entrypoints: websecure
+      traefik.http.routers.dockhand.middlewares: system-http-auth
       traefik.http.routers.dockhand.tls.certresolver: cloudflare
       traefik.http.services.dockhand.loadbalancer.server.port: "3000"
     networks:

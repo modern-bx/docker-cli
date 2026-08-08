@@ -33,6 +33,7 @@ final class XdebugPortManager
         sort($projectFiles);
 
         $changed = false;
+        $usedPorts = $this->registeredPorts($projectsDirectory);
         $port = self::FIRST_PROJECT_PORT;
         foreach ($projectFiles as $projectFile) {
             $data = Yaml::parseFile($projectFile);
@@ -48,14 +49,21 @@ final class XdebugPortManager
             }
 
             $currentPort = $data['data']['project']['xdebug']['client_port'] ?? null;
-            if ($currentPort !== $port) {
-                if (!isset($data['data']['project']['xdebug']) || !is_array($data['data']['project']['xdebug'])) {
-                    $data['data']['project']['xdebug'] = [];
-                }
-                $data['data']['project']['xdebug']['client_port'] = $port;
-                file_put_contents($projectFile, Yaml::dump($data, 4, 2));
-                $changed = true;
+            if ($this->portNumber($currentPort) !== null) {
+                continue;
             }
+
+            while (in_array($port, $usedPorts, true)) {
+                ++$port;
+            }
+
+            if (!isset($data['data']['project']['xdebug']) || !is_array($data['data']['project']['xdebug'])) {
+                $data['data']['project']['xdebug'] = [];
+            }
+            $data['data']['project']['xdebug']['client_port'] = $port;
+            file_put_contents($projectFile, Yaml::dump($data, 4, 2));
+            $usedPorts[] = $port;
+            $changed = true;
 
             ++$port;
         }
@@ -77,17 +85,21 @@ final class XdebugPortManager
                 continue;
             }
 
-            $port = $data['data']['project']['xdebug']['client_port'] ?? null;
-            if (is_int($port)) {
+            $port = $this->portNumber($data['data']['project']['xdebug']['client_port'] ?? null);
+            if ($port !== null) {
                 $ports[] = $port;
-                continue;
-            }
-
-            if (is_string($port) && ctype_digit($port)) {
-                $ports[] = (int) $port;
             }
         }
 
         return $ports;
+    }
+
+    private function portNumber(mixed $port): ?int
+    {
+        if (is_int($port)) {
+            return $port;
+        }
+
+        return is_string($port) && ctype_digit($port) ? (int) $port : null;
     }
 }
