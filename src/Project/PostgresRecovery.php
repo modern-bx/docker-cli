@@ -26,6 +26,7 @@ final class PostgresRecovery
         $container = 'docker-cli-postgres-recover-' . $suffix;
         $network = $container;
         $volume = $container;
+        $role = 'docker_cli_recover_' . $suffix;
 
         $output->writeln(sprintf('<info>Обнаружен PostgreSQL %s. Создаётся изолированная копия данных.</info>', $version));
         try {
@@ -35,6 +36,12 @@ final class PostgresRecovery
                 '--volume', $source . ':/source:ro', '--volume', $volume . ':/target',
                 'postgres:' . $version, '-ec', 'cp -a /source/. /target/ && chown -R postgres:postgres /target',
             ], $output);
+            $this->mustRun([
+                'docker', 'run', '--rm', '--user', 'postgres', '--entrypoint', 'sh',
+                '--volume', $volume . ':/var/lib/postgresql/data', 'postgres:' . $version, '-ec',
+                'printf \'CREATE ROLE "%s" SUPERUSER LOGIN;\\n\' "$1" | postgres --single -D /var/lib/postgresql/data template1',
+                'sh', $role,
+            ], $output);
             $this->mustRun(['docker', 'network', 'create', $network], $output);
             $this->mustRun([
                 'docker', 'run', '--detach', '--name', $container, '--network', $network,
@@ -42,11 +49,11 @@ final class PostgresRecovery
                 'postgres:' . $version, '-ec',
                 "printf '%s\\n' 'local all all trust' 'host all all 0.0.0.0/0 trust' 'host all all ::/0 trust' >/tmp/pg_hba.conf; exec gosu postgres postgres -D /var/lib/postgresql/data -c listen_addresses='*' -c hba_file=/tmp/pg_hba.conf",
             ], $output);
-            $this->waitUntilReady($container);
+            $this->waitUntilReady($container, $role);
 
             [, $databaseOutput] = $this->mustRun([
                 'docker', 'exec', '--user', 'postgres', $container,
-                'psql', '--no-password', '--tuples-only', '--no-align', '--dbname=postgres',
+                'psql', '--no-password', '--tuples-only', '--no-align', '--username=' . $role, '--dbname=template1',
                 '--command', "SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate AND datname <> 'postgres' ORDER BY datname",
             ], $output, true);
             $available = array_values(array_filter(array_map('trim', preg_split('/\R/', $databaseOutput) ?: [])));
@@ -74,8 +81,8 @@ final class PostgresRecovery
                     'docker', 'run', '--rm', '--network', $network, '--user', 'root',
                     '--volume', $directory . ':/dump', '--entrypoint', 'sh',
                     'postgres:' . $version, '-ec',
-                    'database="$1"; jobs="$2"; uid="$3"; gid="$4"; pg_dump --host="$5" --username=postgres --format=directory --jobs="$jobs" --file=/dump "$database"; chown -R "$uid:$gid" /dump',
-                    'sh', $database, '4', (string) $this->uid(), (string) $this->gid(), $container,
+                    'database="$1"; jobs="$2"; uid="$3"; gid="$4"; pg_dump --host="$5" --username="$6" --format=directory --jobs="$jobs" --file=/dump "$database"; chown -R "$uid:$gid" /dump',
+                    'sh', $database, '4', (string) $this->uid(), (string) $this->gid(), $container, $role,
                 ], $output);
             }
         } finally {
@@ -110,10 +117,10 @@ final class PostgresRecovery
         }
     }
 
-    private function waitUntilReady(string $container): void
+    private function waitUntilReady(string $container, string $role): void
     {
         for ($attempt = 0; $attempt < 60; ++$attempt) {
-            [$code] = $this->run(['docker', 'exec', '--user', 'postgres', $container, 'pg_isready', '--dbname=postgres'], true);
+            [$code] = $this->run(['docker', 'exec', '--user', 'postgres', $container, 'pg_isready', '--username=' . $role, '--dbname=template1'], true);
             if ($code === 0) return;
             usleep(500_000);
         }
