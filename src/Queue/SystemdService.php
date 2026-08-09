@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace DockerCli\Queue;
 
+use DockerCli\Service\SystemdUnitPolicy;
+
 final class SystemdService
 {
     private const UNIT_DIRECTORY = '/etc/systemd/system';
+
+    public function __construct(private readonly SystemdUnitPolicy $policy = new SystemdUnitPolicy())
+    {
+    }
 
     public function name(string $queue): string
     {
@@ -23,6 +29,7 @@ final class SystemdService
         $name = $this->name($queue);
         $unitPath = $this->unitPath($queue);
         $previousUnit = is_file($unitPath) ? file_get_contents($unitPath) : false;
+        $previousPolicy = $this->policy->contents($name . '.service');
         $service = ['[Service]', 'Type=simple'];
         if ($user !== null) {
             $service[] = 'User=' . $user;
@@ -52,6 +59,7 @@ final class SystemdService
         }
 
         try {
+            $this->policy->install($name . '.service', $user);
             $this->systemctl('daemon-reload');
             $this->systemctl('enable', $name . '.service');
             $this->systemctl('restart', $name . '.service');
@@ -61,6 +69,7 @@ final class SystemdService
             } else {
                 @file_put_contents($unitPath, $previousUnit, LOCK_EX);
             }
+            $this->policy->restore($name . '.service', $previousPolicy);
             $this->runSystemctl('daemon-reload');
             throw $exception;
         }
@@ -78,6 +87,7 @@ final class SystemdService
         if (!@unlink($unitPath)) {
             throw new \RuntimeException(sprintf('Не удалось удалить конфигурацию сервиса %s.', $unitPath));
         }
+        $this->policy->remove($name . '.service');
         $this->systemctl('daemon-reload');
         $this->runSystemctl('reset-failed', $name . '.service');
     }
