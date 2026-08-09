@@ -37,6 +37,23 @@ bin/docker-cli config:seed --yes
 
 ## Проекты
 
+### `bin/docker-cli mysql:recover [--from=path] [--to=path] [--database=db1,db2]`
+
+Извлекает пользовательские базы из каталога `data` MySQL 5.5–5.7 или 8.0 в
+отдельные директории формата mydumper. По умолчанию исходным каталогом и местом
+назначения служит текущая директория. Системные базы не экспортируются, а
+`--database` ограничивает список баз.
+
+Исходные файлы подключаются только для чтения и сначала копируются во временный
+Docker volume. Команда поднимает из копии изолированный MySQL совместимой версии,
+создаёт дампы `<database>-<YYYYmmdd-HHMMSS>`, после чего удаляет временный
+контейнер, сеть и volume. Работающий системный MySQL docker-cli не используется.
+
+```bash
+bin/docker-cli mysql:recover --from=/srv/mysql/data --to=./recovered
+bin/docker-cli mysql:recover --from=../data --database=shop,content
+```
+
 ### `bin/docker-cli shell:bash`
 
 Открывает интерактивный Bash в контейнере PHP-FPM выбранной для проекта версии от имени пользователя
