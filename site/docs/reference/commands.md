@@ -48,6 +48,9 @@ bin/docker-cli config:seed --yes
 Docker volume. Команда поднимает из копии изолированный MySQL совместимой версии,
 создаёт дампы `<database>-<YYYYmmdd-HHMMSS>`, после чего удаляет временный
 контейнер, сеть и volume. Работающий системный MySQL docker-cli не используется.
+Перед экспортом из MySQL 5.x команда отключает устаревший режим
+`NO_AUTO_CREATE_USER`, чтобы созданный дамп можно было загрузить через
+`mysql:load` в MySQL 8.x.
 
 ```bash
 bin/docker-cli mysql:recover --from=/srv/mysql/data --to=./recovered

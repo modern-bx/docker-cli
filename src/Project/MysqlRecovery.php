@@ -43,6 +43,10 @@ final class MysqlRecovery
                 '--skip-grant-tables', '--skip-networking=0', '--bind-address=0.0.0.0',
             ], $output);
             $this->waitUntilReady($container, $output);
+            $this->mustRun([
+                'docker', 'exec', $container, 'mysql', '--batch', '--skip-column-names',
+                '-e', "SET GLOBAL sql_mode = TRIM(BOTH ',' FROM REPLACE(CONCAT(',', @@GLOBAL.sql_mode, ','), ',NO_AUTO_CREATE_USER,', ','))",
+            ], $output, true);
 
             [, $databaseOutput] = $this->mustRun([
                 'docker', 'exec', $container, 'mysql', '--batch', '--skip-column-names',
