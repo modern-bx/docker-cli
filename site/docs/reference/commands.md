@@ -620,6 +620,15 @@ bin/docker-cli system:start
 bin/docker-cli start
 ```
 
+`system:start` выполняет `docker compose up -d`. Compose может собрать образы сервисов,
+для которых настроен `build`. Чтобы под ответственность пользователя запустить систему
+только из уже существующих образов, передайте `--no-rebuild-images` — команда добавит
+к вызову Compose флаг `--no-build`:
+
+```bash
+docker-cli system:start --no-rebuild-images
+```
+
 ### `bin/docker-cli system:stop` / `bin/docker-cli stop`
 
 Останавливает системный compose-проект, удаляет orphan-контейнеры и общую сеть `docker-cli`:
@@ -638,6 +647,9 @@ bin/docker-cli system:restart
 bin/docker-cli restart
 ```
 
+При полном перезапуске также поддерживается `--no-rebuild-images`; при перезапуске
+отдельных уже работающих сервисов через `--service` этот флаг не требуется.
+
 ### `docker-cli system:self-update`
 
 Скачивает PHAR из релиза `<SOURCE_IMAGE_MAIN_BRANCH>-latest`, атомарно заменяет текущий
@@ -645,6 +657,12 @@ PHAR, обновляет конфигурацию и перезапускает 
 
 ```bash
 docker-cli system:self-update
+```
+
+Чтобы после обновления конфигурации не пересобирать системные образы, используйте:
+
+```bash
+docker-cli system:self-update --no-rebuild-images
 ```
 
 Адрес релиза строится из `SOURCE_IMAGE_NAMESPACE`, `SOURCE_IMAGE_NAME` и

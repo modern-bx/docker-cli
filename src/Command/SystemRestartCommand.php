@@ -25,6 +25,7 @@ final class SystemRestartCommand extends AbstractCommand
         $this->setAliases(['restart']);
         $this->setDescription($this->translator->trans('command.restart.description'));
         $this->addOption('service', null, InputOption::VALUE_REQUIRED, 'Сервисы для перезапуска, разделённые запятыми.');
+        $this->addOption('no-rebuild-images', null, InputOption::VALUE_NONE, 'Не собирать образы при повторном запуске системы.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -47,6 +48,9 @@ final class SystemRestartCommand extends AbstractCommand
             return $stopCode;
         }
 
-        return $this->runOperation($compose, 'up', ['-d'], $output, $this->translator);
+        $arguments = ['-d'];
+        if ($input->getOption('no-rebuild-images')) $arguments[] = '--no-build';
+
+        return $this->runOperation($compose, 'up', $arguments, $output, $this->translator);
     }
 }

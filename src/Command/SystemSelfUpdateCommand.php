@@ -7,6 +7,7 @@ namespace DockerCli\Command;
 use DockerCli\Config\SystemCompose;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 final class SystemSelfUpdateCommand extends AbstractCommand
@@ -17,6 +18,7 @@ final class SystemSelfUpdateCommand extends AbstractCommand
     {
         parent::__construct('system:self-update');
         $this->setDescription('Обновить docker-cli до последней сборки основной ветки.');
+        $this->addOption('no-rebuild-images', null, InputOption::VALUE_NONE, 'Не собирать системные образы после обновления конфигурации.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -51,9 +53,9 @@ final class SystemSelfUpdateCommand extends AbstractCommand
                 $status = $this->runCommand([$binary, 'config:init', '--update', '--migrate', '--rebuild', '--force'], $output);
                 if ($status !== Command::SUCCESS) {
                     $this->writeMessage($output, '<comment>Обновление конфигурации завершилось с ошибкой; пробуем снова запустить систему.</comment>');
-                    $this->runCommand([$binary, 'system:start'], $output);
+                    $this->runCommand($this->startCommand($binary, (bool) $input->getOption('no-rebuild-images')), $output);
                 } else {
-                    $status = $this->runCommand([$binary, 'system:start'], $output);
+                    $status = $this->runCommand($this->startCommand($binary, (bool) $input->getOption('no-rebuild-images')), $output);
                 }
             }
 
@@ -90,6 +92,12 @@ final class SystemSelfUpdateCommand extends AbstractCommand
 
         return sprintf('https://github.com/%s/%s/releases/download/%s-latest/%s.phar',
             rawurlencode($namespace), rawurlencode($name), rawurlencode($branch), rawurlencode($name));
+    }
+
+    /** @return list<string> */
+    private function startCommand(string $binary, bool $noRebuildImages): array
+    {
+        return [$binary, 'system:start', ...($noRebuildImages ? ['--no-rebuild-images'] : [])];
     }
 
     private function download(string $url, string $directory): string
