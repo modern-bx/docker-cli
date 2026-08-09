@@ -37,6 +37,46 @@ bin/docker-cli config:seed --yes
 
 ## Проекты
 
+### `bin/docker-cli mysql:recover [--from=path] [--to=path] [--database=db1,db2]`
+
+Извлекает пользовательские базы из каталога `data` MySQL 5.5–5.7 или 8.0 в
+отдельные директории формата mydumper. По умолчанию исходным каталогом и местом
+назначения служит текущая директория. Системные базы не экспортируются, а
+`--database` ограничивает список баз.
+
+Исходные файлы подключаются только для чтения и сначала копируются во временный
+Docker volume. Команда поднимает из копии изолированный MySQL совместимой версии,
+создаёт дампы `<database>-<YYYYmmdd-HHMMSS>`, после чего удаляет временный
+контейнер, сеть и volume. Работающий системный MySQL docker-cli не используется.
+Перед экспортом из MySQL 5.x команда отключает устаревший режим
+`NO_AUTO_CREATE_USER`, чтобы созданный дамп можно было загрузить через
+`mysql:load` в MySQL 8.x.
+
+```bash
+bin/docker-cli mysql:recover --from=/srv/mysql/data --to=./recovered
+bin/docker-cli mysql:recover --from=../data --database=shop,content
+```
+
+### `bin/docker-cli postgres:recover [--from=path] [--to=path] [--database=db1,db2]`
+
+Извлекает пользовательские базы из каталога `data` остановленного PostgreSQL.
+Версия определяется по `PG_VERSION`, исходные данные подключаются только для
+чтения и копируются во временный Docker volume. Из копии запускается изолированный
+PostgreSQL той же версии, не использующий системный инстанс docker-cli.
+Для подключения во временной копии создаётся одноразовая роль суперпользователя,
+поэтому восстановление не зависит от наличия стандартной роли `postgres` в
+исходном кластере.
+
+Каждая база экспортируется параллельным `pg_dump` в directory-формате, как в
+`postgres:dump`, в каталог `<database>-<YYYYmmdd-HHMMSS>`. Шаблонные базы и база
+`postgres` не экспортируются. После завершения временные контейнер, сеть и volume
+удаляются.
+
+```bash
+bin/docker-cli postgres:recover --from=/srv/postgresql/data --to=./recovered
+bin/docker-cli postgres:recover --from=../data --database=shop,content
+```
+
 ### `bin/docker-cli shell:bash`
 
 Открывает интерактивный Bash в контейнере PHP-FPM выбранной для проекта версии от имени пользователя
