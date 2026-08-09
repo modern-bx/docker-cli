@@ -1,0 +1,15 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Обновление docker-cli
+  code: core.system.self-update
+  type: shell
+  context: system
+  description: Обновляет PHAR, конфигурацию и системные сервисы docker-cli.
+  parameters:
+    no-rebuild-images: { type: boolean, required: false }
+  action: |
+    options=()
+    [ "${no_rebuild_images:-false}" = "true" ] && options+=(--no-rebuild-images)
+    docker-cli system:self-update "${options[@]}"

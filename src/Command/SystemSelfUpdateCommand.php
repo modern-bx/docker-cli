@@ -43,6 +43,17 @@ final class SystemSelfUpdateCommand extends AbstractCommand
             $this->writeMessage($output, sprintf('<info>Скачиваем обновление: %s</info>', $url));
             $temporary = $this->download($url, dirname($binary));
             $this->validatePhar($temporary);
+            $currentSize = filesize($binary);
+            $downloadedSize = filesize($temporary);
+            if ($currentSize === false || $downloadedSize === false) {
+                throw new \RuntimeException('Не удалось определить размер текущего или скачанного PHAR-файла.');
+            }
+            if ($currentSize === $downloadedSize) {
+                CommandContext::fromEnvironment($this, $output)->addMessage(
+                    new Message('Обновление docker-cli не требуется: размер PHAR-файла не изменился.', notify: true),
+                );
+                return Command::SUCCESS;
+            }
             $runningUnits = $this->runningSystemdUnits();
             $this->replaceBinary($binary, $temporary);
             $temporary = null;
@@ -59,14 +70,21 @@ final class SystemSelfUpdateCommand extends AbstractCommand
                 }
             }
 
+            $currentUnit = $this->currentSystemdUnit();
             foreach ($runningUnits as $unit) {
                 $this->writeMessage($output, sprintf('<info>Перезапускаем фоновый сервис %s.</info>', $unit));
+                if ($unit === $currentUnit) {
+                    $this->deferSystemdRestart($unit);
+                    continue;
+                }
                 $restartStatus = $this->runCommand(['systemctl', 'restart', $unit], $output);
                 if ($status === Command::SUCCESS && $restartStatus !== Command::SUCCESS) $status = $restartStatus;
             }
 
             if ($status !== Command::SUCCESS) return $status;
-            $this->writeMessage($output, '<info>docker-cli успешно обновлён.</info>');
+            CommandContext::fromEnvironment($this, $output)->addMessage(
+                new Message('docker-cli успешно обновлён.', notify: true),
+            );
             return Command::SUCCESS;
         } catch (\Throwable $exception) {
             $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
@@ -172,6 +190,30 @@ final class SystemSelfUpdateCommand extends AbstractCommand
         }
 
         return array_values(array_unique($units));
+    }
+
+    private function currentSystemdUnit(): ?string
+    {
+        foreach (@file('/proc/self/cgroup', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+            if (preg_match('~(?:^|/)(docker-cli\.(?:panel|queue\.[a-zA-Z0-9_.@-]+)\.service)(?:/|$)~', $line, $matches) === 1) {
+                return $matches[1];
+            }
+        }
+
+        return null;
+    }
+
+    private function deferSystemdRestart(string $unit): void
+    {
+        $script = sprintf('sleep 5; systemctl restart %s', escapeshellarg($unit));
+        $process = proc_open(['/bin/sh', '-c', $script . ' >/dev/null 2>&1 &'], [
+            ['file', '/dev/null', 'r'],
+            ['file', '/dev/null', 'w'],
+            ['file', '/dev/null', 'w'],
+        ], $pipes);
+        if (!is_resource($process) || proc_close($process) !== Command::SUCCESS) {
+            throw new \RuntimeException(sprintf('Не удалось отложить перезапуск сервиса %s.', $unit));
+        }
     }
 
     /** @param list<string> $command */

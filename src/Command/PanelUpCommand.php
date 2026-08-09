@@ -111,7 +111,7 @@ final class PanelUpCommand extends AbstractCommand
         $queues = new QueueRepository();
         $projectRegistry = new ProjectRegistry();
         $projects = new ProjectController($projectRegistry, $compose, $queues, new ProjectsSettingsRepository(), new TaskRepository(), $backupsSettings);
-        $system = new SystemController($compose);
+        $system = new SystemController($compose, $queues, new TaskRepository());
         $queue = new QueueController($queues);
         $notifications = new NotificationController(new NotificationRepository());
         $responses = new ResponseEmitter($assets);
