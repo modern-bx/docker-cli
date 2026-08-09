@@ -54,6 +54,23 @@ bin/docker-cli mysql:recover --from=/srv/mysql/data --to=./recovered
 bin/docker-cli mysql:recover --from=../data --database=shop,content
 ```
 
+### `bin/docker-cli postgres:recover [--from=path] [--to=path] [--database=db1,db2]`
+
+Извлекает пользовательские базы из каталога `data` остановленного PostgreSQL.
+Версия определяется по `PG_VERSION`, исходные данные подключаются только для
+чтения и копируются во временный Docker volume. Из копии запускается изолированный
+PostgreSQL той же версии, не использующий системный инстанс docker-cli.
+
+Каждая база экспортируется параллельным `pg_dump` в directory-формате, как в
+`postgres:dump`, в каталог `<database>-<YYYYmmdd-HHMMSS>`. Шаблонные базы и база
+`postgres` не экспортируются. После завершения временные контейнер, сеть и volume
+удаляются.
+
+```bash
+bin/docker-cli postgres:recover --from=/srv/postgresql/data --to=./recovered
+bin/docker-cli postgres:recover --from=../data --database=shop,content
+```
+
 ### `bin/docker-cli shell:bash`
 
 Открывает интерактивный Bash в контейнере PHP-FPM выбранной для проекта версии от имени пользователя
