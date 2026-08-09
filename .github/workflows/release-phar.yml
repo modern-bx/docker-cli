@@ -1,15 +1,16 @@
-name: Build PHAR
+name: Release PHAR
 
 on:
   push:
-  workflow_dispatch:
+    tags:
+      - 'v*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  build:
-    name: Build application PHAR
+  release:
+    name: Build and publish PHAR release
     runs-on: ubuntu-latest
 
     steps:
@@ -41,10 +42,23 @@ jobs:
       - name: Build PHAR
         run: composer run build
 
-      - name: Upload PHAR artifact
+      - name: Rename release asset
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          cp build/docker-cli.phar "build/docker-cli-${RELEASE_VERSION}.phar"
+
+      - name: Upload PHAR build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: docker-cli-phar-${{ github.sha }}
-          path: build/docker-cli.phar
+          name: docker-cli-${{ github.ref_name }}
+          path: build/docker-cli-${{ github.ref_name }}.phar
           if-no-files-found: error
 
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: build/docker-cli-${{ github.ref_name }}.phar
+          fail_on_unmatched_files: true
