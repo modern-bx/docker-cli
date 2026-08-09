@@ -1,0 +1,64 @@
+name: Release PHAR
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish PHAR release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: json, mbstring
+          tools: composer:v2
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Build PHAR
+        run: composer run build
+
+      - name: Rename release asset
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          cp build/docker-cli.phar "build/docker-cli-${RELEASE_VERSION}.phar"
+
+      - name: Upload PHAR build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-cli-${{ github.ref_name }}
+          path: build/docker-cli-${{ github.ref_name }}.phar
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: build/docker-cli-${{ github.ref_name }}.phar
+          fail_on_unmatched_files: true
