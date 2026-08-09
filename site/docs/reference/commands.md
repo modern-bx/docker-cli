@@ -638,6 +638,20 @@ bin/docker-cli system:restart
 bin/docker-cli restart
 ```
 
+### `docker-cli system:self-update`
+
+Скачивает PHAR из релиза `<SOURCE_IMAGE_MAIN_BRANCH>-latest`, атомарно заменяет текущий
+PHAR, обновляет конфигурацию и перезапускает системное окружение:
+
+```bash
+docker-cli system:self-update
+```
+
+Адрес релиза строится из `SOURCE_IMAGE_NAMESPACE`, `SOURCE_IMAGE_NAME` и
+`SOURCE_IMAGE_MAIN_BRANCH` системного `.env`. Команда запоминает запущенные systemd-сервисы
+панели и очередей и перезапускает только их; процессы, запущенные вручную, не затрагиваются.
+Самообновление следует запускать с правами на замену установленного PHAR-файла.
+
 ## Образы
 
 ### `docker-cli image:build`

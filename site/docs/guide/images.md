@@ -60,6 +60,7 @@ docker-cli image:publish --tag=1.0.0
 - `SOURCE_IMAGE_REGISTRY` — registry для образов, например `ghcr.io`;
 - `SOURCE_IMAGE_NAMESPACE` — ваш vendor, GitHub namespace или organization;
 - `SOURCE_IMAGE_NAME` — имя приложения в пути образа, по умолчанию `docker-cli`;
+- `SOURCE_IMAGE_MAIN_BRANCH` — основная ветка для релиза самообновления, по умолчанию `main`;
 - `SOURCE_IMAGE_TAG`;
 - `SOURCE_IMAGE_DOCKER_BUILDKIT`.
 
