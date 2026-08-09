@@ -67,5 +67,6 @@
         - name: Publish PHAR
           env:
             GH_TOKEN: ${{ github.token }}
+            GH_REPO: ${{ github.repository }}
           run: |
             gh release upload main-latest build/docker-cli.phar --clobber
