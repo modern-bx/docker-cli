@@ -7,15 +7,41 @@ namespace DockerCli\Panel;
 use DockerCli\Config\SystemCompose;
 use DockerCli\Panel\Dto\SystemServiceDto;
 use DockerCli\Panel\Dto\SystemStatusDto;
+use DockerCli\Panel\Dto\QueuedOperationDto;
 use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\SystemActionRequestDto;
 use DockerCli\Panel\Enum\SystemActionEnum;
 use DockerCli\Panel\Http\Attribute\Route;
+use DockerCli\Queue\QueueItemValidator;
+use DockerCli\Queue\QueueRepository;
+use DockerCli\Task\TaskRepository;
 
 final class SystemController
 {
-    public function __construct(private readonly SystemCompose $compose)
+    public function __construct(
+        private readonly SystemCompose $compose,
+        private readonly ?QueueRepository $queues = null,
+        private readonly ?TaskRepository $tasks = null,
+    )
     {
+    }
+
+    #[Route('POST', '/api/system/self-update', EmptyRequestDto::class, QueuedOperationDto::class)]
+    public function selfUpdate(EmptyRequestDto $request): QueuedOperationDto
+    {
+        $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
+            'code' => 'core.system.self-update',
+            'arguments' => ['no-rebuild-images' => ['value' => true]],
+        ]]]];
+        $validationErrors = (new QueueItemValidator($this->tasks ?? new TaskRepository()))->validate($item);
+        if ($validationErrors !== []) throw new SystemActionException(implode("\n", $validationErrors), 422);
+        try {
+            $file = ($this->queues ?? new QueueRepository())->create('default', 'core.system.self-update', $item);
+        } catch (\InvalidArgumentException|\RuntimeException $exception) {
+            throw new SystemActionException($exception->getMessage());
+        }
+
+        return new QueuedOperationDto($file);
     }
 
     #[Route('GET', '/api/system', EmptyRequestDto::class, SystemStatusDto::class)]

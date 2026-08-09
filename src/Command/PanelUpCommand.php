@@ -111,7 +111,7 @@ final class PanelUpCommand extends AbstractCommand
         $queues = new QueueRepository();
         $projectRegistry = new ProjectRegistry();
         $projects = new ProjectController($projectRegistry, $compose, $queues, new ProjectsSettingsRepository(), new TaskRepository(), $backupsSettings);
-        $system = new SystemController($compose);
+        $system = new SystemController($compose, $queues, new TaskRepository());
         $queue = new QueueController($queues);
         $notifications = new NotificationController(new NotificationRepository());
         $responses = new ResponseEmitter($assets);
@@ -157,8 +157,9 @@ final class PanelUpCommand extends AbstractCommand
         $this->writeMessage($output, sprintf('<info>Сервис запускает: %s panel:up</info>', $binary));
         if (is_string($rawUser)) {
             $this->writeMessage($output, sprintf('<info>Сервис работает от пользователя: %s</info>', $rawUser));
+            $this->writeMessage($output, sprintf('<info>Пользователю разрешено запускать, останавливать и перезапускать сервис %s без sudo.</info>', $rawUser));
         }
-        $this->writeMessage($output, sprintf('<info>Сервис включён и запущен. Управление: systemctl {status|restart|stop} %s</info>', SystemdService::NAME));
+        $this->writeMessage($output, sprintf('<info>Сервис включён и запущен. Управление: systemctl {status|start|restart|stop} %s</info>', SystemdService::NAME));
 
         return Command::SUCCESS;
     }

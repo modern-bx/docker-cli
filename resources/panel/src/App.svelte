@@ -13,11 +13,11 @@
   import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
   import { vscodeDark, vscodeLight } from '@uiw/codemirror-theme-vscode';
   import { Combobox, Dialog, Tabs, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { Archive, Bell, CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Settings, Square, Trash2, Undo2 } from '@lucide/svelte';
+  import { Archive, Bell, CircleHelp, Copy, Download, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Settings, Square, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import BackupDateFilter from './BackupDateFilter.svelte';
   import HttpRefreshBoundary from './HttpRefreshBoundary.svelte';
-  import { addProjectSchedule, cloneProject, createHookSettings, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHookContent, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, toggleHookSettings, updateProject, updateProjectBackupComment, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, runHookSettings, saveHookContent, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
+  import { addProjectSchedule, cloneProject, createHookSettings, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHookContent, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, queueSystemSelfUpdate, toggleHookSettings, updateProject, updateProjectBackupComment, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, runHookSettings, saveHookContent, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
   import { createRefreshCoordinator } from './refresh.js';
 
   const THEME_KEY = 'docker-cli-panel-color-theme';
@@ -151,6 +151,7 @@
   let systemStatus = 'stopped';
   let systemServices = [];
   let systemPending = false;
+  let systemUpdatePending = false;
   let systemPendingMessage = '';
   let queuedOperationNotice = '';
   let systemConfirmation = null;
@@ -1932,6 +1933,22 @@
     systemAction(action, service);
   }
 
+  async function enqueueSystemUpdate() {
+    if (systemUpdatePending) return;
+    systemOpen = false;
+    systemUpdatePending = true;
+    try {
+      await queueSystemSelfUpdate(api);
+      notifyQueuedOperation('Обновление docker-cli');
+    } catch (cause) {
+      errorTitle = 'Не удалось запустить обновление';
+      error = cause instanceof Error ? cause.message : 'Не удалось добавить обновление docker-cli в очередь.';
+      errorStatus = cause instanceof Error && 'status' in cause && typeof cause.status === 'number' ? cause.status : 0;
+    } finally {
+      systemUpdatePending = false;
+    }
+  }
+
   async function waitForPanelServices() {
     for (let attempt = 0; attempt < 120; attempt += 1) {
       try {
@@ -2056,6 +2073,10 @@
                 {#if hasStoppedServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('start')}><Play size={14} aria-hidden="true" />Запустить</button>{/if}
                 {#if hasRunningServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('stop')}><Square size={14} aria-hidden="true" />Остановить</button>{/if}
                 <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart')}><RotateCw size={14} aria-hidden="true" />Перезапустить</button>
+              </div>
+              <div class="system-menu-divider" aria-hidden="true"></div>
+              <div class="system-menu-global-actions">
+                <button class="btn btn-sm preset-tonal" type="button" disabled={systemUpdatePending} onclick={enqueueSystemUpdate}><Download size={14} aria-hidden="true" />{systemUpdatePending ? 'Добавляем…' : 'Обновить'}</button>
               </div>
               <div class="system-menu-divider" aria-hidden="true"></div>
               {#if systemServices.length === 0}<p class="system-empty">Сервисы не найдены</p>{/if}

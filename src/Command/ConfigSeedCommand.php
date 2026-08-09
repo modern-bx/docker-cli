@@ -133,6 +133,8 @@ final class ConfigSeedCommand extends AbstractCommand
             'HOST_GID',
             'SOURCE_IMAGE_REGISTRY',
             'SOURCE_IMAGE_NAMESPACE',
+            'SOURCE_IMAGE_NAME',
+            'SOURCE_IMAGE_MAIN_BRANCH',
             'SOURCE_IMAGE_TAG',
             'SOURCE_IMAGE_DOCKER_BUILDKIT',
             'CLOUDFLARE_DNS_API_TOKEN',

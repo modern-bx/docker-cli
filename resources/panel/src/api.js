@@ -130,6 +130,10 @@ export async function runSystemAction(request, action, service = '') {
   return /** @type {Promise<SystemStatusDto>} */ (request(target, { method: 'POST' }));
 }
 
+export async function queueSystemSelfUpdate(request) {
+  return request('/api/system/self-update', { method: 'POST' });
+}
+
 export async function getLogs(request, parameters) {
   return request(`/api/logs?${new URLSearchParams(parameters)}`);
 }

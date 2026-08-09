@@ -9,7 +9,9 @@ task:
   description: Перезапускает один или несколько системных сервисов docker-cli.
   parameters:
     service: { type: string, required: false }
+    no-rebuild-images: { type: boolean, required: false }
   action: |
     options=()
     [ -n "${service+x}" ] && options+=(--service="$service")
+    [ "${no_rebuild_images:-false}" = "true" ] && options+=(--no-rebuild-images)
     docker-cli system:restart "${options[@]}"

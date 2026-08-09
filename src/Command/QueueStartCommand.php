@@ -85,8 +85,9 @@ final class QueueStartCommand extends AbstractCommand
         $this->writeMessage($output, sprintf('<info>Сервис запускает: %s queue:start --queue=%s</info>', $binary, $queue));
         if (is_string($rawUser)) {
             $this->writeMessage($output, sprintf('<info>Сервис работает от пользователя: %s</info>', $rawUser));
+            $this->writeMessage($output, sprintf('<info>Пользователю разрешено запускать, останавливать и перезапускать сервис %s без sudo.</info>', $rawUser));
         }
-        $this->writeMessage($output, sprintf('<info>Сервис включён и запущен. Управление: systemctl {status|restart|stop} %s</info>', $name));
+        $this->writeMessage($output, sprintf('<info>Сервис включён и запущен. Управление: systemctl {status|start|restart|stop} %s</info>', $name));
 
         return Command::SUCCESS;
     }

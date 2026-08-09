@@ -4,14 +4,21 @@ declare(strict_types=1);
 
 namespace DockerCli\Panel;
 
+use DockerCli\Service\SystemdUnitPolicy;
+
 final class SystemdService
 {
     public const NAME = 'docker-cli.panel';
     public const UNIT_PATH = '/etc/systemd/system/' . self::NAME . '.service';
 
+    public function __construct(private readonly SystemdUnitPolicy $policy = new SystemdUnitPolicy())
+    {
+    }
+
     public function install(string $binary, ?int $port = null, ?string $user = null): void
     {
         $previousUnit = is_file(self::UNIT_PATH) ? file_get_contents(self::UNIT_PATH) : false;
+        $previousPolicy = $this->policy->contents(self::NAME . '.service');
         $arguments = [$binary, 'panel:up'];
         if ($port !== null) {
             $arguments[] = '--port=' . $port;
@@ -44,6 +51,7 @@ final class SystemdService
         }
 
         try {
+            $this->policy->install(self::NAME . '.service', $user);
             $this->systemctl('daemon-reload');
             $this->systemctl('enable', self::NAME . '.service');
             $this->systemctl('restart', self::NAME . '.service');
@@ -53,6 +61,7 @@ final class SystemdService
             } else {
                 @file_put_contents(self::UNIT_PATH, $previousUnit, LOCK_EX);
             }
+            $this->policy->restore(self::NAME . '.service', $previousPolicy);
             $this->runSystemctl('daemon-reload');
             throw $exception;
         }
@@ -68,6 +77,7 @@ final class SystemdService
         if (!@unlink(self::UNIT_PATH)) {
             throw new \RuntimeException(sprintf('Не удалось удалить конфигурацию сервиса %s.', self::UNIT_PATH));
         }
+        $this->policy->remove(self::NAME . '.service');
         $this->systemctl('daemon-reload');
         $this->runSystemctl('reset-failed', self::NAME . '.service');
     }
