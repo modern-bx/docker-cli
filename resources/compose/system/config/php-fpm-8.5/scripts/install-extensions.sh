@@ -7,6 +7,7 @@ apt-get update
 apt-get install -y --no-install-recommends \
     libfreetype6-dev \
     libjpeg62-turbo-dev \
+    libldap2-dev \
     libmemcached-dev \
     libpng-dev \
     libpq-dev \
@@ -18,10 +19,12 @@ apt-get install -y --no-install-recommends \
     zlib1g-dev
 
 docker-php-ext-configure gd --with-freetype --with-jpeg
+docker-php-ext-configure ldap --with-libdir="lib/$(dpkg-architecture --query DEB_HOST_MULTIARCH)"
 
 # OPcache is compiled into PHP 8.5 and is no longer built as a shared extension.
 docker-php-ext-install -j"$(nproc)" \
     gd \
+    ldap \
     zip \
     soap \
     exif \
