@@ -72,6 +72,7 @@ final class TaskRunCommand extends AbstractCommand
         foreach ($values as $name => $value) {
             $environment[$this->normalizeName($name)] = (string) $value;
         }
+        $environment['DOCKER_CLI_EXECUTABLE'] = $this->executable();
 
         try {
             $process = proc_open(['bash', $scriptFile], [STDIN, STDOUT, STDERR], $pipes, $cwd, $environment);
@@ -276,7 +277,19 @@ final class TaskRunCommand extends AbstractCommand
             return escapeshellarg((string) $values[$match[1]]);
         }, $task['action']);
 
-        return sprintf("#!/usr/bin/env bash\n# Задача: %s (%s)\n# Параметры: %s\nset -Eeuo pipefail\n%s\n", str_replace("\n", ' ', $task['name']), $task['code'], implode(', ', array_keys($task['parameters'] ?? [])), $action);
+        return sprintf("#!/usr/bin/env bash\n# Задача: %s (%s)\n# Параметры: %s\nset -Eeuo pipefail\ndocker-cli() { \"\$DOCKER_CLI_EXECUTABLE\" \"\$@\"; }\n%s\n", str_replace("\n", ' ', $task['name']), $task['code'], implode(', ', array_keys($task['parameters'] ?? [])), $action);
+    }
+
+    private function executable(): string
+    {
+        $phar = \Phar::running(false);
+        if ($phar !== '') {
+            return $phar;
+        }
+
+        $binary = (string) ($_SERVER['argv'][0] ?? 'docker-cli');
+
+        return realpath($binary) ?: $binary;
     }
 
     private function normalizeName(string $name): string
