@@ -80,20 +80,50 @@ final class ProjectRegistry
         }
 
         $directory = realpath($directory) ?: $directory;
+        $contextDirectory = $directory;
         while (true) {
             $metaFile = join_path($directory, '.docker-cli', 'project.yaml');
             if (is_file($metaFile)) {
                 $data = Yaml::parseFile($metaFile);
                 $name = is_array($data) ? ($data['data']['project']['name'] ?? null) : null;
 
-                return is_string($name) && $name !== '' ? $name : null;
+                if (is_string($name) && $name !== '') {
+                    return $name;
+                }
             }
 
             $parent = dirname($directory);
             if ($parent === $directory) {
-                return null;
+                break;
             }
             $directory = $parent;
         }
+
+        return $this->projectNameFromRegisteredRoots($contextDirectory);
+    }
+
+    private function projectNameFromRegisteredRoots(string $contextDirectory): ?string
+    {
+        $matchedName = null;
+        $matchedRootLength = -1;
+
+        foreach ($this->registeredProjectNames() as $projectName) {
+            $root = $this->readProjectConfig($projectName)['data']['project']['root'] ?? null;
+            if (!is_string($root) || $root === '') {
+                continue;
+            }
+
+            $root = rtrim(realpath($root) ?: $root, DIRECTORY_SEPARATOR);
+            if ($contextDirectory !== $root && !str_starts_with($contextDirectory, $root . DIRECTORY_SEPARATOR)) {
+                continue;
+            }
+
+            if (strlen($root) > $matchedRootLength) {
+                $matchedName = $projectName;
+                $matchedRootLength = strlen($root);
+            }
+        }
+
+        return $matchedName;
     }
 }

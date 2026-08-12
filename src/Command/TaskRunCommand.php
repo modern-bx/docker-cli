@@ -40,9 +40,10 @@ final class TaskRunCommand extends AbstractCommand
             $task = $definition['task'];
             $this->validateTask($task, $code);
             $values = $this->mapArguments($task['parameters'] ?? [], $input->getArgument('task-args'));
-            $cwd = $this->workingDirectory($task, $input->getOption('project'));
+            $project = $this->resolveProject($task, $input->getOption('project'));
+            $cwd = $this->workingDirectory($task, $project);
             if (($task['context'] ?? null) === 'project') {
-                $values['project'] = (string) $input->getOption('project');
+                $values['project'] = $project;
             }
             $this->ensureDirectory($cwd);
             $script = $this->compileScript($task, $values);
@@ -246,13 +247,26 @@ final class TaskRunCommand extends AbstractCommand
     }
 
     /** @param array<string, mixed> $task */
+    private function resolveProject(array $task, mixed $project): ?string
+    {
+        if (($task['context'] ?? null) !== 'project') {
+            return null;
+        }
+        if (is_string($project) && $project !== '') {
+            return $project;
+        }
+
+        return ($this->registry ?? new ProjectRegistry())->projectNameFromContext();
+    }
+
+    /** @param array<string, mixed> $task */
     private function workingDirectory(array $task, mixed $project): string
     {
         if (($task['context'] ?? null) !== 'project') {
             return '/tmp/.docker-cli';
         }
         if (!is_string($project) || $project === '') {
-            throw new \RuntimeException('Для задачи с context: project необходимо указать --project.');
+            throw new \RuntimeException('Для задачи с context: project необходимо запустить команду в директории проекта или указать --project.');
         }
         $registry = $this->registry ?? new ProjectRegistry();
         if (!$registry->hasProject($project)) {
