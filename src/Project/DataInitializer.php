@@ -19,7 +19,7 @@ final class DataInitializer
         $mysqlSql = $this->mysqlSql($projectName, $mysqlPassword, $rebuild);
         $code = $this->run(array_merge($compose->dockerComposeCommand('exec'), [
             '-T',
-            'mysql',
+            $this->service($projectName, 'mysql'),
             'sh',
             '-ec',
             'MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}" mysql -uroot -e "$1"',
@@ -33,7 +33,7 @@ final class DataInitializer
         [$postgresRoleSql, $postgresDropRoleSql, $postgresTerminateSql, $postgresDatabaseExistsSql, $postgresGrantSql] = $this->postgresSql($projectName, $postgresPassword);
         return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
             '-T',
-            'postgres',
+            $this->service($projectName, 'postgres'),
             'sh',
             '-ec',
             <<<'SH'
@@ -78,7 +78,7 @@ SH,
 
         $code = $this->run(array_merge($compose->dockerComposeCommand('exec'), [
             '-T',
-            'mysql',
+            $this->service($projectName, 'mysql'),
             'sh',
             '-ec',
             'MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}" mysql -uroot -e "$1"',
@@ -92,7 +92,7 @@ SH,
         [$postgresTerminateSql, $postgresRoleCleanupSql] = $this->postgresDropSql($projectName);
         return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
             '-T',
-            'postgres',
+            $this->service($projectName, 'postgres'),
             'sh',
             '-ec',
             <<<'SH'
@@ -112,6 +112,19 @@ SH,
             $postgresTerminateSql,
             $postgresRoleCleanupSql,
         ]), $compose, $output);
+    }
+
+    private function service(string $projectName, string $driver): string
+    {
+        $registry = new ProjectRegistry();
+        if (!$registry->hasProject($projectName)) {
+            return $driver;
+        }
+        $hostname = $registry->readProjectConfig($projectName)['data']['databases'][$driver]['hostname'] ?? null;
+
+        return $hostname === sprintf('docker-cli-%s-%s', $driver, $projectName)
+            ? ($this->compose ?? new SystemCompose())->databaseService($projectName, $driver)
+            : $driver;
     }
 
     public function clonePostgres(string $sourceDatabase, string $targetDatabase, string $sourceUser, string $targetUser, OutputInterface $output): int

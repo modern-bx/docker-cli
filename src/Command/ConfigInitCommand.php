@@ -10,6 +10,7 @@ use DockerCli\Project\PanelGatewayAuthRenderer;
 use DockerCli\Project\OfeliaConfigRenderer;
 use DockerCli\Project\OfeliaReloadScheduler;
 use DockerCli\Project\XdebugPortManager;
+use DockerCli\Project\DedicatedDatabaseComposeRenderer;
 use DockerCli\Service\TranslatorFactory;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -65,6 +66,7 @@ final class ConfigInitCommand extends AbstractCommand
         ]) . '</info>');
 
         if ($rebuild) {
+            (new DedicatedDatabaseComposeRenderer())->render();
             (new XdebugPortManager())->rebuildProjectPorts($this->projectsDirectory());
             (new OpenRestyHostRenderer())->render();
             (new PanelGatewayAuthRenderer())->render();

@@ -7,7 +7,7 @@ namespace DockerCli\Panel\Dto;
 /**
  * Public project representation used by the panel API.
  *
- * @phpstan-type ProjectPayload array{name: string, language: ConceptDto|null, languageVersion: string|null, framework: ConceptDto|null, enabled: bool, protected: bool, url: string|null, tags: list<string>, description: string, root: string}
+ * @phpstan-type ProjectPayload array{name: string, language: ConceptDto|null, languageVersion: string|null, framework: ConceptDto|null, enabled: bool, protected: bool, url: string|null, mysqlHost: string, postgresHost: string, tags: list<string>, description: string, root: string}
  */
 final readonly class ProjectDto implements \JsonSerializable
 {
@@ -19,6 +19,8 @@ final readonly class ProjectDto implements \JsonSerializable
         public bool $enabled,
         public bool $protected,
         public ?string $url,
+        public string $mysqlHost,
+        public string $postgresHost,
         /** @var list<string> */
         public array $tags,
         public string $description,
@@ -26,7 +28,7 @@ final readonly class ProjectDto implements \JsonSerializable
     ) {
     }
 
-    /** @return array{name: string, language: ConceptDto|null, languageVersion: string|null, framework: ConceptDto|null, enabled: bool, protected: bool, url: string|null, tags: list<string>, description: string, root: string} */
+    /** @return array<string, mixed> */
     public function jsonSerialize(): array
     {
         return [
@@ -37,6 +39,8 @@ final readonly class ProjectDto implements \JsonSerializable
             'enabled' => $this->enabled,
             'protected' => $this->protected,
             'url' => $this->url,
+            'mysqlHost' => $this->mysqlHost,
+            'postgresHost' => $this->postgresHost,
             'tags' => $this->tags,
             'description' => $this->description,
             'root' => $this->root,

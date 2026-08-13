@@ -25,6 +25,20 @@ final class SystemCompose
         return join_path($this->directory(), self::COMPOSE_FILE);
     }
 
+    public function additionalComposeFile(string $driver): string
+    {
+        if (!in_array($driver, ['mysql', 'postgres'], true)) {
+            throw new \InvalidArgumentException(sprintf('Unsupported database driver "%s".', $driver));
+        }
+
+        return join_path($this->directory(), sprintf('compose.%s.yaml', $driver));
+    }
+
+    public function databaseService(string $projectName, string $driver): string
+    {
+        return sprintf('%s-%s', $driver, $projectName);
+    }
+
     public function envFile(): string
     {
         return join_path($this->directory(), self::ENV_FILE);
@@ -176,7 +190,7 @@ final class SystemCompose
     /** @return list<string> */
     public function dockerComposeCommand(string $operation): array
     {
-        return [
+        $command = [
             'docker',
             'compose',
             '--project-name',
@@ -185,8 +199,16 @@ final class SystemCompose
             $this->envFile(),
             '--file',
             $this->composeFile(),
-            $operation,
         ];
+        foreach (['mysql', 'postgres'] as $driver) {
+            $file = $this->additionalComposeFile($driver);
+            if (is_file($file)) {
+                array_push($command, '--file', $file);
+            }
+        }
+        $command[] = $operation;
+
+        return $command;
     }
 
     /** @return list<string> */

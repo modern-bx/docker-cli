@@ -12,6 +12,7 @@ use DockerCli\Hook\CommandHookRunner;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\DataInitializer;
+use DockerCli\Project\DedicatedDatabaseComposeRenderer;
 use DockerCli\Project\ProjectDatabaseConfig;
 use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Project\ProjectRegistry;
@@ -44,11 +45,17 @@ final class ProjectUpCommand extends AbstractCommand
         $this->addOption('force', null, InputOption::VALUE_NONE, 'Зарегистрировать проект, даже если фреймворк не удалось определить.');
         $this->addOption('language', null, InputOption::VALUE_REQUIRED, 'Код языка проекта.');
         $this->addOption('framework', null, InputOption::VALUE_REQUIRED, 'Код фреймворка. Если не указан, фреймворк определяется автоматически.');
+        $this->addOption('dedicated-db', null, InputOption::VALUE_REQUIRED, 'Выделенные СУБД через запятую: mysql, postgres.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $frameworkCode = $input->getOption('framework');
+        $dedicatedDatabases = array_values(array_unique(array_filter(array_map('trim', explode(',', (string) ($input->getOption('dedicated-db') ?? ''))))));
+        if (array_diff($dedicatedDatabases, ['mysql', 'postgres']) !== []) {
+            $this->writeMessage($output, '<error>Опция --dedicated-db поддерживает только mysql и postgres.</error>');
+            return Command::INVALID;
+        }
         $languageCode = $input->getOption('language');
         if ($languageCode !== null && $languageCode !== 'php' || $frameworkCode !== null && !in_array($frameworkCode, ['symfony', 'laravel', 'bitrix', 'bitrix24'], true)) {
             $this->writeMessage($output, '<error>Указан неподдерживаемый язык или фреймворк.</error>'); return Command::FAILURE;
@@ -122,8 +129,9 @@ final class ProjectUpCommand extends AbstractCommand
                     ],
                 ],
             ],
-        ]);
+        ], $dedicatedDatabases);
         $this->writeYaml(join_path($projectDirectory, 'project.yaml'), $projectConfig);
+        (new DedicatedDatabaseComposeRenderer())->render();
 
         $projectMetadataDirectory = join_path($projectRoot, '.docker-cli');
         if (!is_dir($projectMetadataDirectory) && !mkdir($projectMetadataDirectory, 0775, true) && !is_dir($projectMetadataDirectory)) {

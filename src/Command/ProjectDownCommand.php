@@ -9,6 +9,9 @@ use DockerCli\Framework\FrameworkDetectionService;
 use DockerCli\Hook\CommandHookRunner;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\DataInitializer;
+use DockerCli\Project\DedicatedDatabaseComposeRenderer;
+use DockerCli\Config\SystemCompose;
+use DockerCli\Service\TranslatorFactory;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
@@ -21,6 +24,7 @@ use function DockerCli\Util\join_path;
 
 final class ProjectDownCommand extends AbstractCommand
 {
+    use DockerComposeRunner;
     public function __construct(
         private readonly ?FrameworkDetectionService $detectionService = null,
         private readonly ?DataInitializer $dataInitializer = null,
@@ -68,6 +72,10 @@ final class ProjectDownCommand extends AbstractCommand
 
             return Command::FAILURE;
         }
+        $projectConfig = $registry->hasProject($projectName) ? $registry->readProjectConfig($projectName) : [];
+        $dedicated = array_values(array_filter(['mysql', 'postgres'], static fn (string $driver): bool =>
+            ($projectConfig['data']['databases'][$driver]['hostname'] ?? null) === sprintf('docker-cli-%s-%s', $driver, $projectName)
+        ));
         if ($destructive && $registry->hasProject($projectName) && $registry->isProjectProtected($projectName)) {
             $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
             return Command::FAILURE;
@@ -103,9 +111,27 @@ final class ProjectDownCommand extends AbstractCommand
             }
         }
 
+        if ($dedicated !== []) {
+            $services = array_map(static fn (string $driver): string => $driver . '-' . $projectName, $dedicated);
+            $removeCode = $this->runOperation(new SystemCompose(), 'rm', ['--stop', '--force', ...$services], $output, TranslatorFactory::create());
+            if ($removeCode !== Command::SUCCESS) {
+                return $removeCode;
+            }
+        }
+
         $projectDirectory = join_path($this->projectsDirectory(), $projectName);
         if (is_dir($projectDirectory)) {
             $this->removeDirectory($projectDirectory);
+        }
+        (new DedicatedDatabaseComposeRenderer())->render();
+        if ($input->getOption('drop') && $input->getOption('force')) {
+            $composeDirectory = (new SystemCompose())->directory();
+            foreach ($dedicated as $driver) {
+                $dataDirectory = join_path($composeDirectory, 'data', $driver . '-' . $projectName);
+                if (is_dir($dataDirectory)) {
+                    $this->removeDirectory($dataDirectory);
+                }
+            }
         }
 
         if ($input->getOption('erase')) {

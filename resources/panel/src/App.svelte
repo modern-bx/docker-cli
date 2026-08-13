@@ -2310,6 +2310,8 @@
                     <div><dt>Фреймворк</dt><dd>{selectedProject.framework?.name || 'Без фреймворка'}</dd></div>
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
                     <div><dt>Основной хост</dt><dd>{#if selectedProject.url}<a class="project-host" href={selectedProject.url} target="_blank" rel="noreferrer">{selectedProject.url}<ExternalLink size={14} aria-hidden="true" /></a>{:else}Не указан{/if}</dd></div>
+                    <div><dt>Хост MySQL</dt><dd><code>{selectedProject.mysqlHost || 'docker-cli-mysql'}</code></dd></div>
+                    <div><dt>Хост PostgreSQL</dt><dd><code>{selectedProject.postgresHost || 'docker-cli-postgres'}</code></dd></div>
                   </dl>
                   <div class="project-general-actions">
                     <button class="btn preset-tonal" type="button" onclick={() => openProjectUpdateDialog(selectedProject)}>
