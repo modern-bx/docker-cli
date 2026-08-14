@@ -315,7 +315,7 @@
   $: defaultProjectDatabaseLocation = projectAddOptions.databaseLocations.find((item) => item.default) || null;
   $: projectDatabaseLocationOptions = [
     { value: 'system', label: 'Системное расположение' },
-    { value: 'default', label: `Расположение по умолчанию${defaultProjectDatabaseLocation ? ` (${defaultProjectDatabaseLocation.code})` : ''}` },
+    ...(defaultProjectDatabaseLocation ? [{ value: 'default', label: `Расположение по умолчанию (${defaultProjectDatabaseLocation.code})` }] : []),
     ...projectAddOptions.databaseLocations.map((item) => ({ value: item.code, label: item.code })),
   ];
   $: projectDatabaseLocationCollection = useListCollection({ items: projectDatabaseLocationOptions });
