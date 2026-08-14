@@ -16,6 +16,9 @@ task:
     exclude: { type: string }
     skip-db: { type: boolean }
     dbms: { type: string }
+    dedicated-db: { type: string }
+    location-mysql: { type: string }
+    location-postgres: { type: string }
   action: |
     options=()
     [ "${force:-false}" = true ] && options+=(--force)
@@ -26,4 +29,7 @@ task:
     [ -n "${exclude:-}" ] && options+=(--exclude="$exclude")
     [ "${skip_db:-false}" = true ] && options+=(--skip-db)
     [ -n "${dbms:-}" ] && options+=(--dbms="$dbms")
+    [ -n "${dedicated_db:-}" ] && options+=(--dedicated-db="$dedicated_db")
+    [ -n "${location_mysql:-}" ] && options+=(--location-mysql="$location_mysql")
+    [ -n "${location_postgres:-}" ] && options+=(--location-postgres="$location_postgres")
     docker-cli project:clone "${options[@]}"

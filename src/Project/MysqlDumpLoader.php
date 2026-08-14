@@ -13,7 +13,7 @@ final class MysqlDumpLoader
     public function __construct(private readonly ?SystemCompose $compose = null) {}
 
     /** @param list<string> $include @param list<string> $exclude */
-    public function dump(string $database, string $directory, int $threads, OutputInterface $output, array $include = [], array $exclude = []): int
+    public function dump(string $database, string $directory, int $threads, OutputInterface $output, array $include = [], array $exclude = [], string $hostname = 'mysql'): int
     {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
@@ -35,8 +35,8 @@ final class MysqlDumpLoader
         return $this->run(array_merge($compose->dockerComposeCommand('run'), [
             '--rm', '-T', '--no-deps', '--user', 'root', '--entrypoint', 'sh',
             '--volume', $directory . ':/dump', 'mydumper', '-ec',
-            'mydumper --host=mysql --user=root --password="${MYSQL_ROOT_PASSWORD:?}" --database="$1" --outputdir=/dump --threads="$2" ${5:+--regex="$5"} && chown -R "$3:$4" /dump',
-            'sh', $database, (string) $threads, (string) $this->uid(), (string) $this->gid(), $regex,
+            'mydumper --host="$6" --user=root --password="${MYSQL_ROOT_PASSWORD:?}" --database="$1" --outputdir=/dump --threads="$2" ${5:+--regex="$5"} && chown -R "$3:$4" /dump',
+            'sh', $database, (string) $threads, (string) $this->uid(), (string) $this->gid(), $regex, $hostname,
         ]), $compose, $output);
     }
 
@@ -50,7 +50,7 @@ final class MysqlDumpLoader
         return $include === [] && $exclude === [] ? '' : $prefix . $denied . $allowed . '$';
     }
 
-    public function load(string $database, string $directory, int $threads, bool $disableRedoLog, OutputInterface $output): int
+    public function load(string $database, string $directory, int $threads, bool $disableRedoLog, OutputInterface $output, string $hostname = 'mysql'): int
     {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
@@ -59,8 +59,8 @@ final class MysqlDumpLoader
         return $this->run(array_merge($compose->dockerComposeCommand('run'), [
             '--rm', '-T', '--no-deps', '--entrypoint', 'sh',
             '--volume', $directory . ':/dump:ro', 'mydumper', '-ec',
-            'myloader --host=mysql --user=root --password="${MYSQL_ROOT_PASSWORD:?}" --database="$1" --directory=/dump --threads="$2" --drop-database --optimize-keys=AFTER_IMPORT_ALL_TABLES $3',
-            'sh', $database, (string) $threads, $redoOption,
+            'myloader --host="$4" --user=root --password="${MYSQL_ROOT_PASSWORD:?}" --database="$1" --directory=/dump --threads="$2" --drop-database --optimize-keys=AFTER_IMPORT_ALL_TABLES $3',
+            'sh', $database, (string) $threads, $redoOption, $hostname,
         ]), $compose, $output);
     }
 

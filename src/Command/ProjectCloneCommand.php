@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
+use DockerCli\Config\SystemCompose;
 use DockerCli\Hook\CommandHookRunner;
 use DockerCli\Panel\ProjectsSettingsRepository;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\DataInitializer;
+use DockerCli\Project\DedicatedDatabaseComposeRenderer;
 use DockerCli\Project\MysqlDumpLoader;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectDatabaseConfig;
@@ -43,6 +45,9 @@ final class ProjectCloneCommand extends AbstractCommand
         $this->addOption('exclude', null, InputOption::VALUE_REQUIRED, 'Список glob-шаблонов через запятую.');
         $this->addOption('skip-db', null, InputOption::VALUE_NONE, 'Не клонировать базы данных.');
         $this->addOption('dbms', null, InputOption::VALUE_REQUIRED, 'Список СУБД для клонирования через запятую.');
+        $this->addOption('dedicated-db', null, InputOption::VALUE_REQUIRED, 'Выделенные СУБД целевого проекта через запятую: mysql, postgres. По умолчанию наследуются от исходного проекта.');
+        $this->addOption('location-mysql', null, InputOption::VALUE_REQUIRED, 'Каталог данных выделенного MySQL целевого проекта.');
+        $this->addOption('location-postgres', null, InputOption::VALUE_REQUIRED, 'Каталог данных выделенного PostgreSQL целевого проекта.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -65,6 +70,8 @@ final class ProjectCloneCommand extends AbstractCommand
             return Command::FAILURE;
         }
         $sourceConfig = $registry->readProjectConfig($from);
+        $dedicated = $this->resolveDedicatedDatabases($input, $sourceConfig, $from, $output);
+        if ($dedicated === null) return Command::INVALID;
         $sourceRoot = $sourceConfig['data']['project']['root'] ?? null;
         if (!is_string($sourceRoot) || !is_dir($sourceRoot)) {
             $this->writeMessage($output, '<error>Директория исходного проекта не найдена.</error>');
@@ -123,9 +130,24 @@ final class ProjectCloneCommand extends AbstractCommand
         $config['data']['project']['name'] = $name;
         $config['data']['project']['root'] = $destination;
         $config['data']['project']['document_root'] = $relativeDocumentRoot === '' ? $destination : join_path($destination, $relativeDocumentRoot);
-        $config = (new ProjectDatabaseConfig())->ensure($config);
+        foreach (['mysql', 'postgres'] as $driver) {
+            unset($config['data']['databases'][$driver]['hostname'], $config['data']['databases'][$driver]['location']);
+        }
+        if (count($dedicated['locations']) < count($dedicated['drivers'])) {
+            $defaultLocation = current(array_filter(
+                ($this->settings ?? new ProjectsSettingsRepository())->databaseLocations(),
+                static fn (array $location): bool => $location['default'],
+            ));
+            if (is_array($defaultLocation)) {
+                foreach ($dedicated['drivers'] as $driver) {
+                    $dedicated['locations'][$driver] ??= join_path($defaultLocation['path'], $driver . '-' . $name);
+                }
+            }
+        }
+        $config = (new ProjectDatabaseConfig())->ensure($config, $dedicated['drivers'], $dedicated['locations']);
         if (!is_dir($registry->projectDirectory($name))) mkdir($registry->projectDirectory($name), 0775, true);
         $registry->writeProjectConfig($name, $config);
+        (new DedicatedDatabaseComposeRenderer())->render();
         $metadata = join_path($destination, '.docker-cli');
         if (!is_dir($metadata)) mkdir($metadata, 0775, true);
         file_put_contents(join_path($metadata, 'project.yaml'), Yaml::dump(['meta' => ['schema' => 'project-meta', 'version' => 0.1], 'data' => ['project' => ['name' => $name]]], 4, 2));
@@ -145,7 +167,8 @@ final class ProjectCloneCommand extends AbstractCommand
         $databaseDuration = 0.0;
         if ($dbms !== []) {
             $databaseStarted = microtime(true);
-            $databaseCode = $this->initializeTargetDatabases($config, $name, $output);
+            $databaseCode = $this->startDedicatedDatabases($name, $dedicated['drivers'], $output);
+            if ($databaseCode === Command::SUCCESS) $databaseCode = $this->initializeTargetDatabases($config, $name, $output);
             if ($databaseCode === Command::SUCCESS && in_array('mysql', $dbms, true)) {
                 $databaseCode = $this->cloneMysqlDatabase($sourceConfig, $config, $output);
             }
@@ -224,6 +247,52 @@ final class ProjectCloneCommand extends AbstractCommand
         return $dbms;
     }
 
+    /** @param array<string, mixed> $sourceConfig @return array{drivers: list<string>, locations: array<string, string>}|null */
+    private function resolveDedicatedDatabases(InputInterface $input, array $sourceConfig, string $sourceName, OutputInterface $output): ?array
+    {
+        $option = $input->getOption('dedicated-db');
+        $drivers = is_string($option)
+            ? array_values(array_unique(array_filter(array_map('trim', explode(',', $option)))))
+            : array_values(array_filter(['mysql', 'postgres'], static fn (string $driver): bool =>
+                ($sourceConfig['data']['databases'][$driver]['hostname'] ?? null) === sprintf('docker-cli-%s-%s', $driver, $sourceName)));
+        if (array_diff($drivers, ['mysql', 'postgres']) !== []) {
+            $this->writeMessage($output, '<error>Опция --dedicated-db поддерживает только mysql и postgres.</error>');
+            return null;
+        }
+        $locations = [];
+        foreach (['mysql', 'postgres'] as $driver) {
+            $location = $input->getOption('location-' . $driver);
+            if ($location === null) continue;
+            if (!in_array($driver, $drivers, true)) {
+                $this->writeMessage($output, sprintf('<error>Опцию --location-%s можно использовать только для выделенной БД.</error>', $driver));
+                return null;
+            }
+            if (!is_string($location) || trim($location) === '' || in_array(trim($location), ['.', '..', DIRECTORY_SEPARATOR], true)) {
+                $this->writeMessage($output, sprintf('<error>Опция --location-%s должна содержать путь.</error>', $driver));
+                return null;
+            }
+            $locations[$driver] = trim($location);
+        }
+        return ['drivers' => $drivers, 'locations' => $locations];
+    }
+
+    /** @param list<string> $drivers */
+    private function startDedicatedDatabases(string $projectName, array $drivers, OutputInterface $output): int
+    {
+        if ($drivers === []) return Command::SUCCESS;
+        $compose = new SystemCompose();
+        try { $compose->assertInitialized(); }
+        catch (MissingConfigException $exception) {
+            $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            return Command::FAILURE;
+        }
+        $services = array_map(static fn (string $driver): string => $compose->databaseService($projectName, $driver), $drivers);
+        $command = array_merge($compose->dockerComposeCommand('up'), ['--detach'], $services);
+        $this->writeMessage($output, '<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
+        $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
+        return is_resource($process) ? proc_close($process) : Command::FAILURE;
+    }
+
     /** @param array<string, mixed> $targetConfig */
     private function initializeTargetDatabases(array $targetConfig, string $targetName, OutputInterface $output): int
     {
@@ -258,9 +327,11 @@ final class ProjectCloneCommand extends AbstractCommand
         $snapshot = join_path($home, '.config', 'docker-cli', 'cache', 'project-clone', bin2hex(random_bytes(8)));
         $loader = $this->mysqlDumpLoader ?? new MysqlDumpLoader();
         try {
-            $code = $loader->dump($source, $snapshot, 4, $output);
+            $sourceHost = $sourceConfig['data']['databases']['mysql']['hostname'] ?? 'docker-cli-mysql';
+            $targetHost = $targetConfig['data']['databases']['mysql']['hostname'] ?? 'docker-cli-mysql';
+            $code = $loader->dump($source, $snapshot, 4, $output, [], [], is_string($sourceHost) ? $sourceHost : 'docker-cli-mysql');
             if ($code !== Command::SUCCESS) return $code;
-            return $loader->load($target, $snapshot, 4, false, $output);
+            return $loader->load($target, $snapshot, 4, false, $output, is_string($targetHost) ? $targetHost : 'docker-cli-mysql');
         } catch (MissingConfigException $exception) {
             $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
             return Command::FAILURE;
@@ -282,7 +353,9 @@ final class ProjectCloneCommand extends AbstractCommand
             return Command::FAILURE;
         }
         try {
-            return ($this->dataInitializer ?? new DataInitializer())->clonePostgres($source, $target, $sourceUser, $targetUser, $output);
+            $sourceHost = $sourceConfig['data']['databases']['postgres']['hostname'] ?? 'docker-cli-postgres';
+            $targetHost = $targetConfig['data']['databases']['postgres']['hostname'] ?? 'docker-cli-postgres';
+            return ($this->dataInitializer ?? new DataInitializer())->clonePostgres($source, $target, $sourceUser, $targetUser, $output, is_string($sourceHost) ? $sourceHost : 'docker-cli-postgres', is_string($targetHost) ? $targetHost : 'docker-cli-postgres');
         } catch (MissingConfigException $exception) {
             $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
             return Command::FAILURE;
