@@ -66,7 +66,10 @@ final class DedicatedDatabaseComposeRenderer
                     'DNSDOCK_NAME' => $hostname,
                     'DNSDOCK_IMAGE' => 'system',
                 ],
-                'volumes' => [$dataDirectory . '/data:/var/lib/mysql', $dataDirectory . '/logs:/var/log/mysql'],
+                'volumes' => [
+                    ['type' => 'bind', 'source' => $dataDirectory . '/data', 'target' => '/var/lib/mysql'],
+                    ['type' => 'bind', 'source' => $dataDirectory . '/logs', 'target' => '/var/log/mysql'],
+                ],
                 'networks' => ['docker-cli' => ['aliases' => [$hostname]]],
                 'healthcheck' => [
                     'test' => ['CMD-SHELL', 'MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin --protocol=socket -uroot ping --silent'],
@@ -88,7 +91,10 @@ final class DedicatedDatabaseComposeRenderer
                 'DNSDOCK_NAME' => $hostname,
                 'DNSDOCK_IMAGE' => 'system',
             ],
-            'volumes' => [$dataDirectory . '/data:/var/lib/postgresql', $dataDirectory . '/logs:/var/log/postgresql'],
+            'volumes' => [
+                ['type' => 'bind', 'source' => $dataDirectory . '/data', 'target' => '/var/lib/postgresql'],
+                ['type' => 'bind', 'source' => $dataDirectory . '/logs', 'target' => '/var/log/postgresql'],
+            ],
             'networks' => ['docker-cli' => ['aliases' => [$hostname]]],
             'healthcheck' => [
                 'test' => ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER:-system}" -d postgres'],
