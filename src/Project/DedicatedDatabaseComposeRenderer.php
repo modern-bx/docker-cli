@@ -57,9 +57,17 @@ final class DedicatedDatabaseComposeRenderer
                     'MYSQL_DATABASE' => '${MYSQL_DATABASE:-system}',
                     'MYSQL_USER' => '${MYSQL_USER:-system}',
                     'MYSQL_PASSWORD' => '${MYSQL_PASSWORD}',
+                    'DNSDOCK_NAME' => $hostname,
+                    'DNSDOCK_IMAGE' => 'system',
                 ],
                 'volumes' => [$dataDirectory . '/data:/var/lib/mysql', $dataDirectory . '/logs:/var/log/mysql'],
                 'networks' => ['docker-cli' => ['aliases' => [$hostname]]],
+                'healthcheck' => [
+                    'test' => ['CMD-SHELL', 'MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin --protocol=socket -uroot ping --silent'],
+                    'interval' => '2s',
+                    'timeout' => '2s',
+                    'retries' => 60,
+                ],
                 'restart' => 'unless-stopped',
             ];
         }
@@ -71,9 +79,17 @@ final class DedicatedDatabaseComposeRenderer
                 'POSTGRES_DB' => '${POSTGRES_DB:-system}',
                 'POSTGRES_USER' => '${POSTGRES_USER:-system}',
                 'POSTGRES_PASSWORD' => '${POSTGRES_PASSWORD}',
+                'DNSDOCK_NAME' => $hostname,
+                'DNSDOCK_IMAGE' => 'system',
             ],
             'volumes' => [$dataDirectory . '/data:/var/lib/postgresql', $dataDirectory . '/logs:/var/log/postgresql'],
             'networks' => ['docker-cli' => ['aliases' => [$hostname]]],
+            'healthcheck' => [
+                'test' => ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER:-system}" -d postgres'],
+                'interval' => '2s',
+                'timeout' => '2s',
+                'retries' => 60,
+            ],
             'restart' => 'unless-stopped',
         ];
     }
