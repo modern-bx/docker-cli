@@ -150,7 +150,7 @@ SH,
             : $driver;
     }
 
-    public function clonePostgres(string $sourceDatabase, string $targetDatabase, string $sourceUser, string $targetUser, OutputInterface $output): int
+    public function clonePostgres(string $sourceDatabase, string $targetDatabase, string $sourceUser, string $targetUser, OutputInterface $output, string $sourceHostname = 'postgres', string $targetHostname = 'postgres'): int
     {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
@@ -160,6 +160,20 @@ SH,
         $targetLiteral = str_replace("'", "''", $targetDatabase);
         $sourceUserIdentifier = '"' . str_replace('"', '""', $sourceUser) . '"';
         $targetUserIdentifier = '"' . str_replace('"', '""', $targetUser) . '"';
+
+        if ($sourceHostname !== $targetHostname) {
+            $sourceService = $this->serviceForHostname($sourceHostname, 'postgres');
+            return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
+                '-T', $sourceService, 'sh', '-ec', <<<'SH'
+set -eu
+export PGPASSWORD="${POSTGRES_PASSWORD:?}"
+root_user="${POSTGRES_USER:-system}"
+pg_dump -U "$root_user" -d "$1" --no-owner --no-acl --clean --if-exists |
+  psql -v ON_ERROR_STOP=1 -h "$2" -U "$root_user" -d "$3"
+SH,
+                'sh', $sourceDatabase, $targetHostname, $targetDatabase,
+            ]), $compose, $output);
+        }
 
         return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
             '-T', 'postgres', 'sh', '-ec', <<<'SH'
@@ -193,6 +207,14 @@ SH,
             $targetDatabase,
             "REASSIGN OWNED BY {$sourceUserIdentifier} TO {$targetUserIdentifier}; ALTER DATABASE {$sourceIdentifier} OWNER TO {$sourceUserIdentifier};",
         ]), $compose, $output);
+    }
+
+    private function serviceForHostname(string $hostname, string $driver): string
+    {
+        if (preg_match('/^docker-cli-' . preg_quote($driver, '/') . '-(.+)$/', $hostname, $matches) === 1) {
+            return ($this->compose ?? new SystemCompose())->databaseService($matches[1], $driver);
+        }
+        return $driver;
     }
 
     public function wipe(string $mysqlDatabase, string $postgresDatabase, OutputInterface $output): int

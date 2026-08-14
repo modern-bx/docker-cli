@@ -604,12 +604,21 @@ final class ProjectController
     public function clone(ProjectCloneRequestDto $request): QueuedOperationDto
     {
         if (!$this->projects->hasProject($request->name)) throw new ProjectActionException('Проект не найден.', 404);
-        $arguments = ['from' => ['value' => $request->name]];
+        $targetName = $request->to ?? (new ProjectNameGenerator())->generate($this->projects->registeredProjectNames());
+        $arguments = ['from' => ['value' => $request->name], 'to' => ['value' => $targetName]];
         if ($request->location === null) $arguments['here'] = ['value' => true];
         else $arguments['location'] = ['value' => $request->location];
-        if ($request->to !== null) $arguments['to'] = ['value' => $request->to];
         if ($request->skipDb || $request->dbms === []) $arguments['skip-db'] = ['value' => true];
         else $arguments['dbms'] = ['value' => implode(',', $request->dbms)];
+        if ($request->dedicatedDatabases !== null) {
+            $arguments['dedicated-db'] = ['value' => $request->dedicatedDatabases === [] ? 'false' : implode(',', $request->dedicatedDatabases)];
+            $options = $this->options(new EmptyRequestDto());
+            foreach ($request->dedicatedDatabases as $driver) {
+                $selection = $driver === 'mysql' ? $request->locationMysql : $request->locationPostgres;
+                $databaseLocation = $this->resolveDatabaseLocation($selection, $options->databaseLocations);
+                $arguments['location-' . $driver] = ['value' => $databaseLocation === null ? 'system' : join_path($databaseLocation, $driver . '-' . $targetName)];
+            }
+        }
         $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
             'code' => 'core.project.clone', 'arguments' => $arguments,
         ]]]];
