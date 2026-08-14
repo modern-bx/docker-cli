@@ -22,13 +22,13 @@ final readonly class ProjectsSettingsRequestDto implements RequestDto
         $databaseLocations = $request->body['databaseLocations'] ?? null;
 
         return new static(
-            self::validateLocations($locations, 'файлов проектов'),
-            self::validateLocations($databaseLocations, 'баз данных'),
+            self::validateLocations($locations, 'файлов проектов', true),
+            self::validateLocations($databaseLocations, 'баз данных', false),
         );
     }
 
     /** @return list<array{path: string, code: string, default: bool}> */
-    private static function validateLocations(mixed $locations, string $type): array
+    private static function validateLocations(mixed $locations, string $type, bool $defaultRequired): array
     {
         if (!is_array($locations) || $locations === [] || !array_is_list($locations)) {
             throw new RequestValidationException(sprintf('Добавьте хотя бы одно расположение %s.', $type));
@@ -56,8 +56,8 @@ final readonly class ProjectsSettingsRequestDto implements RequestDto
             }
             $validated[] = ['path' => $path, 'code' => $code, 'default' => $location['default']];
         }
-        if ($defaults !== 1) {
-            throw new RequestValidationException('Выберите одно расположение по умолчанию.');
+        if ($defaults > 1 || ($defaultRequired && $defaults !== 1)) {
+            throw new RequestValidationException($defaultRequired ? 'Выберите одно расположение по умолчанию.' : 'Можно выбрать не более одного расположения БД по умолчанию.');
         }
         return $validated;
     }

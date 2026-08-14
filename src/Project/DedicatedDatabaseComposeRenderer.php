@@ -53,7 +53,7 @@ final class DedicatedDatabaseComposeRenderer
     /** @return array<string, mixed> */
     private function service(string $driver, string $projectName, string $hostname, ?string $location): array
     {
-        $dataDirectory = $location ?? sprintf('./data/%s-%s', $driver, $projectName);
+        $dataDirectory = $location ?? sprintf('${DEFAULT_DATA_DIR_%s:-data/%s}-%s', strtoupper($driver), $driver, $projectName);
         if ($driver === 'mysql') {
             return [
                 'image' => 'mysql:8.0',
