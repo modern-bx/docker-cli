@@ -25,7 +25,20 @@ final class ProjectsSettingsRepository
     /** @return list<array{path: string, code: string, default: bool}> */
     public function locations(): array
     {
-        $valid = $this->storedLocations();
+        return $this->normalizeLocations($this->storedLocations('locations'));
+    }
+
+    /** @return list<array{path: string, code: string, default: bool}> */
+    public function databaseLocations(): array
+    {
+        return $this->normalizeLocations($this->storedLocations('databaseLocations'));
+    }
+
+    /** @param list<array{path: string, code?: mixed, default: bool}> $valid
+     *  @return list<array{path: string, code: string, default: bool}>
+     */
+    private function normalizeLocations(array $valid): array
+    {
         $used = [];
         foreach ($valid as &$location) {
             $code = $location['code'] ?? '';
@@ -38,13 +51,38 @@ final class ProjectsSettingsRepository
         return $valid;
     }
 
-    /** @param list<array{path: string, code: string, default: bool}> $locations */
-    public function save(array $locations): array
+    /** @param list<array{path: string, code: string, default: bool}> $locations
+     *  @param list<array{path: string, code: string, default: bool}> $databaseLocations
+     *  @return array{locations: list<array{path: string, code: string, default: bool}>, databaseLocations: list<array{path: string, code: string, default: bool}>}
+     */
+    public function save(array $locations, array $databaseLocations): array
+    {
+        $locations = $this->prepareLocations($locations, 'locations');
+        $databaseLocations = $this->prepareLocations($databaseLocations, 'databaseLocations');
+        $directory = dirname($this->file);
+        if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
+            throw new \RuntimeException(sprintf('Unable to create settings directory "%s".', $directory));
+        }
+        $contents = Yaml::dump([
+            'meta' => ['schema' => 'settings.projects', 'version' => 0.1],
+            'settings.projects' => ['locations' => $locations, 'databaseLocations' => $databaseLocations],
+        ], 4, 2);
+        if (file_put_contents($this->file, $contents, LOCK_EX) === false) {
+            throw new \RuntimeException(sprintf('Unable to write projects settings "%s".', $this->file));
+        }
+        chmod($this->file, 0600);
+        return ['locations' => $locations, 'databaseLocations' => $databaseLocations];
+    }
+
+    /** @param list<array{path: string, code: string, default: bool}> $locations
+     *  @return list<array{path: string, code: string, default: bool}>
+     */
+    private function prepareLocations(array $locations, string $key): array
     {
         // Use the values actually persisted in the file to distinguish an
         // existing location from a newly added one. Existing location codes may
         // be changed, but must never be saved empty.
-        $previous = $this->storedLocations();
+        $previous = $this->storedLocations($key);
         $previousByPath = array_column($previous, null, 'path');
         $used = [];
         foreach ($locations as $index => &$location) {
@@ -67,31 +105,19 @@ final class ProjectsSettingsRepository
                 throw new \InvalidArgumentException(sprintf('Каталог «%s» должен быть доступен для чтения, записи и листинга.', $path));
             }
         }
-        $directory = dirname($this->file);
-        if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
-            throw new \RuntimeException(sprintf('Unable to create settings directory "%s".', $directory));
-        }
-        $contents = Yaml::dump([
-            'meta' => ['schema' => 'settings.projects', 'version' => 0.1],
-            'settings.projects' => ['locations' => $locations],
-        ], 4, 2);
-        if (file_put_contents($this->file, $contents, LOCK_EX) === false) {
-            throw new \RuntimeException(sprintf('Unable to write projects settings "%s".', $this->file));
-        }
-        chmod($this->file, 0600);
         return $locations;
     }
 
     /** @return list<array{path: string, code?: mixed, default: bool}> */
-    private function storedLocations(): array
+    private function storedLocations(string $key): array
     {
         if (!is_file($this->file)) return [];
         $data = Yaml::parseFile($this->file);
         $locations = is_array($data)
             && ($data['meta']['schema'] ?? null) === 'settings.projects'
             && ($data['meta']['version'] ?? null) === 0.1
-            && is_array($data['settings.projects']['locations'] ?? null)
-            ? $data['settings.projects']['locations'] : [];
+            && is_array($data['settings.projects'][$key] ?? null)
+            ? $data['settings.projects'][$key] : [];
 
         return array_values(array_filter($locations, static fn ($item): bool => is_array($item)
             && is_string($item['path'] ?? null) && is_bool($item['default'] ?? null)));

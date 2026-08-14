@@ -7,7 +7,7 @@ namespace DockerCli\Project;
 final class ProjectDatabaseConfig
 {
     /** @return array<string, mixed> */
-    public function ensure(array $projectConfig, array $dedicated = []): array
+    public function ensure(array $projectConfig, array $dedicated = [], array $locations = []): array
     {
         $projectName = $projectConfig['data']['project']['name'] ?? null;
         if (!is_string($projectName) || $projectName === '') {
@@ -18,6 +18,7 @@ final class ProjectDatabaseConfig
         foreach (['mysql', 'postgres'] as $driver) {
             $password = $projectConfig['data']['databases'][$driver]['password'] ?? null;
             $hostname = $projectConfig['data']['databases'][$driver]['hostname'] ?? null;
+            $location = $projectConfig['data']['databases'][$driver]['location'] ?? ($locations[$driver] ?? null);
             $projectConfig['data']['databases'][$driver] = [
                 'database' => $projectName,
                 'username' => $projectName,
@@ -26,6 +27,9 @@ final class ProjectDatabaseConfig
                     ? $hostname
                     : (in_array($driver, $dedicated, true) ? sprintf('docker-cli-%s-%s', $driver, $projectName) : 'docker-cli-' . $driver),
             ];
+            if (is_string($location) && $location !== '') {
+                $projectConfig['data']['databases'][$driver]['location'] = $location;
+            }
         }
 
         if ($projectConfig['data']['databases']['mysql']['password'] === $projectConfig['data']['databases']['postgres']['password']) {

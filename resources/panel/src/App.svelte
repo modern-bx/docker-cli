@@ -234,6 +234,7 @@
   let settingsLoading = false;
   let settingsSaving = false;
   let projectLocations = [{ path: '', default: true }];
+  let projectDatabaseLocations = [{ path: '', code: '', default: true }];
   let projectSettingsLoading = false;
   let projectSettingsSaving = false;
   let backupLocations = [{ path: '', code: '', default: true }];
@@ -1024,6 +1025,9 @@
       projectLocations = Array.isArray(data.locations) && data.locations.length
         ? data.locations.map((location) => ({ path: location.path, code: location.code || '', default: location.default === true }))
         : [{ path: '', code: '', default: true }];
+      projectDatabaseLocations = Array.isArray(data.databaseLocations) && data.databaseLocations.length
+        ? data.databaseLocations.map((location) => ({ path: location.path, code: location.code || '', default: location.default === true }))
+        : [{ path: '', code: '', default: true }];
     } catch (cause) {
       errorTitle = 'Не удалось загрузить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить расположения проектов.';
@@ -1147,12 +1151,31 @@
     projectLocations = projectLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === index }));
   }
 
+  function updateProjectDatabaseLocation(index, field, value) {
+    projectDatabaseLocations = projectDatabaseLocations.map((location, itemIndex) => itemIndex === index ? { ...location, [field]: value } : location);
+  }
+
+  function addProjectDatabaseLocation() {
+    projectDatabaseLocations = [...projectDatabaseLocations, { path: '', code: '', default: false }];
+  }
+
+  function removeProjectDatabaseLocation(index) {
+    const wasDefault = projectDatabaseLocations[index].default;
+    projectDatabaseLocations = projectDatabaseLocations.filter((_, itemIndex) => itemIndex !== index);
+    if (wasDefault && projectDatabaseLocations.length) projectDatabaseLocations = projectDatabaseLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === 0 }));
+  }
+
+  function setDefaultProjectDatabaseLocation(index) {
+    projectDatabaseLocations = projectDatabaseLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === index }));
+  }
+
   async function saveProjectLocations() {
-    if (projectSettingsSaving || projectLocations.some((location) => !location.path.trim())) return;
+    if (projectSettingsSaving || projectLocations.some((location) => !location.path.trim()) || projectDatabaseLocations.some((location) => !location.path.trim())) return;
     projectSettingsSaving = true;
     try {
-      const data = await saveProjectsSettings(api, projectLocations.map((location) => ({ ...location, path: location.path.trim() })));
+      const data = await saveProjectsSettings(api, projectLocations.map((location) => ({ ...location, path: location.path.trim() })), projectDatabaseLocations.map((location) => ({ ...location, path: location.path.trim() })));
       projectLocations = data.locations;
+      projectDatabaseLocations = data.databaseLocations;
     } catch (cause) {
       errorTitle = 'Не удалось сохранить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось сохранить расположения проектов.';
@@ -2523,12 +2546,12 @@
               <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadProjectsSettings} />
             <div class="settings-scroll">
               <div class="project-toolbar">
-                <button class="btn preset-filled-primary-500" type="button" disabled={projectSettingsLoading || projectSettingsSaving || projectLocations.some((location) => !location.path.trim())} onclick={saveProjectLocations}>
+                <button class="btn preset-filled-primary-500" type="button" disabled={projectSettingsLoading || projectSettingsSaving || projectLocations.some((location) => !location.path.trim()) || projectDatabaseLocations.some((location) => !location.path.trim())} onclick={saveProjectLocations}>
                   <Save size={16} aria-hidden="true" />{projectSettingsSaving ? 'Сохраняем…' : 'Сохранить'}
                 </button>
               </div>
-              <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Расположение">
-                <h2>Расположение
+              <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Расположения файлов">
+                <h2>Расположения файлов
                   <Tooltip positioning={{ placement: 'right' }}>
                     <Tooltip.Trigger class="security-help" aria-label="О расположениях проектов"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
                     <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Эти пути будут использоваться в скриптах автоматической развертки проектов. Пока не добавлен хотя бы один путь, функционал автоматической развертки не заработает</Tooltip.Content></Tooltip.Positioner>
@@ -2549,6 +2572,25 @@
                         </Tooltip>
                       </div>
                     </div>
+                  {/each}
+                </div>
+              </section>
+              <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Расположение БД">
+                <h2>Расположение БД
+                  <Tooltip positioning={{ placement: 'right' }}>
+                    <Tooltip.Trigger class="security-help" aria-label="О расположениях БД"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                    <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Каталоги для хранения данных выделенных экземпляров MySQL и PostgreSQL</Tooltip.Content></Tooltip.Positioner>
+                  </Tooltip>
+                </h2>
+                <div class="location-list">
+                  {#each projectDatabaseLocations as location, index}
+                    <div class="location-item"><div class="location-row">
+                      <input class="input location-path" type="text" value={location.path} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="/путь/к/базам-данных" aria-label={`Расположение БД ${index + 1}`} oninput={(event) => updateProjectDatabaseLocation(index, 'path', event.currentTarget.value)} />
+                      <input class="input location-code" type="text" value={location.code} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="код (автоматически)" aria-label={`Код расположения БД ${index + 1}`} oninput={(event) => updateProjectDatabaseLocation(index, 'code', event.currentTarget.value)} />
+                      <button class="btn preset-tonal" type="button" title="Добавить расположение БД" aria-label="Добавить расположение БД" disabled={!location.path.trim() || projectSettingsLoading || projectSettingsSaving} onclick={addProjectDatabaseLocation}><Plus size={16} aria-hidden="true" /></button>
+                      {#if projectDatabaseLocations.length > 1}<button class="btn preset-tonal location-delete" type="button" title="Удалить расположение БД" aria-label="Удалить расположение БД" disabled={projectSettingsLoading || projectSettingsSaving} onclick={() => removeProjectDatabaseLocation(index)}><Trash2 size={16} aria-hidden="true" /></button>{/if}
+                      <input class="radio location-default" type="radio" name="default-project-database-location" checked={location.default} disabled={projectSettingsLoading || projectSettingsSaving} aria-label="Путь БД по умолчанию" onchange={() => setDefaultProjectDatabaseLocation(index)} />
+                    </div></div>
                   {/each}
                 </div>
               </section>
@@ -2908,7 +2950,7 @@
       <form class="project-add-form" onsubmit={(event) => { event.preventDefault(); addProject(); }}>
         <div class="project-add-main">
           <label class="label"><span class="label-text">Код (опционально)</span><input class="input" bind:value={projectAddDialog.code} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
-          <label class="label"><span class="label-text">Локация</span><Combobox collection={projectLocationCollection} value={[projectAddDialog.location]} openOnClick onValueChange={(details) => { if (details.value[0]) projectAddDialog.location = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly required /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectLocationOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          <label class="label"><span class="label-text">Расположение файлов</span><Combobox collection={projectLocationCollection} value={[projectAddDialog.location]} openOnClick onValueChange={(details) => { if (details.value[0]) projectAddDialog.location = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly required /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectLocationOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <label class="label"><span class="label-text">Язык</span><Combobox collection={projectLanguageCollection} value={[projectAddDialog.language]} openOnClick onValueChange={(details) => { if (details.value[0]) { projectAddDialog.language = details.value[0]; projectAddDialog.framework = projectAddOptions.frameworks[projectAddDialog.language]?.[0]?.code || ''; } }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languages.map((language) => ({ value: language.code, label: language.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <label class="label"><span class="label-text">Фреймворк</span><Combobox collection={projectFrameworkCollection} value={[projectAddDialog.framework]} openOnClick onValueChange={(details) => { projectAddDialog.framework = details.value[0] ?? ''; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each (projectAddOptions.frameworks[projectAddDialog.language] || []).map((framework) => ({ value: framework.code, label: framework.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
         </div>

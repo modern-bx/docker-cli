@@ -11,15 +11,27 @@ use DockerCli\Panel\Http\RequestValidationException;
 final readonly class ProjectsSettingsRequestDto implements RequestDto
 {
     /** @param list<array{path: string, code: string, default: bool}> $locations */
-    public function __construct(public array $locations)
+    /** @param list<array{path: string, code: string, default: bool}> $databaseLocations */
+    public function __construct(public array $locations, public array $databaseLocations)
     {
     }
 
     public static function fromRequest(RequestData $request): static
     {
         $locations = $request->body['locations'] ?? null;
+        $databaseLocations = $request->body['databaseLocations'] ?? null;
+
+        return new static(
+            self::validateLocations($locations, 'файлов проектов'),
+            self::validateLocations($databaseLocations, 'баз данных'),
+        );
+    }
+
+    /** @return list<array{path: string, code: string, default: bool}> */
+    private static function validateLocations(mixed $locations, string $type): array
+    {
         if (!is_array($locations) || $locations === [] || !array_is_list($locations)) {
-            throw new RequestValidationException('Добавьте хотя бы одно расположение проектов.');
+            throw new RequestValidationException(sprintf('Добавьте хотя бы одно расположение %s.', $type));
         }
 
         $validated = [];
@@ -28,7 +40,7 @@ final readonly class ProjectsSettingsRequestDto implements RequestDto
             if (!is_array($location) || array_keys($location) !== ['path', 'code', 'default']
                 || !is_string($location['path']) || trim($location['path']) === ''
                 || strlen($location['path']) > 4096 || !is_string($location['code']) || !is_bool($location['default'])) {
-                throw new RequestValidationException('Некорректное расположение проектов.');
+                throw new RequestValidationException(sprintf('Некорректное расположение %s.', $type));
             }
             $path = trim($location['path']);
             if (in_array($path, array_column($validated, 'path'), true)) {
@@ -47,6 +59,6 @@ final readonly class ProjectsSettingsRequestDto implements RequestDto
         if ($defaults !== 1) {
             throw new RequestValidationException('Выберите одно расположение по умолчанию.');
         }
-        return new static($validated);
+        return $validated;
     }
 }

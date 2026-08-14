@@ -46,6 +46,8 @@ final class ProjectUpCommand extends AbstractCommand
         $this->addOption('language', null, InputOption::VALUE_REQUIRED, 'Код языка проекта.');
         $this->addOption('framework', null, InputOption::VALUE_REQUIRED, 'Код фреймворка. Если не указан, фреймворк определяется автоматически.');
         $this->addOption('dedicated-db', null, InputOption::VALUE_REQUIRED, 'Выделенные СУБД через запятую: mysql, postgres.');
+        $this->addOption('location-mysql', null, InputOption::VALUE_REQUIRED, 'Каталог данных выделенного MySQL.');
+        $this->addOption('location-postgres', null, InputOption::VALUE_REQUIRED, 'Каталог данных выделенного PostgreSQL.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -55,6 +57,22 @@ final class ProjectUpCommand extends AbstractCommand
         if (array_diff($dedicatedDatabases, ['mysql', 'postgres']) !== []) {
             $this->writeMessage($output, '<error>Опция --dedicated-db поддерживает только mysql и postgres.</error>');
             return Command::INVALID;
+        }
+        $databaseLocations = [];
+        foreach (['mysql', 'postgres'] as $driver) {
+            $location = $input->getOption('location-' . $driver);
+            if ($location === null) {
+                continue;
+            }
+            if (!in_array($driver, $dedicatedDatabases, true)) {
+                $this->writeMessage($output, sprintf('<error>Опцию --location-%s можно использовать только вместе с --dedicated-db=%s.</error>', $driver, $driver));
+                return Command::INVALID;
+            }
+            if (!is_string($location) || trim($location) === '' || in_array(trim($location), ['.', '..', DIRECTORY_SEPARATOR], true)) {
+                $this->writeMessage($output, sprintf('<error>Опция --location-%s должна содержать путь.</error>', $driver));
+                return Command::INVALID;
+            }
+            $databaseLocations[$driver] = trim($location);
         }
         $languageCode = $input->getOption('language');
         if ($languageCode !== null && $languageCode !== 'php' || $frameworkCode !== null && !in_array($frameworkCode, ['symfony', 'laravel', 'bitrix', 'bitrix24'], true)) {
@@ -129,7 +147,7 @@ final class ProjectUpCommand extends AbstractCommand
                     ],
                 ],
             ],
-        ], $dedicatedDatabases);
+        ], $dedicatedDatabases, $databaseLocations);
         $this->writeYaml(join_path($projectDirectory, 'project.yaml'), $projectConfig);
         (new DedicatedDatabaseComposeRenderer())->render();
 

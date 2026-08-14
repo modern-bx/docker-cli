@@ -28,7 +28,13 @@ final class DedicatedDatabaseComposeRenderer
                 if ($hostname !== $expected) {
                     continue;
                 }
-                $services[$driver][$compose->databaseService($projectName, $driver)] = $this->service($driver, $projectName, $hostname);
+                $location = $databases[$driver]['location'] ?? null;
+                $services[$driver][$compose->databaseService($projectName, $driver)] = $this->service(
+                    $driver,
+                    $projectName,
+                    $hostname,
+                    is_string($location) && $location !== '' ? $location : null,
+                );
             }
         }
 
@@ -45,9 +51,9 @@ final class DedicatedDatabaseComposeRenderer
     }
 
     /** @return array<string, mixed> */
-    private function service(string $driver, string $projectName, string $hostname): array
+    private function service(string $driver, string $projectName, string $hostname, ?string $location): array
     {
-        $dataDirectory = sprintf('./data/%s-%s', $driver, $projectName);
+        $dataDirectory = $location ?? sprintf('./data/%s-%s', $driver, $projectName);
         if ($driver === 'mysql') {
             return [
                 'image' => 'mysql:8.0',

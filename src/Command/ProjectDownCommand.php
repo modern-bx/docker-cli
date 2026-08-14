@@ -127,7 +127,10 @@ final class ProjectDownCommand extends AbstractCommand
         if ($input->getOption('drop') && $input->getOption('force')) {
             $composeDirectory = (new SystemCompose())->directory();
             foreach ($dedicated as $driver) {
-                $dataDirectory = join_path($composeDirectory, 'data', $driver . '-' . $projectName);
+                $configuredLocation = $projectConfig['data']['databases'][$driver]['location'] ?? null;
+                $dataDirectory = is_string($configuredLocation) && $configuredLocation !== ''
+                    ? (str_starts_with($configuredLocation, DIRECTORY_SEPARATOR) ? $configuredLocation : join_path($composeDirectory, $configuredLocation))
+                    : join_path($composeDirectory, 'data', $driver . '-' . $projectName);
                 if (is_dir($dataDirectory)) {
                     $this->removeDirectory($dataDirectory);
                 }

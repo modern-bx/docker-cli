@@ -19,6 +19,8 @@ task:
         - { name: Bitrix, value: bitrix }
         - { name: Bitrix24, value: bitrix24 }
     dedicated-db: { type: string, required: false }
+    location-mysql: { type: string, required: false }
+    location-postgres: { type: string, required: false }
   action: |
     project_root={{ location }}/{{ name }}
     mkdir "$project_root"
@@ -26,4 +28,6 @@ task:
     options=(--language={{ language }})
     [ -n "${framework:-}" ] && options+=(--framework="$framework")
     [ -n "${dedicated_db:-}" ] && options+=(--dedicated-db="$dedicated_db")
+    [ -n "${location_mysql:-}" ] && options+=(--location-mysql="$location_mysql")
+    [ -n "${location_postgres:-}" ] && options+=(--location-postgres="$location_postgres")
     docker-cli project:up {{ name }} "${options[@]}"

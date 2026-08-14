@@ -19,17 +19,17 @@ final readonly class ProjectsSettingsController
     #[Route('GET', '/api/settings/projects', EmptyRequestDto::class, ProjectsSettingsDto::class)]
     public function get(EmptyRequestDto $request): ProjectsSettingsDto
     {
-        return new ProjectsSettingsDto($this->settings->locations());
+        return new ProjectsSettingsDto($this->settings->locations(), $this->settings->databaseLocations());
     }
 
     #[Route('POST', '/api/settings/projects', ProjectsSettingsRequestDto::class, ProjectsSettingsDto::class)]
     public function save(ProjectsSettingsRequestDto $request): ProjectsSettingsDto
     {
         try {
-            $locations = $this->settings->save($request->locations);
+            $settings = $this->settings->save($request->locations, $request->databaseLocations);
         } catch (\InvalidArgumentException $exception) {
             throw new RequestValidationException($exception->getMessage());
         }
-        return new ProjectsSettingsDto($locations);
+        return new ProjectsSettingsDto($settings['locations'], $settings['databaseLocations']);
     }
 }

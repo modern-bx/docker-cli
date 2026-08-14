@@ -77,8 +77,8 @@ services:
       DNSDOCK_NAME: mysql
       DNSDOCK_IMAGE: system
     volumes:
-      - ./data/mysql/data:/var/lib/mysql
-      - ./data/mysql/logs:/var/log/mysql
+      - ${DEFAULT_DATA_DIR_MYSQL:-data/mysql}/data:/var/lib/mysql
+      - ${DEFAULT_DATA_DIR_MYSQL:-data/mysql}/logs:/var/log/mysql
     networks:
       docker-cli:
         aliases:
@@ -106,8 +106,8 @@ services:
       DNSDOCK_NAME: postgres
       DNSDOCK_IMAGE: system
     volumes:
-      - ./data/postgres/data:/var/lib/postgresql
-      - ./data/postgres/logs:/var/log/postgresql
+      - ${DEFAULT_DATA_DIR_POSTGRES:-data/postgres}/data:/var/lib/postgresql
+      - ${DEFAULT_DATA_DIR_POSTGRES:-data/postgres}/logs:/var/log/postgresql
     networks:
       docker-cli:
         aliases:
