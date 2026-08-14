@@ -1540,7 +1540,10 @@
     try {
       projectAddOptions = await getProjectOptions(api);
       const location = projectAddOptions.locations.find((item) => item.default);
-      projectCloneDialog = { project: project.name, to: '', location: location?.code || '', mysql: true, postgres: true };
+      const databaseLocation = projectAddOptions.databaseLocations.find((item) => item.default) ? 'default' : 'system';
+      const dedicatedMysql = project.mysqlHost === `docker-cli-mysql-${project.name}`;
+      const dedicatedPostgres = project.postgresHost === `docker-cli-postgres-${project.name}`;
+      projectCloneDialog = { project: project.name, to: '', location: location?.code || '', mysql: true, postgres: true, dedicated: dedicatedMysql || dedicatedPostgres, dedicatedMysql, dedicatedPostgres, locationMysql: databaseLocation, locationPostgres: databaseLocation };
     } catch (cause) {
       errorTitle = 'Не удалось открыть клонирование проекта';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить параметры проекта.';
@@ -1553,7 +1556,14 @@
     try {
       const dialog = projectCloneDialog;
       const dbms = [dialog.mysql && 'mysql', dialog.postgres && 'postgres'].filter(Boolean);
-      await cloneProject(api, dialog.project, { to: dialog.to, location: dialog.location, dbms });
+      await cloneProject(api, dialog.project, {
+        to: dialog.to,
+        location: dialog.location,
+        dbms,
+        dedicatedDatabases: dialog.dedicated ? [dialog.dedicatedMysql && 'mysql', dialog.dedicatedPostgres && 'postgres'].filter(Boolean) : [],
+        locationMysql: dialog.locationMysql,
+        locationPostgres: dialog.locationPostgres,
+      });
       projectCloneDialog = null;
       notifyQueuedOperation(`Клонирование проекта «${dialog.project}»`);
     } catch (cause) {
@@ -2925,7 +2935,18 @@
           <label class="label"><span class="label-text">Имя проекта (опционально)</span><input class="input" bind:value={projectCloneDialog.to} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
           <label class="label"><span class="label-text">Расположение (опционально)</span><Combobox collection={projectCloneLocationCollection} value={[projectCloneDialog.location]} openOnClick onValueChange={(details) => { projectCloneDialog.location = details.value[0] ?? ''; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Рядом с исходным проектом' }, ...projectAddOptions.locations.map((location) => ({ value: location.code, label: location.code }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <fieldset class="project-clone-dbms"><legend class="label-text">Выбрать БД для клонирования</legend><div class="project-deployment-checkboxes"><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.mysql} /><span>MySQL</span></label><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.postgres} /><span>PostgreSQL</span></label></div></fieldset>
-          <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectCloning} onclick={() => { projectCloneDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectCloning}>{projectCloning ? 'Добавляем…' : 'Добавить'}</button></div>
+          <fieldset class="project-clone-dbms project-dedicated-db"><legend class="label-text">Инстансы баз данных клона</legend>
+            <label class="project-deployment-checkbox project-dedicated-toggle"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.dedicated} /><span>Выделенные инстансы БД</span></label>
+            {#if projectCloneDialog.dedicated}
+              <div class="project-deployment-checkboxes">
+                <label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.dedicatedMysql} /><span>MySQL</span></label>
+                <label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectCloneDialog.dedicatedPostgres} /><span>PostgreSQL</span></label>
+              </div>
+              {#if projectCloneDialog.dedicatedMysql}<label class="label project-dedicated-location"><span class="label-text">Расположение MySQL</span><Combobox collection={projectDatabaseLocationCollection} value={[projectCloneDialog.locationMysql]} openOnClick onValueChange={(details) => { projectCloneDialog.locationMysql = details.value[0] ?? 'system'; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectDatabaseLocationOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>{/if}
+              {#if projectCloneDialog.dedicatedPostgres}<label class="label project-dedicated-location"><span class="label-text">Расположение PostgreSQL</span><Combobox collection={projectDatabaseLocationCollection} value={[projectCloneDialog.locationPostgres]} onValueChange={(details) => { projectCloneDialog.locationPostgres = details.value[0] ?? 'system'; }} openOnClick><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectDatabaseLocationOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>{/if}
+            {/if}
+          </fieldset>
+          <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectCloning} onclick={() => { projectCloneDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectCloning || (projectCloneDialog.dedicated && !projectCloneDialog.dedicatedMysql && !projectCloneDialog.dedicatedPostgres)}>{projectCloning ? 'Добавляем…' : 'Добавить'}</button></div>
         </form>
       {/if}
     </Dialog.Content>

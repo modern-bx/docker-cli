@@ -45,7 +45,7 @@ final class ProjectCloneCommand extends AbstractCommand
         $this->addOption('exclude', null, InputOption::VALUE_REQUIRED, 'Список glob-шаблонов через запятую.');
         $this->addOption('skip-db', null, InputOption::VALUE_NONE, 'Не клонировать базы данных.');
         $this->addOption('dbms', null, InputOption::VALUE_REQUIRED, 'Список СУБД для клонирования через запятую.');
-        $this->addOption('dedicated-db', null, InputOption::VALUE_REQUIRED, 'Выделенные СУБД целевого проекта через запятую: mysql, postgres. По умолчанию наследуются от исходного проекта.');
+        $this->addOption('dedicated-db', null, InputOption::VALUE_REQUIRED, 'Выделенные СУБД целевого проекта: mysql, postgres или false для системных инстансов. По умолчанию наследуются настройки исходного проекта.');
         $this->addOption('location-mysql', null, InputOption::VALUE_REQUIRED, 'Каталог данных выделенного MySQL целевого проекта.');
         $this->addOption('location-postgres', null, InputOption::VALUE_REQUIRED, 'Каталог данных выделенного PostgreSQL целевого проекта.');
     }
@@ -133,14 +133,16 @@ final class ProjectCloneCommand extends AbstractCommand
         foreach (['mysql', 'postgres'] as $driver) {
             unset($config['data']['databases'][$driver]['hostname'], $config['data']['databases'][$driver]['location']);
         }
-        if (count($dedicated['locations']) < count($dedicated['drivers'])) {
+        if (count($dedicated['locations']) + count($dedicated['systemLocations']) < count($dedicated['drivers'])) {
             $defaultLocation = current(array_filter(
                 ($this->settings ?? new ProjectsSettingsRepository())->databaseLocations(),
                 static fn (array $location): bool => $location['default'],
             ));
             if (is_array($defaultLocation)) {
                 foreach ($dedicated['drivers'] as $driver) {
-                    $dedicated['locations'][$driver] ??= join_path($defaultLocation['path'], $driver . '-' . $name);
+                    if (!in_array($driver, $dedicated['systemLocations'], true)) {
+                        $dedicated['locations'][$driver] ??= join_path($defaultLocation['path'], $driver . '-' . $name);
+                    }
                 }
             }
         }
@@ -247,19 +249,20 @@ final class ProjectCloneCommand extends AbstractCommand
         return $dbms;
     }
 
-    /** @param array<string, mixed> $sourceConfig @return array{drivers: list<string>, locations: array<string, string>}|null */
+    /** @param array<string, mixed> $sourceConfig @return array{drivers: list<string>, locations: array<string, string>, systemLocations: list<string>}|null */
     private function resolveDedicatedDatabases(InputInterface $input, array $sourceConfig, string $sourceName, OutputInterface $output): ?array
     {
         $option = $input->getOption('dedicated-db');
         $drivers = is_string($option)
-            ? array_values(array_unique(array_filter(array_map('trim', explode(',', $option)))))
+            ? ($option === 'false' ? [] : array_values(array_unique(array_filter(array_map('trim', explode(',', $option))))))
             : array_values(array_filter(['mysql', 'postgres'], static fn (string $driver): bool =>
                 ($sourceConfig['data']['databases'][$driver]['hostname'] ?? null) === sprintf('docker-cli-%s-%s', $driver, $sourceName)));
         if (array_diff($drivers, ['mysql', 'postgres']) !== []) {
-            $this->writeMessage($output, '<error>Опция --dedicated-db поддерживает только mysql и postgres.</error>');
+            $this->writeMessage($output, '<error>Опция --dedicated-db поддерживает mysql, postgres или false.</error>');
             return null;
         }
         $locations = [];
+        $systemLocations = [];
         foreach (['mysql', 'postgres'] as $driver) {
             $location = $input->getOption('location-' . $driver);
             if ($location === null) continue;
@@ -267,13 +270,17 @@ final class ProjectCloneCommand extends AbstractCommand
                 $this->writeMessage($output, sprintf('<error>Опцию --location-%s можно использовать только для выделенной БД.</error>', $driver));
                 return null;
             }
+            if ($location === 'system') {
+                $systemLocations[] = $driver;
+                continue;
+            }
             if (!is_string($location) || trim($location) === '' || in_array(trim($location), ['.', '..', DIRECTORY_SEPARATOR], true)) {
                 $this->writeMessage($output, sprintf('<error>Опция --location-%s должна содержать путь.</error>', $driver));
                 return null;
             }
             $locations[$driver] = trim($location);
         }
-        return ['drivers' => $drivers, 'locations' => $locations];
+        return ['drivers' => $drivers, 'locations' => $locations, 'systemLocations' => $systemLocations];
     }
 
     /** @param list<string> $drivers */
