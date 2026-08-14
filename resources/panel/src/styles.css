@@ -475,6 +475,7 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .project-clone-form { grid-template-columns: minmax(0, 1fr); }
 .login-error-dialog.project-clone-dialog { width: min(28.667rem, calc(100vw - 2rem)); }
 .project-clone-dbms .project-deployment-checkboxes { display: flex; align-items: center; gap: 1.5rem; margin-top: .375rem; }
+.project-clone-help-heading { display: inline-flex; align-items: center; gap: .35rem; }
 .project-dedicated-db > legend { margin-bottom: 8px; }
 .project-dedicated-toggle { margin-bottom: 8px; }
 .project-dedicated-location { margin-top: 14px; }
