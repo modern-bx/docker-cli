@@ -122,21 +122,9 @@ final class ProjectDownCommand extends AbstractCommand
             $this->removeDirectory($projectDirectory);
         }
         (new DedicatedDatabaseComposeRenderer())->render();
-        if ($input->getOption('drop') && $input->getOption('force')) {
-            $composeDirectory = (new SystemCompose())->directory();
-            foreach ($dedicated as $driver) {
-                $configuredLocation = $projectConfig['data']['databases'][$driver]['location'] ?? null;
-                if (is_string($configuredLocation) && $configuredLocation !== '') {
-                    $dataDirectory = str_starts_with($configuredLocation, DIRECTORY_SEPARATOR) ? $configuredLocation : join_path($composeDirectory, $configuredLocation);
-                } else {
-                    $defaultLocation = (new SystemCompose())->envValue('DEFAULT_DATA_DIR_' . strtoupper($driver), 'data/' . $driver) . '-' . $projectName;
-                    $dataDirectory = str_starts_with($defaultLocation, DIRECTORY_SEPARATOR) ? $defaultLocation : join_path($composeDirectory, $defaultLocation);
-                }
-                if (is_dir($dataDirectory)) {
-                    $this->removeDirectory($dataDirectory);
-                }
-            }
-        }
+        // Dedicated database directories are bind mounts and may be owned by
+        // the database image user. --drop removes the project database and
+        // role through the DBMS, but host storage is intentionally preserved.
 
         if ($input->getOption('erase')) {
             $this->removeDirectory($metadataDirectory);
