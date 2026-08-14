@@ -84,7 +84,7 @@ final class DedicatedDatabaseComposeRenderer
                 ],
                 'networks' => ['docker-cli' => ['aliases' => [$hostname]]],
                 'healthcheck' => [
-                    'test' => ['CMD-SHELL', 'MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin --protocol=socket -uroot ping --silent'],
+                    'test' => ['CMD-SHELL', 'MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysql --protocol=socket -uroot -e "SELECT 1" >/dev/null'],
                     'interval' => '2s',
                     'timeout' => '2s',
                     'retries' => 60,

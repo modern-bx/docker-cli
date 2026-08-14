@@ -26,7 +26,7 @@ final class DataInitializer
 set -eu
 export MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}"
 attempt=0
-until mysqladmin --protocol=socket -uroot ping --silent >/dev/null 2>&1; do
+until mysql --protocol=socket -uroot -e 'SELECT 1' >/dev/null 2>&1; do
   attempt=$((attempt + 1))
   if [ "$attempt" -ge 60 ]; then
     echo "MySQL did not become ready within 60 seconds." >&2

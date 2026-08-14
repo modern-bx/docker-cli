@@ -11,7 +11,6 @@ use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\DataInitializer;
 use DockerCli\Project\DedicatedDatabaseComposeRenderer;
 use DockerCli\Config\SystemCompose;
-use DockerCli\Service\TranslatorFactory;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
@@ -24,7 +23,6 @@ use function DockerCli\Util\join_path;
 
 final class ProjectDownCommand extends AbstractCommand
 {
-    use DockerComposeRunner;
     public function __construct(
         private readonly ?FrameworkDetectionService $detectionService = null,
         private readonly ?DataInitializer $dataInitializer = null,
@@ -112,13 +110,9 @@ final class ProjectDownCommand extends AbstractCommand
         }
 
         if ($dedicated !== []) {
-            $services = array_map(static fn (string $driver): string => $driver . '-' . $projectName, $dedicated);
-            $removeCode = $this->runOperation(new SystemCompose(), 'rm', ['--stop', '--force', ...$services], $output, TranslatorFactory::create());
-            if ($removeCode !== Command::SUCCESS && !$this->dedicatedContainersAreAbsent($projectName, $dedicated)) {
-                return $removeCode;
-            }
+            $removeCode = $this->removeDedicatedContainers($projectName, $dedicated, $output);
             if ($removeCode !== Command::SUCCESS) {
-                $this->writeMessage($output, '<comment>Docker Compose вернул ненулевой код после удаления выделенных контейнеров; контейнеры отсутствуют, удаление проекта продолжается.</comment>');
+                return $removeCode;
             }
         }
 
@@ -220,29 +214,51 @@ final class ProjectDownCommand extends AbstractCommand
     }
 
     /** @param list<string> $drivers */
-    private function dedicatedContainersAreAbsent(string $projectName, array $drivers): bool
+    private function removeDedicatedContainers(string $projectName, array $drivers, OutputInterface $output): int
     {
         foreach ($drivers as $driver) {
             $container = sprintf('docker-cli-%s-%s', $driver, $projectName);
-            $process = proc_open(
-                ['docker', 'container', 'inspect', $container],
-                [['file', '/dev/null', 'r'], ['pipe', 'w'], ['pipe', 'w']],
-                $pipes,
-            );
-            if (!is_resource($process)) {
-                return false;
+            $exists = $this->containerExists($container);
+            if ($exists === null) {
+                return Command::FAILURE;
             }
-            stream_get_contents($pipes[1]);
-            $error = stream_get_contents($pipes[2]);
-            fclose($pipes[1]);
-            fclose($pipes[2]);
+            if (!$exists) {
+                continue;
+            }
+            $command = ['docker', 'container', 'rm', '--force', $container];
+            $this->writeMessage($output, '<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
+            $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes);
+            if (!is_resource($process)) {
+                return Command::FAILURE;
+            }
             $code = proc_close($process);
-            if ($code === Command::SUCCESS || !str_contains($error, 'No such container')) {
-                return false;
+            $exists = $this->containerExists($container);
+            if ($code !== Command::SUCCESS && $exists !== false) {
+                return $code;
             }
         }
 
-        return true;
+        return Command::SUCCESS;
+    }
+
+    private function containerExists(string $container): ?bool
+    {
+        $process = proc_open(
+            ['docker', 'container', 'inspect', $container],
+            [['file', '/dev/null', 'r'], ['file', '/dev/null', 'w'], ['pipe', 'w']],
+            $pipes,
+        );
+        if (!is_resource($process)) {
+            return null;
+        }
+        $error = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $code = proc_close($process);
+        if ($code === Command::SUCCESS) {
+            return true;
+        }
+
+        return str_contains($error, 'No such container') || str_contains($error, 'No such object') ? false : null;
     }
 
     private function wipeProjectRoot(string $projectRoot): void
