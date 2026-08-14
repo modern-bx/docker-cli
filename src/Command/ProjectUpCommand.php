@@ -9,6 +9,7 @@ use DockerCli\Config\SystemCompose;
 use DockerCli\Framework\Description\FrameworkDescriptionService;
 use DockerCli\Framework\FrameworkDetectionService;
 use DockerCli\Hook\CommandHookRunner;
+use DockerCli\Panel\ProjectsSettingsRepository;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\DataInitializer;
@@ -37,6 +38,7 @@ final class ProjectUpCommand extends AbstractCommand
         private readonly ?FrameworkDescriptionService $descriptionService = null,
         private readonly ?CommandContext $context = null,
         private readonly ?CommandHookRunner $hookRunner = null,
+        private readonly ?ProjectsSettingsRepository $projectSettings = null,
     ) {
         parent::__construct('project:up');
         $this->setDescription('Зарегистрировать проект docker-cli.');
@@ -74,6 +76,16 @@ final class ProjectUpCommand extends AbstractCommand
             }
             $databaseLocations[$driver] = trim($location);
         }
+        $defaultDatabaseLocation = null;
+        if ($dedicatedDatabases !== [] && count($databaseLocations) < count($dedicatedDatabases)) {
+            $defaultLocation = current(array_filter(
+                ($this->projectSettings ?? new ProjectsSettingsRepository())->databaseLocations(),
+                static fn (array $location): bool => $location['default'],
+            ));
+            if (is_array($defaultLocation)) {
+                $defaultDatabaseLocation = $defaultLocation['path'];
+            }
+        }
         $languageCode = $input->getOption('language');
         if ($languageCode !== null && $languageCode !== 'php' || $frameworkCode !== null && !in_array($frameworkCode, ['symfony', 'laravel', 'bitrix', 'bitrix24'], true)) {
             $this->writeMessage($output, '<error>Указан неподдерживаемый язык или фреймворк.</error>'); return Command::FAILURE;
@@ -85,6 +97,11 @@ final class ProjectUpCommand extends AbstractCommand
         $projectsDirectory = $registry->projectsDirectory();
         $projectRoot = $framework?->getProjectRoot() ?? (string) getcwd();
         $projectName = $this->resolveProjectName($input, $output, $projectRoot, $projectsDirectory);
+        if (is_string($defaultDatabaseLocation)) {
+            foreach ($dedicatedDatabases as $driver) {
+                $databaseLocations[$driver] ??= join_path($defaultDatabaseLocation, $driver . '-' . $projectName);
+            }
+        }
         if (!$this->isValidProjectName($projectName)) {
             $this->writeMessage($output, sprintf('<error>Имя проекта "%s" не соответствует конвенции: используйте строчные латинские буквы, цифры и дефисы; имя должно начинаться и заканчиваться буквой или цифрой.</error>', $projectName));
 

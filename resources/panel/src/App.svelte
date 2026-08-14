@@ -312,9 +312,10 @@
   $: projectFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectAddDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
   $: projectUpdateFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectUpdateDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
   $: projectDeploymentCollection = useListCollection({ items: [{ value: '', label: 'Не использовать' }, ...projectAddOptions.deploymentScripts.map((item) => ({ value: item.code, label: item.name }))] });
+  $: defaultProjectDatabaseLocation = projectAddOptions.databaseLocations.find((item) => item.default) || null;
   $: projectDatabaseLocationOptions = [
     { value: 'system', label: 'Системное расположение' },
-    { value: 'default', label: 'Расположение по умолчанию' },
+    { value: 'default', label: `Расположение по умолчанию${defaultProjectDatabaseLocation ? ` (${defaultProjectDatabaseLocation.code})` : ''}` },
     ...projectAddOptions.databaseLocations.map((item) => ({ value: item.code, label: item.code })),
   ];
   $: projectDatabaseLocationCollection = useListCollection({ items: projectDatabaseLocationOptions });
@@ -1565,8 +1566,9 @@
     try {
       projectAddOptions = await getProjectOptions(api);
       const location = projectAddOptions.locations.find((item) => item.default) || projectAddOptions.locations[0];
+      const databaseLocation = projectAddOptions.databaseLocations.find((item) => item.default) ? 'default' : 'system';
       const language = projectAddOptions.languages[0];
-      projectAddDialog = { code: '', location: location?.code || '', language: language?.code || '', framework: projectAddOptions.frameworks[language?.code]?.[0]?.code || '', deploymentScript: '', deploymentArguments: {}, dedicated: false, mysql: false, postgres: false, locationMysql: 'system', locationPostgres: 'system' };
+      projectAddDialog = { code: '', location: location?.code || '', language: language?.code || '', framework: projectAddOptions.frameworks[language?.code]?.[0]?.code || '', deploymentScript: '', deploymentArguments: {}, dedicated: false, mysql: false, postgres: false, locationMysql: databaseLocation, locationPostgres: databaseLocation };
     } catch (cause) {
       errorTitle = 'Не удалось открыть добавление проекта';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить параметры проекта.';
