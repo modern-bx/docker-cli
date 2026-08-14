@@ -101,6 +101,7 @@ final class ProjectController
             $config = $this->projects->readProjectConfig($name);
             $project = is_array($config['data']['project'] ?? null) ? $config['data']['project'] : [];
             $projectName = is_string($project['name'] ?? null) && $project['name'] !== '' ? $project['name'] : $name;
+            $databases = is_array($config['data']['databases'] ?? null) ? $config['data']['databases'] : [];
             $projects[] = new ProjectDto(
                 name: $projectName,
                 language: $this->concept($project['language'] ?? null, ['php' => 'PHP']),
@@ -113,6 +114,8 @@ final class ProjectController
                 enabled: ($project['enabled'] ?? true) !== false,
                 protected: ($project['protected'] ?? false) === true,
                 url: $baseHost !== '' ? sprintf('https://web-%s.%s', $projectName, $baseHost) : null,
+                mysqlHost: is_string($databases['mysql']['hostname'] ?? null) && $databases['mysql']['hostname'] !== '' ? $databases['mysql']['hostname'] : 'docker-cli-mysql',
+                postgresHost: is_string($databases['postgres']['hostname'] ?? null) && $databases['postgres']['hostname'] !== '' ? $databases['postgres']['hostname'] : 'docker-cli-postgres',
                 tags: $this->tags($project['tags'] ?? []),
                 description: is_string($project['description'] ?? null) ? $project['description'] : '',
                 root: is_string($project['root'] ?? null) ? $project['root'] : '',
@@ -537,6 +540,7 @@ final class ProjectController
         }
         return new ProjectOptionsDto(
             ($this->settings ?? new ProjectsSettingsRepository())->locations(),
+            ($this->settings ?? new ProjectsSettingsRepository())->databaseLocations(),
             [new ConceptDto('php', 'PHP')],
             PhpLanguageVersion::SUPPORTED,
             PhpLanguageVersion::default($this->compose),
@@ -562,6 +566,16 @@ final class ProjectController
                 'language' => ['value' => $request->language],
         ];
         if ($request->framework !== null) $arguments['framework'] = ['value' => $request->framework];
+        if ($request->dedicatedDatabases !== []) {
+            $arguments['dedicated-db'] = ['value' => implode(',', $request->dedicatedDatabases)];
+            foreach ($request->dedicatedDatabases as $driver) {
+                $selection = $driver === 'mysql' ? $request->locationMysql : $request->locationPostgres;
+                $databaseLocation = $this->resolveDatabaseLocation($selection, $options->databaseLocations);
+                if ($databaseLocation !== null) {
+                    $arguments['location-' . $driver] = ['value' => join_path($databaseLocation, $driver . '-' . $name)];
+                }
+            }
+        }
         $queuedTasks = [[
             'code' => 'core.project.up', 'arguments' => $arguments, 'project' => $name,
         ]];
@@ -738,6 +752,24 @@ final class ProjectController
         } catch (\InvalidArgumentException|\RuntimeException $exception) {
             throw new ProjectActionException($exception->getMessage(), 500);
         }
+    }
+
+    /** @param list<array{path: string, code: string, default: bool}> $locations */
+    private function resolveDatabaseLocation(string $selection, array $locations): ?string
+    {
+        if ($selection === 'system') {
+            return null;
+        }
+        if ($selection === 'default') {
+            $location = current(array_filter($locations, static fn (array $item): bool => $item['default']));
+            return is_array($location) ? $location['path'] : null;
+        }
+        $location = current(array_filter($locations, static fn (array $item): bool => $item['code'] === $selection));
+        if (!is_array($location)) {
+            throw new ProjectActionException('Расположение БД не найдено.', 422);
+        }
+
+        return $location['path'];
     }
 
     private function reloadOpenResty(): void

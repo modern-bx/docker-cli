@@ -9,6 +9,8 @@ use DockerCli\Framework\FrameworkDetectionService;
 use DockerCli\Hook\CommandHookRunner;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\DataInitializer;
+use DockerCli\Project\DedicatedDatabaseComposeRenderer;
+use DockerCli\Config\SystemCompose;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
@@ -68,6 +70,10 @@ final class ProjectDownCommand extends AbstractCommand
 
             return Command::FAILURE;
         }
+        $projectConfig = $registry->hasProject($projectName) ? $registry->readProjectConfig($projectName) : [];
+        $dedicated = array_values(array_filter(['mysql', 'postgres'], static fn (string $driver): bool =>
+            ($projectConfig['data']['databases'][$driver]['hostname'] ?? null) === sprintf('docker-cli-%s-%s', $driver, $projectName)
+        ));
         if ($destructive && $registry->hasProject($projectName) && $registry->isProjectProtected($projectName)) {
             $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
             return Command::FAILURE;
@@ -81,6 +87,7 @@ final class ProjectDownCommand extends AbstractCommand
 
         if ($input->getOption('wipe') || $input->getOption('erase')) {
             try {
+                $this->leaveProjectWorkingDirectory($projectRoot);
                 $this->wipeProjectRoot($projectRoot);
             } catch (\RuntimeException $exception) {
                 $this->writeMessage($output, sprintf('<error>Не удалось очистить файлы проекта "%s": %s</error>', $projectName, $exception->getMessage()));
@@ -103,10 +110,21 @@ final class ProjectDownCommand extends AbstractCommand
             }
         }
 
+        if ($dedicated !== []) {
+            $removeCode = $this->removeDedicatedContainers($projectName, $dedicated, $output);
+            if ($removeCode !== Command::SUCCESS) {
+                return $removeCode;
+            }
+        }
+
         $projectDirectory = join_path($this->projectsDirectory(), $projectName);
         if (is_dir($projectDirectory)) {
             $this->removeDirectory($projectDirectory);
         }
+        (new DedicatedDatabaseComposeRenderer())->render();
+        // Dedicated database directories are bind mounts and may be owned by
+        // the database image user. --drop removes the project database and
+        // role through the DBMS, but host storage is intentionally preserved.
 
         if ($input->getOption('erase')) {
             $this->removeDirectory($metadataDirectory);
@@ -184,6 +202,54 @@ final class ProjectDownCommand extends AbstractCommand
         rmdir($directory);
     }
 
+    /** @param list<string> $drivers */
+    private function removeDedicatedContainers(string $projectName, array $drivers, OutputInterface $output): int
+    {
+        foreach ($drivers as $driver) {
+            $container = sprintf('docker-cli-%s-%s', $driver, $projectName);
+            $exists = $this->containerExists($container);
+            if ($exists === null) {
+                return Command::FAILURE;
+            }
+            if (!$exists) {
+                continue;
+            }
+            $command = ['docker', 'container', 'rm', '--force', $container];
+            $this->writeMessage($output, '<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
+            $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes);
+            if (!is_resource($process)) {
+                return Command::FAILURE;
+            }
+            $code = proc_close($process);
+            $exists = $this->containerExists($container);
+            if ($code !== Command::SUCCESS && $exists !== false) {
+                return $code;
+            }
+        }
+
+        return Command::SUCCESS;
+    }
+
+    private function containerExists(string $container): ?bool
+    {
+        $process = proc_open(
+            ['docker', 'container', 'inspect', $container],
+            [['file', '/dev/null', 'r'], ['file', '/dev/null', 'w'], ['pipe', 'w']],
+            $pipes,
+        );
+        if (!is_resource($process)) {
+            return null;
+        }
+        $error = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $code = proc_close($process);
+        if ($code === Command::SUCCESS) {
+            return true;
+        }
+
+        return str_contains($error, 'No such container') || str_contains($error, 'No such object') ? false : null;
+    }
+
     private function wipeProjectRoot(string $projectRoot): void
     {
         $realRoot = realpath($projectRoot);
@@ -196,6 +262,25 @@ final class ProjectDownCommand extends AbstractCommand
             if (is_dir($path) && !is_link($path)) $this->removeDirectory($path); elseif (!unlink($path)) {
                 throw new \RuntimeException(sprintf('не удалось удалить "%s".', $path));
             }
+        }
+    }
+
+    private function leaveProjectWorkingDirectory(string $projectRoot): void
+    {
+        $workingDirectory = getcwd();
+        $realRoot = realpath($projectRoot);
+        $realWorkingDirectory = is_string($workingDirectory) ? realpath($workingDirectory) : false;
+        if ($realRoot === false || $realWorkingDirectory === false
+            || ($realWorkingDirectory !== $realRoot && !str_starts_with($realWorkingDirectory, $realRoot . DIRECTORY_SEPARATOR))) {
+            return;
+        }
+
+        $safeDirectory = (new SystemCompose())->directory();
+        if (!is_dir($safeDirectory)) {
+            $safeDirectory = sys_get_temp_dir();
+        }
+        if (!chdir($safeDirectory)) {
+            throw new \RuntimeException(sprintf('Не удалось перейти в безопасную директорию "%s" перед удалением проекта.', $safeDirectory));
         }
     }
 }

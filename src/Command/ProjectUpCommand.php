@@ -9,9 +9,11 @@ use DockerCli\Config\SystemCompose;
 use DockerCli\Framework\Description\FrameworkDescriptionService;
 use DockerCli\Framework\FrameworkDetectionService;
 use DockerCli\Hook\CommandHookRunner;
+use DockerCli\Panel\ProjectsSettingsRepository;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\DataInitializer;
+use DockerCli\Project\DedicatedDatabaseComposeRenderer;
 use DockerCli\Project\ProjectDatabaseConfig;
 use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Project\ProjectRegistry;
@@ -36,6 +38,7 @@ final class ProjectUpCommand extends AbstractCommand
         private readonly ?FrameworkDescriptionService $descriptionService = null,
         private readonly ?CommandContext $context = null,
         private readonly ?CommandHookRunner $hookRunner = null,
+        private readonly ?ProjectsSettingsRepository $projectSettings = null,
     ) {
         parent::__construct('project:up');
         $this->setDescription('Зарегистрировать проект docker-cli.');
@@ -44,11 +47,45 @@ final class ProjectUpCommand extends AbstractCommand
         $this->addOption('force', null, InputOption::VALUE_NONE, 'Зарегистрировать проект, даже если фреймворк не удалось определить.');
         $this->addOption('language', null, InputOption::VALUE_REQUIRED, 'Код языка проекта.');
         $this->addOption('framework', null, InputOption::VALUE_REQUIRED, 'Код фреймворка. Если не указан, фреймворк определяется автоматически.');
+        $this->addOption('dedicated-db', null, InputOption::VALUE_REQUIRED, 'Выделенные СУБД через запятую: mysql, postgres.');
+        $this->addOption('location-mysql', null, InputOption::VALUE_REQUIRED, 'Каталог данных выделенного MySQL.');
+        $this->addOption('location-postgres', null, InputOption::VALUE_REQUIRED, 'Каталог данных выделенного PostgreSQL.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $frameworkCode = $input->getOption('framework');
+        $dedicatedDatabases = array_values(array_unique(array_filter(array_map('trim', explode(',', (string) ($input->getOption('dedicated-db') ?? ''))))));
+        if (array_diff($dedicatedDatabases, ['mysql', 'postgres']) !== []) {
+            $this->writeMessage($output, '<error>Опция --dedicated-db поддерживает только mysql и postgres.</error>');
+            return Command::INVALID;
+        }
+        $databaseLocations = [];
+        foreach (['mysql', 'postgres'] as $driver) {
+            $location = $input->getOption('location-' . $driver);
+            if ($location === null) {
+                continue;
+            }
+            if (!in_array($driver, $dedicatedDatabases, true)) {
+                $this->writeMessage($output, sprintf('<error>Опцию --location-%s можно использовать только вместе с --dedicated-db=%s.</error>', $driver, $driver));
+                return Command::INVALID;
+            }
+            if (!is_string($location) || trim($location) === '' || in_array(trim($location), ['.', '..', DIRECTORY_SEPARATOR], true)) {
+                $this->writeMessage($output, sprintf('<error>Опция --location-%s должна содержать путь.</error>', $driver));
+                return Command::INVALID;
+            }
+            $databaseLocations[$driver] = trim($location);
+        }
+        $defaultDatabaseLocation = null;
+        if ($dedicatedDatabases !== [] && count($databaseLocations) < count($dedicatedDatabases)) {
+            $defaultLocation = current(array_filter(
+                ($this->projectSettings ?? new ProjectsSettingsRepository())->databaseLocations(),
+                static fn (array $location): bool => $location['default'],
+            ));
+            if (is_array($defaultLocation)) {
+                $defaultDatabaseLocation = $defaultLocation['path'];
+            }
+        }
         $languageCode = $input->getOption('language');
         if ($languageCode !== null && $languageCode !== 'php' || $frameworkCode !== null && !in_array($frameworkCode, ['symfony', 'laravel', 'bitrix', 'bitrix24'], true)) {
             $this->writeMessage($output, '<error>Указан неподдерживаемый язык или фреймворк.</error>'); return Command::FAILURE;
@@ -60,6 +97,11 @@ final class ProjectUpCommand extends AbstractCommand
         $projectsDirectory = $registry->projectsDirectory();
         $projectRoot = $framework?->getProjectRoot() ?? (string) getcwd();
         $projectName = $this->resolveProjectName($input, $output, $projectRoot, $projectsDirectory);
+        if (is_string($defaultDatabaseLocation)) {
+            foreach ($dedicatedDatabases as $driver) {
+                $databaseLocations[$driver] ??= join_path($defaultDatabaseLocation, $driver . '-' . $projectName);
+            }
+        }
         if (!$this->isValidProjectName($projectName)) {
             $this->writeMessage($output, sprintf('<error>Имя проекта "%s" не соответствует конвенции: используйте строчные латинские буквы, цифры и дефисы; имя должно начинаться и заканчиваться буквой или цифрой.</error>', $projectName));
 
@@ -122,8 +164,9 @@ final class ProjectUpCommand extends AbstractCommand
                     ],
                 ],
             ],
-        ]);
+        ], $dedicatedDatabases, $databaseLocations);
         $this->writeYaml(join_path($projectDirectory, 'project.yaml'), $projectConfig);
+        (new DedicatedDatabaseComposeRenderer())->render();
 
         $projectMetadataDirectory = join_path($projectRoot, '.docker-cli');
         if (!is_dir($projectMetadataDirectory) && !mkdir($projectMetadataDirectory, 0775, true) && !is_dir($projectMetadataDirectory)) {

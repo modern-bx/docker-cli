@@ -475,6 +475,9 @@ main.workspace { min-height: 0; overflow: hidden; align-items: stretch; justify-
 .project-clone-form { grid-template-columns: minmax(0, 1fr); }
 .login-error-dialog.project-clone-dialog { width: min(28.667rem, calc(100vw - 2rem)); }
 .project-clone-dbms .project-deployment-checkboxes { display: flex; align-items: center; gap: 1.5rem; margin-top: .375rem; }
+.project-dedicated-db > legend { margin-bottom: 8px; }
+.project-dedicated-toggle { margin-bottom: 8px; }
+.project-dedicated-location { margin-top: 14px; }
 .project-add-form .label { position: relative; }
 .project-add-form .label:focus-within, .project-add-form .font-combobox-positioner { z-index: 60; }
 .backup-invalid > td { background: color-mix(in oklab, var(--color-error-500) 18%, transparent) !important; color: var(--color-error-800); }

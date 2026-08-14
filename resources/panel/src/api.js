@@ -153,10 +153,10 @@ export async function getProjectsSettings(request) {
   return request('/api/settings/projects');
 }
 
-export async function saveProjectsSettings(request, locations) {
+export async function saveProjectsSettings(request, locations, databaseLocations) {
   return request('/api/settings/projects', {
     method: 'POST',
-    body: JSON.stringify({ locations }),
+    body: JSON.stringify({ locations, databaseLocations }),
   });
 }
 

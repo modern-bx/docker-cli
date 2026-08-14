@@ -162,13 +162,14 @@
   let projectCloning = false;
   let projectUpdateDialog = null;
   let projectUpdating = false;
-  let projectAddOptions = { locations: [], languages: [], languageVersions: [], defaultLanguageVersion: '8.2', frameworks: {}, deploymentScripts: [] };
+  let projectAddOptions = { locations: [], databaseLocations: [], languages: [], languageVersions: [], defaultLanguageVersion: '8.2', frameworks: {}, deploymentScripts: [] };
   let projectLocationCollection = useListCollection({ items: [] });
   let projectCloneLocationCollection = useListCollection({ items: [] });
   let projectLanguageCollection = useListCollection({ items: [] });
   let projectLanguageVersionCollection = useListCollection({ items: [] });
   let projectFrameworkCollection = useListCollection({ items: [] });
   let projectDeploymentCollection = useListCollection({ items: [] });
+  let projectDatabaseLocationCollection = useListCollection({ items: [] });
   let projectAdding = false;
   let backupItems = [];
   let backupTotal = 0;
@@ -234,6 +235,7 @@
   let settingsLoading = false;
   let settingsSaving = false;
   let projectLocations = [{ path: '', default: true }];
+  let projectDatabaseLocations = [{ path: '', code: '', default: false }];
   let projectSettingsLoading = false;
   let projectSettingsSaving = false;
   let backupLocations = [{ path: '', code: '', default: true }];
@@ -310,6 +312,13 @@
   $: projectFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectAddDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
   $: projectUpdateFrameworkCollection = useListCollection({ items: (projectAddOptions.frameworks[projectUpdateDialog?.language] || []).map((item) => ({ value: item.code, label: item.name })) });
   $: projectDeploymentCollection = useListCollection({ items: [{ value: '', label: 'Не использовать' }, ...projectAddOptions.deploymentScripts.map((item) => ({ value: item.code, label: item.name }))] });
+  $: defaultProjectDatabaseLocation = projectAddOptions.databaseLocations.find((item) => item.default) || null;
+  $: projectDatabaseLocationOptions = [
+    { value: 'system', label: 'Системное расположение' },
+    { value: 'default', label: `Расположение по умолчанию${defaultProjectDatabaseLocation ? ` (${defaultProjectDatabaseLocation.code})` : ''}` },
+    ...projectAddOptions.databaseLocations.map((item) => ({ value: item.code, label: item.code })),
+  ];
+  $: projectDatabaseLocationCollection = useListCollection({ items: projectDatabaseLocationOptions });
   $: backupStorageOptions = [{ value: '', label: 'Папка проекта' }, ...backupLocations.filter((item) => item.code && item.path).map((item) => ({ value: item.code, label: item.code }))];
   $: backupStorageCollection = useListCollection({ items: backupStorageOptions });
   $: backupLocationFilterOptions = [{ value: 'all', label: 'Все расположения' }, { value: 'project', label: 'Папка проекта' }, ...backupLocations.filter((item) => item.code && item.path).map((item) => ({ value: item.code, label: item.code }))];
@@ -1024,6 +1033,9 @@
       projectLocations = Array.isArray(data.locations) && data.locations.length
         ? data.locations.map((location) => ({ path: location.path, code: location.code || '', default: location.default === true }))
         : [{ path: '', code: '', default: true }];
+      projectDatabaseLocations = Array.isArray(data.databaseLocations) && data.databaseLocations.length
+        ? data.databaseLocations.map((location) => ({ path: location.path, code: location.code || '', default: location.default === true }))
+        : [{ path: '', code: '', default: false }];
     } catch (cause) {
       errorTitle = 'Не удалось загрузить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить расположения проектов.';
@@ -1147,12 +1159,30 @@
     projectLocations = projectLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === index }));
   }
 
+  function updateProjectDatabaseLocation(index, field, value) {
+    projectDatabaseLocations = projectDatabaseLocations.map((location, itemIndex) => itemIndex === index ? { ...location, [field]: value } : location);
+  }
+
+  function addProjectDatabaseLocation() {
+    projectDatabaseLocations = [...projectDatabaseLocations, { path: '', code: '', default: false }];
+  }
+
+  function removeProjectDatabaseLocation(index) {
+    projectDatabaseLocations = projectDatabaseLocations.filter((_, itemIndex) => itemIndex !== index);
+  }
+
+  function setDefaultProjectDatabaseLocation(index) {
+    const selected = projectDatabaseLocations[index].default;
+    projectDatabaseLocations = projectDatabaseLocations.map((location, itemIndex) => ({ ...location, default: itemIndex === index ? !selected : false }));
+  }
+
   async function saveProjectLocations() {
-    if (projectSettingsSaving || projectLocations.some((location) => !location.path.trim())) return;
+    if (projectSettingsSaving || projectLocations.some((location) => !location.path.trim()) || projectDatabaseLocations.some((location) => !location.path.trim())) return;
     projectSettingsSaving = true;
     try {
-      const data = await saveProjectsSettings(api, projectLocations.map((location) => ({ ...location, path: location.path.trim() })));
+      const data = await saveProjectsSettings(api, projectLocations.map((location) => ({ ...location, path: location.path.trim() })), projectDatabaseLocations.map((location) => ({ ...location, path: location.path.trim() })));
       projectLocations = data.locations;
+      projectDatabaseLocations = data.databaseLocations;
     } catch (cause) {
       errorTitle = 'Не удалось сохранить настройки';
       error = cause instanceof Error ? cause.message : 'Не удалось сохранить расположения проектов.';
@@ -1536,8 +1566,9 @@
     try {
       projectAddOptions = await getProjectOptions(api);
       const location = projectAddOptions.locations.find((item) => item.default) || projectAddOptions.locations[0];
+      const databaseLocation = projectAddOptions.databaseLocations.find((item) => item.default) ? 'default' : 'system';
       const language = projectAddOptions.languages[0];
-      projectAddDialog = { code: '', location: location?.code || '', language: language?.code || '', framework: projectAddOptions.frameworks[language?.code]?.[0]?.code || '', deploymentScript: '', deploymentArguments: {} };
+      projectAddDialog = { code: '', location: location?.code || '', language: language?.code || '', framework: projectAddOptions.frameworks[language?.code]?.[0]?.code || '', deploymentScript: '', deploymentArguments: {}, dedicated: false, mysql: false, postgres: false, locationMysql: databaseLocation, locationPostgres: databaseLocation };
     } catch (cause) {
       errorTitle = 'Не удалось открыть добавление проекта';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить параметры проекта.';
@@ -1575,7 +1606,10 @@
     if (!projectAddDialog) return;
     projectAdding = true;
     try {
-      const data = await createProject(api, projectAddDialog);
+      const data = await createProject(api, {
+        ...projectAddDialog,
+        dedicatedDatabases: projectAddDialog.dedicated ? ['mysql', 'postgres'].filter((driver) => projectAddDialog[driver]) : [],
+      });
       projects = data.projects;
       projectAddDialog = null;
       notifyQueuedOperation('Добавление проекта');
@@ -2310,6 +2344,8 @@
                     <div><dt>Фреймворк</dt><dd>{selectedProject.framework?.name || 'Без фреймворка'}</dd></div>
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
                     <div><dt>Основной хост</dt><dd>{#if selectedProject.url}<a class="project-host" href={selectedProject.url} target="_blank" rel="noreferrer">{selectedProject.url}<ExternalLink size={14} aria-hidden="true" /></a>{:else}Не указан{/if}</dd></div>
+                    <div><dt>Хост MySQL</dt><dd><code>{selectedProject.mysqlHost || 'docker-cli-mysql'}</code></dd></div>
+                    <div><dt>Хост PostgreSQL</dt><dd><code>{selectedProject.postgresHost || 'docker-cli-postgres'}</code></dd></div>
                   </dl>
                   <div class="project-general-actions">
                     <button class="btn preset-tonal" type="button" onclick={() => openProjectUpdateDialog(selectedProject)}>
@@ -2521,12 +2557,12 @@
               <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadProjectsSettings} />
             <div class="settings-scroll">
               <div class="project-toolbar">
-                <button class="btn preset-filled-primary-500" type="button" disabled={projectSettingsLoading || projectSettingsSaving || projectLocations.some((location) => !location.path.trim())} onclick={saveProjectLocations}>
+                <button class="btn preset-filled-primary-500" type="button" disabled={projectSettingsLoading || projectSettingsSaving || projectLocations.some((location) => !location.path.trim()) || projectDatabaseLocations.some((location) => !location.path.trim())} onclick={saveProjectLocations}>
                   <Save size={16} aria-hidden="true" />{projectSettingsSaving ? 'Сохраняем…' : 'Сохранить'}
                 </button>
               </div>
-              <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Расположение">
-                <h2>Расположение
+              <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Расположения файлов">
+                <h2>Расположения файлов
                   <Tooltip positioning={{ placement: 'right' }}>
                     <Tooltip.Trigger class="security-help" aria-label="О расположениях проектов"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
                     <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Эти пути будут использоваться в скриптах автоматической развертки проектов. Пока не добавлен хотя бы один путь, функционал автоматической развертки не заработает</Tooltip.Content></Tooltip.Positioner>
@@ -2547,6 +2583,25 @@
                         </Tooltip>
                       </div>
                     </div>
+                  {/each}
+                </div>
+              </section>
+              <section class="settings-card locations-card card preset-filled-surface-100-900" aria-label="Расположение БД">
+                <h2>Расположение БД
+                  <Tooltip positioning={{ placement: 'right' }}>
+                    <Tooltip.Trigger class="security-help" aria-label="О расположениях БД"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                    <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Каталоги для хранения данных выделенных экземпляров MySQL и PostgreSQL</Tooltip.Content></Tooltip.Positioner>
+                  </Tooltip>
+                </h2>
+                <div class="location-list">
+                  {#each projectDatabaseLocations as location, index}
+                    <div class="location-item"><div class="location-row">
+                      <input class="input location-path" type="text" value={location.path} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="/путь/к/базам-данных" aria-label={`Расположение БД ${index + 1}`} oninput={(event) => updateProjectDatabaseLocation(index, 'path', event.currentTarget.value)} />
+                      <input class="input location-code" type="text" value={location.code} disabled={projectSettingsLoading || projectSettingsSaving} placeholder="код (автоматически)" aria-label={`Код расположения БД ${index + 1}`} oninput={(event) => updateProjectDatabaseLocation(index, 'code', event.currentTarget.value)} />
+                      <button class="btn preset-tonal" type="button" title="Добавить расположение БД" aria-label="Добавить расположение БД" disabled={!location.path.trim() || projectSettingsLoading || projectSettingsSaving} onclick={addProjectDatabaseLocation}><Plus size={16} aria-hidden="true" /></button>
+                      {#if projectDatabaseLocations.length > 1}<button class="btn preset-tonal location-delete" type="button" title="Удалить расположение БД" aria-label="Удалить расположение БД" disabled={projectSettingsLoading || projectSettingsSaving} onclick={() => removeProjectDatabaseLocation(index)}><Trash2 size={16} aria-hidden="true" /></button>{/if}
+                      <input class="checkbox location-default" type="checkbox" checked={location.default} disabled={projectSettingsLoading || projectSettingsSaving} aria-label="Путь БД по умолчанию" onchange={() => setDefaultProjectDatabaseLocation(index)} />
+                    </div></div>
                   {/each}
                 </div>
               </section>
@@ -2906,9 +2961,20 @@
       <form class="project-add-form" onsubmit={(event) => { event.preventDefault(); addProject(); }}>
         <div class="project-add-main">
           <label class="label"><span class="label-text">Код (опционально)</span><input class="input" bind:value={projectAddDialog.code} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
-          <label class="label"><span class="label-text">Локация</span><Combobox collection={projectLocationCollection} value={[projectAddDialog.location]} openOnClick onValueChange={(details) => { if (details.value[0]) projectAddDialog.location = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly required /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectLocationOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          <label class="label"><span class="label-text">Расположение файлов</span><Combobox collection={projectLocationCollection} value={[projectAddDialog.location]} openOnClick onValueChange={(details) => { if (details.value[0]) projectAddDialog.location = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly required /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectLocationOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <label class="label"><span class="label-text">Язык</span><Combobox collection={projectLanguageCollection} value={[projectAddDialog.language]} openOnClick onValueChange={(details) => { if (details.value[0]) { projectAddDialog.language = details.value[0]; projectAddDialog.framework = projectAddOptions.frameworks[projectAddDialog.language]?.[0]?.code || ''; } }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languages.map((language) => ({ value: language.code, label: language.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <label class="label"><span class="label-text">Фреймворк</span><Combobox collection={projectFrameworkCollection} value={[projectAddDialog.framework]} openOnClick onValueChange={(details) => { projectAddDialog.framework = details.value[0] ?? ''; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each (projectAddOptions.frameworks[projectAddDialog.language] || []).map((framework) => ({ value: framework.code, label: framework.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          <fieldset class="project-clone-dbms project-dedicated-db"><legend class="label-text">Базы данных</legend>
+            <label class="project-deployment-checkbox project-dedicated-toggle"><input class="checkbox" type="checkbox" bind:checked={projectAddDialog.dedicated} /><span>Выделенные инстансы БД</span></label>
+            {#if projectAddDialog.dedicated}
+              <div class="project-deployment-checkboxes">
+                <label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectAddDialog.mysql} /><span>MySQL</span></label>
+                <label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectAddDialog.postgres} /><span>PostgreSQL</span></label>
+              </div>
+              {#if projectAddDialog.mysql}<label class="label project-dedicated-location"><span class="label-text">Расположение MySQL</span><Combobox collection={projectDatabaseLocationCollection} value={[projectAddDialog.locationMysql]} openOnClick onValueChange={(details) => { projectAddDialog.locationMysql = details.value[0] ?? 'system'; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectDatabaseLocationOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>{/if}
+              {#if projectAddDialog.postgres}<label class="label project-dedicated-location"><span class="label-text">Расположение PostgreSQL</span><Combobox collection={projectDatabaseLocationCollection} value={[projectAddDialog.locationPostgres]} openOnClick onValueChange={(details) => { projectAddDialog.locationPostgres = details.value[0] ?? 'system'; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectDatabaseLocationOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>{/if}
+            {/if}
+          </fieldset>
         </div>
         <div class="project-add-deployment">
         <label class="label"><span class="label-text">Скрипт развертки</span><Combobox collection={projectDeploymentCollection} value={[projectAddDialog.deploymentScript]} openOnClick onValueChange={(details) => { selectDeploymentScript(details.value[0] ?? ''); }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [{ value: '', label: 'Не использовать' }, ...projectAddOptions.deploymentScripts.map((script) => ({ value: script.code, label: script.name }))] as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
@@ -2933,7 +2999,7 @@
           {/if}
         {/if}
         </div>
-        <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectAdding} onclick={() => { projectAddDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectAdding || !projectAddDialog.location}>{projectAdding ? 'Добавляем…' : 'Добавить'}</button></div>
+        <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectAdding} onclick={() => { projectAddDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectAdding || !projectAddDialog.location || (projectAddDialog.dedicated && !projectAddDialog.mysql && !projectAddDialog.postgres)}>{projectAdding ? 'Добавляем…' : 'Добавить'}</button></div>
       </form>
       {/if}
     </Dialog.Content>

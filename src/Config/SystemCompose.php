@@ -25,6 +25,20 @@ final class SystemCompose
         return join_path($this->directory(), self::COMPOSE_FILE);
     }
 
+    public function additionalComposeFile(string $driver): string
+    {
+        if (!in_array($driver, ['mysql', 'postgres'], true)) {
+            throw new \InvalidArgumentException(sprintf('Unsupported database driver "%s".', $driver));
+        }
+
+        return join_path($this->directory(), sprintf('compose.%s.yaml', $driver));
+    }
+
+    public function databaseService(string $projectName, string $driver): string
+    {
+        return sprintf('%s-%s', $driver, $projectName);
+    }
+
     public function envFile(): string
     {
         return join_path($this->directory(), self::ENV_FILE);
@@ -176,7 +190,7 @@ final class SystemCompose
     /** @return list<string> */
     public function dockerComposeCommand(string $operation): array
     {
-        return [
+        $command = [
             'docker',
             'compose',
             '--project-name',
@@ -185,8 +199,16 @@ final class SystemCompose
             $this->envFile(),
             '--file',
             $this->composeFile(),
-            $operation,
         ];
+        foreach (['mysql', 'postgres'] as $driver) {
+            $file = $this->additionalComposeFile($driver);
+            if (is_file($file)) {
+                array_push($command, '--file', $file);
+            }
+        }
+        $command[] = $operation;
+
+        return $command;
     }
 
     /** @return list<string> */
@@ -317,13 +339,15 @@ final class SystemCompose
     private function dataDirectories(): array
     {
         $data = join_path($this->directory(), 'data');
+        $mysqlData = $this->dataDirectoryFromEnv('DEFAULT_DATA_DIR_MYSQL', 'data/mysql');
+        $postgresData = $this->dataDirectoryFromEnv('DEFAULT_DATA_DIR_POSTGRES', 'data/postgres');
 
         return [
             join_path($data, 'dockhand'),
-            join_path($data, 'mysql', 'data'),
-            join_path($data, 'mysql', 'logs'),
-            join_path($data, 'postgres', 'data'),
-            join_path($data, 'postgres', 'logs'),
+            join_path($mysqlData, 'data'),
+            join_path($mysqlData, 'logs'),
+            join_path($postgresData, 'data'),
+            join_path($postgresData, 'logs'),
             join_path($data, 'mailpit'),
             join_path($this->directory(), 'config', 'openresty', 'hosts'),
             join_path($this->directory(), 'config', 'ofelia'),
@@ -338,6 +362,16 @@ final class SystemCompose
             join_path($this->directory(), 'config', 'php-fpm-8.5', 'php-fpm.d'),
             $this->playwrightScriptsDirectory(),
         ];
+    }
+
+    private function dataDirectoryFromEnv(string $key, string $default): string
+    {
+        $directory = $this->envValue($key, $default);
+        if ($directory === '') {
+            $directory = $default;
+        }
+
+        return str_starts_with($directory, DIRECTORY_SEPARATOR) ? $directory : join_path($this->directory(), $directory);
     }
 
     /** @return array<string, string> */

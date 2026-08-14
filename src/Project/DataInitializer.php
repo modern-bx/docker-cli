@@ -19,10 +19,23 @@ final class DataInitializer
         $mysqlSql = $this->mysqlSql($projectName, $mysqlPassword, $rebuild);
         $code = $this->run(array_merge($compose->dockerComposeCommand('exec'), [
             '-T',
-            'mysql',
+            $this->service($projectName, 'mysql'),
             'sh',
             '-ec',
-            'MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}" mysql -uroot -e "$1"',
+            <<<'SH'
+set -eu
+export MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}"
+attempt=0
+until mysql --protocol=socket -uroot -e 'SELECT 1' >/dev/null 2>&1; do
+  attempt=$((attempt + 1))
+  if [ "$attempt" -ge 60 ]; then
+    echo "MySQL did not become ready within 60 seconds." >&2
+    exit 1
+  fi
+  sleep 1
+done
+mysql -uroot -e "$1"
+SH,
             'sh',
             $mysqlSql,
         ]), $compose, $output);
@@ -33,7 +46,7 @@ final class DataInitializer
         [$postgresRoleSql, $postgresDropRoleSql, $postgresTerminateSql, $postgresDatabaseExistsSql, $postgresGrantSql] = $this->postgresSql($projectName, $postgresPassword);
         return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
             '-T',
-            'postgres',
+            $this->service($projectName, 'postgres'),
             'sh',
             '-ec',
             <<<'SH'
@@ -47,6 +60,16 @@ drop_role_sql="$4"
 terminate_sql="$5"
 database_exists_sql="$6"
 grant_sql="$7"
+
+attempt=0
+until pg_isready -q -U "$root_user" -d postgres; do
+  attempt=$((attempt + 1))
+  if [ "$attempt" -ge 60 ]; then
+    echo "PostgreSQL did not become ready within 60 seconds." >&2
+    exit 1
+  fi
+  sleep 1
+done
 
 if [ "$rebuild" = "1" ]; then
   psql -v ON_ERROR_STOP=1 -U "$root_user" -d postgres -c "$terminate_sql"
@@ -78,7 +101,7 @@ SH,
 
         $code = $this->run(array_merge($compose->dockerComposeCommand('exec'), [
             '-T',
-            'mysql',
+            $this->service($projectName, 'mysql'),
             'sh',
             '-ec',
             'MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}" mysql -uroot -e "$1"',
@@ -92,7 +115,7 @@ SH,
         [$postgresTerminateSql, $postgresRoleCleanupSql] = $this->postgresDropSql($projectName);
         return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
             '-T',
-            'postgres',
+            $this->service($projectName, 'postgres'),
             'sh',
             '-ec',
             <<<'SH'
@@ -112,6 +135,19 @@ SH,
             $postgresTerminateSql,
             $postgresRoleCleanupSql,
         ]), $compose, $output);
+    }
+
+    private function service(string $projectName, string $driver): string
+    {
+        $registry = new ProjectRegistry();
+        if (!$registry->hasProject($projectName)) {
+            return $driver;
+        }
+        $hostname = $registry->readProjectConfig($projectName)['data']['databases'][$driver]['hostname'] ?? null;
+
+        return $hostname === sprintf('docker-cli-%s-%s', $driver, $projectName)
+            ? ($this->compose ?? new SystemCompose())->databaseService($projectName, $driver)
+            : $driver;
     }
 
     public function clonePostgres(string $sourceDatabase, string $targetDatabase, string $sourceUser, string $targetUser, OutputInterface $output): int
