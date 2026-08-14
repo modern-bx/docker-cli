@@ -114,8 +114,11 @@ final class ProjectDownCommand extends AbstractCommand
         if ($dedicated !== []) {
             $services = array_map(static fn (string $driver): string => $driver . '-' . $projectName, $dedicated);
             $removeCode = $this->runOperation(new SystemCompose(), 'rm', ['--stop', '--force', ...$services], $output, TranslatorFactory::create());
-            if ($removeCode !== Command::SUCCESS) {
+            if ($removeCode !== Command::SUCCESS && !$this->dedicatedContainersAreAbsent($projectName, $dedicated)) {
                 return $removeCode;
+            }
+            if ($removeCode !== Command::SUCCESS) {
+                $this->writeMessage($output, '<comment>Docker Compose вернул ненулевой код после удаления выделенных контейнеров; контейнеры отсутствуют, удаление проекта продолжается.</comment>');
             }
         }
 
@@ -211,6 +214,32 @@ final class ProjectDownCommand extends AbstractCommand
         }
 
         rmdir($directory);
+    }
+
+    /** @param list<string> $drivers */
+    private function dedicatedContainersAreAbsent(string $projectName, array $drivers): bool
+    {
+        foreach ($drivers as $driver) {
+            $container = sprintf('docker-cli-%s-%s', $driver, $projectName);
+            $process = proc_open(
+                ['docker', 'container', 'inspect', $container],
+                [['file', '/dev/null', 'r'], ['pipe', 'w'], ['pipe', 'w']],
+                $pipes,
+            );
+            if (!is_resource($process)) {
+                return false;
+            }
+            stream_get_contents($pipes[1]);
+            $error = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $code = proc_close($process);
+            if ($code === Command::SUCCESS || !str_contains($error, 'No such container')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function wipeProjectRoot(string $projectRoot): void
