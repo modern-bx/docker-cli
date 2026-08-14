@@ -87,6 +87,7 @@ final class ProjectDownCommand extends AbstractCommand
 
         if ($input->getOption('wipe') || $input->getOption('erase')) {
             try {
+                $this->leaveProjectWorkingDirectory($projectRoot);
                 $this->wipeProjectRoot($projectRoot);
             } catch (\RuntimeException $exception) {
                 $this->writeMessage($output, sprintf('<error>Не удалось очистить файлы проекта "%s": %s</error>', $projectName, $exception->getMessage()));
@@ -273,6 +274,25 @@ final class ProjectDownCommand extends AbstractCommand
             if (is_dir($path) && !is_link($path)) $this->removeDirectory($path); elseif (!unlink($path)) {
                 throw new \RuntimeException(sprintf('не удалось удалить "%s".', $path));
             }
+        }
+    }
+
+    private function leaveProjectWorkingDirectory(string $projectRoot): void
+    {
+        $workingDirectory = getcwd();
+        $realRoot = realpath($projectRoot);
+        $realWorkingDirectory = is_string($workingDirectory) ? realpath($workingDirectory) : false;
+        if ($realRoot === false || $realWorkingDirectory === false
+            || ($realWorkingDirectory !== $realRoot && !str_starts_with($realWorkingDirectory, $realRoot . DIRECTORY_SEPARATOR))) {
+            return;
+        }
+
+        $safeDirectory = (new SystemCompose())->directory();
+        if (!is_dir($safeDirectory)) {
+            $safeDirectory = sys_get_temp_dir();
+        }
+        if (!chdir($safeDirectory)) {
+            throw new \RuntimeException(sprintf('Не удалось перейти в безопасную директорию "%s" перед удалением проекта.', $safeDirectory));
         }
     }
 }
