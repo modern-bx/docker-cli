@@ -6,6 +6,7 @@ namespace DockerCli\Project;
 
 use DockerCli\Config\SystemCompose;
 use Symfony\Component\Yaml\Yaml;
+use function DockerCli\Util\join_path;
 
 /** Builds compose fragments for database servers owned by registered projects. */
 final class DedicatedDatabaseComposeRenderer
@@ -53,7 +54,18 @@ final class DedicatedDatabaseComposeRenderer
     /** @return array<string, mixed> */
     private function service(string $driver, string $projectName, string $hostname, ?string $location): array
     {
+        $compose = $this->compose ?? new SystemCompose();
         $dataDirectory = $location ?? sprintf('${DEFAULT_DATA_DIR_%s:-data/%s}-%s', strtoupper($driver), $driver, $projectName);
+        $hostDataDirectory = $location ?? $compose->envValue('DEFAULT_DATA_DIR_' . strtoupper($driver), 'data/' . $driver) . '-' . $projectName;
+        if (!str_starts_with($hostDataDirectory, DIRECTORY_SEPARATOR)) {
+            $hostDataDirectory = join_path($compose->directory(), $hostDataDirectory);
+        }
+        foreach (['data', 'logs'] as $subdirectory) {
+            $directory = join_path($hostDataDirectory, $subdirectory);
+            if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
+                throw new \RuntimeException(sprintf('Unable to create dedicated %s directory "%s".', $driver, $directory));
+            }
+        }
         if ($driver === 'mysql') {
             return [
                 'image' => 'mysql:8.0',
