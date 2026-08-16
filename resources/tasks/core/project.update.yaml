@@ -6,7 +6,7 @@ task:
   code: core.project.update
   type: shell
   context: project
-  description: Изменяет имя, язык, версию языка или фреймворк проекта.
+  description: Изменяет проект и переносит его базы между общими и выделенными инстансами.
   parameters:
     name: { type: string, required: false }
     language: { type: list, required: false, items: [{ name: PHP, value: php }] }
@@ -20,10 +20,16 @@ task:
         - { name: Laravel, value: laravel }
         - { name: Bitrix, value: bitrix }
         - { name: Bitrix24, value: bitrix24 }
+    dedicated_db: { type: string, required: false }
+    location_mysql: { type: string, required: false }
+    location_postgres: { type: string, required: false }
   action: |
     options=()
     [ -n "${name+x}" ] && options+=(--name="$name")
     [ -n "${language+x}" ] && options+=(--language="$language")
     [ -n "${language_version+x}" ] && options+=(--language-version="$language_version")
     [ -n "${framework+x}" ] && options+=(--framework="$framework")
+    [ -n "${dedicated_db+x}" ] && options+=(--dedicated-db="$dedicated_db")
+    [ -n "${location_mysql+x}" ] && options+=(--location-mysql="$location_mysql")
+    [ -n "${location_postgres+x}" ] && options+=(--location-postgres="$location_postgres")
     docker-cli project:update "${options[@]}"
