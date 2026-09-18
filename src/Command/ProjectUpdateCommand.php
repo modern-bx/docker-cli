@@ -190,7 +190,7 @@ final class ProjectUpdateCommand extends AbstractCommand
     {
         $compose = new SystemCompose();
         $services = array_map(fn (string $driver): string => $compose->databaseService($name, $driver), array_values(array_filter($drivers, fn (string $driver): bool => ($config['data']['databases'][$driver]['hostname'] ?? '') === "docker-cli-$driver-$name")));
-        if ($services !== []) { $code = $this->run(array_merge($compose->dockerComposeCommand('up'), ['--detach', ...$services]), $compose, $output); if ($code !== 0) return $code; }
+        if ($services !== []) { $code = $this->runProcess(array_merge($compose->dockerComposeCommand('up'), ['--detach', ...$services]), $compose, $output); if ($code !== 0) return $code; }
         $code = (new DataInitializer())->initialize($name, (string) $config['data']['databases']['mysql']['password'], (string) $config['data']['databases']['postgres']['password'], false, $output);
         if ($code !== Command::SUCCESS) return $code;
         foreach ($drivers as $driver) {
@@ -212,7 +212,7 @@ final class ProjectUpdateCommand extends AbstractCommand
                     ? 'database="$1"; MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}" mysql -uroot -e "DROP DATABASE IF EXISTS \`$database\`; DROP USER IF EXISTS \`$database\`@\`%\`;"'
                     : 'export PGPASSWORD="${POSTGRES_PASSWORD:?}"; root="${POSTGRES_USER:-system}"; dropdb -U "$root" --if-exists --force "$1"; dropuser -U "$root" --if-exists "$1"';
                 $command = array_merge($compose->dockerComposeCommand('exec'), ['-T', $driver, 'sh', '-ec', $script, 'sh', $database]);
-                $this->run($command, $compose, $output);
+                $this->runProcess($command, $compose, $output);
                 continue;
             }
             if (($config['data']['databases'][$driver]['hostname'] ?? '') !== "docker-cli-$driver-$name") continue;
@@ -221,6 +221,6 @@ final class ProjectUpdateCommand extends AbstractCommand
             if (is_string($location) && is_dir($location)) $this->removeDirectory($location);
         }
     }
-    private function run(array $command, SystemCompose $compose, OutputInterface $output): int { $output->writeln('<comment>' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>'); $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment()); return is_resource($process) ? proc_close($process) : Command::FAILURE; }
+    private function runProcess(array $command, SystemCompose $compose, OutputInterface $output): int { $output->writeln('<comment>' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>'); $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment()); return is_resource($process) ? proc_close($process) : Command::FAILURE; }
     private function removeDirectory(string $path): void { foreach (scandir($path) ?: [] as $item) if ($item !== '.' && $item !== '..') { $child = join_path($path, $item); is_dir($child) && !is_link($child) ? $this->removeDirectory($child) : unlink($child); } rmdir($path); }
 }
