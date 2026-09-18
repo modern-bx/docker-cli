@@ -127,26 +127,40 @@ final class DataInitializer
         );
     }
 
-    public function drop(string $projectName, OutputInterface $output): int
-    {
+    /** @param list<string> $drivers */
+    public function drop(
+        string $projectName,
+        OutputInterface $output,
+        array $drivers = ["mysql", "postgres"],
+    ): int {
+        if ($drivers === []) {
+            return Command::SUCCESS;
+        }
+
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
 
-        $code = $this->run(
-            array_merge($compose->dockerComposeCommand("exec"), [
-                "-T",
-                $this->service($projectName, "mysql"),
-                "sh",
-                "-ec",
-                'MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}" mysql -uroot -e "$1"',
-                "sh",
-                $this->mysqlDropSql($projectName),
-            ]),
-            $compose,
-            $output,
-        );
-        if ($code !== Command::SUCCESS) {
-            return $code;
+        if (in_array("mysql", $drivers, true)) {
+            $code = $this->run(
+                array_merge($compose->dockerComposeCommand("exec"), [
+                    "-T",
+                    $this->service($projectName, "mysql"),
+                    "sh",
+                    "-ec",
+                    'MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}" mysql -uroot -e "$1"',
+                    "sh",
+                    $this->mysqlDropSql($projectName),
+                ]),
+                $compose,
+                $output,
+            );
+            if ($code !== Command::SUCCESS) {
+                return $code;
+            }
+        }
+
+        if (!in_array("postgres", $drivers, true)) {
+            return Command::SUCCESS;
         }
 
         [$postgresTerminateSql, $postgresRoleCleanupSql] = $this->postgresDropSql($projectName);

@@ -134,7 +134,11 @@ final class ProjectDownCommand extends AbstractCommand
 
         if ($input->getOption("drop")) {
             try {
-                $dropCode = ($this->dataInitializer ?? new DataInitializer())->drop($projectName, $output);
+                $dropCode = ($this->dataInitializer ?? new DataInitializer())->drop(
+                    $projectName,
+                    $output,
+                    array_values(array_diff(["mysql", "postgres"], $dedicated)),
+                );
             } catch (MissingConfigException $exception) {
                 $this->writeMessage(
                     $output,
