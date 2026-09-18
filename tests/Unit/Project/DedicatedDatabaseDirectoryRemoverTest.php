@@ -37,8 +37,7 @@ final class DedicatedDatabaseDirectoryRemoverTest extends TestCase
         ));
         self::assertSame(
             [
-                ["sudo", "rm", "-rf", "--", $location . "/data"],
-                ["sudo", "rmdir", "--", $location],
+                ["sudo", "rm", "-rf", "--", $location],
             ],
             $commands,
         );
@@ -69,7 +68,7 @@ final class DedicatedDatabaseDirectoryRemoverTest extends TestCase
                 ],
             ],
         ));
-        self::assertSame([["sudo", "rm", "-rf", "--", "/srv/postgres-example/data"]], $commands);
+        self::assertSame([["sudo", "rm", "-rf", "--", "/srv/postgres-example"]], $commands);
     }
 
     public function testDoesNotRemoveSharedDatabaseStorage(): void

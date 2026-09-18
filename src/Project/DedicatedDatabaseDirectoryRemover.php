@@ -6,8 +6,6 @@ namespace DockerCli\Project;
 
 use DockerCli\Config\SystemCompose;
 
-use function DockerCli\Util\join_path;
-
 final class DedicatedDatabaseDirectoryRemover
 {
     /** @var \Closure(list<string>): int */
@@ -44,10 +42,7 @@ final class DedicatedDatabaseDirectoryRemover
                 $driver,
                 is_string($location) ? $location : null,
             );
-            if (($this->processRunner)(["sudo", "rm", "-rf", "--", join_path($directory, "data")]) !== 0) {
-                return false;
-            }
-            if (($this->processRunner)(["sudo", "rmdir", "--", $directory]) !== 0) {
+            if (($this->processRunner)(["sudo", "rm", "-rf", "--", $directory]) !== 0) {
                 return false;
             }
         }

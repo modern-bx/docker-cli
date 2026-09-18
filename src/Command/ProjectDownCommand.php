@@ -26,6 +26,9 @@ use Symfony\Component\Yaml\Yaml;
 
 final class ProjectDownCommand extends AbstractCommand
 {
+    private const CONTAINER_REMOVAL_ATTEMPTS = 50;
+    private const CONTAINER_REMOVAL_DELAY_MICROSECONDS = 100_000;
+
     public function __construct(
         private readonly ?FrameworkDetectionService $detectionService = null,
         private readonly ?DataInitializer $dataInitializer = null,
@@ -289,10 +292,18 @@ final class ProjectDownCommand extends AbstractCommand
                 return Command::FAILURE;
             }
             $code = proc_close($process);
-            $exists = $this->containerExists($container);
-            if ($code !== Command::SUCCESS && $exists !== false) {
-                return $code;
+            for ($attempt = 0; $attempt < self::CONTAINER_REMOVAL_ATTEMPTS; $attempt++) {
+                $exists = $this->containerExists($container);
+                if ($exists === false) {
+                    continue 2;
+                }
+                if ($exists === null) {
+                    return Command::FAILURE;
+                }
+                usleep(self::CONTAINER_REMOVAL_DELAY_MICROSECONDS);
             }
+
+            return $code === Command::SUCCESS ? Command::FAILURE : $code;
         }
 
         return Command::SUCCESS;
