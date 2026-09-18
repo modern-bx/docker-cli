@@ -13,7 +13,7 @@ final class PostgresDumpLoader
     public function __construct(private readonly ?SystemCompose $compose = null) {}
 
     /** @param list<string> $include @param list<string> $exclude */
-    public function dump(string $database, string $directory, int $jobs, OutputInterface $output, array $include = [], array $exclude = []): int
+    public function dump(string $database, string $directory, int $jobs, OutputInterface $output, array $include = [], array $exclude = [], string $hostname = 'postgres'): int
     {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
@@ -37,12 +37,12 @@ final class PostgresDumpLoader
         return $this->run(array_merge($compose->dockerComposeCommand('run'), [
             '--rm', '-T', '--no-deps', '--user', 'root', '--entrypoint', 'sh',
             '--volume', $directory . ':/dump', 'postgres', '-ec',
-            'export PGPASSWORD="${POSTGRES_PASSWORD:?}"; database="$1"; jobs="$2"; uid="$3"; gid="$4"; shift 4; pg_dump --host=postgres --username="${POSTGRES_USER:-system}" --format=directory --jobs="$jobs" --file=/dump "$database" "$@"; chown -R "$uid:$gid" /dump',
-            'sh', $database, (string) $jobs, (string) $this->uid(), (string) $this->gid(), ...$filters,
+            'export PGPASSWORD="${POSTGRES_PASSWORD:?}"; database="$1"; jobs="$2"; uid="$3"; gid="$4"; hostname="$5"; shift 5; pg_dump --host="$hostname" --username="${POSTGRES_USER:-system}" --format=directory --jobs="$jobs" --file=/dump "$database" "$@"; chown -R "$uid:$gid" /dump',
+            'sh', $database, (string) $jobs, (string) $this->uid(), (string) $this->gid(), $hostname, ...$filters,
         ]), $compose, $output);
     }
 
-    public function load(string $database, string $owner, string $directory, int $jobs, OutputInterface $output): int
+    public function load(string $database, string $owner, string $directory, int $jobs, OutputInterface $output, string $hostname = 'postgres'): int
     {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
@@ -54,11 +54,11 @@ final class PostgresDumpLoader
 set -eu
 export PGPASSWORD="${POSTGRES_PASSWORD:?}"
 root_user="${POSTGRES_USER:-system}"
-dropdb --host=postgres --username="$root_user" --if-exists --force "$1"
-createdb --host=postgres --username="$root_user" --owner="$2" "$1"
-pg_restore --host=postgres --username="$root_user" --dbname="$1" --jobs="$3" --no-owner --no-acl --role="$2" /dump
+dropdb --host="$4" --username="$root_user" --if-exists --force "$1"
+createdb --host="$4" --username="$root_user" --owner="$2" "$1"
+pg_restore --host="$4" --username="$root_user" --dbname="$1" --jobs="$3" --no-owner --no-acl --role="$2" /dump
 SH,
-            'sh', $database, $owner, (string) $jobs,
+            'sh', $database, $owner, (string) $jobs, $hostname,
         ]), $compose, $output);
     }
 

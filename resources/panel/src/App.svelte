@@ -1589,7 +1589,10 @@
     try {
       projectAddOptions = await getProjectOptions(api);
       const language = project.language?.code || projectAddOptions.languages[0]?.code || '';
-      projectUpdateDialog = { project: project.name, name: project.name, language, languageVersion: project.languageVersion || projectAddOptions.defaultLanguageVersion, framework: project.framework?.code || '' };
+      const dedicatedMysql = project.mysqlHost === `docker-cli-mysql-${project.name}`;
+      const dedicatedPostgres = project.postgresHost === `docker-cli-postgres-${project.name}`;
+      const databaseLocation = projectAddOptions.databaseLocations.find((item) => item.default) ? 'default' : 'system';
+      projectUpdateDialog = { project: project.name, name: project.name, language, languageVersion: project.languageVersion || projectAddOptions.defaultLanguageVersion, framework: project.framework?.code || '', dedicated: dedicatedMysql || dedicatedPostgres, dedicatedMysql, dedicatedPostgres, locationMysql: databaseLocation, locationPostgres: databaseLocation };
       projectContextMenu = null;
     } catch (cause) {
       errorTitle = 'Не удалось открыть изменение проекта';
@@ -1632,9 +1635,14 @@
 
   async function submitProjectUpdate() {
     if (!projectUpdateDialog || projectUpdating) return;
+    if (projectUpdateDialog.dedicated && !projectUpdateDialog.dedicatedMysql && !projectUpdateDialog.dedicatedPostgres) {
+      errorTitle = 'Некорректная конфигурация баз данных';
+      error = 'Выберите MySQL или PostgreSQL для выделенного инстанса либо отключите использование выделенных инстансов.';
+      return;
+    }
     projectUpdating = true;
     try {
-      const data = await updateProject(api, projectUpdateDialog.project, { name: projectUpdateDialog.name, language: projectUpdateDialog.language, languageVersion: projectUpdateDialog.languageVersion, framework: projectUpdateDialog.framework });
+      const data = await updateProject(api, projectUpdateDialog.project, { name: projectUpdateDialog.name, language: projectUpdateDialog.language, languageVersion: projectUpdateDialog.languageVersion, framework: projectUpdateDialog.framework, dedicatedDatabases: projectUpdateDialog.dedicated ? [projectUpdateDialog.dedicatedMysql && 'mysql', projectUpdateDialog.dedicatedPostgres && 'postgres'].filter(Boolean) : [], locationMysql: projectUpdateDialog.locationMysql, locationPostgres: projectUpdateDialog.locationPostgres });
       projects = data.projects;
       projectUpdateDialog = null;
       notifyQueuedOperation('Изменение проекта');
@@ -2966,6 +2974,13 @@
             <label class="label"><span class="label-text">Версия PHP</span><Combobox collection={projectLanguageVersionCollection} value={[projectUpdateDialog.languageVersion]} openOnClick onValueChange={(details) => { if (details.value[0]) projectUpdateDialog.languageVersion = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languageVersions.map((version) => ({ value: version, label: version })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           {/if}
           <label class="label"><span class="label-text">Фреймворк</span><Combobox collection={projectUpdateFrameworkCollection} value={[projectUpdateDialog.framework]} openOnClick onValueChange={(details) => { projectUpdateDialog.framework = details.value[0] ?? ''; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each (projectAddOptions.frameworks[projectUpdateDialog.language] || []).map((framework) => ({ value: framework.code, label: framework.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          <fieldset class="project-clone-dbms project-dedicated-db"><legend class="label-text">Инстансы баз данных</legend>
+            <label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectUpdateDialog.dedicated} /><span>Использовать выделенные инстансы</span></label>
+            {#if projectUpdateDialog.dedicated}<div class="project-deployment-checkboxes"><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectUpdateDialog.dedicatedMysql} /><span>MySQL</span></label><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectUpdateDialog.dedicatedPostgres} /><span>PostgreSQL</span></label></div>
+              {#if projectUpdateDialog.dedicatedMysql}<label class="label project-dedicated-location"><span class="label-text">Расположение MySQL</span><Combobox collection={projectDatabaseLocationCollection} value={[projectUpdateDialog.locationMysql]} openOnClick onValueChange={(details) => { projectUpdateDialog.locationMysql = details.value[0] ?? 'system'; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectDatabaseLocationOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>{/if}
+              {#if projectUpdateDialog.dedicatedPostgres}<label class="label project-dedicated-location"><span class="label-text">Расположение PostgreSQL</span><Combobox collection={projectDatabaseLocationCollection} value={[projectUpdateDialog.locationPostgres]} openOnClick onValueChange={(details) => { projectUpdateDialog.locationPostgres = details.value[0] ?? 'system'; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectDatabaseLocationOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>{/if}
+            {/if}
+          </fieldset>
           <div class="login-error-actions"><button class="btn preset-tonal" type="button" disabled={projectUpdating} onclick={() => { projectUpdateDialog = null; }}>Отмена</button><button class="btn preset-filled-primary-500" type="submit" disabled={projectUpdating || !projectUpdateDialog.name}>{projectUpdating ? 'Изменяем…' : 'Изменить'}</button></div>
         </form>
       {/if}
@@ -3360,7 +3375,7 @@
 >
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
-    <Dialog.Content class={`login-error-dialog card preset-filled-surface-100-900 shadow-2xl${errorStatus >= 500 ? ' error-alert' : ''}`}>
+    <Dialog.Content class={`login-error-dialog card preset-filled-surface-100-900 shadow-2xl${errorStatus >= 500 ? ' error-alert' : ''}${errorTitle === 'Некорректная конфигурация баз данных' ? ' database-config-alert' : ''}`}>
       <Dialog.Title class="login-error-title">{errorStatus >= 500 ? 'Ошибка сервера' : errorTitle}</Dialog.Title>
       <Dialog.Description class="login-error-description">{error}</Dialog.Description>
       <div class="login-error-actions">

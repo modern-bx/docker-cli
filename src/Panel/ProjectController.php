@@ -645,6 +645,15 @@ final class ProjectController
             if ($request->{$option} !== null) $arguments[$option] = ['value' => $request->{$option}];
         }
         if ($request->languageVersion !== null) $arguments['language_version'] = ['value' => $request->languageVersion];
+        if ($request->dedicatedDatabases !== null) {
+            $arguments['dedicated-db'] = ['value' => $request->dedicatedDatabases === [] ? 'false' : implode(',', $request->dedicatedDatabases)];
+            $targetName = $request->name ?? $request->project;
+            foreach ($request->dedicatedDatabases as $driver) {
+                $selection = $driver === 'mysql' ? $request->locationMysql : $request->locationPostgres;
+                $location = $this->resolveDatabaseLocation($selection, $options->databaseLocations);
+                $arguments['location_' . $driver] = ['value' => $location === null ? 'system' : join_path($location, $driver . '-' . $targetName)];
+            }
+        }
         $item = ['meta' => ['schema' => 'queue-item', 'version' => '0.1'], 'queue-item' => ['tasks' => [[
             'code' => 'core.project.update', 'arguments' => $arguments, 'project' => $request->project,
         ]]]];
