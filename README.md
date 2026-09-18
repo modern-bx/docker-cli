@@ -137,6 +137,7 @@ docker-cli project:up shop
 | [Бэкапы](https://modern-bx.github.io/docker-cli/guide/backups) | Файловые копии, MySQL, PostgreSQL и внешние хранилища |
 | [Задачи и очереди](https://modern-bx.github.io/docker-cli/guide/tasks) | YAML-задачи, параметры, очередь выполнения и systemd |
 | [Xdebug](https://modern-bx.github.io/docker-cli/guide/xdebug) | Настройка PhpStorm и разделение IDE-портов проектов |
+| [PHP-SPX](https://modern-bx.github.io/docker-cli/guide/spx) | Профилирование web-запросов и консольных скриптов |
 | [Playwright](https://modern-bx.github.io/docker-cli/guide/playwright) | Браузерные сценарии, данные, логирование и визуальный режим |
 
 ## Разработка
