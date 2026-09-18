@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title description">
+  <title id="title">Место для скриншота управления проектами</title>
+  <desc id="description">Временный SVG-макет, который нужно заменить настоящим PNG-скриншотом списка проектов.</desc>
+  <rect width="1200" height="675" rx="28" fill="#f1f5f9"/>
+  <rect x="65" y="55" width="1070" height="565" rx="20" fill="#fff" stroke="#cbd5e1"/>
+  <rect x="65" y="55" width="1070" height="72" rx="20" fill="#0f172a"/>
+  <rect x="65" y="107" width="1070" height="20" fill="#0f172a"/>
+  <text x="105" y="100" fill="#f8fafc" font-size="22" font-family="Inter,Segoe UI,Arial,sans-serif" font-weight="700">Проекты</text>
+  <rect x="930" y="76" width="165" height="36" rx="18" fill="#2563eb"/>
+  <text x="1012" y="100" text-anchor="middle" fill="#fff" font-size="13" font-family="Inter,Segoe UI,Arial,sans-serif">Добавить проект</text>
+  <g font-family="Inter,Segoe UI,Arial,sans-serif">
+    <text x="105" y="174" fill="#64748b" font-size="13">ИМЯ</text>
+    <text x="430" y="174" fill="#64748b" font-size="13">ФРЕЙМВОРК</text>
+    <text x="650" y="174" fill="#64748b" font-size="13">PHP</text>
+    <text x="790" y="174" fill="#64748b" font-size="13">СОСТОЯНИЕ</text>
+    <g fill="#0f172a" font-size="17" font-weight="600">
+      <text x="105" y="230">shop</text>
+      <text x="105" y="307">crm-feature</text>
+      <text x="105" y="384">portal</text>
+      <text x="105" y="461">api</text>
+    </g>
+    <g fill="#475569" font-size="15">
+      <text x="430" y="230">1С-Битрикс</text>
+      <text x="430" y="307">Symfony</text>
+      <text x="430" y="384">Битрикс24</text>
+      <text x="430" y="461">Laravel</text>
+      <text x="650" y="230">8.2</text>
+      <text x="650" y="307">8.4</text>
+      <text x="650" y="384">8.3</text>
+      <text x="650" y="461">8.5</text>
+    </g>
+    <g fill="#047857" font-size="14" font-weight="600">
+      <text x="790" y="230">Доступен</text>
+      <text x="790" y="307">Доступен</text>
+      <text x="790" y="384">Доступен</text>
+      <text x="790" y="461">Доступен</text>
+    </g>
+  </g>
+  <g stroke="#e2e8f0"><path d="M105 254H1095M105 331H1095M105 408H1095M105 485H1095"/></g>
+  <g transform="translate(396 572)">
+    <rect width="408" height="42" rx="21" fill="#0f172a"/>
+    <text x="204" y="27" text-anchor="middle" fill="#fff" font-size="14" font-family="Inter,Segoe UI,Arial,sans-serif" font-weight="700">ЗАМЕНИТЬ НА PNG: проекты, 1200 × 675</text>
+  </g>
+</svg>
