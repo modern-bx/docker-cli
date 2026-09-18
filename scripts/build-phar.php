@@ -28,7 +28,7 @@ if (file_exists($pharPath)) {
 $phar = new Phar($pharPath);
 $phar->startBuffering();
 
-$files = new RecursiveIteratorIterator(
+$files = new CallbackFilterIterator(new RecursiveIteratorIterator(
     new RecursiveCallbackFilterIterator(
         new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
         static function (SplFileInfo $file): bool {
@@ -38,25 +38,18 @@ $files = new RecursiveIteratorIterator(
                 !($file->isDir() && $name === "bin" && str_contains($file->getPath(), "/vendor"));
         },
     ),
-);
+), static function (SplFileInfo $file) use ($root): bool {
+    $relativePath = substr($file->getPathname(), strlen($root) + 1);
 
-foreach ($files as $file) {
-    if (!($file instanceof SplFileInfo) || !$file->isFile()) {
-        continue;
-    }
-
-    $path = $file->getPathname();
-    $relativePath = substr($path, strlen($root) + 1);
-    if (
+    return $file->isFile() && (
         $relativePath === "LICENSE" ||
         $relativePath === "bin/docker-cli" ||
         preg_match("/^(?:resources|src|scripts|vendor)\//", $relativePath) ||
         preg_match('/\.(?:json|lock)$/', $relativePath)
-    ) {
-        $phar->addFile($path, $relativePath);
-    }
-}
+    );
+});
 
+$phar->buildFromIterator($files, $root);
 $phar->setStub("#!/usr/bin/env php\n" . $phar->createDefaultStub("bin/docker-cli"));
 $phar->stopBuffering();
 chmod($pharPath, 0755);
