@@ -70,6 +70,10 @@ docker-cli image:publish --tag=1.0.0
 Флаги PHP-расширений применяются при сборке сразу ко всем версиям; после их изменения используйте
 `docker-cli image:build --no-cache`.
 
+Общая настройка стилей страницы PHP-SPX находится в
+`~/.config/docker-cli/compose/system/config/php-spx/settings.css`. `config:init` создаёт файл один раз и не
+перезаписывает пользовательские изменения; CSS включается во все PHP-FPM-образы при следующей сборке.
+
 ## Публикация в GHCR
 
 Для публикации нужен GitHub Personal Access Token с правами `write:packages` и, если образ приватный, `read:packages`.

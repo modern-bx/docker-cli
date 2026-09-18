@@ -55,6 +55,7 @@ if [ "${PHP_ENABLE_SPX:-1}" = "1" ]; then
         | tar -xz -C /tmp
     cd /tmp/php-spx-0.4.22
     patch -p1 < /usr/local/src/spx-web-ui.patch
+    cat /usr/local/src/spx-settings.css >> assets/web-ui/css/main.css
     phpize
     ./configure
     make -j"$(nproc)"

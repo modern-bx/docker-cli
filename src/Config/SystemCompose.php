@@ -392,7 +392,10 @@ final class SystemCompose
     /** @return array<string, string> */
     private function templateMap(): array
     {
-        return $this->editableTemplateMap() + $this->staticTemplateMap() + $this->playwrightDataTemplateMap();
+        return $this->editableTemplateMap()
+            + $this->customizableTemplateMap()
+            + $this->staticTemplateMap()
+            + $this->playwrightDataTemplateMap();
     }
 
     private function copyTemplate(
@@ -510,6 +513,20 @@ final class SystemCompose
 
         return [
             $this->envFile() => join_path($resources, self::ENV_FILE),
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function customizableTemplateMap(): array
+    {
+        $resources = join_path(dirname(__DIR__, 2), "resources", "compose", "system", "config");
+
+        return [
+            join_path($this->directory(), "config", "php-spx", "settings.css") => join_path(
+                $resources,
+                "php-spx",
+                "settings.css",
+            ),
         ];
     }
 
