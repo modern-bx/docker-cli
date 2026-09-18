@@ -33,6 +33,7 @@ final class PhpImageConfigurationTest extends TestCase
         $base = sprintf("resources/compose/system/config/php-fpm-%s", $version);
         $dockerfile = $this->read($base . "/Dockerfile");
         $installer = $this->read($base . "/scripts/install-extensions.sh");
+        $webUiPatch = $this->read($base . "/spx-web-ui.patch");
         $spxConfiguration = $this->read($base . "/php/conf.d/zz-spx.ini");
         $fpmConfiguration = $this->read($base . "/php-fpm.d/zz-local.conf");
 
@@ -41,6 +42,8 @@ final class PhpImageConfigurationTest extends TestCase
         self::assertStringContainsString('${PHP_ENABLE_XDEBUG:-1}', $installer);
         self::assertStringContainsString('${PHP_ENABLE_SPX:-1}', $installer);
         self::assertStringContainsString("php-spx-0.4.22", $installer);
+        self::assertStringContainsString("patch -p1 < /usr/local/src/spx-web-ui.patch", $installer);
+        self::assertStringContainsString("if (frame === undefined)", $webUiPatch);
         self::assertStringContainsString("spx.http_enabled=1", $spxConfiguration);
         self::assertStringContainsString("process.dumpable = yes", $fpmConfiguration);
     }

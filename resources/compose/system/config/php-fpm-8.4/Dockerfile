@@ -3,6 +3,7 @@ FROM php:8.4-fpm
 ARG PHP_ENABLE_XDEBUG=1
 ARG PHP_ENABLE_SPX=1
 
+COPY spx-web-ui.patch /usr/local/src/spx-web-ui.patch
 COPY scripts/install-extensions.sh /usr/local/bin/docker-cli-install-extensions
 COPY scripts/setup-runtime-user.sh /usr/local/bin/docker-cli-setup-runtime-user
 COPY scripts/setup-xdebug-cli.sh /usr/local/bin/docker-cli-setup-xdebug-cli

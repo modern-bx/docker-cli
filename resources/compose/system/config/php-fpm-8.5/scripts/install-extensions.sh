@@ -50,17 +50,18 @@ if [ "${PHP_ENABLE_XDEBUG:-1}" = "1" ]; then
 fi
 
 if [ "${PHP_ENABLE_SPX:-1}" = "1" ]; then
-    apt-get install -y --no-install-recommends $PHPIZE_DEPS
+    apt-get install -y --no-install-recommends $PHPIZE_DEPS patch
     curl -fsSL https://github.com/NoiseByNorthwest/php-spx/archive/refs/tags/v0.4.22.tar.gz \
         | tar -xz -C /tmp
     cd /tmp/php-spx-0.4.22
+    patch -p1 < /usr/local/src/spx-web-ui.patch
     phpize
     ./configure
     make -j"$(nproc)"
     make install
     docker-php-ext-enable spx
     cd /
-    apt-get purge -y --auto-remove $PHPIZE_DEPS
+    apt-get purge -y --auto-remove $PHPIZE_DEPS patch
     rm -rf /tmp/php-spx-0.4.22
 fi
 
