@@ -24,7 +24,16 @@ final class DedicatedDatabaseDirectoryRemoverTest extends TestCase
         self::assertTrue($remover->remove(
             "example",
             ["mysql"],
-            ["data" => ["databases" => ["mysql" => ["location" => $location]]]],
+            [
+                "data" => [
+                    "databases" => [
+                        "mysql" => [
+                            "hostname" => "docker-cli-mysql-example",
+                            "location" => $location,
+                        ],
+                    ],
+                ],
+            ],
         ));
         self::assertSame(
             [
@@ -49,8 +58,45 @@ final class DedicatedDatabaseDirectoryRemoverTest extends TestCase
         self::assertFalse($remover->remove(
             "example",
             ["postgres"],
-            ["data" => ["databases" => ["postgres" => ["location" => "/srv/postgres-example"]]]],
+            [
+                "data" => [
+                    "databases" => [
+                        "postgres" => [
+                            "hostname" => "docker-cli-postgres-example",
+                            "location" => "/srv/postgres-example",
+                        ],
+                    ],
+                ],
+            ],
         ));
         self::assertSame([["sudo", "rm", "-rf", "--", "/srv/postgres-example/data"]], $commands);
+    }
+
+    public function testDoesNotRemoveSharedDatabaseStorage(): void
+    {
+        $commands = [];
+        $remover = new DedicatedDatabaseDirectoryRemover(
+            static function (array $command) use (&$commands): int {
+                $commands[] = $command;
+
+                return 0;
+            },
+        );
+
+        self::assertTrue($remover->remove(
+            "example",
+            ["mysql"],
+            [
+                "data" => [
+                    "databases" => [
+                        "mysql" => [
+                            "hostname" => "docker-cli-mysql",
+                            "location" => "/srv/mysql",
+                        ],
+                    ],
+                ],
+            ],
+        ));
+        self::assertSame([], $commands);
     }
 }

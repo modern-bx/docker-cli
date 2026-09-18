@@ -31,7 +31,14 @@ final class DedicatedDatabaseDirectoryRemover
     {
         $compose = $this->compose ?? new SystemCompose();
         foreach ($drivers as $driver) {
-            $location = $projectConfig["data"]["databases"][$driver]["location"] ?? null;
+            $databaseConfig = $projectConfig["data"]["databases"][$driver] ?? null;
+            if (
+                !is_array($databaseConfig) ||
+                ($databaseConfig["hostname"] ?? null) !== sprintf("docker-cli-%s-%s", $driver, $projectName)
+            ) {
+                continue;
+            }
+            $location = $databaseConfig["location"] ?? null;
             $directory = $compose->dedicatedDatabaseDirectory(
                 $projectName,
                 $driver,
