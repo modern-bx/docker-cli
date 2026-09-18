@@ -166,7 +166,10 @@ bin/docker-cli project:clone --from=my-project --to=my-project-copy
 bin/docker-cli project:clone --to=/home/user/projects/my-project-copy
 bin/docker-cli project:clone --to=my-project-copy --location=work
 bin/docker-cli project:clone --to=my-project-copy --here
+bin/docker-cli project:clone --to=my-project-copy --mirror=tree
 ```
+
+Опция `--mirror[=tree,db]` включает ускоренные механизмы клонирования. Без значения выбираются оба режима. Для `tree` поддерживается CoW-копирование через `cp -a --reflink=always`, когда исходный и целевой каталоги находятся на одном разделе Btrfs; в остальных случаях используется обычное копирование. Режим `db` копирует через `sudo cp -a --reflink=always` каталоги данных выделенных инстансов, временно останавливая исходные контейнеры. Он применяется к СУБД, которая выделена и у источника, и у клона, выбрана через `--dbms` и явно указана для клона через `--dedicated-db`; иначе для этой СУБД используется обычное клонирование. При быстром клонировании имя базы и пользователя сохраняются как у источника.
 
 `--exclude` принимает разделённые запятыми glob-шаблоны файлов, которые не нужно
 копировать. `--skip-db` отключает клонирование баз, а `--dbms=mysql,postgres`
@@ -660,6 +663,30 @@ composer build-panel
 Команда `composer build` последовательно собирает панель и PHAR. Важно: сборка не заменяет ранее установленный глобальный исполняемый файл `docker-cli`. После сборки запускайте `build/docker-cli.phar` либо установите этот файл вместо старой версии.
 
 ## Системное окружение
+
+### `sudo docker-cli system:setup` / `sudo docker-cli system:rollback`
+
+`system:setup` создаёт в `/etc/sudoers.d` правило, разрешающее выбранному пользователю
+запускать `cp`, `chown` и `chmod` через sudo без ввода пароля. По умолчанию используется
+пользователь, вызвавший `sudo`; другой логин можно передать через `--user`:
+
+```bash
+sudo docker-cli system:setup
+sudo docker-cli system:setup --user=developer
+sudo docker-cli system:setup --user=developer --update
+```
+
+Если файл правила уже существует, команда завершится ошибкой. Опция `--update`
+разрешает перезаписать его. `system:rollback` удаляет правило независимо от того, какой
+программой оно было создано:
+
+```bash
+sudo docker-cli system:rollback
+sudo docker-cli system:rollback --user=developer
+```
+
+Эти команды не читают пользовательскую конфигурацию docker-cli, поэтому могут
+выполняться с домашней директорией пользователя `root`.
 
 ### `bin/docker-cli system:start` / `bin/docker-cli start`
 

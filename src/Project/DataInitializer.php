@@ -12,17 +12,19 @@ final class DataInitializer
 {
     public function __construct(private readonly ?SystemCompose $compose = null) {}
 
-    public function initialize(string $projectName, string $mysqlPassword, string $postgresPassword, bool $rebuild, OutputInterface $output): int
+    /** @param list<string> $drivers */
+    public function initialize(string $projectName, string $mysqlPassword, string $postgresPassword, bool $rebuild, OutputInterface $output, array $drivers = ['mysql', 'postgres']): int
     {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
-        $mysqlSql = $this->mysqlSql($projectName, $mysqlPassword, $rebuild);
-        $code = $this->run(array_merge($compose->dockerComposeCommand('exec'), [
-            '-T',
-            $this->service($projectName, 'mysql'),
-            'sh',
-            '-ec',
-            <<<'SH'
+        if (in_array('mysql', $drivers, true)) {
+            $mysqlSql = $this->mysqlSql($projectName, $mysqlPassword, $rebuild);
+            $code = $this->run(array_merge($compose->dockerComposeCommand('exec'), [
+                '-T',
+                $this->service($projectName, 'mysql'),
+                'sh',
+                '-ec',
+                <<<'SH'
 set -eu
 export MYSQL_PWD="${MYSQL_ROOT_PASSWORD:?}"
 attempt=0
@@ -36,13 +38,15 @@ until mysql --protocol=socket -uroot -e 'SELECT 1' >/dev/null 2>&1; do
 done
 mysql -uroot -e "$1"
 SH,
-            'sh',
-            $mysqlSql,
-        ]), $compose, $output);
-        if ($code !== Command::SUCCESS) {
-            return $code;
+                'sh',
+                $mysqlSql,
+            ]), $compose, $output);
+            if ($code !== Command::SUCCESS) {
+                return $code;
+            }
         }
 
+        if (!in_array('postgres', $drivers, true)) return Command::SUCCESS;
         [$postgresRoleSql, $postgresDropRoleSql, $postgresTerminateSql, $postgresDatabaseExistsSql, $postgresGrantSql] = $this->postgresSql($projectName, $postgresPassword);
         return $this->run(array_merge($compose->dockerComposeCommand('exec'), [
             '-T',

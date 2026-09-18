@@ -39,6 +39,16 @@ final class SystemCompose
         return sprintf('%s-%s', $driver, $projectName);
     }
 
+    public function dedicatedDatabaseDirectory(string $projectName, string $driver, ?string $location = null): string
+    {
+        if (!in_array($driver, ['mysql', 'postgres'], true)) {
+            throw new \InvalidArgumentException(sprintf('Unsupported database driver "%s".', $driver));
+        }
+        $directory = $location ?? $this->envValue('DEFAULT_DATA_DIR_' . strtoupper($driver), 'data/' . $driver) . '-' . $projectName;
+
+        return str_starts_with($directory, DIRECTORY_SEPARATOR) ? $directory : join_path($this->directory(), $directory);
+    }
+
     public function envFile(): string
     {
         return join_path($this->directory(), self::ENV_FILE);

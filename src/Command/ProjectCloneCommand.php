@@ -43,6 +43,7 @@ final class ProjectCloneCommand extends AbstractCommand
         $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код расположения проектов.');
         $this->addOption('here', null, InputOption::VALUE_NONE, 'Создать проект рядом с исходным.');
         $this->addOption('exclude', null, InputOption::VALUE_REQUIRED, 'Список glob-шаблонов через запятую.');
+        $this->addOption('mirror', null, InputOption::VALUE_OPTIONAL, 'Ускоренное клонирование: tree, db или оба значения через запятую. Без значения включает оба режима.');
         $this->addOption('skip-db', null, InputOption::VALUE_NONE, 'Не клонировать базы данных.');
         $this->addOption('dbms', null, InputOption::VALUE_REQUIRED, 'Список СУБД для клонирования через запятую.');
         $this->addOption('dedicated-db', null, InputOption::VALUE_REQUIRED, 'Выделенные СУБД целевого проекта: mysql, postgres или false для системных инстансов. По умолчанию наследуются настройки исходного проекта.');
@@ -52,6 +53,8 @@ final class ProjectCloneCommand extends AbstractCommand
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $mirror = $this->resolveMirror($input, $output);
+        if ($mirror === null) return Command::INVALID;
         if ($input->getOption('here') && $input->getOption('location') !== null) {
             $this->writeMessage($output, '<error>Опции --here и --location нельзя использовать одновременно.</error>');
             return Command::FAILURE;
@@ -146,35 +149,56 @@ final class ProjectCloneCommand extends AbstractCommand
                 }
             }
         }
+        $mirroredDatabases = $this->mirroredDatabaseDrivers($mirror, $dbms, $sourceConfig, $from, $dedicated['drivers'], $input);
         $config = (new ProjectDatabaseConfig())->ensure($config, $dedicated['drivers'], $dedicated['locations']);
         if (!is_dir($registry->projectDirectory($name))) mkdir($registry->projectDirectory($name), 0775, true);
         $registry->writeProjectConfig($name, $config);
         (new DedicatedDatabaseComposeRenderer())->render();
+        $mirroredDatabases = array_values(array_filter($mirroredDatabases, fn (string $driver): bool =>
+            $this->canMirrorDatabase($from, $name, $driver, $sourceConfig, $config)));
+        foreach ($mirroredDatabases as $driver) {
+            $configuredDatabase = $sourceConfig['data']['databases'][$driver]['database'] ?? null;
+            $sourceDatabase = is_string($configuredDatabase) && $configuredDatabase !== '' ? $configuredDatabase : $from;
+            $configuredUsername = $sourceConfig['data']['databases'][$driver]['username'] ?? null;
+            $sourceUsername = is_string($configuredUsername) && $configuredUsername !== '' ? $configuredUsername : $sourceDatabase;
+            $config['data']['databases'][$driver]['database'] = $sourceDatabase;
+            $config['data']['databases'][$driver]['username'] = $sourceUsername;
+        }
+        if ($mirroredDatabases !== []) $registry->writeProjectConfig($name, $config);
         $metadata = join_path($destination, '.docker-cli');
-        if (!is_dir($metadata)) mkdir($metadata, 0775, true);
-        file_put_contents(join_path($metadata, 'project.yaml'), Yaml::dump(['meta' => ['schema' => 'project-meta', 'version' => 0.1], 'data' => ['project' => ['name' => $name]]], 4, 2));
 
         $excludes = ['.docker-cli'];
         $rawExclude = $input->getOption('exclude');
         if (is_string($rawExclude)) foreach (explode(',', $rawExclude) as $pattern) if (trim($pattern) !== '') $excludes[] = ltrim(trim($pattern), './');
-        $excludeArgs = implode(' ', array_map(static fn (string $pattern): string => '--exclude=' . escapeshellarg($pattern), $excludes));
-        $command = sprintf('tar %s -cf - . | (cd %s && tar -xf -)', $excludeArgs, escapeshellarg($destination));
         $filesStarted = microtime(true);
-        passthru('cd ' . escapeshellarg($sourceRoot) . ' && ' . $command, $status);
+        if ($rawExclude === null && in_array('tree', $mirror, true) && $this->canReflink($sourceRoot, $destination)) {
+            $command = sprintf('cp -a --reflink=always -- %s/. %s/', escapeshellarg($sourceRoot), escapeshellarg($destination));
+            passthru($command, $status);
+            if ($status === 0) $this->wipeMetadata($destination);
+        } else {
+            $excludeArgs = implode(' ', array_map(static fn (string $pattern): string => '--exclude=' . escapeshellarg($pattern), $excludes));
+            $command = sprintf('tar %s -cf - . | (cd %s && tar -xf -)', $excludeArgs, escapeshellarg($destination));
+            passthru('cd ' . escapeshellarg($sourceRoot) . ' && ' . $command, $status);
+        }
         $filesDuration = microtime(true) - $filesStarted;
         if ($status !== 0) {
             $this->writeMessage($output, '<error>Копирование проекта завершилось с ошибкой.</error>');
             return Command::FAILURE;
         }
+        if (!is_dir($metadata)) mkdir($metadata, 0775, true);
+        file_put_contents(join_path($metadata, 'project.yaml'), Yaml::dump(['meta' => ['schema' => 'project-meta', 'version' => 0.1], 'data' => ['project' => ['name' => $name]]], 4, 2));
         $databaseDuration = 0.0;
         if ($dbms !== []) {
             $databaseStarted = microtime(true);
-            $databaseCode = $this->startDedicatedDatabases($name, $dedicated['drivers'], $output);
-            if ($databaseCode === Command::SUCCESS) $databaseCode = $this->initializeTargetDatabases($config, $name, $output);
-            if ($databaseCode === Command::SUCCESS && in_array('mysql', $dbms, true)) {
+            $databaseCode = $this->mirrorDedicatedDatabases($from, $name, $mirroredDatabases, $sourceConfig, $config, $output);
+            $regularDedicated = array_values(array_diff($dedicated['drivers'], $mirroredDatabases));
+            if ($databaseCode === Command::SUCCESS) $databaseCode = $this->startDedicatedDatabases($name, $regularDedicated, $output);
+            $regularDrivers = array_values(array_diff(['mysql', 'postgres'], $mirroredDatabases));
+            if ($databaseCode === Command::SUCCESS) $databaseCode = $this->initializeTargetDatabases($config, $name, $regularDrivers, $output);
+            if ($databaseCode === Command::SUCCESS && in_array('mysql', $dbms, true) && !in_array('mysql', $mirroredDatabases, true)) {
                 $databaseCode = $this->cloneMysqlDatabase($sourceConfig, $config, $output);
             }
-            if ($databaseCode === Command::SUCCESS && in_array('postgres', $dbms, true)) {
+            if ($databaseCode === Command::SUCCESS && in_array('postgres', $dbms, true) && !in_array('postgres', $mirroredDatabases, true)) {
                 $databaseCode = $this->clonePostgresDatabase($sourceConfig, $config, $output);
             }
             $databaseDuration = microtime(true) - $databaseStarted;
@@ -234,6 +258,59 @@ final class ProjectCloneCommand extends AbstractCommand
         $mod100 = $value % 100;
         if ($mod100 >= 11 && $mod100 <= 14) return $many;
         return match ($value % 10) { 1 => $one, 2, 3, 4 => $few, default => $many };
+    }
+
+    /** @return list<string>|null */
+    private function resolveMirror(InputInterface $input, OutputInterface $output): ?array
+    {
+        if (!$input->hasParameterOption('--mirror')) return [];
+        $option = $input->getOption('mirror');
+        $modes = is_string($option) && trim($option) !== ''
+            ? array_values(array_unique(array_filter(array_map('trim', explode(',', $option)))))
+            : ['tree', 'db'];
+        if (array_diff($modes, ['tree', 'db']) !== []) {
+            $this->writeMessage($output, '<error>Опция --mirror должна содержать tree и/или db.</error>');
+            return null;
+        }
+        return $modes;
+    }
+
+    private function canReflink(string $source, string $destination): bool
+    {
+        $sourceStat = stat($source);
+        $destinationStat = stat($destination);
+        if ($sourceStat === false || $destinationStat === false || $sourceStat['dev'] !== $destinationStat['dev']) return false;
+        $type = shell_exec('stat -f -c %T -- ' . escapeshellarg($source) . ' 2>/dev/null');
+        return trim((string) $type) === 'btrfs';
+    }
+
+    /** @param list<string> $mirror @param list<string> $dbms @param array<string, mixed> $sourceConfig @param list<string> $targetDedicated @return list<string> */
+    private function mirroredDatabaseDrivers(array $mirror, array $dbms, array $sourceConfig, string $sourceName, array $targetDedicated, InputInterface $input): array
+    {
+        if (!in_array('db', $mirror, true) || !is_string($input->getOption('dedicated-db'))) return [];
+
+        return array_values(array_filter(['mysql', 'postgres'], static fn (string $driver): bool =>
+            in_array($driver, $dbms, true)
+            && in_array($driver, $targetDedicated, true)
+            && ($sourceConfig['data']['databases'][$driver]['hostname'] ?? null) === sprintf('docker-cli-%s-%s', $driver, $sourceName)));
+    }
+
+    /** @param array<string, mixed> $sourceConfig @param array<string, mixed> $targetConfig */
+    private function canMirrorDatabase(string $sourceName, string $targetName, string $driver, array $sourceConfig, array $targetConfig): bool
+    {
+        $compose = new SystemCompose();
+        $sourceLocation = $sourceConfig['data']['databases'][$driver]['location'] ?? null;
+        $targetLocation = $targetConfig['data']['databases'][$driver]['location'] ?? null;
+        $sourceData = join_path($compose->dedicatedDatabaseDirectory($sourceName, $driver, is_string($sourceLocation) ? $sourceLocation : null), 'data');
+        $targetData = join_path($compose->dedicatedDatabaseDirectory($targetName, $driver, is_string($targetLocation) ? $targetLocation : null), 'data');
+
+        return realpath($sourceData) !== realpath($targetData) && $this->canReflink($sourceData, $targetData);
+    }
+
+    private function wipeMetadata(string $destination): void
+    {
+        $metadata = join_path($destination, '.docker-cli');
+        if (is_dir($metadata) || is_link($metadata)) $this->remove($metadata);
     }
 
     /** @return list<string>|null */
@@ -300,8 +377,8 @@ final class ProjectCloneCommand extends AbstractCommand
         return is_resource($process) ? proc_close($process) : Command::FAILURE;
     }
 
-    /** @param array<string, mixed> $targetConfig */
-    private function initializeTargetDatabases(array $targetConfig, string $targetName, OutputInterface $output): int
+    /** @param array<string, mixed> $targetConfig @param list<string> $drivers */
+    private function initializeTargetDatabases(array $targetConfig, string $targetName, array $drivers, OutputInterface $output): int
     {
         $mysqlPassword = $targetConfig['data']['databases']['mysql']['password'] ?? null;
         $postgresPassword = $targetConfig['data']['databases']['postgres']['password'] ?? null;
@@ -310,11 +387,59 @@ final class ProjectCloneCommand extends AbstractCommand
             return Command::FAILURE;
         }
         try {
-            return ($this->dataInitializer ?? new DataInitializer())->initialize($targetName, $mysqlPassword, $postgresPassword, false, $output);
+            return ($this->dataInitializer ?? new DataInitializer())->initialize($targetName, $mysqlPassword, $postgresPassword, false, $output, $drivers);
         } catch (MissingConfigException $exception) {
             $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
             return Command::FAILURE;
         }
+    }
+
+    /** @param list<string> $drivers @param array<string, mixed> $sourceConfig @param array<string, mixed> $targetConfig */
+    private function mirrorDedicatedDatabases(string $sourceName, string $targetName, array $drivers, array $sourceConfig, array $targetConfig, OutputInterface $output): int
+    {
+        if ($drivers === []) return Command::SUCCESS;
+        $compose = new SystemCompose();
+        try { $compose->assertInitialized(); }
+        catch (MissingConfigException $exception) {
+            $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            return Command::FAILURE;
+        }
+        foreach ($drivers as $driver) {
+            $sourceService = $compose->databaseService($sourceName, $driver);
+            $targetService = $compose->databaseService($targetName, $driver);
+            $stopCode = $this->runComposeProcess($compose, ['stop', $sourceService], $output);
+            if ($stopCode !== Command::SUCCESS) return $stopCode;
+
+            $copied = false;
+            try {
+                $sourceLocation = $sourceConfig['data']['databases'][$driver]['location'] ?? null;
+                $targetLocation = $targetConfig['data']['databases'][$driver]['location'] ?? null;
+                $sourceData = join_path($compose->dedicatedDatabaseDirectory($sourceName, $driver, is_string($sourceLocation) ? $sourceLocation : null), 'data');
+                $targetData = join_path($compose->dedicatedDatabaseDirectory($targetName, $driver, is_string($targetLocation) ? $targetLocation : null), 'data');
+                $command = ['sudo', 'cp', '-a', '--reflink=always', '--', rtrim($sourceData, '/') . '/.', rtrim($targetData, '/') . '/'];
+                $this->writeMessage($output, '<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
+                $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes);
+                $copyCode = is_resource($process) ? proc_close($process) : Command::FAILURE;
+                $copied = $copyCode === Command::SUCCESS;
+            } finally {
+                $services = $copied ? [$sourceService, $targetService] : [$sourceService];
+                $startCode = $this->runComposeProcess($compose, ['up', '--detach', ...$services], $output);
+            }
+            if (!$copied) return Command::FAILURE;
+            if ($startCode !== Command::SUCCESS) return $startCode;
+        }
+
+        return Command::SUCCESS;
+    }
+
+    /** @param list<string> $arguments */
+    private function runComposeProcess(SystemCompose $compose, array $arguments, OutputInterface $output): int
+    {
+        $command = array_merge($compose->dockerComposeCommand(array_shift($arguments) ?? ''), $arguments);
+        $this->writeMessage($output, '<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
+        $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
+
+        return is_resource($process) ? proc_close($process) : Command::FAILURE;
     }
 
     /** @param array<string, mixed> $sourceConfig @param array<string, mixed> $targetConfig */

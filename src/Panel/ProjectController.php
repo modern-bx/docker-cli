@@ -610,6 +610,7 @@ final class ProjectController
         else $arguments['location'] = ['value' => $request->location];
         if ($request->skipDb || $request->dbms === []) $arguments['skip-db'] = ['value' => true];
         else $arguments['dbms'] = ['value' => implode(',', $request->dbms)];
+        if ($request->mirror !== null) $arguments['mirror'] = ['value' => implode(',', $request->mirror)];
         if ($request->dedicatedDatabases !== null) {
             $arguments['dedicated-db'] = ['value' => $request->dedicatedDatabases === [] ? 'false' : implode(',', $request->dedicatedDatabases)];
             $options = $this->options(new EmptyRequestDto());
