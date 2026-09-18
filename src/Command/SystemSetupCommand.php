@@ -10,8 +10,10 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class SystemSetupCommand extends SystemUserCommand {
-    public function __construct(private readonly ?SudoersManager $sudoers = null) {
+final class SystemSetupCommand extends SystemUserCommand
+{
+    public function __construct(private readonly ?SudoersManager $sudoers = null)
+    {
         parent::__construct("system:setup");
         $this->setDescription("Настроить системные права для работы docker-cli.");
         $this->addOption(
@@ -23,7 +25,8 @@ final class SystemSetupCommand extends SystemUserCommand {
         $this->addOption("update", null, InputOption::VALUE_NONE, "Перезаписать существующую конфигурацию.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         try {
             $user = $this->resolveUser($input);
             $file = ($this->sudoers ?? new SudoersManager())->setup($user, (bool) $input->getOption("update"));

@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace DockerCli\System;
 
-final class SudoersManager {
+final class SudoersManager
+{
     private const COMMANDS = ["/usr/bin/cp", "/usr/bin/chown", "/usr/bin/chmod"];
 
-    public function __construct(private readonly string $directory = "/etc/sudoers.d") {}
+    public function __construct(private readonly string $directory = "/etc/sudoers.d")
+    {
+    }
 
-    public function setup(string $user, bool $update): string {
+    public function setup(string $user, bool $update): string
+    {
         $file = $this->file($user);
         if (file_exists($file) && !$update) {
             throw new \RuntimeException(
@@ -54,7 +58,8 @@ final class SudoersManager {
         return $file;
     }
 
-    public function rollback(string $user): string {
+    public function rollback(string $user): string
+    {
         $file = $this->file($user);
         if (file_exists($file) && !unlink($file)) {
             throw new \RuntimeException("Не удалось удалить конфигурацию sudoers. " . "Запустите команду через sudo.");
@@ -63,11 +68,13 @@ final class SudoersManager {
         return $file;
     }
 
-    public function file(string $user): string {
+    public function file(string $user): string
+    {
         return rtrim($this->directory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . "docker-cli-" . $user;
     }
 
-    private function validate(string $file): void {
+    private function validate(string $file): void
+    {
         $visudo = is_executable("/usr/sbin/visudo")
             ? "/usr/sbin/visudo"
             : (is_executable("/sbin/visudo")

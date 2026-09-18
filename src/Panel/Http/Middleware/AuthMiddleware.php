@@ -10,13 +10,17 @@ use DockerCli\Panel\JwtTokenService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
-final readonly class AuthMiddleware implements Middleware {
+final readonly class AuthMiddleware implements Middleware
+{
     public const LOGIN_ATTRIBUTE = "panel.authenticated_login";
     public const SESSION_STARTED_AT_ATTRIBUTE = "panel.session_started_at";
 
-    public function __construct(private JwtTokenService $tokens, private ResponseEmitter $responses) {}
+    public function __construct(private JwtTokenService $tokens, private ResponseEmitter $responses)
+    {
+    }
 
-    public function process(ServerRequestInterface $request, callable $next): ResponseInterface {
+    public function process(ServerRequestInterface $request, callable $next): ResponseInterface
+    {
         $token = $request->getCookieParams()[JwtTokenService::COOKIE] ?? null;
         $login = is_string($token) ? $this->tokens->login($token) : null;
         $sessionStartedAt = is_string($token) ? $this->tokens->sessionStartedAt($token) : null;

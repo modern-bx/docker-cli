@@ -6,11 +6,15 @@ namespace DockerCli\Hook;
 
 use function DockerCli\Util\join_path;
 
-final readonly class HookJournal {
-    public function __construct(private ?string $configDirectory = null) {}
+final readonly class HookJournal
+{
+    public function __construct(private ?string $configDirectory = null)
+    {
+    }
 
     /** @param array<string, mixed> $metadata */
-    public function record(array $metadata, int $exitCode, string $stdout, string $stderr): void {
+    public function record(array $metadata, int $exitCode, string $stdout, string $stderr): void
+    {
         $timestamp = $this->timestamp();
         $base = $metadata + [
             "type" => "hook",
@@ -126,7 +130,8 @@ final readonly class HookJournal {
     }
 
     /** @param array<string, mixed> $record */
-    private function append(array $record): void {
+    private function append(array $record): void
+    {
         $directory = $this->journalDirectory();
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf('Не удалось создать директорию "%s".', $directory));
@@ -138,11 +143,13 @@ final readonly class HookJournal {
         }
     }
 
-    private function journalDirectory(): string {
+    private function journalDirectory(): string
+    {
         return join_path($this->configDirectory(), "journal", "hooks");
     }
 
-    private function configDirectory(): string {
+    private function configDirectory(): string
+    {
         if ($this->configDirectory !== null) {
             return $this->configDirectory;
         }
@@ -151,12 +158,13 @@ final readonly class HookJournal {
     }
 
     /** @param array<string, mixed> $record @return list<string> */
-    private function projectsFromRecord(array $record): array {
+    private function projectsFromRecord(array $record): array
+    {
         if (is_array($record["projects"] ?? null)) {
             return array_values(
                 array_filter(
                     $record["projects"],
-                    static fn(mixed $project): bool => is_string($project) && $project !== "",
+                    static fn (mixed $project): bool => is_string($project) && $project !== "",
                 ),
             );
         }
@@ -164,7 +172,8 @@ final readonly class HookJournal {
         return is_string($project) && $project !== "" ? [$project] : [];
     }
 
-    private function timestamp(): string {
+    private function timestamp(): string
+    {
         $microtime = microtime(true);
         $seconds = (int) $microtime;
         $fraction = (int) (($microtime - $seconds) * 1_000_000);

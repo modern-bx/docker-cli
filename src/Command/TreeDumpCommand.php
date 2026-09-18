@@ -17,7 +17,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class TreeDumpCommand extends AbstractCommand {
+final class TreeDumpCommand extends AbstractCommand
+{
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?BackupStorageLocator $storageLocator = null,
@@ -46,7 +47,8 @@ final class TreeDumpCommand extends AbstractCommand {
         $this->addOption("comment", null, InputOption::VALUE_REQUIRED, "Комментарий к бэкапу.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $project = $input->getOption("project") ?: $registry->projectNameFromContext();
         if (!is_string($project) || !$registry->hasProject($project)) {

@@ -8,10 +8,12 @@ use function DockerCli\Util\join_path;
 
 use Symfony\Component\Yaml\Yaml;
 
-final class TokenRepository {
+final class TokenRepository
+{
     private readonly string $directory;
 
-    public function __construct(?string $directory = null) {
+    public function __construct(?string $directory = null)
+    {
         if ($directory === null) {
             $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
             $directory = join_path($home, ".config", "docker-cli", "state", "panel", "sessions", "tokens");
@@ -19,7 +21,8 @@ final class TokenRepository {
         $this->directory = $directory;
     }
 
-    public function store(string $token, string $jti, string $login, int $issuedAt, int $expiresAt): void {
+    public function store(string $token, string $jti, string $login, int $issuedAt, int $expiresAt): void
+    {
         $this->ensureDirectory();
         $lock = fopen(join_path($this->directory, ".lock"), "c+");
         if ($lock === false || !flock($lock, LOCK_EX)) {
@@ -53,7 +56,8 @@ final class TokenRepository {
         }
     }
 
-    public function contains(string $token, string $jti, string $login, int $expiresAt, ?int $now = null): bool {
+    public function contains(string $token, string $jti, string $login, int $expiresAt, ?int $now = null): bool
+    {
         $now ??= time();
         foreach ($this->records() as [$file, $record]) {
             if (($record["expires_at"] ?? 0) <= $now) {
@@ -75,7 +79,8 @@ final class TokenRepository {
     }
 
     /** @param list<string> $logins */
-    public function revoke(array $logins): int {
+    public function revoke(array $logins): int
+    {
         $lookup = array_fill_keys(array_map(UserRepository::normalizeLogin(...), $logins), true);
         $removed = 0;
         foreach ($this->records() as [$file, $record]) {
@@ -88,7 +93,8 @@ final class TokenRepository {
     }
 
     /** @return list<array{string, array<string, mixed>}> */
-    private function records(): array {
+    private function records(): array
+    {
         if (!is_dir($this->directory)) {
             return [];
         }
@@ -117,7 +123,8 @@ final class TokenRepository {
         return $records;
     }
 
-    private function ensureDirectory(): void {
+    private function ensureDirectory(): void
+    {
         if (!is_dir($this->directory) && !mkdir($this->directory, 0700, true) && !is_dir($this->directory)) {
             throw new \RuntimeException(sprintf('Unable to create token directory "%s".', $this->directory));
         }

@@ -6,7 +6,8 @@ namespace DockerCli\Panel;
 
 use function DockerCli\Util\join_path;
 
-final readonly class HookRepository {
+final readonly class HookRepository
+{
     private const OUTPUT_LIMIT = 65536;
     private const COMMANDS = [
         "project:clone",
@@ -18,10 +19,13 @@ final readonly class HookRepository {
         "project:wipe",
     ];
 
-    public function __construct(private ?string $hooksDirectory = null) {}
+    public function __construct(private ?string $hooksDirectory = null)
+    {
+    }
 
     /** @return list<array{id: string, level: string, command: string, timing: string, enabled: bool, hook: string}> */
-    public function all(): array {
+    public function all(): array
+    {
         $commandsDirectory = join_path($this->directory(), "commands");
         if (!is_dir($commandsDirectory)) {
             return [];
@@ -60,7 +64,7 @@ final readonly class HookRepository {
 
         usort(
             $hooks,
-            static fn(array $left, array $right): int => [
+            static fn (array $left, array $right): int => [
                 $left["level"],
                 $left["command"],
                 $left["timing"],
@@ -72,12 +76,14 @@ final readonly class HookRepository {
     }
 
     /** @return list<string> */
-    public function commands(): array {
+    public function commands(): array
+    {
         return self::COMMANDS;
     }
 
     /** @return array{id: string, level: string, command: string, timing: string, enabled: bool, hook: string} */
-    public function create(string $name, bool $enabled, string $level, string $command, string $timing): array {
+    public function create(string $name, bool $enabled, string $level, string $command, string $timing): array
+    {
         $name = trim($name);
         if ($name === "" || $name === "." || $name === ".." || basename($name) !== $name || str_contains($name, "\0")) {
             throw new \RuntimeException("Некорректное имя хука.");
@@ -120,7 +126,8 @@ final readonly class HookRepository {
         ];
     }
 
-    public function toggle(string $id): void {
+    public function toggle(string $id): void
+    {
         $path = $this->existingHookPath($id);
         $directory = dirname($path);
         $fileName = basename($path);
@@ -138,7 +145,8 @@ final readonly class HookRepository {
         }
     }
 
-    public function content(string $id): string {
+    public function content(string $id): string
+    {
         $content = file_get_contents($this->existingHookPath($id));
         if ($content === false) {
             throw new \RuntimeException("Не удалось прочитать хук.");
@@ -185,7 +193,8 @@ final readonly class HookRepository {
     }
 
     /** @return array{exitCode: int, stdout: string, stderr: string} */
-    public function run(string $id, string $profile, string $workingDirectory): array {
+    public function run(string $id, string $profile, string $workingDirectory): array
+    {
         $path = $this->existingHookPath($id);
         $arguments = $this->profileArguments($profile);
         $process = proc_open(
@@ -205,7 +214,8 @@ final readonly class HookRepository {
         return ["exitCode" => $exitCode, "stdout" => $stdout, "stderr" => $stderr];
     }
 
-    public function delete(string $id): void {
+    public function delete(string $id): void
+    {
         $path = $this->existingHookPath($id);
         if (!unlink($path)) {
             throw new \RuntimeException("Не удалось удалить хук.");
@@ -213,7 +223,8 @@ final readonly class HookRepository {
     }
 
     /** @return list<string> */
-    private function profileArguments(string $profile): array {
+    private function profileArguments(string $profile): array
+    {
         $arguments = [];
         foreach (preg_split("/\s+/", trim($profile)) ?: [] as $argument) {
             if ($argument !== "") {
@@ -224,7 +235,8 @@ final readonly class HookRepository {
         return $arguments;
     }
 
-    private function readOutput(mixed $pipe): string {
+    private function readOutput(mixed $pipe): string
+    {
         if (!is_resource($pipe)) {
             return "";
         }
@@ -241,7 +253,8 @@ final readonly class HookRepository {
         return $output;
     }
 
-    private function existingHookPath(string $id): string {
+    private function existingHookPath(string $id): string
+    {
         $path = $this->hookPath($id);
         if (!is_file($path)) {
             throw new \RuntimeException("Хук не найден.");
@@ -250,7 +263,8 @@ final readonly class HookRepository {
         return $path;
     }
 
-    private function templateContent(string $extension, string $command, string $timing): string {
+    private function templateContent(string $extension, string $command, string $timing): string
+    {
         $template = join_path(dirname(__DIR__, 2), "resources", "hooks", "templates", strtolower($extension));
         if (!is_file($template)) {
             return "";
@@ -263,7 +277,8 @@ final readonly class HookRepository {
         return str_replace(["{{COMMAND}}", "{{TIMING}}"], [$command, $timing], $content);
     }
 
-    private function hookPath(string $id): string {
+    private function hookPath(string $id): string
+    {
         $path = join_path($this->directory(), ...explode("/", $id));
         $realRoot = realpath($this->directory());
         $realDirectory = realpath(dirname($path));
@@ -278,7 +293,8 @@ final readonly class HookRepository {
         return $path;
     }
 
-    private function directory(): string {
+    private function directory(): string
+    {
         if ($this->hooksDirectory !== null) {
             return $this->hooksDirectory;
         }

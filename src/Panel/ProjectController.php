@@ -45,7 +45,8 @@ use function DockerCli\Util\join_path;
 
 use Symfony\Component\Yaml\Yaml;
 
-final class ProjectController {
+final class ProjectController
+{
     public function __construct(
         private readonly ProjectRegistry $projects,
         private readonly ?SystemCompose $compose = null,
@@ -53,7 +54,8 @@ final class ProjectController {
         private readonly ?ProjectsSettingsRepository $settings = null,
         private readonly ?TaskRepository $tasks = null,
         private readonly ?BackupsSettingsRepository $backupSettings = null,
-    ) {}
+    ) {
+    }
 
     #[
         Route(
@@ -63,7 +65,8 @@ final class ProjectController {
             ProjectListDto::class,
         ),
     ]
-    public function action(ProjectActionRequestDto $request): ProjectListDto {
+    public function action(ProjectActionRequestDto $request): ProjectListDto
+    {
         $name = $request->name;
         $action = $request->action;
         if (!$this->projects->hasProject($name)) {
@@ -98,7 +101,8 @@ final class ProjectController {
     }
 
     #[Route("GET", "/api/projects", EmptyRequestDto::class, ProjectListDto::class)]
-    public function projects(EmptyRequestDto $request): ProjectListDto {
+    public function projects(EmptyRequestDto $request): ProjectListDto
+    {
         $projects = [];
         $baseHost = ($this->compose ?? new SystemCompose())->envValue("BASE_HOST", "");
         foreach ($this->projects->registeredProjectNames() as $name) {
@@ -137,7 +141,8 @@ final class ProjectController {
     }
 
     #[Route("GET", "/api/projects/{name}/schedule", ProjectNameRequestDto::class, ScheduleListDto::class)]
-    public function schedule(ProjectNameRequestDto $request): ScheduleListDto {
+    public function schedule(ProjectNameRequestDto $request): ScheduleListDto
+    {
         if (!$this->projects->hasProject($request->name)) {
             throw new ProjectActionException("Проект не найден.", 404);
         }
@@ -152,13 +157,14 @@ final class ProjectController {
                 array_map(static function (array $item): array {
                     $item["enabled"] = ($item["enabled"] ?? true) !== false;
                     return $item;
-                }, array_filter($items, static fn(mixed $item): bool => is_array($item))),
+                }, array_filter($items, static fn (mixed $item): bool => is_array($item))),
             ),
         );
     }
 
     #[Route("POST", "/api/projects/{name}/schedule", ProjectScheduleRequestDto::class, ScheduleListDto::class)]
-    public function addSchedule(ProjectScheduleRequestDto $request): ScheduleListDto {
+    public function addSchedule(ProjectScheduleRequestDto $request): ScheduleListDto
+    {
         if (!$this->projects->hasProject($request->name)) {
             throw new ProjectActionException("Проект не найден.", 404);
         }
@@ -192,7 +198,8 @@ final class ProjectController {
             ScheduleListDto::class,
         ),
     ]
-    public function updateSchedule(ProjectScheduleRequestDto $request): ScheduleListDto {
+    public function updateSchedule(ProjectScheduleRequestDto $request): ScheduleListDto
+    {
         [$config, $items] = $this->scheduleConfig($request->name);
         if ($request->index === null || !isset($items[$request->index])) {
             throw new ProjectActionException("Запись расписания не найдена.", 404);
@@ -219,7 +226,8 @@ final class ProjectController {
             ScheduleListDto::class,
         ),
     ]
-    public function deleteSchedule(ProjectScheduleItemRequestDto $request): ScheduleListDto {
+    public function deleteSchedule(ProjectScheduleItemRequestDto $request): ScheduleListDto
+    {
         [$config, $items] = $this->scheduleConfig($request->name);
         if (!isset($items[$request->index])) {
             throw new ProjectActionException("Запись расписания не найдена.", 404);
@@ -231,7 +239,8 @@ final class ProjectController {
     }
 
     /** @return array{array<string, mixed>, list<mixed>} */
-    private function scheduleConfig(string $name): array {
+    private function scheduleConfig(string $name): array
+    {
         if (!$this->projects->hasProject($name)) {
             throw new ProjectActionException("Проект не найден.", 404);
         }
@@ -245,7 +254,8 @@ final class ProjectController {
     }
 
     /** @param array<string, mixed> $config @param list<mixed> $items */
-    private function writeSchedule(string $name, array $config, array $items): void {
+    private function writeSchedule(string $name, array $config, array $items): void
+    {
         $config["data"]["project"]["schedule"] = $items;
         $this->projects->writeProjectConfig($name, $config);
         $root = $config["data"]["project"]["root"] ?? null;
@@ -266,7 +276,8 @@ final class ProjectController {
     }
 
     #[Route("GET", "/api/projects/{name}/backups", ProjectBackupListRequestDto::class, ProjectBackupListDto::class)]
-    public function backups(ProjectBackupListRequestDto $request): ProjectBackupListDto {
+    public function backups(ProjectBackupListRequestDto $request): ProjectBackupListDto
+    {
         if (!$this->projects->hasProject($request->name)) {
             throw new ProjectActionException("Проект не найден.", 404);
         }
@@ -356,7 +367,7 @@ final class ProjectController {
                     $grouped[$key]["database"] = implode(
                         ", ",
                         array_map(
-                            static fn(string $code): string => ["mysql" => "MySQL", "postgres" => "PostgreSQL"][$code],
+                            static fn (string $code): string => ["mysql" => "MySQL", "postgres" => "PostgreSQL"][$code],
                             $grouped[$key]["databaseCodes"],
                         ),
                     );
@@ -482,7 +493,8 @@ final class ProjectController {
     }
 
     #[Route("POST", "/api/projects/{name}/backups", ProjectBackupCreateRequestDto::class, QueuedOperationDto::class)]
-    public function createBackup(ProjectBackupCreateRequestDto $request): QueuedOperationDto {
+    public function createBackup(ProjectBackupCreateRequestDto $request): QueuedOperationDto
+    {
         if (!$this->projects->hasProject($request->name)) {
             throw new ProjectActionException("Проект не найден.", 404);
         }
@@ -576,7 +588,8 @@ final class ProjectController {
             BackupCommentDto::class,
         ),
     ]
-    public function updateBackupComment(ProjectBackupCommentRequestDto $request): BackupCommentDto {
+    public function updateBackupComment(ProjectBackupCommentRequestDto $request): BackupCommentDto
+    {
         if (!$this->projects->hasProject($request->name)) {
             throw new ProjectActionException("Проект не найден.", 404);
         }
@@ -590,7 +603,7 @@ final class ProjectController {
             $location = current(
                 array_filter(
                     ($this->backupSettings ?? new BackupsSettingsRepository())->locations(),
-                    static fn(array $item): bool => $item["code"] === $request->location,
+                    static fn (array $item): bool => $item["code"] === $request->location,
                 ),
             );
             if (!is_array($location)) {
@@ -639,7 +652,8 @@ final class ProjectController {
             QueuedOperationDto::class,
         ),
     ]
-    public function restoreBackup(ProjectBackupRestoreRequestDto $request): QueuedOperationDto {
+    public function restoreBackup(ProjectBackupRestoreRequestDto $request): QueuedOperationDto
+    {
         if (!$this->projects->hasProject($request->name)) {
             throw new ProjectActionException("Проект не найден.", 404);
         }
@@ -745,7 +759,8 @@ final class ProjectController {
             QueuedOperationDto::class,
         ),
     ]
-    public function deleteBackup(ProjectBackupRestoreRequestDto $request): QueuedOperationDto {
+    public function deleteBackup(ProjectBackupRestoreRequestDto $request): QueuedOperationDto
+    {
         if (!$this->projects->hasProject($request->name)) {
             throw new ProjectActionException("Проект не найден.", 404);
         }
@@ -793,7 +808,8 @@ final class ProjectController {
     ];
 
     #[Route("GET", "/api/projects/options", EmptyRequestDto::class, ProjectOptionsDto::class)]
-    public function options(EmptyRequestDto $request): ProjectOptionsDto {
+    public function options(EmptyRequestDto $request): ProjectOptionsDto
+    {
         $deploymentScripts = [];
         foreach (($this->tasks ?? new TaskRepository())->all() as $definition) {
             $task = $definition["task"];
@@ -816,7 +832,7 @@ final class ProjectController {
                 "php" => [
                     new ConceptDto("", "Без фреймворка"),
                     ...array_map(
-                        static fn(string $code, string $name) => new ConceptDto($code, $name),
+                        static fn (string $code, string $name) => new ConceptDto($code, $name),
                         array_keys(self::FRAMEWORK_NAMES),
                         self::FRAMEWORK_NAMES,
                     ),
@@ -827,10 +843,11 @@ final class ProjectController {
     }
 
     #[Route("POST", "/api/projects", ProjectCreateRequestDto::class, ProjectListDto::class)]
-    public function create(ProjectCreateRequestDto $request): ProjectListDto {
+    public function create(ProjectCreateRequestDto $request): ProjectListDto
+    {
         $options = $this->options(new EmptyRequestDto());
         $location = current(
-            array_filter($options->locations, static fn(array $item): bool => $item["code"] === $request->location),
+            array_filter($options->locations, static fn (array $item): bool => $item["code"] === $request->location),
         );
         if (!is_array($location)) {
             throw new ProjectActionException("Локация не найдена.", 422);
@@ -840,7 +857,7 @@ final class ProjectController {
             !isset($options->frameworks[$request->language]) ||
             !in_array(
                 $request->framework ?? "",
-                array_map(static fn(ConceptDto $item) => $item->code, $options->frameworks[$request->language]),
+                array_map(static fn (ConceptDto $item) => $item->code, $options->frameworks[$request->language]),
                 true,
             )
         ) {
@@ -887,7 +904,7 @@ final class ProjectController {
             $script = current(
                 array_filter(
                     $options->deploymentScripts,
-                    static fn(DeploymentScriptDto $item): bool => $item->code === $request->deploymentScript,
+                    static fn (DeploymentScriptDto $item): bool => $item->code === $request->deploymentScript,
                 ),
             );
             if (!($script instanceof DeploymentScriptDto)) {
@@ -925,7 +942,8 @@ final class ProjectController {
     }
 
     #[Route("POST", "/api/projects/{name}/clone", ProjectCloneRequestDto::class, QueuedOperationDto::class)]
-    public function clone(ProjectCloneRequestDto $request): QueuedOperationDto {
+    public function clone(ProjectCloneRequestDto $request): QueuedOperationDto
+    {
         if (!$this->projects->hasProject($request->name)) {
             throw new ProjectActionException("Проект не найден.", 404);
         }
@@ -984,7 +1002,8 @@ final class ProjectController {
     }
 
     #[Route("POST", "/api/projects/{name}/update", ProjectUpdateRequestDto::class, ProjectListDto::class)]
-    public function update(ProjectUpdateRequestDto $request): ProjectListDto {
+    public function update(ProjectUpdateRequestDto $request): ProjectListDto
+    {
         if (!$this->projects->hasProject($request->project)) {
             throw new ProjectActionException("Проект не найден.", 404);
         }
@@ -1016,7 +1035,7 @@ final class ProjectController {
             $request->framework !== null &&
             !in_array(
                 $request->framework,
-                array_map(static fn(ConceptDto $item) => $item->code, $options->frameworks[$language] ?? []),
+                array_map(static fn (ConceptDto $item) => $item->code, $options->frameworks[$language] ?? []),
                 true,
             )
         ) {
@@ -1065,7 +1084,8 @@ final class ProjectController {
     }
 
     #[Route("POST", "/api/projects/{name}/security", ProjectSecurityRequestDto::class, ProjectListDto::class)]
-    public function saveSecurity(ProjectSecurityRequestDto $request): ProjectListDto {
+    public function saveSecurity(ProjectSecurityRequestDto $request): ProjectListDto
+    {
         if (!$this->projects->hasProject($request->name)) {
             throw new ProjectActionException("Проект не найден.", 404);
         }
@@ -1080,7 +1100,8 @@ final class ProjectController {
     }
 
     #[Route("POST", "/api/projects/{name}/notes", ProjectNotesRequestDto::class, ProjectListDto::class)]
-    public function saveNotes(ProjectNotesRequestDto $request): ProjectListDto {
+    public function saveNotes(ProjectNotesRequestDto $request): ProjectListDto
+    {
         $name = $request->name;
         $tags = $request->tags;
         $description = $request->description;
@@ -1109,15 +1130,17 @@ final class ProjectController {
     }
 
     /** @return list<string> */
-    private function tags(mixed $tags): array {
+    private function tags(mixed $tags): array
+    {
         if (!is_array($tags)) {
             return [];
         }
 
-        return array_values(array_filter($tags, static fn(mixed $tag): bool => is_string($tag) && $tag !== ""));
+        return array_values(array_filter($tags, static fn (mixed $tag): bool => is_string($tag) && $tag !== ""));
     }
 
-    private function directorySize(string $directory): int {
+    private function directorySize(string $directory): int
+    {
         $size = 0;
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
@@ -1131,14 +1154,16 @@ final class ProjectController {
     }
 
     /** @param array<string, string> $names */
-    private function concept(mixed $value, array $names): ?ConceptDto {
+    private function concept(mixed $value, array $names): ?ConceptDto
+    {
         if (!is_string($value) || $value === "" || !isset($names[$value])) {
             return null;
         }
         return new ConceptDto($value, $names[$value]);
     }
 
-    private function enqueueWipe(string $name): void {
+    private function enqueueWipe(string $name): void
+    {
         $item = [
             "meta" => ["schema" => "queue-item", "version" => "0.1"],
             "queue-item" => [
@@ -1158,7 +1183,8 @@ final class ProjectController {
         }
     }
 
-    private function enqueueDelete(string $name): void {
+    private function enqueueDelete(string $name): void
+    {
         $item = [
             "meta" => ["schema" => "queue-item", "version" => "0.1"],
             "queue-item" => [
@@ -1184,15 +1210,16 @@ final class ProjectController {
     }
 
     /** @param list<array{path: string, code: string, default: bool}> $locations */
-    private function resolveDatabaseLocation(string $selection, array $locations): ?string {
+    private function resolveDatabaseLocation(string $selection, array $locations): ?string
+    {
         if ($selection === "system") {
             return null;
         }
         if ($selection === "default") {
-            $location = current(array_filter($locations, static fn(array $item): bool => $item["default"]));
+            $location = current(array_filter($locations, static fn (array $item): bool => $item["default"]));
             return is_array($location) ? $location["path"] : null;
         }
-        $location = current(array_filter($locations, static fn(array $item): bool => $item["code"] === $selection));
+        $location = current(array_filter($locations, static fn (array $item): bool => $item["code"] === $selection));
         if (!is_array($location)) {
             throw new ProjectActionException("Расположение БД не найдено.", 422);
         }
@@ -1200,7 +1227,8 @@ final class ProjectController {
         return $location["path"];
     }
 
-    private function reloadOpenResty(): void {
+    private function reloadOpenResty(): void
+    {
         $compose = $this->compose ?? new SystemCompose();
         $command = [...$compose->dockerComposeCommand("exec"), "--no-TTY", "openresty", "openresty", "-s", "reload"];
         $process = proc_open(

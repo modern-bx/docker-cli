@@ -13,7 +13,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class QueueStartCommand extends AbstractCommand {
+final class QueueStartCommand extends AbstractCommand
+{
     private const POLL_INTERVAL_MICROSECONDS = 1_000_000;
 
     public function __construct(
@@ -33,7 +34,8 @@ final class QueueStartCommand extends AbstractCommand {
         $this->addOption("path", null, InputOption::VALUE_REQUIRED, "Явный путь к бинарнику для systemd-сервиса.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $queue = (string) $input->getOption("queue");
         $repository = $this->queues ?? new QueueRepository();
         // Validate the queue code before installing a service, without requiring
@@ -63,7 +65,8 @@ final class QueueStartCommand extends AbstractCommand {
         }
     }
 
-    private function installSystemdService(InputInterface $input, OutputInterface $output, string $queue): int {
+    private function installSystemdService(InputInterface $input, OutputInterface $output, string $queue): int
+    {
         $rawUser = $input->getOption("user");
         if ($rawUser !== null && (!is_string($rawUser) || preg_match('/^[a-zA-Z0-9_.@-]+$/D', $rawUser) !== 1)) {
             $this->writeMessage($output, "<error>Некорректное имя пользователя для " . "systemd-сервиса.</error>");
@@ -123,7 +126,8 @@ final class QueueStartCommand extends AbstractCommand {
         return Command::SUCCESS;
     }
 
-    private function resolveBinary(string $binary): string {
+    private function resolveBinary(string $binary): string
+    {
         if (str_contains($binary, DIRECTORY_SEPARATOR)) {
             return realpath($binary) ?: $binary;
         }

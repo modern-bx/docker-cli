@@ -9,8 +9,10 @@ use DockerCli\Framework\Detected\Symfony;
 
 use function DockerCli\Util\join_path;
 
-final class SymfonyDetector extends ComposerPackageDetector {
-    public function detect(string $projectRoot): ?DetectedFramework {
+final class SymfonyDetector extends ComposerPackageDetector
+{
+    public function detect(string $projectRoot): ?DetectedFramework
+    {
         if (!$this->hasComposerPackage($projectRoot, "symfony/framework-bundle")) {
             return null;
         }

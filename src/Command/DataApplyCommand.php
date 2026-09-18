@@ -15,7 +15,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DataApplyCommand extends AbstractCommand {
+final class DataApplyCommand extends AbstractCommand
+{
     private const DBMS = ["mysql", "postgres"];
 
     public function __construct(
@@ -33,7 +34,8 @@ final class DataApplyCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $dbms = $input->getOption("dbms");
         if (!is_string($dbms) || !in_array($dbms, self::DBMS, true)) {
             $this->writeMessage(
@@ -121,7 +123,8 @@ final class DataApplyCommand extends AbstractCommand {
         }
     }
 
-    private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string {
+    private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string
+    {
         $projectName = $input->getOption("project");
         if (is_string($projectName) && $projectName !== "") {
             return $projectName;
@@ -134,7 +137,8 @@ final class DataApplyCommand extends AbstractCommand {
      * @param list<string> $paths
      * @return list<string>
      */
-    private function resolveSqlFiles(array $paths, OutputInterface $output, array &$temporaryDirectories): array {
+    private function resolveSqlFiles(array $paths, OutputInterface $output, array &$temporaryDirectories): array
+    {
         $files = [];
         foreach ($paths as $path) {
             if (!is_string($path) || $path === "") {
@@ -168,7 +172,7 @@ final class DataApplyCommand extends AbstractCommand {
                 continue;
             }
 
-            $matches = array_values(array_filter(glob($path) ?: [], static fn(string $file): bool => is_file($file)));
+            $matches = array_values(array_filter(glob($path) ?: [], static fn (string $file): bool => is_file($file)));
             if ($matches === []) {
                 $this->writeMessage($output, sprintf('<error>Путь "%s" не найден.</error>', $path));
                 return [];
@@ -189,7 +193,8 @@ final class DataApplyCommand extends AbstractCommand {
      * @param list<string> $files
      * @param list<string> $temporaryDirectories
      */
-    private function addFile(string $file, array &$files, array &$temporaryDirectories, OutputInterface $output): bool {
+    private function addFile(string $file, array &$files, array &$temporaryDirectories, OutputInterface $output): bool
+    {
         $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
         if ($extension === "sql") {
             $files[] = $this->normalizePath($file);
@@ -213,14 +218,16 @@ final class DataApplyCommand extends AbstractCommand {
         return true;
     }
 
-    private function removeDirectory(string $directory): void {
+    private function removeDirectory(string $directory): void
+    {
         foreach (glob($directory . DIRECTORY_SEPARATOR . "*") ?: [] as $file) {
             @unlink($file);
         }
         @rmdir($directory);
     }
 
-    private function normalizePath(string $path): string {
+    private function normalizePath(string $path): string
+    {
         return realpath($path) ?: $path;
     }
 }

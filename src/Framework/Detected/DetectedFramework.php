@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace DockerCli\Framework\Detected;
 
-abstract class DetectedFramework {
-    public function __construct(protected readonly string $projectRoot) {}
+abstract class DetectedFramework
+{
+    public function __construct(protected readonly string $projectRoot)
+    {
+    }
 
-    public function getProjectRoot(): string {
+    public function getProjectRoot(): string
+    {
         return $this->projectRoot;
     }
 

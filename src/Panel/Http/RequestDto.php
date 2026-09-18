@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DockerCli\Panel\Http;
 
-interface RequestDto {
+interface RequestDto
+{
     public static function fromRequest(RequestData $request): static;
 }

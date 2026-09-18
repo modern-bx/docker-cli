@@ -12,14 +12,17 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelUserCreateCommand extends AbstractCommand {
-    public function __construct() {
+final class PanelUserCreateCommand extends AbstractCommand
+{
+    public function __construct()
+    {
         parent::__construct("panel:user-create");
         $this->setDescription("Создать пользователя административной панели.");
         $this->addArgument("login", InputArgument::REQUIRED, "Логин пользователя (email).");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $compose = new SystemCompose();
         $salt = $compose->envValue("PANEL_PASSWORD_SALT");
         if ($salt === "") {

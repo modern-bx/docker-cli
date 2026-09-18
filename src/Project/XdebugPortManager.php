@@ -8,10 +8,12 @@ use function DockerCli\Util\join_path;
 
 use Symfony\Component\Yaml\Yaml;
 
-final class XdebugPortManager {
+final class XdebugPortManager
+{
     private const FIRST_PROJECT_PORT = 9004;
 
-    public function nextPort(string $projectsDirectory): int {
+    public function nextPort(string $projectsDirectory): int
+    {
         $port = self::FIRST_PROJECT_PORT;
         $usedPorts = $this->registeredPorts($projectsDirectory);
 
@@ -22,7 +24,8 @@ final class XdebugPortManager {
         return $port;
     }
 
-    public function rebuildProjectPorts(string $projectsDirectory): bool {
+    public function rebuildProjectPorts(string $projectsDirectory): bool
+    {
         if (!is_dir($projectsDirectory)) {
             return false;
         }
@@ -70,7 +73,8 @@ final class XdebugPortManager {
     }
 
     /** @return list<int> */
-    private function registeredPorts(string $projectsDirectory): array {
+    private function registeredPorts(string $projectsDirectory): array
+    {
         if (!is_dir($projectsDirectory)) {
             return [];
         }
@@ -91,7 +95,8 @@ final class XdebugPortManager {
         return $ports;
     }
 
-    private function portNumber(mixed $port): ?int {
+    private function portNumber(mixed $port): ?int
+    {
         if (is_int($port)) {
             return $port;
         }

@@ -9,10 +9,14 @@ use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
 /** JSON request accepted by POST /api/projects/{name}/security. */
-final readonly class ProjectSecurityRequestDto implements RequestDto {
-    public function __construct(public string $name, public bool $protected) {}
+final readonly class ProjectSecurityRequestDto implements RequestDto
+{
+    public function __construct(public string $name, public bool $protected)
+    {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         if (!is_bool($request->body["protected"] ?? null)) {
             throw new RequestValidationException("Некорректные настройки безопасности.");
         }

@@ -10,10 +10,12 @@ use function DockerCli\Util\join_path;
 
 use Symfony\Component\Yaml\Yaml;
 
-final class BackupsSettingsRepository {
+final class BackupsSettingsRepository
+{
     private readonly string $file;
 
-    public function __construct(?string $file = null) {
+    public function __construct(?string $file = null)
+    {
         if ($file === null) {
             $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
             $file = join_path($home, ".config", "docker-cli", "state", "panel", "settings", "backups.yaml");
@@ -22,7 +24,8 @@ final class BackupsSettingsRepository {
     }
 
     /** @return list<array{path: string, code: string, default: bool}> */
-    public function locations(): array {
+    public function locations(): array
+    {
         $valid = $this->storedLocations();
         $used = [];
         foreach ($valid as &$location) {
@@ -37,7 +40,8 @@ final class BackupsSettingsRepository {
     }
 
     /** @return list<array{name: string, code: string, include: list<string>, exclude: list<string>}> */
-    public function fileStrategies(): array {
+    public function fileStrategies(): array
+    {
         return $this->storedSettings()["fileStrategies"];
     }
 
@@ -49,7 +53,8 @@ final class BackupsSettingsRepository {
      *     fileStrategies: list<array{name: string, code: string, include: list<string>, exclude: list<string>}>
      * }
      */
-    public function save(array $locations, array $fileStrategies): array {
+    public function save(array $locations, array $fileStrategies): array
+    {
         // Use the values actually persisted in the file to distinguish an
         // existing location from a newly added one. Existing location codes may
         // be changed, but must never be saved empty.
@@ -112,7 +117,8 @@ final class BackupsSettingsRepository {
     }
 
     /** @return list<array{path: string, code?: mixed, default: bool}> */
-    private function storedLocations(): array {
+    private function storedLocations(): array
+    {
         return $this->storedSettings()["locations"];
     }
 
@@ -120,7 +126,8 @@ final class BackupsSettingsRepository {
      * @return array{locations: list<array{path: string, code?: mixed, default: bool}>, fileStrategies:
      * list<array{name: string, code: string, include: list<string>, exclude: list<string>}>}
      */
-    private function storedSettings(): array {
+    private function storedSettings(): array
+    {
         $data = is_file($this->file) ? Yaml::parseFile($this->file) : [];
         $settings =
             is_array($data) &&
@@ -132,7 +139,7 @@ final class BackupsSettingsRepository {
         $locations = array_values(
             array_filter(
                 is_array($settings["locations"] ?? null) ? $settings["locations"] : [],
-                static fn($item): bool => is_array($item) &&
+                static fn ($item): bool => is_array($item) &&
                     is_string($item["path"] ?? null) &&
                     is_bool($item["default"] ?? null),
             ),
@@ -140,15 +147,15 @@ final class BackupsSettingsRepository {
         $strategies = array_values(
             array_filter(
                 is_array($settings["fileStrategies"] ?? null) ? $settings["fileStrategies"] : [],
-                static fn($item): bool => is_array($item) &&
+                static fn ($item): bool => is_array($item) &&
                     is_string($item["name"] ?? null) &&
                     is_string($item["code"] ?? null) &&
                     is_array($item["include"] ?? null) &&
                     array_is_list($item["include"]) &&
-                    !array_filter($item["include"], static fn($value): bool => !is_string($value)) &&
+                    !array_filter($item["include"], static fn ($value): bool => !is_string($value)) &&
                     is_array($item["exclude"] ?? null) &&
                     array_is_list($item["exclude"]) &&
-                    !array_filter($item["exclude"], static fn($value): bool => !is_string($value)),
+                    !array_filter($item["exclude"], static fn ($value): bool => !is_string($value)),
             ),
         );
         foreach ($strategies as &$strategy) {
@@ -159,10 +166,11 @@ final class BackupsSettingsRepository {
     }
 
     /** @return list<string> */
-    private static function patterns(mixed $value): array {
+    private static function patterns(mixed $value): array
+    {
         return is_array($value) &&
             array_is_list($value) &&
-            !array_filter($value, static fn($item): bool => !is_string($item))
+            !array_filter($value, static fn ($item): bool => !is_string($item))
             ? $value
             : [];
     }

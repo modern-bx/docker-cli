@@ -13,7 +13,8 @@ namespace DockerCli\Panel\Dto;
  *     tags: list<string>, description: string, root: string
  * }
  */
-final readonly class ProjectDto implements \JsonSerializable {
+final readonly class ProjectDto implements \JsonSerializable
+{
     public function __construct(
         public string $name,
         public ?ConceptDto $language,
@@ -28,10 +29,12 @@ final readonly class ProjectDto implements \JsonSerializable {
         public array $tags,
         public string $description,
         public string $root,
-    ) {}
+    ) {
+    }
 
     /** @return array<string, mixed> */
-    public function jsonSerialize(): array {
+    public function jsonSerialize(): array
+    {
         return [
             "name" => $this->name,
             "language" => $this->language,

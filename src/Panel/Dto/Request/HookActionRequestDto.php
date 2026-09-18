@@ -8,10 +8,14 @@ use DockerCli\Panel\Http\RequestData;
 use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class HookActionRequestDto implements RequestDto {
-    public function __construct(public string $id) {}
+final readonly class HookActionRequestDto implements RequestDto
+{
+    public function __construct(public string $id)
+    {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         $id = rawurldecode($request->route["id"] ?? "");
         if (
             $id === "" ||

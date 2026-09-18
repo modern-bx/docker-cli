@@ -6,10 +6,14 @@ namespace DockerCli\Project;
 
 use function DockerCli\Util\join_path;
 
-final readonly class TreeArchiveLoader {
-    public function __construct(private ?TreeArchiveManager $manager = null) {}
+final readonly class TreeArchiveLoader
+{
+    public function __construct(private ?TreeArchiveManager $manager = null)
+    {
+    }
 
-    public function load(string $backupDirectory, string $projectRoot, bool $force, bool $wipe): void {
+    public function load(string $backupDirectory, string $projectRoot, bool $force, bool $wipe): void
+    {
         $metadata = json_decode((string) @file_get_contents(join_path($backupDirectory, "docker-cli.json")), true);
         if (!is_array($metadata)) {
             throw new \InvalidArgumentException("Метаданные файлового бэкапа повреждены.");
@@ -53,21 +57,24 @@ final readonly class TreeArchiveLoader {
     }
 
     /** @return list<string> */
-    private function entries(string $archive, string $archiveName): array {
+    private function entries(string $archive, string $archiveName): array
+    {
         $command = $this->tarCommand($archive, $archiveName, "-tf");
         $output = $this->run($command, true);
         return array_values(
-            array_filter(explode("\n", rtrim($output, "\n")), static fn(string $entry): bool => $entry !== ""),
+            array_filter(explode("\n", rtrim($output, "\n")), static fn (string $entry): bool => $entry !== ""),
         );
     }
 
-    private function extract(string $archive, string $projectRoot, string $archiveName): void {
+    private function extract(string $archive, string $projectRoot, string $archiveName): void
+    {
         $command = $this->tarCommand($archive, $archiveName, "-xf", ["-C", $projectRoot]);
         $this->run($command);
     }
 
     /** @param list<string> $suffix @return list<string> */
-    private function tarCommand(string $archive, string $archiveName, string $operation, array $suffix = []): array {
+    private function tarCommand(string $archive, string $archiveName, string $operation, array $suffix = []): array
+    {
         if (str_ends_with($archiveName, ".tar.lz4")) {
             return [
                 "sh",
@@ -95,7 +102,8 @@ final readonly class TreeArchiveLoader {
         return ["tar", $operation, $archive, ...$suffix];
     }
 
-    private function assertSafeEntry(string $entry): void {
+    private function assertSafeEntry(string $entry): void
+    {
         $normalized = str_replace("\\", "/", $entry);
         $normalized = preg_replace("~^\./~", "", $normalized) ?? $normalized;
         if ($normalized === "") {
@@ -112,7 +120,8 @@ final readonly class TreeArchiveLoader {
     }
 
     /** @param list<string> $command */
-    private function run(array $command, bool $capture = false): string {
+    private function run(array $command, bool $capture = false): string
+    {
         $descriptors = [STDIN, $capture ? ["pipe", "w"] : STDOUT, STDERR];
         $process = proc_open($command, $descriptors, $pipes);
         if (!is_resource($process)) {

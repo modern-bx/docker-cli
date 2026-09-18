@@ -11,14 +11,18 @@ use DockerCli\Panel\Dto\Request\EmptyRequestDto;
 use DockerCli\Panel\Dto\Request\NotificationRequestDto;
 use DockerCli\Panel\Http\Attribute\Route;
 
-final readonly class NotificationController {
-    public function __construct(private NotificationRepository $notifications) {}
+final readonly class NotificationController
+{
+    public function __construct(private NotificationRepository $notifications)
+    {
+    }
 
     #[Route("GET", "/api/notifications", EmptyRequestDto::class, NotificationListDto::class)]
-    public function current(EmptyRequestDto $request): NotificationListDto {
+    public function current(EmptyRequestDto $request): NotificationListDto
+    {
         return new NotificationListDto(
             array_map(
-                static fn(array $item): NotificationDto => new NotificationDto(
+                static fn (array $item): NotificationDto => new NotificationDto(
                     $item["file"],
                     $item["time"],
                     $item["level"],
@@ -30,7 +34,8 @@ final readonly class NotificationController {
     }
 
     #[Route("DELETE", "/api/notifications/{file}", NotificationRequestDto::class, NotificationListDto::class)]
-    public function archive(NotificationRequestDto $request): NotificationListDto {
+    public function archive(NotificationRequestDto $request): NotificationListDto
+    {
         try {
             $this->notifications->archive($request->file);
         } catch (\InvalidArgumentException | \RuntimeException $exception) {
@@ -40,7 +45,8 @@ final readonly class NotificationController {
     }
 
     #[Route("DELETE", "/api/notifications", EmptyRequestDto::class, NotificationListDto::class)]
-    public function archiveAll(EmptyRequestDto $request): NotificationListDto {
+    public function archiveAll(EmptyRequestDto $request): NotificationListDto
+    {
         try {
             $this->notifications->archiveAll();
         } catch (\RuntimeException $exception) {

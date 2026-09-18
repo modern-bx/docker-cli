@@ -6,8 +6,10 @@ namespace DockerCli\Command;
 
 use Symfony\Component\Console\Input\InputInterface;
 
-abstract class SystemUserCommand extends AbstractCommand {
-    protected function resolveUser(InputInterface $input): string {
+abstract class SystemUserCommand extends AbstractCommand
+{
+    protected function resolveUser(InputInterface $input): string
+    {
         $option = $input->getOption("user");
         $user = is_string($option) && trim($option) !== "" ? trim($option) : $this->invokingUser();
         if (preg_match('/^[a-z_][a-z0-9_.-]*\$?$/i', $user) !== 1) {
@@ -22,7 +24,8 @@ abstract class SystemUserCommand extends AbstractCommand {
         return $user;
     }
 
-    private function invokingUser(): string {
+    private function invokingUser(): string
+    {
         $sudoUser = getenv("SUDO_USER");
         if (is_string($sudoUser) && $sudoUser !== "" && $sudoUser !== "root") {
             return $sudoUser;

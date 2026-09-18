@@ -8,7 +8,8 @@ use DockerCli\Panel\Http\RequestData;
 use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class ProjectBackupListRequestDto implements RequestDto {
+final readonly class ProjectBackupListRequestDto implements RequestDto
+{
     public function __construct(
         public string $name,
         public int $page,
@@ -22,9 +23,11 @@ final readonly class ProjectBackupListRequestDto implements RequestDto {
         public ?string $dateTo,
         public string $sort,
         public string $direction,
-    ) {}
+    ) {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         $page = filter_var($request->query["page"] ?? 1, FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]]);
         $pageSize = filter_var($request->query["pageSize"] ?? 25, FILTER_VALIDATE_INT);
         $name = $request->query["name"] ?? "";
@@ -71,7 +74,8 @@ final readonly class ProjectBackupListRequestDto implements RequestDto {
         );
     }
 
-    private static function date(mixed $value): string|null|false {
+    private static function date(mixed $value): string|null|false
+    {
         if ($value === "") {
             return null;
         }

@@ -14,7 +14,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DataInitCommand extends AbstractCommand {
+final class DataInitCommand extends AbstractCommand
+{
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?DataInitializer $initializer = null,
@@ -30,7 +31,8 @@ final class DataInitCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $projectName = $this->resolveProjectName($input, $registry);
         if ($projectName === null) {
@@ -83,7 +85,8 @@ final class DataInitCommand extends AbstractCommand {
         return $code;
     }
 
-    private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string {
+    private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string
+    {
         $projectName = $input->getArgument("project");
         if (is_string($projectName) && $projectName !== "") {
             return $projectName;

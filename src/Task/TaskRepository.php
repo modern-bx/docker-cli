@@ -9,10 +9,14 @@ use function DockerCli\Util\join_path;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
-final class TaskRepository {
-    public function __construct(private readonly ?string $directory = null) {}
+final class TaskRepository
+{
+    public function __construct(private readonly ?string $directory = null)
+    {
+    }
 
-    public function directory(): string {
+    public function directory(): string
+    {
         if ($this->directory !== null) {
             return $this->directory;
         }
@@ -26,7 +30,8 @@ final class TaskRepository {
     }
 
     /** @return array{file: string, task: array<string, mixed>} */
-    public function find(string $code): array {
+    public function find(string $code): array
+    {
         foreach ($this->all() as $definition) {
             if (($definition["task"]["code"] ?? null) === $code) {
                 return $definition;
@@ -37,7 +42,8 @@ final class TaskRepository {
     }
 
     /** @return list<array{file: string, task: array<string, mixed>}> */
-    public function all(): array {
+    public function all(): array
+    {
         $definitions = [];
         foreach ($this->files() as $file) {
             try {
@@ -66,7 +72,7 @@ final class TaskRepository {
         }
         usort(
             $definitions,
-            static fn(array $left, array $right): int => strcmp(
+            static fn (array $left, array $right): int => strcmp(
                 (string) ($left["task"]["code"] ?? ""),
                 (string) ($right["task"]["code"] ?? ""),
             ),
@@ -76,7 +82,8 @@ final class TaskRepository {
     }
 
     /** @return list<string> */
-    private function files(): array {
+    private function files(): array
+    {
         $directory = $this->directory();
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf('Не удалось создать директорию задач "%s".', $directory));
@@ -96,7 +103,8 @@ final class TaskRepository {
         return $files;
     }
 
-    private function validateTags(mixed $tags, string $owner): void {
+    private function validateTags(mixed $tags, string $owner): void
+    {
         if ($tags === null) {
             return;
         }

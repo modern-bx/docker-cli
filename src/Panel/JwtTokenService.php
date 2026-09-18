@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace DockerCli\Panel;
 
-final class JwtTokenService {
+final class JwtTokenService
+{
     public const LIFETIME = 600;
     public const COOKIE = "__Host-docker-cli-panel-session";
     private const ISSUER = "docker-cli-panel";
@@ -21,7 +22,8 @@ final class JwtTokenService {
         }
     }
 
-    public function issue(string $login, ?int $now = null, ?int $sessionStartedAt = null): string {
+    public function issue(string $login, ?int $now = null, ?int $sessionStartedAt = null): string
+    {
         $now ??= time();
         $sessionStartedAt ??= $now;
         $header = $this->encode(["alg" => "HS256", "typ" => "JWT"]);
@@ -44,7 +46,8 @@ final class JwtTokenService {
         return $token;
     }
 
-    public function login(string $token, ?int $now = null): ?string {
+    public function login(string $token, ?int $now = null): ?string
+    {
         $parts = explode(".", $token);
         if (count($parts) !== 3) {
             return null;
@@ -90,7 +93,8 @@ final class JwtTokenService {
             : null;
     }
 
-    public function sessionStartedAt(string $token, ?int $now = null): ?int {
+    public function sessionStartedAt(string $token, ?int $now = null): ?int
+    {
         if ($this->login($token, $now) === null) {
             return null;
         }
@@ -100,12 +104,14 @@ final class JwtTokenService {
     }
 
     /** @param array<string, int|string> $value */
-    private function encode(array $value): string {
+    private function encode(array $value): string
+    {
         return $this->base64UrlEncode(json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
     }
 
     /** @return array<string, mixed> */
-    private function decode(string $value): array {
+    private function decode(string $value): array
+    {
         $padding = (4 - (strlen($value) % 4)) % 4;
         $json = base64_decode(strtr($value . str_repeat("=", $padding), "-_", "+/"), true);
         if (!is_string($json)) {
@@ -120,7 +126,8 @@ final class JwtTokenService {
         return is_array($decoded) ? $decoded : [];
     }
 
-    private function base64UrlEncode(string $value): string {
+    private function base64UrlEncode(string $value): string
+    {
         return rtrim(strtr(base64_encode($value), "+/", "-_"), "=");
     }
 }

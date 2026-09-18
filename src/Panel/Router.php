@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace DockerCli\Panel;
 
-use DockerCli\Panel\NotificationActionException as NotificationError;
-use DockerCli\Panel\ProjectActionException as ProjectError;
-use DockerCli\Panel\QueueActionException as QueueError;
-use DockerCli\Panel\SystemActionException as SystemError;
 use DockerCli\Panel\Dto\ErrorResponseDto;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Panel\Http\ControllerInvoker;
@@ -15,6 +11,10 @@ use DockerCli\Panel\Http\Middleware\AuthMiddleware;
 use DockerCli\Panel\Http\RequestValidationException;
 use DockerCli\Panel\Http\ResponseEmitter;
 use DockerCli\Panel\Http\UnauthorizedException;
+use DockerCli\Panel\NotificationActionException as NotificationError;
+use DockerCli\Panel\ProjectActionException as ProjectError;
+use DockerCli\Panel\QueueActionException as QueueError;
+use DockerCli\Panel\SystemActionException as SystemError;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
 
@@ -24,7 +24,8 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use React\Http\Message\Response;
 
-final readonly class Router {
+final readonly class Router
+{
     private Dispatcher $dispatcher;
 
     /** @param list<object> $controllers */
@@ -60,7 +61,8 @@ final readonly class Router {
         });
     }
 
-    public function __invoke(ServerRequestInterface $request): ResponseInterface {
+    public function __invoke(ServerRequestInterface $request): ResponseInterface
+    {
         $match = $this->dispatcher->dispatch($request->getMethod(), $request->getUri()->getPath());
         if ($match[0] === Dispatcher::NOT_FOUND) {
             return $this->responses->json(404, new ErrorResponseDto("Страница не найдена."));

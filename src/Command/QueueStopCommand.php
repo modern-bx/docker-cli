@@ -11,7 +11,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class QueueStopCommand extends AbstractCommand {
+final class QueueStopCommand extends AbstractCommand
+{
     public function __construct(
         private readonly SystemdService $service = new SystemdService(),
         private readonly ?QueueRepository $queues = null,
@@ -21,7 +22,8 @@ final class QueueStopCommand extends AbstractCommand {
         $this->addOption("queue", null, InputOption::VALUE_REQUIRED, "Код очереди.", "default");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $queue = (string) $input->getOption("queue");
         ($this->queues ?? new QueueRepository())->queueDirectory($queue);
 

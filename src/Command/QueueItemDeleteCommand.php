@@ -11,15 +11,18 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class QueueItemDeleteCommand extends AbstractCommand {
-    public function __construct(private readonly ?QueueRepository $queues = null) {
+final class QueueItemDeleteCommand extends AbstractCommand
+{
+    public function __construct(private readonly ?QueueRepository $queues = null)
+    {
         parent::__construct("queue:item-delete");
         $this->setDescription("Удалить неактивный элемент очереди.");
         $this->addOption("queue", null, InputOption::VALUE_REQUIRED, "Код очереди.", "default");
         $this->addArgument("item", InputArgument::REQUIRED, "Короткое имя элемента с расширением .yaml или без него.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $queue = (string) $input->getOption("queue");
         $item = (string) $input->getArgument("item");
         if (!str_ends_with($item, ".yaml")) {

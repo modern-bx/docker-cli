@@ -8,8 +8,11 @@ use DockerCli\Config\SystemCompose;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PostgresDumpLoader {
-    public function __construct(private readonly ?SystemCompose $compose = null) {}
+final class PostgresDumpLoader
+{
+    public function __construct(private readonly ?SystemCompose $compose = null)
+    {
+    }
 
     /** @param list<string> $include @param list<string> $exclude */
     public function dump(
@@ -120,7 +123,8 @@ final class PostgresDumpLoader {
     }
 
     /** @param list<string> $command */
-    private function run(array $command, SystemCompose $compose, OutputInterface $output): int {
+    private function run(array $command, SystemCompose $compose, OutputInterface $output): int
+    {
         $output->writeln("<comment>" . implode(" ", array_map("escapeshellarg", $command)) . "</comment>");
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
         if (!is_resource($process)) {
@@ -130,11 +134,13 @@ final class PostgresDumpLoader {
         return proc_close($process);
     }
 
-    private function uid(): int {
+    private function uid(): int
+    {
         return function_exists("posix_getuid") ? posix_getuid() : 1000;
     }
 
-    private function gid(): int {
+    private function gid(): int
+    {
         return function_exists("posix_getgid") ? posix_getgid() : 1000;
     }
 }

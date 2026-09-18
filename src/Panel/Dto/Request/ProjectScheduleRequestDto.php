@@ -8,7 +8,8 @@ use DockerCli\Panel\Http\RequestData;
 use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class ProjectScheduleRequestDto implements RequestDto {
+final readonly class ProjectScheduleRequestDto implements RequestDto
+{
     public function __construct(
         public string $name,
         public ?int $index,
@@ -16,9 +17,11 @@ final readonly class ProjectScheduleRequestDto implements RequestDto {
         public string $schedule,
         public string $command,
         public string $workingDirectory,
-    ) {}
+    ) {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         foreach (["schedule", "command"] as $field) {
             if (!is_string($request->body[$field] ?? null) || trim($request->body[$field]) === "") {
                 throw new RequestValidationException("Расписание и команда обязательны.");

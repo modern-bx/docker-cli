@@ -10,8 +10,10 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class SystemRollbackCommand extends SystemUserCommand {
-    public function __construct(private readonly ?SudoersManager $sudoers = null) {
+final class SystemRollbackCommand extends SystemUserCommand
+{
+    public function __construct(private readonly ?SudoersManager $sudoers = null)
+    {
         parent::__construct("system:rollback");
         $this->setDescription("Откатить системные права, настроенные для docker-cli.");
         $this->addOption(
@@ -22,7 +24,8 @@ final class SystemRollbackCommand extends SystemUserCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         try {
             $user = $this->resolveUser($input);
             $file = ($this->sudoers ?? new SudoersManager())->rollback($user);

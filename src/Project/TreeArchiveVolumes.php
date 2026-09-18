@@ -6,8 +6,10 @@ namespace DockerCli\Project;
 
 use function DockerCli\Util\join_path;
 
-final class TreeArchiveVolumes {
-    public static function parseSize(string $value): int {
+final class TreeArchiveVolumes
+{
+    public static function parseSize(string $value): int
+    {
         if (preg_match('/^(\d+(?:\.\d+)?)(B|K|M|G)?$/i', trim($value), $matches) !== 1) {
             throw new \InvalidArgumentException("Размер тома должен иметь формат 1024, 1024B, 10K, 1.5M или 2.25G.");
         }
@@ -27,7 +29,8 @@ final class TreeArchiveVolumes {
     }
 
     /** @return array{chunkSize: int, chunkCount: int, parts: list<array{name: string, size: int}>} */
-    public function split(string $directory, string $archiveName, ?int $chunkSize, ?int $chunkCount): array {
+    public function split(string $directory, string $archiveName, ?int $chunkSize, ?int $chunkCount): array
+    {
         $archive = join_path($directory, $archiveName);
         $total = filesize($archive);
         if ($total === false) {
@@ -82,7 +85,8 @@ final class TreeArchiveVolumes {
     }
 
     /** @param array<string, mixed> $metadata @return list<string> */
-    public function validate(string $directory, array $metadata): array {
+    public function validate(string $directory, array $metadata): array
+    {
         $archive = $metadata["archive"] ?? null;
         if (!is_string($archive) || preg_match('/^tree\.tar(?:\.(?:gz|bz2|xz|zst|lz4|zip))?$/', $archive) !== 1) {
             return ["В метаданных отсутствует корректное имя " . "файлового архива."];
@@ -152,7 +156,8 @@ final class TreeArchiveVolumes {
     }
 
     /** @param array<string, mixed> $metadata */
-    public function assemble(string $directory, array $metadata): string {
+    public function assemble(string $directory, array $metadata): string
+    {
         $errors = $this->validate($directory, $metadata);
         if ($errors !== []) {
             throw new \InvalidArgumentException("Файловый бэкап повреждён:\n— " . implode("\n— ", $errors));

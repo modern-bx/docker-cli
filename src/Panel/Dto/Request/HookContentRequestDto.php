@@ -8,7 +8,8 @@ use DockerCli\Panel\Http\RequestData;
 use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class HookContentRequestDto implements RequestDto {
+final readonly class HookContentRequestDto implements RequestDto
+{
     public function __construct(
         public string $id,
         public string $content,
@@ -16,9 +17,11 @@ final readonly class HookContentRequestDto implements RequestDto {
         public bool $enabled,
         public string $command,
         public string $timing,
-    ) {}
+    ) {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         $action = HookActionRequestDto::fromRequest($request);
         $content = $request->body["content"] ?? null;
         $name = $request->body["name"] ?? null;

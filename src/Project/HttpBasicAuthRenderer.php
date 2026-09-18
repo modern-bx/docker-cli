@@ -6,7 +6,8 @@ namespace DockerCli\Project;
 
 use function DockerCli\Util\join_path;
 
-final class HttpBasicAuthRenderer {
+final class HttpBasicAuthRenderer
+{
     public const LOGIN_KEY = "HTTP_AUTH_LOGIN";
     public const PASSWORD_KEY = "HTTP_AUTH_PASSWORD";
     public const PLAYWRIGHT_IP_KEY = "PLAYWRIGHT_IP";
@@ -52,7 +53,8 @@ final class HttpBasicAuthRenderer {
     }
 
     /** @param array<string, string> $envValues */
-    public function renderPlaywrightBypassMap(array $envValues): string {
+    public function renderPlaywrightBypassMap(array $envValues): string
+    {
         $playwrightIp = $envValues[self::PLAYWRIGHT_IP_KEY] ?? self::DEFAULT_PLAYWRIGHT_IP;
         if (filter_var($playwrightIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
             throw new \RuntimeException(self::PLAYWRIGHT_IP_KEY . " must be a valid IPv4 address.");
@@ -64,7 +66,8 @@ final class HttpBasicAuthRenderer {
         );
     }
 
-    private function removeIfExists(string $file): void {
+    private function removeIfExists(string $file): void
+    {
         if (is_file($file)) {
             unlink($file);
         }

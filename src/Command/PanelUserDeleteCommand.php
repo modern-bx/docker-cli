@@ -12,14 +12,17 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelUserDeleteCommand extends AbstractCommand {
-    public function __construct() {
+final class PanelUserDeleteCommand extends AbstractCommand
+{
+    public function __construct()
+    {
         parent::__construct("panel:user-delete");
         $this->setDescription("Удалить пользователя административной панели.");
         $this->addArgument("login", InputArgument::REQUIRED, "Логин пользователя (email).");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $login = $input->getArgument("login");
         try {
             $login = UserRepository::normalizeLogin(is_string($login) ? $login : "");

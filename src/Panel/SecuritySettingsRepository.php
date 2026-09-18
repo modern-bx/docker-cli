@@ -10,13 +10,15 @@ use function DockerCli\Util\join_path;
 
 use Symfony\Component\Yaml\Yaml;
 
-final class SecuritySettingsRepository {
+final class SecuritySettingsRepository
+{
     public const DEFAULT_SESSION_HOURS = 8;
     public const MAX_SESSION_HOURS = 8760;
 
     private readonly string $file;
 
-    public function __construct(?string $file = null) {
+    public function __construct(?string $file = null)
+    {
         if ($file === null) {
             $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
             $file = join_path($home, ".config", "docker-cli", "state", "panel", "settings", "security.yaml");
@@ -24,7 +26,8 @@ final class SecuritySettingsRepository {
         $this->file = $file;
     }
 
-    public function sessionHours(): int {
+    public function sessionHours(): int
+    {
         if (!is_file($this->file)) {
             return self::DEFAULT_SESSION_HOURS;
         }
@@ -43,7 +46,8 @@ final class SecuritySettingsRepository {
     }
 
     /** @return array{login: string, password: string} */
-    public function httpAuth(): array {
+    public function httpAuth(): array
+    {
         $values = $this->readSystemEnv();
 
         return [
@@ -52,7 +56,8 @@ final class SecuritySettingsRepository {
         ];
     }
 
-    public function saveHttpAuth(string $login, string $password): void {
+    public function saveHttpAuth(string $login, string $password): void
+    {
         $envFile = (new SystemCompose())->envFile();
         $contents = is_file($envFile) ? file_get_contents($envFile) : false;
         if ($contents === false) {
@@ -75,7 +80,8 @@ final class SecuritySettingsRepository {
     }
 
     /** @return array<string, string> */
-    private function readSystemEnv(): array {
+    private function readSystemEnv(): array
+    {
         $envFile = (new SystemCompose())->envFile();
         if (!is_file($envFile)) {
             return [];
@@ -93,7 +99,8 @@ final class SecuritySettingsRepository {
         return $values;
     }
 
-    public function saveSessionHours(int $hours): void {
+    public function saveSessionHours(int $hours): void
+    {
         if ($hours < 1 || $hours > self::MAX_SESSION_HOURS) {
             throw new \InvalidArgumentException(
                 sprintf("Длительность сессии должна быть от 1 до %d часов.", self::MAX_SESSION_HOURS),

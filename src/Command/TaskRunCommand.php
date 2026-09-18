@@ -16,7 +16,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class TaskRunCommand extends AbstractCommand {
+final class TaskRunCommand extends AbstractCommand
+{
     /** @var array<string, array{message: string, level: string}> */
     private array $journal = [];
 
@@ -47,7 +48,8 @@ final class TaskRunCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $code = (string) $input->getArgument("task-code");
         try {
             $definition = ($this->repository ?? new TaskRepository())->find($code);
@@ -140,11 +142,13 @@ final class TaskRunCommand extends AbstractCommand {
     }
 
     /** @return array<string, array{message: string, level: string}> */
-    public function journal(): array {
+    public function journal(): array
+    {
         return $this->journal;
     }
 
-    private function contextDirectory(): string {
+    private function contextDirectory(): string
+    {
         $home = getenv("HOME");
         if (!is_string($home) || $home === "") {
             throw new \RuntimeException("Не удалось определить домашнюю директорию (HOME).");
@@ -154,7 +158,8 @@ final class TaskRunCommand extends AbstractCommand {
     }
 
     /** @param array<string, mixed> $task */
-    private function validateTask(array $task, string $code): void {
+    private function validateTask(array $task, string $code): void
+    {
         foreach (["name", "code", "type", "action"] as $key) {
             if (!isset($task[$key]) || !is_string($task[$key]) || $task[$key] === "") {
                 throw new \RuntimeException(sprintf('В задаче "%s" отсутствует строковое поле task.%s.', $code, $key));
@@ -183,7 +188,8 @@ final class TaskRunCommand extends AbstractCommand {
         }
     }
 
-    private function validateTags(mixed $tags, string $owner): void {
+    private function validateTags(mixed $tags, string $owner): void
+    {
         if ($tags === null) {
             return;
         }
@@ -203,7 +209,8 @@ final class TaskRunCommand extends AbstractCommand {
         }
     }
 
-    private function validateParameter(string $name, mixed $spec, bool $return = false): void {
+    private function validateParameter(string $name, mixed $spec, bool $return = false): void
+    {
         if (!is_array($spec) || !in_array($spec["type"] ?? null, ["string", "integer", "boolean", "list"], true)) {
             throw new \RuntimeException(sprintf('Параметр "%s" имеет неподдерживаемый тип.', $name));
         }
@@ -223,7 +230,8 @@ final class TaskRunCommand extends AbstractCommand {
     }
 
     /** @param array<string, mixed> $parameters @param list<mixed> $arguments @return array<string, string|int> */
-    private function mapArguments(array $parameters, array $arguments): array {
+    private function mapArguments(array $parameters, array $arguments): array
+    {
         $named = [];
         $positional = [];
         foreach ($arguments as $argument) {
@@ -286,7 +294,8 @@ final class TaskRunCommand extends AbstractCommand {
     }
 
     /** @param array<string, mixed> $task */
-    private function resolveProject(array $task, mixed $project): ?string {
+    private function resolveProject(array $task, mixed $project): ?string
+    {
         if (($task["context"] ?? null) !== "project") {
             return null;
         }
@@ -298,7 +307,8 @@ final class TaskRunCommand extends AbstractCommand {
     }
 
     /** @param array<string, mixed> $task */
-    private function workingDirectory(array $task, mixed $project): string {
+    private function workingDirectory(array $task, mixed $project): string
+    {
         if (($task["context"] ?? null) !== "project") {
             return "/tmp/.docker-cli";
         }
@@ -322,7 +332,8 @@ final class TaskRunCommand extends AbstractCommand {
     }
 
     /** @param array<string, mixed> $task @param array<string, string|int> $values */
-    private function compileScript(array $task, array $values): string {
+    private function compileScript(array $task, array $values): string
+    {
         $action = preg_replace_callback(
             "/\{\{\s*([A-Za-z_][A-Za-z0-9_-]*)\s*\}\}/",
             function (array $match) use ($values): string {
@@ -351,7 +362,8 @@ final class TaskRunCommand extends AbstractCommand {
         );
     }
 
-    private function executable(): string {
+    private function executable(): string
+    {
         $phar = \Phar::running(false);
         if ($phar !== "") {
             return $phar;
@@ -362,11 +374,13 @@ final class TaskRunCommand extends AbstractCommand {
         return realpath($binary) ?: $binary;
     }
 
-    private function normalizeName(string $name): string {
+    private function normalizeName(string $name): string
+    {
         return str_replace("-", "_", $name);
     }
 
-    private function ensureDirectory(string $directory): void {
+    private function ensureDirectory(string $directory): void
+    {
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf('Не удалось создать директорию "%s".', $directory));
         }

@@ -16,16 +16,21 @@ use DockerCli\Panel\Dto\Request\HookRunRequestDto;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class HooksSettingsController {
-    public function __construct(private HookRepository $hooks, private ?ProjectsSettingsRepository $settings = null) {}
+final readonly class HooksSettingsController
+{
+    public function __construct(private HookRepository $hooks, private ?ProjectsSettingsRepository $settings = null)
+    {
+    }
 
     #[Route("GET", "/api/settings/hooks", EmptyRequestDto::class, HookListDto::class)]
-    public function list(EmptyRequestDto $request): HookListDto {
+    public function list(EmptyRequestDto $request): HookListDto
+    {
         return new HookListDto($this->hooks->all(), $this->hooks->commands());
     }
 
     #[Route("POST", "/api/settings/hooks", HookCreateRequestDto::class, HookDto::class)]
-    public function create(HookCreateRequestDto $request): HookDto {
+    public function create(HookCreateRequestDto $request): HookDto
+    {
         try {
             return new HookDto(
                 $this->hooks->create(
@@ -42,7 +47,8 @@ final readonly class HooksSettingsController {
     }
 
     #[Route("GET", "/api/settings/hooks/{id}/content", HookActionRequestDto::class, HookContentDto::class)]
-    public function content(HookActionRequestDto $request): HookContentDto {
+    public function content(HookActionRequestDto $request): HookContentDto
+    {
         try {
             return new HookContentDto($this->hooks->content($request->id));
         } catch (\RuntimeException $exception) {
@@ -51,7 +57,8 @@ final readonly class HooksSettingsController {
     }
 
     #[Route("POST", "/api/settings/hooks/{id}/content", HookContentRequestDto::class, HookContentDto::class)]
-    public function save(HookContentRequestDto $request): HookContentDto {
+    public function save(HookContentRequestDto $request): HookContentDto
+    {
         try {
             $this->hooks->save(
                 $request->id,
@@ -69,7 +76,8 @@ final readonly class HooksSettingsController {
     }
 
     #[Route("POST", "/api/settings/hooks/{id}/run", HookRunRequestDto::class, HookRunResultDto::class)]
-    public function run(HookRunRequestDto $request): HookRunResultDto {
+    public function run(HookRunRequestDto $request): HookRunResultDto
+    {
         try {
             $workingDirectory = $this->workingDirectory($request->workingDirectory);
             $result = $this->hooks->run($request->id, $request->profile, $workingDirectory);
@@ -81,7 +89,8 @@ final readonly class HooksSettingsController {
     }
 
     #[Route("POST", "/api/settings/hooks/{id}/toggle", HookActionRequestDto::class, HookListDto::class)]
-    public function toggle(HookActionRequestDto $request): HookListDto {
+    public function toggle(HookActionRequestDto $request): HookListDto
+    {
         try {
             $this->hooks->toggle($request->id);
         } catch (\RuntimeException $exception) {
@@ -92,7 +101,8 @@ final readonly class HooksSettingsController {
     }
 
     #[Route("DELETE", "/api/settings/hooks/{id}", HookActionRequestDto::class, HookListDto::class)]
-    public function delete(HookActionRequestDto $request): HookListDto {
+    public function delete(HookActionRequestDto $request): HookListDto
+    {
         try {
             $this->hooks->delete($request->id);
         } catch (\RuntimeException $exception) {
@@ -102,7 +112,8 @@ final readonly class HooksSettingsController {
         return new HookListDto($this->hooks->all(), $this->hooks->commands());
     }
 
-    private function workingDirectory(string $workingDirectory): string {
+    private function workingDirectory(string $workingDirectory): string
+    {
         if ($workingDirectory !== "") {
             $real = realpath($workingDirectory);
             if ($real === false || !is_dir($real)) {

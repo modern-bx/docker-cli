@@ -9,7 +9,8 @@ use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
 /** JSON request accepted by POST /api/projects/{project}/update. */
-final readonly class ProjectUpdateRequestDto implements RequestDto {
+final readonly class ProjectUpdateRequestDto implements RequestDto
+{
     /** @param list<string>|null $dedicatedDatabases */
     public function __construct(
         public string $project,
@@ -20,9 +21,11 @@ final readonly class ProjectUpdateRequestDto implements RequestDto {
         public ?array $dedicatedDatabases,
         public string $locationMysql,
         public string $locationPostgres,
-    ) {}
+    ) {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         foreach (["name", "language", "languageVersion", "framework"] as $field) {
             if (array_key_exists($field, $request->body) && !is_string($request->body[$field])) {
                 throw new RequestValidationException("Параметры проекта должны быть строками.");
@@ -35,7 +38,7 @@ final readonly class ProjectUpdateRequestDto implements RequestDto {
                 !array_is_list($dedicated) ||
                 array_filter(
                     $dedicated,
-                    static fn(mixed $item): bool => !is_string($item) || !in_array($item, ["mysql", "postgres"], true),
+                    static fn (mixed $item): bool => !is_string($item) || !in_array($item, ["mysql", "postgres"], true),
                 ) !== [] ||
                 count(array_unique($dedicated)) !== count($dedicated))
         ) {

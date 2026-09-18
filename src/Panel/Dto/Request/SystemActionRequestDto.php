@@ -10,10 +10,14 @@ use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
 /** Route request for a global or service-specific system action. */
-final readonly class SystemActionRequestDto implements RequestDto {
-    public function __construct(public SystemActionEnum $action, public ?string $service = null) {}
+final readonly class SystemActionRequestDto implements RequestDto
+{
+    public function __construct(public SystemActionEnum $action, public ?string $service = null)
+    {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         $action = SystemActionEnum::tryFrom($request->route["action"]);
         if ($action === null) {
             throw new RequestValidationException("Неизвестное системное действие.");

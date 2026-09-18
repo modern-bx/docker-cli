@@ -9,8 +9,10 @@ use DockerCli\Framework\Detected\DetectedFramework;
 
 use function DockerCli\Util\join_path;
 
-final class Bitrix24Detector implements FrameworkDetectorInterface {
-    public function detect(string $projectRoot): ?DetectedFramework {
+final class Bitrix24Detector implements FrameworkDetectorInterface
+{
+    public function detect(string $projectRoot): ?DetectedFramework
+    {
         if (!is_dir(join_path($projectRoot, "bitrix"))) {
             return null;
         }

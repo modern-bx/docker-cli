@@ -12,12 +12,14 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class SystemRestartCommand extends AbstractCommand {
+final class SystemRestartCommand extends AbstractCommand
+{
     use DockerComposeRunner;
 
     private TranslatorInterface $translator;
 
-    public function __construct(?TranslatorInterface $translator = null) {
+    public function __construct(?TranslatorInterface $translator = null)
+    {
         $this->translator = $translator ?? TranslatorFactory::create();
         parent::__construct("system:restart");
         $this->setAliases(["restart"]);
@@ -36,7 +38,8 @@ final class SystemRestartCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $compose = new SystemCompose();
         $serviceOption = $input->getOption("service");
         if (is_string($serviceOption) && trim($serviceOption) !== "") {

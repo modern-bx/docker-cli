@@ -8,14 +8,18 @@ use DockerCli\Panel\Http\RequestData;
 use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class BackupsSettingsRequestDto implements RequestDto {
+final readonly class BackupsSettingsRequestDto implements RequestDto
+{
     /**
      * @param list<array{path: string, code: string, default: bool}> $locations
      * @param list<array{name: string, code: string, include: list<string>, exclude: list<string>}> $fileStrategies
      */
-    public function __construct(public array $locations, public array $fileStrategies) {}
+    public function __construct(public array $locations, public array $fileStrategies)
+    {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         $locations = $request->body["locations"] ?? null;
         if (!is_array($locations) || $locations === [] || !array_is_list($locations)) {
             throw new RequestValidationException("Добавьте хотя бы одно расположение бэкапов.");
@@ -57,7 +61,8 @@ final readonly class BackupsSettingsRequestDto implements RequestDto {
     }
 
     /** @return list<array{name: string, code: string, include: list<string>, exclude: list<string>}> */
-    private static function validateStrategies(mixed $strategies): array {
+    private static function validateStrategies(mixed $strategies): array
+    {
         if (!is_array($strategies) || !array_is_list($strategies)) {
             throw new RequestValidationException("Некорректные стратегии.");
         }
@@ -100,7 +105,7 @@ final readonly class BackupsSettingsRequestDto implements RequestDto {
                 if (
                     array_filter(
                         $strategy[$key],
-                        static fn($value): bool => !is_string($value) || trim($value) === "" || strlen($value) > 4096,
+                        static fn ($value): bool => !is_string($value) || trim($value) === "" || strlen($value) > 4096,
                     )
                 ) {
                     throw new RequestValidationException("Некорректный путь, имя или glob-шаблон стратегии.");

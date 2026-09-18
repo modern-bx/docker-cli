@@ -5,7 +5,7 @@ declare(strict_types=1);
 const MAX_LINE_LENGTH = 120;
 
 $root = dirname(__DIR__);
-$paths = [$root . "/bin/docker-cli"];
+$paths = [$root . "/.php-cs-fixer.dist.php", $root . "/bin/docker-cli"];
 foreach (["src", "scripts", "tests"] as $directory) {
     $files = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($root . "/" . $directory, FilesystemIterator::SKIP_DOTS),

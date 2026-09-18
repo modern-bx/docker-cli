@@ -6,8 +6,10 @@ namespace DockerCli\Framework\Detector;
 
 use function DockerCli\Util\join_path;
 
-abstract class ComposerPackageDetector implements FrameworkDetectorInterface {
-    protected function hasComposerPackage(string $projectRoot, string $packageName): bool {
+abstract class ComposerPackageDetector implements FrameworkDetectorInterface
+{
+    protected function hasComposerPackage(string $projectRoot, string $packageName): bool
+    {
         $composerJson = join_path($projectRoot, "composer.json");
         if (!is_file($composerJson)) {
             return false;

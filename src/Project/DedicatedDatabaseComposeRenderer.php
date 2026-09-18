@@ -11,13 +11,16 @@ use function DockerCli\Util\join_path;
 use Symfony\Component\Yaml\Yaml;
 
 /** Builds compose fragments for database servers owned by registered projects. */
-final class DedicatedDatabaseComposeRenderer {
+final class DedicatedDatabaseComposeRenderer
+{
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?SystemCompose $compose = null,
-    ) {}
+    ) {
+    }
 
-    public function render(): void {
+    public function render(): void
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $compose = $this->compose ?? new SystemCompose();
         $services = ["mysql" => [], "postgres" => []];
@@ -52,7 +55,8 @@ final class DedicatedDatabaseComposeRenderer {
     }
 
     /** @return array<string, mixed> */
-    private function service(string $driver, string $projectName, string $hostname, ?string $location): array {
+    private function service(string $driver, string $projectName, string $hostname, ?string $location): array
+    {
         $compose = $this->compose ?? new SystemCompose();
         $dataDirectory =
             $location ?? sprintf('${DEFAULT_DATA_DIR_%s:-data/%s}-%s', strtoupper($driver), $driver, $projectName);

@@ -23,7 +23,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
-final class ProjectDownCommand extends AbstractCommand {
+final class ProjectDownCommand extends AbstractCommand
+{
     public function __construct(
         private readonly ?FrameworkDetectionService $detectionService = null,
         private readonly ?DataInitializer $dataInitializer = null,
@@ -49,7 +50,8 @@ final class ProjectDownCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $destructive = $input->getOption("wipe") || $input->getOption("erase") || $input->getOption("drop");
         if ($destructive && !$input->getOption("force")) {
             $this->writeMessage(
@@ -89,7 +91,7 @@ final class ProjectDownCommand extends AbstractCommand {
         $dedicated = array_values(
             array_filter(
                 ["mysql", "postgres"],
-                static fn(string $driver): bool => ($projectConfig["data"]["databases"][$driver]["hostname"] ??
+                static fn (string $driver): bool => ($projectConfig["data"]["databases"][$driver]["hostname"] ??
                     null) ===
                     sprintf("docker-cli-%s-%s", $driver, $projectName),
             ),
@@ -196,7 +198,8 @@ final class ProjectDownCommand extends AbstractCommand {
         return ($this->hookRunner ?? new CommandHookRunner())->run("project:down", "after", $hookArguments);
     }
 
-    private function projectRootFromContext(ProjectRegistry $registry): ?string {
+    private function projectRootFromContext(ProjectRegistry $registry): ?string
+    {
         $projectName = $registry->projectNameFromContext();
         if ($projectName === null || !$registry->hasProject($projectName)) {
             return null;
@@ -208,7 +211,8 @@ final class ProjectDownCommand extends AbstractCommand {
         return is_string($projectRoot) && $projectRoot !== "" ? $projectRoot : null;
     }
 
-    private function projectsDirectory(): string {
+    private function projectsDirectory(): string
+    {
         $home = getenv("HOME") ?: null;
         if ($home === null) {
             throw new \RuntimeException("Unable to determine HOME directory.");
@@ -217,7 +221,8 @@ final class ProjectDownCommand extends AbstractCommand {
         return join_path($home, ".config", "docker-cli", "state", "projects");
     }
 
-    private function readProjectName(string $file): ?string {
+    private function readProjectName(string $file): ?string
+    {
         $data = Yaml::parseFile($file);
         if (!is_array($data)) {
             return null;
@@ -228,7 +233,8 @@ final class ProjectDownCommand extends AbstractCommand {
         return is_string($name) ? $name : null;
     }
 
-    private function removeDirectory(string $directory): void {
+    private function removeDirectory(string $directory): void
+    {
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::CHILD_FIRST,
@@ -246,7 +252,8 @@ final class ProjectDownCommand extends AbstractCommand {
     }
 
     /** @param list<string> $drivers */
-    private function removeDedicatedContainers(string $projectName, array $drivers, OutputInterface $output): int {
+    private function removeDedicatedContainers(string $projectName, array $drivers, OutputInterface $output): int
+    {
         foreach ($drivers as $driver) {
             $container = sprintf("docker-cli-%s-%s", $driver, $projectName);
             $exists = $this->containerExists($container);
@@ -275,7 +282,8 @@ final class ProjectDownCommand extends AbstractCommand {
         return Command::SUCCESS;
     }
 
-    private function containerExists(string $container): ?bool {
+    private function containerExists(string $container): ?bool
+    {
         $process = proc_open(
             ["docker", "container", "inspect", $container],
             [["file", "/dev/null", "r"], ["file", "/dev/null", "w"], ["pipe", "w"]],
@@ -294,7 +302,8 @@ final class ProjectDownCommand extends AbstractCommand {
         return str_contains($error, "No such container") || str_contains($error, "No such object") ? false : null;
     }
 
-    private function wipeProjectRoot(string $projectRoot): void {
+    private function wipeProjectRoot(string $projectRoot): void
+    {
         $realRoot = realpath($projectRoot);
         if ($realRoot === false || $realRoot === DIRECTORY_SEPARATOR || !is_dir(join_path($realRoot, ".docker-cli"))) {
             throw new \RuntimeException("небезопасная директория проекта.");
@@ -312,7 +321,8 @@ final class ProjectDownCommand extends AbstractCommand {
         }
     }
 
-    private function leaveProjectWorkingDirectory(string $projectRoot): void {
+    private function leaveProjectWorkingDirectory(string $projectRoot): void
+    {
         $workingDirectory = getcwd();
         $realRoot = realpath($projectRoot);
         $realWorkingDirectory = is_string($workingDirectory) ? realpath($workingDirectory) : false;

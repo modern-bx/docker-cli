@@ -8,7 +8,8 @@ use DockerCli\Panel\Http\RequestData;
 use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class LogRequestDto implements RequestDto {
+final readonly class LogRequestDto implements RequestDto
+{
     public function __construct(
         public int $page,
         public int $pageSize,
@@ -26,9 +27,11 @@ final readonly class LogRequestDto implements RequestDto {
         public ?string $command,
         public ?string $timing,
         public ?string $hookLevel,
-    ) {}
+    ) {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         $page = filter_var($request->query["page"] ?? 1, FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]]);
         $pageSize = filter_var($request->query["pageSize"] ?? 25, FILTER_VALIDATE_INT);
         $sort = (string) ($request->query["sort"] ?? "timestamp");
@@ -65,7 +68,7 @@ final readonly class LogRequestDto implements RequestDto {
                 array_unique(
                     array_filter(
                         $values,
-                        static fn(mixed $item): bool => is_string($item) && in_array($item, $allowed, true),
+                        static fn (mixed $item): bool => is_string($item) && in_array($item, $allowed, true),
                     ),
                 ),
             );
@@ -78,12 +81,12 @@ final readonly class LogRequestDto implements RequestDto {
             $projects = array_values(
                 array_filter(
                     explode(",", $request->query["project"]),
-                    static fn(string $project): bool => $project !== "",
+                    static fn (string $project): bool => $project !== "",
                 ),
             );
         }
         $statuses = $selection("status", \DockerCli\Queue\QueueRepository::STATUSES);
-        $text = static fn(string $field): ?string => isset($request->query[$field]) &&
+        $text = static fn (string $field): ?string => isset($request->query[$field]) &&
         is_string($request->query[$field]) &&
         trim($request->query[$field]) !== ""
             ? trim($request->query[$field])

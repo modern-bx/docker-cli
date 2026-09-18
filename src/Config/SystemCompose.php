@@ -6,23 +6,27 @@ namespace DockerCli\Config;
 
 use function DockerCli\Util\join_path;
 
-final class SystemCompose {
+final class SystemCompose
+{
     public const PROJECT_NAME = "docker-cli";
     public const CONFIG_RELATIVE_PATH = ".config/docker-cli/compose/system";
     public const COMPOSE_FILE = "compose.yaml";
     public const ENV_FILE = ".env";
 
-    public function directory(): string {
+    public function directory(): string
+    {
         $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
 
         return join_path($home, self::CONFIG_RELATIVE_PATH);
     }
 
-    public function composeFile(): string {
+    public function composeFile(): string
+    {
         return join_path($this->directory(), self::COMPOSE_FILE);
     }
 
-    public function additionalComposeFile(string $driver): string {
+    public function additionalComposeFile(string $driver): string
+    {
         if (!in_array($driver, ["mysql", "postgres"], true)) {
             throw new \InvalidArgumentException(sprintf('Unsupported database driver "%s".', $driver));
         }
@@ -30,11 +34,13 @@ final class SystemCompose {
         return join_path($this->directory(), sprintf("compose.%s.yaml", $driver));
     }
 
-    public function databaseService(string $projectName, string $driver): string {
+    public function databaseService(string $projectName, string $driver): string
+    {
         return sprintf("%s-%s", $driver, $projectName);
     }
 
-    public function dedicatedDatabaseDirectory(string $projectName, string $driver, ?string $location = null): string {
+    public function dedicatedDatabaseDirectory(string $projectName, string $driver, ?string $location = null): string
+    {
         if (!in_array($driver, ["mysql", "postgres"], true)) {
             throw new \InvalidArgumentException(sprintf('Unsupported database driver "%s".', $driver));
         }
@@ -47,29 +53,34 @@ final class SystemCompose {
             : join_path($this->directory(), $directory);
     }
 
-    public function envFile(): string {
+    public function envFile(): string
+    {
         return join_path($this->directory(), self::ENV_FILE);
     }
 
-    public function playwrightScriptsDirectory(): string {
+    public function playwrightScriptsDirectory(): string
+    {
         $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
 
         return join_path($home, ".config", "docker-cli", "actions", "playwright", "scripts");
     }
 
-    public function playwrightDataDirectory(): string {
+    public function playwrightDataDirectory(): string
+    {
         $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
 
         return join_path($home, ".config", "docker-cli", "actions", "playwright", "data");
     }
 
-    public function coreTasksDirectory(): string {
+    public function coreTasksDirectory(): string
+    {
         $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
 
         return join_path($home, ".config", "docker-cli", "actions", "tasks", "core");
     }
 
-    public function init(bool $updateStatic = false, bool $migrateEditable = false, bool $copyExamples = false): bool {
+    public function init(bool $updateStatic = false, bool $migrateEditable = false, bool $copyExamples = false): bool
+    {
         $directory = $this->directory();
         if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf('Unable to create config directory "%s".', $directory));
@@ -132,7 +143,8 @@ final class SystemCompose {
         return $created;
     }
 
-    public function assertInitialized(): void {
+    public function assertInitialized(): void
+    {
         $missingFiles = $this->missingFiles();
         if ($missingFiles !== []) {
             throw new MissingConfigException($missingFiles, $this->directory());
@@ -140,14 +152,16 @@ final class SystemCompose {
     }
 
     /** @return list<string> */
-    public function missingFiles(): array {
+    public function missingFiles(): array
+    {
         return array_values(
-            array_filter([$this->envFile(), $this->composeFile()], static fn(string $file): bool => !is_file($file)),
+            array_filter([$this->envFile(), $this->composeFile()], static fn (string $file): bool => !is_file($file)),
         );
     }
 
     /** @return array<string, string> */
-    public function dockerProcessEnvironment(): array {
+    public function dockerProcessEnvironment(): array
+    {
         $environment = getenv();
         if (!is_array($environment)) {
             $environment = [];
@@ -172,7 +186,8 @@ final class SystemCompose {
         return $environment;
     }
 
-    public function envValue(string $key, string $default = ""): string {
+    public function envValue(string $key, string $default = ""): string
+    {
         if (!is_file($this->envFile())) {
             return $default;
         }
@@ -186,7 +201,8 @@ final class SystemCompose {
     }
 
     /** @return list<string> */
-    public function dockerComposeCommand(string $operation): array {
+    public function dockerComposeCommand(string $operation): array
+    {
         $command = [
             "docker",
             "compose",
@@ -209,7 +225,8 @@ final class SystemCompose {
     }
 
     /** @return list<string> */
-    private function snapshotFiles(string $path): array {
+    private function snapshotFiles(string $path): array
+    {
         if (!file_exists($path)) {
             return [];
         }
@@ -233,7 +250,8 @@ final class SystemCompose {
         return $files;
     }
 
-    private function ensureHostIdentityEnv(): bool {
+    private function ensureHostIdentityEnv(): bool
+    {
         $envFile = $this->envFile();
         if (!is_file($envFile)) {
             return false;
@@ -273,7 +291,8 @@ final class SystemCompose {
         return true;
     }
 
-    private function ensurePanelSecrets(): bool {
+    private function ensurePanelSecrets(): bool
+    {
         $envFile = $this->envFile();
         if (!is_file($envFile)) {
             return false;
@@ -307,7 +326,8 @@ final class SystemCompose {
         return true;
     }
 
-    private function hostUserId(): int {
+    private function hostUserId(): int
+    {
         if (function_exists("posix_getuid")) {
             return posix_getuid();
         }
@@ -317,7 +337,8 @@ final class SystemCompose {
         return is_string($uid) && ctype_digit($uid) ? (int) $uid : 1000;
     }
 
-    private function hostGroupId(): int {
+    private function hostGroupId(): int
+    {
         if (function_exists("posix_getgid")) {
             return posix_getgid();
         }
@@ -328,7 +349,8 @@ final class SystemCompose {
     }
 
     /** @return list<string> */
-    private function dataDirectories(): array {
+    private function dataDirectories(): array
+    {
         $data = join_path($this->directory(), "data");
         $mysqlData = $this->dataDirectoryFromEnv("DEFAULT_DATA_DIR_MYSQL", "data/mysql");
         $postgresData = $this->dataDirectoryFromEnv("DEFAULT_DATA_DIR_POSTGRES", "data/postgres");
@@ -355,7 +377,8 @@ final class SystemCompose {
         ];
     }
 
-    private function dataDirectoryFromEnv(string $key, string $default): string {
+    private function dataDirectoryFromEnv(string $key, string $default): string
+    {
         $directory = $this->envValue($key, $default);
         if ($directory === "") {
             $directory = $default;
@@ -367,7 +390,8 @@ final class SystemCompose {
     }
 
     /** @return array<string, string> */
-    private function templateMap(): array {
+    private function templateMap(): array
+    {
         return $this->editableTemplateMap() + $this->staticTemplateMap() + $this->playwrightDataTemplateMap();
     }
 
@@ -414,7 +438,8 @@ final class SystemCompose {
     }
 
     /** @return array<string, string> */
-    private function staticTemplateMap(): array {
+    private function staticTemplateMap(): array
+    {
         $resources = join_path(dirname(__DIR__, 2), "resources");
         $composeResources = join_path($resources, "compose", "system");
 
@@ -452,7 +477,8 @@ final class SystemCompose {
     }
 
     /** @return array<string, string> */
-    private function playwrightDataTemplateMap(): array {
+    private function playwrightDataTemplateMap(): array
+    {
         $resources = join_path(dirname(__DIR__, 2), "resources");
 
         return [
@@ -461,7 +487,8 @@ final class SystemCompose {
     }
 
     /** @return array<string, string> */
-    private function exampleTemplateMap(): array {
+    private function exampleTemplateMap(): array
+    {
         $resources = join_path(dirname(__DIR__, 2), "resources");
 
         return [
@@ -469,14 +496,16 @@ final class SystemCompose {
         ];
     }
 
-    public function hooksDirectory(): string {
+    public function hooksDirectory(): string
+    {
         $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
 
         return join_path($home, ".config", "docker-cli", "actions", "hooks");
     }
 
     /** @return array<string, string> */
-    private function editableTemplateMap(): array {
+    private function editableTemplateMap(): array
+    {
         $resources = join_path(dirname(__DIR__, 2), "resources", "compose", "system");
 
         return [
@@ -484,7 +513,8 @@ final class SystemCompose {
         ];
     }
 
-    private function migrateEnvFile(string $target, string $template): bool {
+    private function migrateEnvFile(string $target, string $template): bool
+    {
         if (!is_file($target)) {
             copy($template, $target);
 
@@ -521,7 +551,8 @@ final class SystemCompose {
     }
 
     /** @return array<string, string> */
-    private function readEnvValues(string $contents): array {
+    private function readEnvValues(string $contents): array
+    {
         $values = [];
         foreach (explode(PHP_EOL, $contents) as $line) {
             $line = trim($line);

@@ -9,8 +9,10 @@ use DockerCli\Framework\Detected\Laravel;
 
 use function DockerCli\Util\join_path;
 
-final class LaravelDetector extends ComposerPackageDetector {
-    public function detect(string $projectRoot): ?DetectedFramework {
+final class LaravelDetector extends ComposerPackageDetector
+{
+    public function detect(string $projectRoot): ?DetectedFramework
+    {
         if (!$this->hasComposerPackage($projectRoot, "laravel/framework")) {
             return null;
         }

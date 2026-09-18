@@ -10,8 +10,10 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class ProjectConfigSetCommand extends AbstractCommand {
-    public function __construct(private readonly ?ProjectRegistry $registry = null) {
+final class ProjectConfigSetCommand extends AbstractCommand
+{
+    public function __construct(private readonly ?ProjectRegistry $registry = null)
+    {
         parent::__construct("project:config-set");
         $this->setDescription("Записать значение в конфигурацию текущего проекта.");
         $this->addArgument(
@@ -22,7 +24,8 @@ final class ProjectConfigSetCommand extends AbstractCommand {
         $this->addArgument("value", InputArgument::REQUIRED, "Новое значение.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $projectName = $registry->projectNameFromContext();
         if ($projectName === null || !$registry->hasProject($projectName)) {
@@ -63,12 +66,14 @@ final class ProjectConfigSetCommand extends AbstractCommand {
         return Command::SUCCESS;
     }
 
-    private function isValidPath(string $path): bool {
+    private function isValidPath(string $path): bool
+    {
         return $path !== "" && !str_starts_with($path, ".") && !str_ends_with($path, ".") && !str_contains($path, "..");
     }
 
     /** @param list<string> $segments */
-    private function setPath(array &$data, array $segments, string $value): void {
+    private function setPath(array &$data, array $segments, string $value): void
+    {
         $current = &$data;
         foreach ($segments as $index => $segment) {
             if ($index === array_key_last($segments)) {

@@ -6,14 +6,16 @@ namespace DockerCli\Project;
 
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class MysqlRecovery {
+final class MysqlRecovery
+{
     private const SYSTEM_DATABASES = ["information_schema", "mysql", "performance_schema", "sys"];
 
     /** @var null|\Closure(list<string>, bool): array{0: int, 1: string} */
     private readonly ?\Closure $runner;
 
     /** @param null|callable(list<string>, bool): array{0: int, 1: string} $runner */
-    public function __construct(?callable $runner = null) {
+    public function __construct(?callable $runner = null)
+    {
         $this->runner = $runner === null ? null : \Closure::fromCallable($runner);
     }
 
@@ -152,7 +154,8 @@ final class MysqlRecovery {
         }
     }
 
-    public function detectVersion(string $source): string {
+    public function detectVersion(string $source): string
+    {
         if (!is_dir($source) || !is_file($source . "/ibdata1") || !is_dir($source . "/mysql")) {
             throw new \InvalidArgumentException(sprintf('Директория "%s" не похожа на каталог data MySQL.', $source));
         }
@@ -171,7 +174,8 @@ final class MysqlRecovery {
         );
     }
 
-    private function prepareDestination(string $destination): void {
+    private function prepareDestination(string $destination): void
+    {
         if (file_exists($destination) && !is_dir($destination)) {
             throw new \InvalidArgumentException(sprintf('Путь назначения "%s" не является директорией.', $destination));
         }
@@ -185,7 +189,8 @@ final class MysqlRecovery {
         }
     }
 
-    private function waitUntilReady(string $container, OutputInterface $output): void {
+    private function waitUntilReady(string $container, OutputInterface $output): void
+    {
         for ($attempt = 0; $attempt < 60; ++$attempt) {
             [$code] = $this->run(["docker", "exec", $container, "mysqladmin", "ping", "--silent"], true);
             if ($code === 0) {
@@ -198,7 +203,8 @@ final class MysqlRecovery {
     }
 
     /** @return array{0: int, 1: string} */
-    private function mustRun(array $command, OutputInterface $output, bool $quiet = false): array {
+    private function mustRun(array $command, OutputInterface $output, bool $quiet = false): array
+    {
         if (!$quiet) {
             $output->writeln("<comment>" . implode(" ", array_map("escapeshellarg", $command)) . "</comment>");
         }
@@ -212,7 +218,8 @@ final class MysqlRecovery {
     }
 
     /** @return array{0: int, 1: string} */
-    private function run(array $command, bool $capture): array {
+    private function run(array $command, bool $capture): array
+    {
         if ($this->runner !== null) {
             return ($this->runner)($command, $capture);
         }
@@ -226,10 +233,12 @@ final class MysqlRecovery {
         return [proc_close($process), (string) $stdout];
     }
 
-    private function uid(): int {
+    private function uid(): int
+    {
         return function_exists("posix_getuid") ? posix_getuid() : 1000;
     }
-    private function gid(): int {
+    private function gid(): int
+    {
         return function_exists("posix_getgid") ? posix_getgid() : 1000;
     }
 }

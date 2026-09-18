@@ -10,14 +10,17 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class ProjectShowCommand extends AbstractCommand {
-    public function __construct(private readonly ?ProjectRegistry $registry = null) {
+final class ProjectShowCommand extends AbstractCommand
+{
+    public function __construct(private readonly ?ProjectRegistry $registry = null)
+    {
         parent::__construct("project:show");
         $this->setDescription("Вывести YAML-конфигурацию текущего или " . "указанного проекта.");
         $this->addArgument("project", InputArgument::OPTIONAL, "Кодовое имя зарегистрированного проекта.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $project = $input->getArgument("project");
         $projectName = is_string($project) && $project !== "" ? $project : $registry->projectNameFromContext();

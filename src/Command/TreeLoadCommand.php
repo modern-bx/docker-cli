@@ -16,7 +16,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class TreeLoadCommand extends AbstractCommand {
+final class TreeLoadCommand extends AbstractCommand
+{
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?TreeArchiveLoader $loader = null,
@@ -38,7 +39,8 @@ final class TreeLoadCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $project = $input->getOption("project") ?: $registry->projectNameFromContext();
         if (!is_string($project) || !$registry->hasProject($project)) {
@@ -117,7 +119,7 @@ final class TreeLoadCommand extends AbstractCommand {
                 if (
                     !is_array($strategyPaths[$key] ?? null) ||
                     !array_is_list($strategyPaths[$key]) ||
-                    array_filter($strategyPaths[$key], static fn($value): bool => !is_string($value))
+                    array_filter($strategyPaths[$key], static fn ($value): bool => !is_string($value))
                 ) {
                     throw new \InvalidArgumentException("Метаданные файловой стратегии повреждены.");
                 }
@@ -149,7 +151,8 @@ final class TreeLoadCommand extends AbstractCommand {
     }
 
     /** @param array{include: list<string>, exclude: list<string>} $savedPaths */
-    private function warnStrategyDifference(OutputInterface $output, string $code, array $savedPaths): void {
+    private function warnStrategyDifference(OutputInterface $output, string $code, array $savedPaths): void
+    {
         $current = null;
         foreach (($this->backupsSettings ?? new BackupsSettingsRepository())->fileStrategies() as $strategy) {
             if ($strategy["code"] === $code) {

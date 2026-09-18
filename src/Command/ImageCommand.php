@@ -13,7 +13,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-abstract class ImageCommand extends AbstractCommand {
+abstract class ImageCommand extends AbstractCommand
+{
     /** @var list<array{name: string, context: string, service: string}> */
     private const IMAGES = [
         [
@@ -43,7 +44,8 @@ abstract class ImageCommand extends AbstractCommand {
         ],
     ];
 
-    protected function configureImageOptions(): void {
+    protected function configureImageOptions(): void
+    {
         $this->addOption(
             "tag",
             null,
@@ -56,11 +58,12 @@ abstract class ImageCommand extends AbstractCommand {
     }
 
     /** @return list<array{name: string, context: string, service: string}> */
-    protected function images(): array {
+    protected function images(): array
+    {
         $root = (new SystemCompose())->directory();
 
         return array_map(
-            static fn(array $image): array => [
+            static fn (array $image): array => [
                 "name" => $image["name"],
                 "context" => join_path($root, $image["context"]),
                 "service" => $image["service"],
@@ -69,7 +72,8 @@ abstract class ImageCommand extends AbstractCommand {
         );
     }
 
-    protected function imageTag(InputInterface $input): string {
+    protected function imageTag(InputInterface $input): string
+    {
         $optionTag = $input->getOption("tag");
         if (is_string($optionTag) && $optionTag !== "") {
             return $this->normalizeTag($optionTag);
@@ -83,11 +87,13 @@ abstract class ImageCommand extends AbstractCommand {
         return $this->latestGitTag() ?? "default";
     }
 
-    protected function localImageReference(string $name, string $tag): string {
+    protected function localImageReference(string $name, string $tag): string
+    {
         return sprintf("%s/%s:%s", $this->imageNamespace(), $this->imageName($name), $tag);
     }
 
-    protected function remoteImageReference(string $name, string $tag): string {
+    protected function remoteImageReference(string $name, string $tag): string
+    {
         return sprintf("%s/%s/%s:%s", $this->imageRegistry(), $this->imageNamespace(), $this->imageName($name), $tag);
     }
 
@@ -131,7 +137,8 @@ abstract class ImageCommand extends AbstractCommand {
     }
 
     /** @return list<string> */
-    protected function composeBuildCommand(string $service, bool $noCache = false): array {
+    protected function composeBuildCommand(string $service, bool $noCache = false): array
+    {
         $command = [
             "docker",
             "compose",
@@ -150,7 +157,8 @@ abstract class ImageCommand extends AbstractCommand {
     }
 
     /** @return array<string, string> */
-    protected function imageCommandEnvironment(string $tag): array {
+    protected function imageCommandEnvironment(string $tag): array
+    {
         return [
             "SOURCE_IMAGE_REGISTRY" => $this->imageRegistry(),
             "SOURCE_IMAGE_NAMESPACE" => $this->imageNamespace(),
@@ -159,13 +167,15 @@ abstract class ImageCommand extends AbstractCommand {
         ];
     }
 
-    private function imageRegistry(): string {
+    private function imageRegistry(): string
+    {
         $registry = $this->imageEnv()["SOURCE_IMAGE_REGISTRY"] ?? "ghcr.io";
 
         return trim((string) $registry, "/");
     }
 
-    private function imageNamespace(): string {
+    private function imageNamespace(): string
+    {
         $namespace = trim((string) ($this->imageEnv()["SOURCE_IMAGE_NAMESPACE"] ?? ""), "/");
         if ($namespace === "") {
             throw new \RuntimeException(
@@ -177,18 +187,21 @@ abstract class ImageCommand extends AbstractCommand {
         return $namespace;
     }
 
-    private function imageName(string $serviceName): string {
+    private function imageName(string $serviceName): string
+    {
         return $this->sourceImageName() . "/" . $serviceName;
     }
 
-    private function sourceImageName(): string {
+    private function sourceImageName(): string
+    {
         $name = trim((string) ($this->imageEnv()["SOURCE_IMAGE_NAME"] ?? ""), "/");
 
         return $name !== "" ? $name : "docker-cli";
     }
 
     /** @return array<string, string> */
-    private function imageEnv(): array {
+    private function imageEnv(): array
+    {
         $env = $this->readEnvFile(
             join_path($this->repositoryRoot(), "resources", "compose", "system", SystemCompose::ENV_FILE),
         );
@@ -201,7 +214,8 @@ abstract class ImageCommand extends AbstractCommand {
     }
 
     /** @return array<string, string> */
-    private function readEnvFile(string $file): array {
+    private function readEnvFile(string $file): array
+    {
         if (!is_file($file)) {
             return [];
         }
@@ -220,7 +234,8 @@ abstract class ImageCommand extends AbstractCommand {
         return $values;
     }
 
-    private function latestGitTag(): ?string {
+    private function latestGitTag(): ?string
+    {
         $repositoryRoot = $this->repositoryRoot();
         if (!is_dir(join_path($repositoryRoot, ".git"))) {
             return null;
@@ -255,7 +270,8 @@ abstract class ImageCommand extends AbstractCommand {
         return null;
     }
 
-    private function normalizeTag(string $tag): string {
+    private function normalizeTag(string $tag): string
+    {
         $tag = trim($tag);
         if (preg_match('/^v?(\d+\.\d+\.\d+)$/', $tag, $matches) === 1) {
             return $matches[1];
@@ -270,15 +286,18 @@ abstract class ImageCommand extends AbstractCommand {
         );
     }
 
-    private function composeFile(): string {
+    private function composeFile(): string
+    {
         return (new SystemCompose())->composeFile();
     }
 
-    private function composeEnvFile(): string {
+    private function composeEnvFile(): string
+    {
         return (new SystemCompose())->envFile();
     }
 
-    private function repositoryRoot(): string {
+    private function repositoryRoot(): string
+    {
         return dirname(__DIR__, 2);
     }
 }

@@ -8,16 +8,19 @@ use DockerCli\Config\SystemCompose;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DatabaseManager {
+final class DatabaseManager
+{
     public const DBMS = ["mysql", "postgres"];
 
     public function __construct(
         private readonly ?SystemCompose $compose = null,
         private readonly ?DatabasePasswordGenerator $passwordGenerator = null,
-    ) {}
+    ) {
+    }
 
     /** @param list<string> $dbms @param list<string> $users */
-    public function createDatabases(array $dbms, string $database, array $users, OutputInterface $output): int {
+    public function createDatabases(array $dbms, string $database, array $users, OutputInterface $output): int
+    {
         $passwords = $this->generatePasswords($users);
         foreach ($dbms as $engine) {
             $sql =
@@ -35,7 +38,8 @@ final class DatabaseManager {
     }
 
     /** @param list<string> $dbms @param list<string> $databases */
-    public function deleteDatabases(array $dbms, array $databases, OutputInterface $output): int {
+    public function deleteDatabases(array $dbms, array $databases, OutputInterface $output): int
+    {
         foreach ($dbms as $engine) {
             $code = $this->execute(
                 $engine,
@@ -52,7 +56,8 @@ final class DatabaseManager {
     }
 
     /** @param list<string> $dbms @param list<string> $databases */
-    public function createUser(array $dbms, string $user, array $databases, OutputInterface $output): int {
+    public function createUser(array $dbms, string $user, array $databases, OutputInterface $output): int
+    {
         // Validate every requested database before changing any DBMS.
         foreach ($dbms as $engine) {
             if ($databases === []) {
@@ -88,7 +93,8 @@ final class DatabaseManager {
     }
 
     /** @param list<string> $dbms @param list<string> $users */
-    public function deleteUsers(array $dbms, array $users, OutputInterface $output): int {
+    public function deleteUsers(array $dbms, array $users, OutputInterface $output): int
+    {
         foreach ($dbms as $engine) {
             $code = $this->execute(
                 $engine,
@@ -102,7 +108,8 @@ final class DatabaseManager {
         return Command::SUCCESS;
     }
 
-    private function execute(string $dbms, string $payload, OutputInterface $output): int {
+    private function execute(string $dbms, string $payload, OutputInterface $output): int
+    {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
         $command = array_merge($compose->dockerComposeCommand("exec"), [
@@ -127,7 +134,8 @@ final class DatabaseManager {
     }
 
     /** @param array<string, string> $passwords */
-    private function mysqlCreateDatabaseSql(string $database, array $passwords): string {
+    private function mysqlCreateDatabaseSql(string $database, array $passwords): string
+    {
         $sql =
             "CREATE DATABASE IF NOT EXISTS " .
             $this->mysqlIdentifier($database) .
@@ -152,7 +160,8 @@ final class DatabaseManager {
     }
 
     /** @param list<string> $databases */
-    private function mysqlDeleteDatabasesSql(array $databases): string {
+    private function mysqlDeleteDatabasesSql(array $databases): string
+    {
         $sql = "";
         foreach ($databases as $database) {
             $literal = $this->mysqlLiteral($database);
@@ -167,12 +176,13 @@ final class DatabaseManager {
     }
 
     /** @param list<string> $databases */
-    private function mysqlAssertDatabasesSql(array $databases): string {
+    private function mysqlAssertDatabasesSql(array $databases): string
+    {
         return "SET @missing=(SELECT GROUP_CONCAT(requested.name) FROM (" .
             implode(
                 " UNION ALL ",
                 array_map(
-                    fn(string $database): string => "SELECT " . $this->mysqlLiteral($database) . " AS name",
+                    fn (string $database): string => "SELECT " . $this->mysqlLiteral($database) . " AS name",
                     $databases,
                 ),
             ) .
@@ -184,7 +194,8 @@ final class DatabaseManager {
     }
 
     /** @param list<string> $databases */
-    private function mysqlCreateUserSql(string $user, string $password, array $databases): string {
+    private function mysqlCreateUserSql(string $user, string $password, array $databases): string
+    {
         $sql =
             "CREATE USER IF NOT EXISTS " .
             $this->mysqlUser($user) .
@@ -207,7 +218,8 @@ final class DatabaseManager {
     }
 
     /** @param list<string> $users */
-    private function mysqlDeleteUsersSql(array $users): string {
+    private function mysqlDeleteUsersSql(array $users): string
+    {
         $sql = "";
         foreach ($users as $user) {
             $literal = $this->mysqlLiteral($user);
@@ -222,7 +234,8 @@ final class DatabaseManager {
     }
 
     /** @param array<string, string> $passwords */
-    private function postgresCreateDatabaseScript(string $database, array $passwords): string {
+    private function postgresCreateDatabaseScript(string $database, array $passwords): string
+    {
         $root = '"${POSTGRES_USER:-system}"';
         $script = $this->postgresCreateUsersSql($passwords);
         $script =
@@ -248,7 +261,8 @@ final class DatabaseManager {
     }
 
     /** @param list<string> $databases */
-    private function postgresDeleteDatabasesScript(array $databases): string {
+    private function postgresDeleteDatabasesScript(array $databases): string
+    {
         $script = 'root="${POSTGRES_USER:-system}"; ';
         foreach ($databases as $database) {
             $query = "SELECT 1 FROM pg_database WHERE datname=" . $this->postgresLiteral($database);
@@ -271,7 +285,8 @@ final class DatabaseManager {
     }
 
     /** @param list<string> $databases */
-    private function postgresAssertDatabasesScript(array $databases): string {
+    private function postgresAssertDatabasesScript(array $databases): string
+    {
         $script = 'root="${POSTGRES_USER:-system}"; missing=""; ';
         foreach ($databases as $database) {
             $query = "SELECT 1 FROM pg_database WHERE datname=" . $this->postgresLiteral($database);
@@ -286,7 +301,8 @@ final class DatabaseManager {
     }
 
     /** @param list<string> $databases */
-    private function postgresCreateUserScript(string $user, string $password, array $databases): string {
+    private function postgresCreateUserScript(string $user, string $password, array $databases): string
+    {
         $script =
             'root="${POSTGRES_USER:-system}"; psql -v ON_ERROR_STOP=1 -U "$root" -d postgres -c ' .
             escapeshellarg($this->postgresCreateUsersSql([$user => $password])) .
@@ -306,7 +322,8 @@ final class DatabaseManager {
     }
 
     /** @param list<string> $users */
-    private function postgresDeleteUsersSql(array $users): string {
+    private function postgresDeleteUsersSql(array $users): string
+    {
         $sql = "";
         foreach ($users as $user) {
             $sql .= "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname={$this->postgresLiteral(
@@ -322,7 +339,8 @@ final class DatabaseManager {
     }
 
     /** @param array<string, string> $passwords */
-    private function postgresCreateUsersSql(array $passwords): string {
+    private function postgresCreateUsersSql(array $passwords): string
+    {
         $sql = "";
         foreach ($passwords as $user => $password) {
             $literal = $this->postgresLiteral($user);
@@ -337,7 +355,8 @@ final class DatabaseManager {
     }
 
     /** @param list<string> $users @return array<string, string> */
-    private function generatePasswords(array $users): array {
+    private function generatePasswords(array $users): array
+    {
         $generator = $this->passwordGenerator ?? new DatabasePasswordGenerator();
         $passwords = [];
         foreach ($users as $user) {
@@ -347,28 +366,35 @@ final class DatabaseManager {
     }
 
     /** @param array<string, string> $passwords */
-    private function printCredentials(array $passwords, OutputInterface $output): void {
+    private function printCredentials(array $passwords, OutputInterface $output): void
+    {
         foreach ($passwords as $user => $password) {
             $output->writeln(sprintf('<info>Учетные данные пользователя "%s": пароль %s</info>', $user, $password));
         }
     }
 
-    private function mysqlIdentifier(string $value): string {
+    private function mysqlIdentifier(string $value): string
+    {
         return "`" . str_replace("`", "``", $value) . "`";
     }
-    private function mysqlLiteral(string $value): string {
+    private function mysqlLiteral(string $value): string
+    {
         return "'" . str_replace("'", "''", $value) . "'";
     }
-    private function mysqlUser(string $value): string {
+    private function mysqlUser(string $value): string
+    {
         return $this->mysqlLiteral($value) . "@'%'";
     }
-    private function postgresIdentifier(string $value): string {
+    private function postgresIdentifier(string $value): string
+    {
         return '"' . str_replace('"', '""', $value) . '"';
     }
-    private function postgresLiteral(string $value): string {
+    private function postgresLiteral(string $value): string
+    {
         return "'" . str_replace("'", "''", $value) . "'";
     }
-    private function plain(string $value): string {
+    private function plain(string $value): string
+    {
         return str_replace(["'", "\n", "\r"], ["", " ", " "], $value);
     }
 }

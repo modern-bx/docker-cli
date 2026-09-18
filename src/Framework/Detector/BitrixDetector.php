@@ -9,8 +9,10 @@ use DockerCli\Framework\Detected\DetectedFramework;
 
 use function DockerCli\Util\join_path;
 
-final class BitrixDetector implements FrameworkDetectorInterface {
-    public function detect(string $projectRoot): ?DetectedFramework {
+final class BitrixDetector implements FrameworkDetectorInterface
+{
+    public function detect(string $projectRoot): ?DetectedFramework
+    {
         $bitrixMarkers = ["bitrix/modules/main/include.php", "bitrix/header.php", "bitrix/footer.php"];
 
         foreach ($bitrixMarkers as $marker) {

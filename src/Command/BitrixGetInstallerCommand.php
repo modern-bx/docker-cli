@@ -9,7 +9,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class BitrixGetInstallerCommand extends AbstractCommand {
+final class BitrixGetInstallerCommand extends AbstractCommand
+{
     private const BASE_URL = "https://www.1c-bitrix.ru/download/";
     private const CACHE_RELATIVE_PATH = ".config/docker-cli/cache/bitrix-get-installer/distro";
     private const DEFAULT_EDITIONS = [
@@ -33,7 +34,8 @@ final class BitrixGetInstallerCommand extends AbstractCommand {
         ],
     ];
 
-    public function __construct() {
+    public function __construct()
+    {
         parent::__construct("bitrix:get-installer");
         $this->setDescription("Скачать дистрибутив 1С-Битрикс или 1С-Битрикс24.");
         $this->addOption("product", null, InputOption::VALUE_REQUIRED, "Продукт: bitrix или bitrix24.", "bitrix");
@@ -47,7 +49,8 @@ final class BitrixGetInstallerCommand extends AbstractCommand {
         $this->addOption("extract", null, InputOption::VALUE_NONE, "Распаковать архив рядом с ним и удалить архив.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $product = $this->stringOption($input, "product");
         $edition = $this->stringOption($input, "edition");
         $path = $this->stringOption($input, "path");
@@ -118,12 +121,14 @@ final class BitrixGetInstallerCommand extends AbstractCommand {
         return Command::SUCCESS;
     }
 
-    private function stringOption(InputInterface $input, string $name): string {
+    private function stringOption(InputInterface $input, string $name): string
+    {
         $value = $input->getOption($name);
         return is_string($value) && $value !== "" ? $value : "";
     }
 
-    private function resolveTargetPath(string $path, string $remoteFilename): string {
+    private function resolveTargetPath(string $path, string $remoteFilename): string
+    {
         if ($path === "" || is_dir($path) || str_ends_with($path, DIRECTORY_SEPARATOR)) {
             return rtrim($path === "" ? "." : $path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $remoteFilename;
         }
@@ -131,7 +136,8 @@ final class BitrixGetInstallerCommand extends AbstractCommand {
         return $path;
     }
 
-    private function cachePath(string $remotePath): string {
+    private function cachePath(string $remotePath): string
+    {
         $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
 
         return $home .
@@ -141,7 +147,8 @@ final class BitrixGetInstallerCommand extends AbstractCommand {
             str_replace("/", DIRECTORY_SEPARATOR, $remotePath);
     }
 
-    private function remoteContentLength(string $url): ?int {
+    private function remoteContentLength(string $url): ?int
+    {
         $read = @fopen(
             $url,
             "rb",
@@ -170,7 +177,8 @@ final class BitrixGetInstallerCommand extends AbstractCommand {
         return null;
     }
 
-    private function download(string $url, string $target): void {
+    private function download(string $url, string $target): void
+    {
         $directory = dirname($target);
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf("Не удалось создать директорию кеша: %s", $directory));
@@ -221,7 +229,8 @@ final class BitrixGetInstallerCommand extends AbstractCommand {
         }
     }
 
-    private function copyFromCache(string $cache, string $target): void {
+    private function copyFromCache(string $cache, string $target): void
+    {
         if (!is_file($cache)) {
             throw new \RuntimeException(sprintf("Кешированный файл не найден: %s", $cache));
         }
@@ -232,7 +241,8 @@ final class BitrixGetInstallerCommand extends AbstractCommand {
     }
 
     /** @param list<string> $headers */
-    private function assertSuccessfulResponse(array $headers, string $url): void {
+    private function assertSuccessfulResponse(array $headers, string $url): void
+    {
         $statusLine = $headers[0] ?? "";
         if (preg_match("/^HTTP\/\S+\s+(\d+)/", $statusLine, $matches) === 1 && (int) $matches[1] >= 400) {
             throw new \RuntimeException(sprintf("Сервер вернул ошибку %s для %s", $matches[1], $url));
@@ -240,7 +250,8 @@ final class BitrixGetInstallerCommand extends AbstractCommand {
     }
 
     /** @param list<string> $command */
-    private function runProcess(array $command): void {
+    private function runProcess(array $command): void
+    {
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes);
         if (!is_resource($process)) {
             throw new \RuntimeException(sprintf("Не удалось запустить команду: %s", implode(" ", $command)));
@@ -254,7 +265,8 @@ final class BitrixGetInstallerCommand extends AbstractCommand {
         }
     }
 
-    private function extract(string $archive, string $directory): void {
+    private function extract(string $archive, string $directory): void
+    {
         if (str_ends_with($archive, ".zip")) {
             $zip = new \ZipArchive();
             if ($zip->open($archive) !== true) {

@@ -12,7 +12,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class SystemReloadCommand extends AbstractCommand {
+final class SystemReloadCommand extends AbstractCommand
+{
     private const RELOAD_COMMANDS = [
         "openresty" => ["openresty", "-s", "reload"],
         "panel-gateway" => ["nginx", "-s", "reload"],
@@ -20,7 +21,8 @@ final class SystemReloadCommand extends AbstractCommand {
 
     private TranslatorInterface $translator;
 
-    public function __construct(?TranslatorInterface $translator = null) {
+    public function __construct(?TranslatorInterface $translator = null)
+    {
         $this->translator = $translator ?? TranslatorFactory::create();
         parent::__construct("system:reload");
         $this->setDescription("Перезагрузить конфигурацию системных " . "сервисов без перезапуска контейнеров.");
@@ -32,7 +34,8 @@ final class SystemReloadCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $serviceOption = $input->getOption("service");
         $services =
             is_string($serviceOption) && trim($serviceOption) !== ""

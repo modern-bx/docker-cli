@@ -8,7 +8,8 @@ use DockerCli\Panel\Http\RequestData;
 use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class ProjectCloneRequestDto implements RequestDto {
+final readonly class ProjectCloneRequestDto implements RequestDto
+{
     /** @param list<string> $dbms @param list<string>|null $mirror @param list<string>|null $dedicatedDatabases */
     public function __construct(
         public string $name,
@@ -20,9 +21,11 @@ final readonly class ProjectCloneRequestDto implements RequestDto {
         public ?array $dedicatedDatabases,
         public string $locationMysql,
         public string $locationPostgres,
-    ) {}
+    ) {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         $name = $request->route["name"] ?? null;
         $to = $request->body["to"] ?? null;
         $location = $request->body["location"] ?? null;
@@ -50,7 +53,7 @@ final readonly class ProjectCloneRequestDto implements RequestDto {
             $mirror !== null &&
             (array_filter(
                 $mirror,
-                static fn(mixed $item): bool => !is_string($item) || !in_array($item, ["tree", "db"], true),
+                static fn (mixed $item): bool => !is_string($item) || !in_array($item, ["tree", "db"], true),
             ) !== [] ||
                 count(array_unique($mirror)) !== count($mirror))
         ) {
@@ -61,7 +64,7 @@ final readonly class ProjectCloneRequestDto implements RequestDto {
         if (
             array_filter(
                 $dbms,
-                static fn(mixed $item): bool => !is_string($item) || !in_array($item, ["mysql", "postgres"], true),
+                static fn (mixed $item): bool => !is_string($item) || !in_array($item, ["mysql", "postgres"], true),
             ) !== []
         ) {
             throw new RequestValidationException("Поддерживается клонирование только MySQL и PostgreSQL.");
@@ -70,7 +73,7 @@ final readonly class ProjectCloneRequestDto implements RequestDto {
             $dedicatedDatabases !== null &&
             (array_filter(
                 $dedicatedDatabases,
-                static fn(mixed $item): bool => !is_string($item) || !in_array($item, ["mysql", "postgres"], true),
+                static fn (mixed $item): bool => !is_string($item) || !in_array($item, ["mysql", "postgres"], true),
             ) !== [] ||
                 count(array_unique($dedicatedDatabases)) !== count($dedicatedDatabases))
         ) {

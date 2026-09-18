@@ -26,7 +26,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
-final class ProjectCloneCommand extends AbstractCommand {
+final class ProjectCloneCommand extends AbstractCommand
+{
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?ProjectsSettingsRepository $settings = null,
@@ -80,7 +81,8 @@ final class ProjectCloneCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $mirror = $this->resolveMirror($input, $output);
         if ($mirror === null) {
             return Command::INVALID;
@@ -207,7 +209,7 @@ final class ProjectCloneCommand extends AbstractCommand {
             $defaultLocation = current(
                 array_filter(
                     ($this->settings ?? new ProjectsSettingsRepository())->databaseLocations(),
-                    static fn(array $location): bool => $location["default"],
+                    static fn (array $location): bool => $location["default"],
                 ),
             );
             if (is_array($defaultLocation)) {
@@ -235,7 +237,7 @@ final class ProjectCloneCommand extends AbstractCommand {
         $mirroredDatabases = array_values(
             array_filter(
                 $mirroredDatabases,
-                fn(string $driver): bool => $this->canMirrorDatabase($from, $name, $driver, $sourceConfig, $config),
+                fn (string $driver): bool => $this->canMirrorDatabase($from, $name, $driver, $sourceConfig, $config),
             ),
         );
         foreach ($mirroredDatabases as $driver) {
@@ -276,7 +278,7 @@ final class ProjectCloneCommand extends AbstractCommand {
         } else {
             $excludeArgs = implode(
                 " ",
-                array_map(static fn(string $pattern): string => "--exclude=" . escapeshellarg($pattern), $excludes),
+                array_map(static fn (string $pattern): string => "--exclude=" . escapeshellarg($pattern), $excludes),
             );
             $command = sprintf("tar %s -cf - . | (cd %s && tar -xf -)", $excludeArgs, escapeshellarg($destination));
             passthru("cd " . escapeshellarg($sourceRoot) . " && " . $command, $status);
@@ -367,7 +369,8 @@ final class ProjectCloneCommand extends AbstractCommand {
         return ($this->hookRunner ?? new CommandHookRunner())->run("project:clone", "after", $hookArguments);
     }
 
-    private function destinationForName(string $name, string $sourceRoot, InputInterface $input): string {
+    private function destinationForName(string $name, string $sourceRoot, InputInterface $input): string
+    {
         if ($input->getOption("here")) {
             return join_path(dirname($sourceRoot), $name);
         }
@@ -385,18 +388,24 @@ final class ProjectCloneCommand extends AbstractCommand {
         );
     }
 
-    private function absolutePath(string $path): string {
+    private function absolutePath(string $path): string
+    {
         return str_starts_with($path, "/") ? rtrim($path, "/") : join_path((string) getcwd(), $path);
     }
-    private function normalizeName(string $name): string {
+    private function normalizeName(string $name): string
+    {
         return trim(preg_replace("/[^a-z0-9]+/", "-", strtolower($name)) ?? "", "-");
     }
-    private function formatDuration(float $seconds): string {
+    private function formatDuration(float $seconds): string
+    {
         $remaining = max(0, (int) round($seconds));
         $parts = [];
         foreach (
-            [[86400, "день", "дня", "дней"], [3600, "час", "часа", "часов"], [60, "минута", "минуты", "минут"]]
-            as [$size, $one, $few, $many]
+            [
+                [86400, "день", "дня", "дней"],
+                [3600, "час", "часа", "часов"],
+                [60, "минута", "минуты", "минут"],
+            ] as [$size, $one, $few, $many]
         ) {
             $value = intdiv($remaining, $size);
             if ($value > 0) {
@@ -410,7 +419,8 @@ final class ProjectCloneCommand extends AbstractCommand {
         return implode(" ", $parts);
     }
 
-    private function plural(int $value, string $one, string $few, string $many): string {
+    private function plural(int $value, string $one, string $few, string $many): string
+    {
         $mod100 = $value % 100;
         if ($mod100 >= 11 && $mod100 <= 14) {
             return $many;
@@ -423,7 +433,8 @@ final class ProjectCloneCommand extends AbstractCommand {
     }
 
     /** @return list<string>|null */
-    private function resolveMirror(InputInterface $input, OutputInterface $output): ?array {
+    private function resolveMirror(InputInterface $input, OutputInterface $output): ?array
+    {
         if (!$input->hasParameterOption("--mirror")) {
             return [];
         }
@@ -439,7 +450,8 @@ final class ProjectCloneCommand extends AbstractCommand {
         return $modes;
     }
 
-    private function canReflink(string $source, string $destination): bool {
+    private function canReflink(string $source, string $destination): bool
+    {
         $sourceStat = stat($source);
         $destinationStat = stat($destination);
         if ($sourceStat === false || $destinationStat === false || $sourceStat["dev"] !== $destinationStat["dev"]) {
@@ -468,7 +480,7 @@ final class ProjectCloneCommand extends AbstractCommand {
         return array_values(
             array_filter(
                 ["mysql", "postgres"],
-                static fn(string $driver): bool => in_array($driver, $dbms, true) &&
+                static fn (string $driver): bool => in_array($driver, $dbms, true) &&
                     in_array($driver, $targetDedicated, true) &&
                     ($sourceConfig["data"]["databases"][$driver]["hostname"] ?? null) ===
                         sprintf("docker-cli-%s-%s", $driver, $sourceName),
@@ -507,7 +519,8 @@ final class ProjectCloneCommand extends AbstractCommand {
         return realpath($sourceData) !== realpath($targetData) && $this->canReflink($sourceData, $targetData);
     }
 
-    private function wipeMetadata(string $destination): void {
+    private function wipeMetadata(string $destination): void
+    {
         $metadata = join_path($destination, ".docker-cli");
         if (is_dir($metadata) || is_link($metadata)) {
             $this->remove($metadata);
@@ -515,7 +528,8 @@ final class ProjectCloneCommand extends AbstractCommand {
     }
 
     /** @return list<string>|null */
-    private function resolveDbms(mixed $option, bool $skip, OutputInterface $output): ?array {
+    private function resolveDbms(mixed $option, bool $skip, OutputInterface $output): ?array
+    {
         if ($skip) {
             return [];
         }
@@ -548,7 +562,7 @@ final class ProjectCloneCommand extends AbstractCommand {
             : array_values(
                 array_filter(
                     ["mysql", "postgres"],
-                    static fn(string $driver): bool => ($sourceConfig["data"]["databases"][$driver]["hostname"] ??
+                    static fn (string $driver): bool => ($sourceConfig["data"]["databases"][$driver]["hostname"] ??
                         null) ===
                         sprintf("docker-cli-%s-%s", $driver, $sourceName),
                 ),
@@ -595,7 +609,8 @@ final class ProjectCloneCommand extends AbstractCommand {
     }
 
     /** @param list<string> $drivers */
-    private function startDedicatedDatabases(string $projectName, array $drivers, OutputInterface $output): int {
+    private function startDedicatedDatabases(string $projectName, array $drivers, OutputInterface $output): int
+    {
         if ($drivers === []) {
             return Command::SUCCESS;
         }
@@ -613,7 +628,7 @@ final class ProjectCloneCommand extends AbstractCommand {
             return Command::FAILURE;
         }
         $services = array_map(
-            static fn(string $driver): string => $compose->databaseService($projectName, $driver),
+            static fn (string $driver): string => $compose->databaseService($projectName, $driver),
             $drivers,
         );
         $command = array_merge($compose->dockerComposeCommand("up"), ["--detach"], $services);
@@ -746,7 +761,8 @@ final class ProjectCloneCommand extends AbstractCommand {
     }
 
     /** @param list<string> $arguments */
-    private function runComposeProcess(SystemCompose $compose, array $arguments, OutputInterface $output): int {
+    private function runComposeProcess(SystemCompose $compose, array $arguments, OutputInterface $output): int
+    {
         $command = array_merge($compose->dockerComposeCommand(array_shift($arguments) ?? ""), $arguments);
         $this->writeMessage(
             $output,
@@ -758,7 +774,8 @@ final class ProjectCloneCommand extends AbstractCommand {
     }
 
     /** @param array<string, mixed> $sourceConfig @param array<string, mixed> $targetConfig */
-    private function cloneMysqlDatabase(array $sourceConfig, array $targetConfig, OutputInterface $output): int {
+    private function cloneMysqlDatabase(array $sourceConfig, array $targetConfig, OutputInterface $output): int
+    {
         $source = $sourceConfig["data"]["databases"]["mysql"]["database"] ?? null;
         $target = $targetConfig["data"]["databases"]["mysql"]["database"] ?? null;
         if (!is_string($source) || $source === "" || !is_string($target) || $target === "") {
@@ -818,7 +835,8 @@ final class ProjectCloneCommand extends AbstractCommand {
     }
 
     /** @param array<string, mixed> $sourceConfig @param array<string, mixed> $targetConfig */
-    private function clonePostgresDatabase(array $sourceConfig, array $targetConfig, OutputInterface $output): int {
+    private function clonePostgresDatabase(array $sourceConfig, array $targetConfig, OutputInterface $output): int
+    {
         $source = $sourceConfig["data"]["databases"]["postgres"]["database"] ?? null;
         $target = $targetConfig["data"]["databases"]["postgres"]["database"] ?? null;
         $sourceUser = $sourceConfig["data"]["databases"]["postgres"]["username"] ?? $source;
@@ -862,10 +880,12 @@ final class ProjectCloneCommand extends AbstractCommand {
             return Command::FAILURE;
         }
     }
-    private function directoryHasFiles(string $path): bool {
+    private function directoryHasFiles(string $path): bool
+    {
         return is_dir($path) && count(scandir($path) ?: []) > 2;
     }
-    private function projectAtPath(string $path, ProjectRegistry $registry): ?string {
+    private function projectAtPath(string $path, ProjectRegistry $registry): ?string
+    {
         foreach ($registry->registeredProjectNames() as $name) {
             if (($registry->readProjectConfig($name)["data"]["project"]["root"] ?? null) === $path) {
                 return $name;
@@ -873,7 +893,8 @@ final class ProjectCloneCommand extends AbstractCommand {
         }
         return null;
     }
-    private function wipe(string $path): void {
+    private function wipe(string $path): void
+    {
         foreach (scandir($path) ?: [] as $entry) {
             if ($entry === "." || $entry === ".." || $entry === ".docker-cli") {
                 continue;
@@ -881,7 +902,8 @@ final class ProjectCloneCommand extends AbstractCommand {
             $this->remove(join_path($path, $entry));
         }
     }
-    private function remove(string $path): void {
+    private function remove(string $path): void
+    {
         if (is_link($path) || !is_dir($path)) {
             unlink($path);
             return;

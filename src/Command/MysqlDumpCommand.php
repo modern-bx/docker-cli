@@ -14,7 +14,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class MysqlDumpCommand extends AbstractCommand {
+final class MysqlDumpCommand extends AbstractCommand
+{
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?MysqlDumpLoader $dumpLoader = null,
@@ -32,7 +33,8 @@ final class MysqlDumpCommand extends AbstractCommand {
         $this->addOption("threads", "j", InputOption::VALUE_REQUIRED, "Число параллельных потоков.", "4");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $project = $input->getOption("project") ?: $registry->projectNameFromContext();
         if (!is_string($project) || !$registry->hasProject($project)) {
@@ -137,7 +139,8 @@ final class MysqlDumpCommand extends AbstractCommand {
         return $code;
     }
 
-    private function resolveStrategy(InputInterface $input, OutputInterface $output): array|false|null {
+    private function resolveStrategy(InputInterface $input, OutputInterface $output): array|false|null
+    {
         $code = $input->getOption("strategy");
         if ($code === null) {
             return null;
@@ -155,7 +158,8 @@ final class MysqlDumpCommand extends AbstractCommand {
         return false;
     }
 
-    private function absolutePath(string $path): string {
+    private function absolutePath(string $path): string
+    {
         return str_starts_with($path, DIRECTORY_SEPARATOR)
             ? rtrim($path, DIRECTORY_SEPARATOR)
             : rtrim((getcwd() ?: ".") . DIRECTORY_SEPARATOR . $path, DIRECTORY_SEPARATOR);

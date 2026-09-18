@@ -8,10 +8,14 @@ use DockerCli\Panel\BackupsSettingsRepository;
 
 use function DockerCli\Util\join_path;
 
-final readonly class BackupStorageLocator {
-    public function __construct(private ?BackupsSettingsRepository $settings = null) {}
+final readonly class BackupStorageLocator
+{
+    public function __construct(private ?BackupsSettingsRepository $settings = null)
+    {
+    }
 
-    public function databaseDirectory(string $location, string $database): string {
+    public function databaseDirectory(string $location, string $database): string
+    {
         foreach (($this->settings ?? new BackupsSettingsRepository())->locations() as $storage) {
             if ($storage["code"] === $location) {
                 return join_path($storage["path"], $database);
@@ -21,7 +25,8 @@ final readonly class BackupStorageLocator {
         throw new \InvalidArgumentException(sprintf("Хранилище бэкапов с кодом «%s» не найдено.", $location));
     }
 
-    public function treeDirectory(string $location): string {
+    public function treeDirectory(string $location): string
+    {
         return $this->databaseDirectory($location, "tree");
     }
 }

@@ -8,12 +8,16 @@ use function DockerCli\Util\join_path;
 
 use Symfony\Component\Yaml\Yaml;
 
-final class QueueRepository {
+final class QueueRepository
+{
     public const STATUSES = ["10-pending", "20-active", "30-success", "40-failure", "50-error", "90-archive"];
 
-    public function __construct(private readonly ?string $configDirectory = null) {}
+    public function __construct(private readonly ?string $configDirectory = null)
+    {
+    }
 
-    public function configDirectory(): string {
+    public function configDirectory(): string
+    {
         if ($this->configDirectory !== null) {
             return $this->configDirectory;
         }
@@ -25,7 +29,8 @@ final class QueueRepository {
         return join_path($home, ".config", "docker-cli");
     }
 
-    public function queueDirectory(string $queue): string {
+    public function queueDirectory(string $queue): string
+    {
         if (preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $queue) !== 1) {
             throw new \InvalidArgumentException(sprintf('Некорректный код очереди "%s".', $queue));
         }
@@ -33,7 +38,8 @@ final class QueueRepository {
         return join_path($this->configDirectory(), "state", "queue", $queue);
     }
 
-    public function initialize(string $queue): void {
+    public function initialize(string $queue): void
+    {
         foreach (self::STATUSES as $status) {
             $directory = join_path($this->queueDirectory($queue), $status);
             if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
@@ -46,11 +52,13 @@ final class QueueRepository {
         }
     }
 
-    public function isPaused(string $queue): bool {
+    public function isPaused(string $queue): bool
+    {
         return is_file(join_path($this->queueDirectory($queue), ".pause"));
     }
 
-    public function pause(string $queue): void {
+    public function pause(string $queue): void
+    {
         $this->initialize($queue);
         $file = join_path($this->queueDirectory($queue), ".pause");
         if (file_put_contents($file, "", LOCK_EX) === false) {
@@ -58,14 +66,16 @@ final class QueueRepository {
         }
     }
 
-    public function resume(string $queue): void {
+    public function resume(string $queue): void
+    {
         $file = join_path($this->queueDirectory($queue), ".pause");
         if (is_file($file) && !unlink($file)) {
             throw new \RuntimeException(sprintf('Не удалось возобновить очередь "%s".', $queue));
         }
     }
 
-    public function nextPending(string $queue): ?string {
+    public function nextPending(string $queue): ?string
+    {
         $files = glob(join_path($this->queueDirectory($queue), "10-pending", "*.yaml")) ?: [];
         $files = array_values(array_filter($files, "is_file"));
         $this->sortTimestampedFiles($files);
@@ -74,7 +84,8 @@ final class QueueRepository {
     }
 
     /** @param array<string, mixed> $item */
-    public function create(string $queue, string $code, array $item): string {
+    public function create(string $queue, string $code, array $item): string
+    {
         $this->initialize($queue);
         $timestamp = (int) floor(microtime(true) * 1_000);
         $safeCode = trim((string) preg_replace("/[^A-Za-z0-9._-]+/", "-", $code), ".-");
@@ -105,7 +116,8 @@ final class QueueRepository {
     }
 
     /** @return list<array{file: string, status: string, queuedAt: string, code: string}> */
-    public function items(string $queue): array {
+    public function items(string $queue): array
+    {
         $items = [];
         foreach (["10-pending", "20-active", "40-failure", "50-error"] as $status) {
             $files = glob(join_path($this->queueDirectory($queue), $status, "*.yaml")) ?: [];
@@ -127,7 +139,7 @@ final class QueueRepository {
         }
         usort(
             $items,
-            static fn(array $left, array $right): int => [$left["queuedAt"], $left["file"]] <=> [
+            static fn (array $left, array $right): int => [$left["queuedAt"], $left["file"]] <=> [
                 $right["queuedAt"],
                 $right["file"],
             ],
@@ -139,7 +151,8 @@ final class QueueRepository {
     /**
      * @return list<array{queue: string, status: string, file: string, path: string, relativePath: string}>
      */
-    public function listItems(?string $queue = null, ?string $status = null): array {
+    public function listItems(?string $queue = null, ?string $status = null): array
+    {
         if ($status !== null && !in_array($status, self::STATUSES, true)) {
             throw new \InvalidArgumentException(sprintf('Неизвестный статус "%s".', $status));
         }
@@ -148,8 +161,7 @@ final class QueueRepository {
         } else {
             $directories = [];
             foreach (
-                glob(join_path($this->configDirectory(), "state", "queue", "*"), GLOB_ONLYDIR) ?: []
-                as $directory
+                glob(join_path($this->configDirectory(), "state", "queue", "*"), GLOB_ONLYDIR) ?: [] as $directory
             ) {
                 $directories[basename($directory)] = $directory;
             }
@@ -177,7 +189,8 @@ final class QueueRepository {
         return $items;
     }
 
-    private function timestampMicroseconds(string $timestamp, string $file): int {
+    private function timestampMicroseconds(string $timestamp, string $file): int
+    {
         if (!ctype_digit($timestamp)) {
             return ((int) filemtime($file)) * 1_000_000;
         }
@@ -192,7 +205,8 @@ final class QueueRepository {
     }
 
     /** @param list<string> $files */
-    private function sortTimestampedFiles(array &$files): void {
+    private function sortTimestampedFiles(array &$files): void
+    {
         usort($files, function (string $left, string $right): int {
             $leftTimestamp = explode(".", basename($left), 2)[0];
             $rightTimestamp = explode(".", basename($right), 2)[0];
@@ -203,7 +217,8 @@ final class QueueRepository {
         });
     }
 
-    public function delete(string $queue, string $file): void {
+    public function delete(string $queue, string $file): void
+    {
         if (basename($file) !== $file || preg_match('/^[A-Za-z0-9._-]+\.yaml$/D', $file) !== 1) {
             throw new \InvalidArgumentException("Некорректное имя элемента очереди.");
         }
@@ -222,7 +237,8 @@ final class QueueRepository {
         throw new \RuntimeException("Элемент очереди не найден.");
     }
 
-    public function archive(string $queue, string $file): void {
+    public function archive(string $queue, string $file): void
+    {
         if (basename($file) !== $file || preg_match('/^[A-Za-z0-9._-]+\.yaml$/D', $file) !== 1) {
             throw new \InvalidArgumentException("Некорректное имя элемента очереди.");
         }
@@ -245,7 +261,8 @@ final class QueueRepository {
         throw new \RuntimeException("Элемент очереди не найден или уже архивирован.");
     }
 
-    public function move(string $file, string $queue, string $status): string {
+    public function move(string $file, string $queue, string $status): string
+    {
         if (!in_array($status, self::STATUSES, true)) {
             throw new \InvalidArgumentException(sprintf('Неизвестный статус "%s".', $status));
         }
@@ -258,7 +275,8 @@ final class QueueRepository {
     }
 
     /** @param array<string, mixed> $item */
-    public function write(string $file, array $item): void {
+    public function write(string $file, array $item): void
+    {
         if (file_put_contents($file, Yaml::dump($item, 8, 2), LOCK_EX) === false) {
             throw new \RuntimeException(sprintf('Не удалось записать элемент очереди "%s".', $file));
         }
@@ -320,7 +338,7 @@ final class QueueRepository {
         array $messages,
     ): void {
         $item["journal"] ??= [];
-        $item["journal"][$journalKey] = array_map(static fn(array $record): string => $record["message"], $messages);
+        $item["journal"][$journalKey] = array_map(static fn (array $record): string => $record["message"], $messages);
         $this->write($file, $item);
         $projects = $this->projectsFromItem($item, $taskCode);
         $name = basename($file);
@@ -350,7 +368,8 @@ final class QueueRepository {
     }
 
     /** @param array<string, mixed> $record */
-    private function appendLog(string $queue, array $record): void {
+    private function appendLog(string $queue, array $record): void
+    {
         $line = json_encode($record, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
         if (
             file_put_contents(
@@ -364,7 +383,8 @@ final class QueueRepository {
     }
 
     /** @param array<string, mixed> $item @return list<string> */
-    private function projectsFromItem(array $item, ?string $taskCode): array {
+    private function projectsFromItem(array $item, ?string $taskCode): array
+    {
         $projects = [];
         foreach ($item["queue-item"]["tasks"] ?? [] as $task) {
             if (!is_array($task) || ($taskCode !== null && ($task["code"] ?? null) !== $taskCode)) {
@@ -380,12 +400,13 @@ final class QueueRepository {
     }
 
     /** @param array<string, mixed> $record @return list<string> */
-    private function projectsFromRecord(array $record): array {
+    private function projectsFromRecord(array $record): array
+    {
         if (is_array($record["projects"] ?? null)) {
             return array_values(
                 array_filter(
                     $record["projects"],
-                    static fn(mixed $project): bool => is_string($project) && $project !== "",
+                    static fn (mixed $project): bool => is_string($project) && $project !== "",
                 ),
             );
         }

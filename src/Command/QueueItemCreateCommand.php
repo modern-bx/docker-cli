@@ -13,7 +13,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class QueueItemCreateCommand extends AbstractCommand {
+final class QueueItemCreateCommand extends AbstractCommand
+{
     public function __construct(
         private readonly ?QueueRepository $queues = null,
         private readonly ?TaskRepository $tasks = null,
@@ -31,7 +32,8 @@ final class QueueItemCreateCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         try {
             if ($input->getOption("mode") !== "task") {
                 throw new \InvalidArgumentException('Опция --mode должна иметь значение "task".');
@@ -73,7 +75,8 @@ final class QueueItemCreateCommand extends AbstractCommand {
      * @param array<string, mixed> $parameters @param list<mixed> $arguments @return array<string, array{value:
      * string|int|bool}>
      */
-    private function mapArguments(array $parameters, array $arguments): array {
+    private function mapArguments(array $parameters, array $arguments): array
+    {
         $named = [];
         $positional = [];
         foreach ($arguments as $argument) {

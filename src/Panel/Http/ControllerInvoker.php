@@ -8,7 +8,8 @@ use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Panel\Http\Middleware\AuthMiddleware;
 use Psr\Http\Message\ServerRequestInterface;
 
-final class ControllerInvoker {
+final class ControllerInvoker
+{
     /** @param array<string, string> $variables */
     public function invoke(
         object $controller,

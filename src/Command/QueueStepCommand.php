@@ -19,14 +19,17 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
-final class QueueStepCommand extends AbstractCommand {
-    public function __construct(private readonly ?QueueRepository $queues = null) {
+final class QueueStepCommand extends AbstractCommand
+{
+    public function __construct(private readonly ?QueueRepository $queues = null)
+    {
         parent::__construct("queue:step");
         $this->setDescription("Обработать следующий элемент очереди.");
         $this->addOption("queue", null, InputOption::VALUE_REQUIRED, "Код очереди.", "default");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $queue = (string) $input->getOption("queue");
         $repository = $this->queues ?? new QueueRepository();
         try {

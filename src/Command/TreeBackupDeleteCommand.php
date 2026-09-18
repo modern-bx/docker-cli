@@ -15,7 +15,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class TreeBackupDeleteCommand extends AbstractCommand {
+final class TreeBackupDeleteCommand extends AbstractCommand
+{
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?BackupStorageLocator $storageLocator = null,
@@ -26,7 +27,8 @@ final class TreeBackupDeleteCommand extends AbstractCommand {
         $this->addOption("location", null, InputOption::VALUE_REQUIRED, "Код централизованного хранилища бэкапов.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $project = $registry->projectNameFromContext();
         if ($project === null || !$registry->hasProject($project)) {
@@ -90,7 +92,8 @@ final class TreeBackupDeleteCommand extends AbstractCommand {
         return Command::SUCCESS;
     }
 
-    private function removeDirectory(string $directory): void {
+    private function removeDirectory(string $directory): void
+    {
         foreach (new \FilesystemIterator($directory) as $item) {
             $path = $item->getPathname();
             if ($item->isDir() && !$item->isLink()) {

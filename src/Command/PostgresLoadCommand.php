@@ -13,7 +13,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PostgresLoadCommand extends AbstractCommand {
+final class PostgresLoadCommand extends AbstractCommand
+{
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?PostgresDumpLoader $dumpLoader = null,
@@ -28,7 +29,8 @@ final class PostgresLoadCommand extends AbstractCommand {
         $this->addOption("jobs", "j", InputOption::VALUE_REQUIRED, "Число параллельных процессов.", "4");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $project = $input->getOption("project") ?: $registry->projectNameFromContext();
         if (!is_string($project) || !$registry->hasProject($project)) {

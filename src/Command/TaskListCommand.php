@@ -11,15 +11,18 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class TaskListCommand extends AbstractCommand {
-    public function __construct(private readonly ?TaskRepository $repository = null) {
+final class TaskListCommand extends AbstractCommand
+{
+    public function __construct(private readonly ?TaskRepository $repository = null)
+    {
         parent::__construct("task:list");
         $this->setDescription("Вывести список пользовательских задач.");
         $this->addOption("short", null, InputOption::VALUE_NONE, "Вывести только краткую сигнатуру без подробностей.");
         $this->addOption("task", null, InputOption::VALUE_REQUIRED, "Коды задач через запятую, которые нужно вывести.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         try {
             $definitions = ($this->repository ?? new TaskRepository())->all();
             $definitions = $this->filterDefinitions($definitions, $input->getOption("task"));
@@ -50,7 +53,8 @@ final class TaskListCommand extends AbstractCommand {
     }
 
     /** @param array<string, mixed> $task */
-    private function signature(array $task, bool $short): string {
+    private function signature(array $task, bool $short): string
+    {
         $parameters = [];
         $details = [];
         foreach ($task["parameters"] ?? [] as $name => $spec) {
@@ -81,7 +85,8 @@ final class TaskListCommand extends AbstractCommand {
     }
 
     /** @param array<string, mixed> $spec */
-    private function parameterDetails(string $code, array $spec): string {
+    private function parameterDetails(string $code, array $spec): string
+    {
         $lines = [
             $code,
             "  Название: " . $this->scalarText($spec["name"] ?? null),
@@ -129,18 +134,19 @@ final class TaskListCommand extends AbstractCommand {
      * @param list<array{file: string, task: array<string, mixed>}> $definitions
      * @return list<array{file: string, task: array<string, mixed>}>
      */
-    private function filterDefinitions(array $definitions, mixed $option): array {
+    private function filterDefinitions(array $definitions, mixed $option): array
+    {
         if (!is_string($option) || trim($option) === "") {
             return $definitions;
         }
 
         $codes = array_values(
             array_unique(
-                array_filter(array_map("trim", explode(",", $option)), static fn(string $code): bool => $code !== ""),
+                array_filter(array_map("trim", explode(",", $option)), static fn (string $code): bool => $code !== ""),
             ),
         );
         $available = array_map(
-            static fn(array $definition): string => (string) ($definition["task"]["code"] ?? ""),
+            static fn (array $definition): string => (string) ($definition["task"]["code"] ?? ""),
             $definitions,
         );
         $missing = array_values(array_diff($codes, $available));
@@ -151,23 +157,26 @@ final class TaskListCommand extends AbstractCommand {
         return array_values(
             array_filter(
                 $definitions,
-                static fn(array $definition): bool => in_array($definition["task"]["code"] ?? null, $codes, true),
+                static fn (array $definition): bool => in_array($definition["task"]["code"] ?? null, $codes, true),
             ),
         );
     }
 
-    private function scalarText(mixed $value): string {
+    private function scalarText(mixed $value): string
+    {
         return is_scalar($value) ? (string) $value : "—";
     }
 
-    private function indent(string $text, int $spaces): string {
+    private function indent(string $text, int $spaces): string
+    {
         $text = rtrim($text, "\r\n");
 
         return preg_replace("/^/m", str_repeat(" ", $spaces), $text) ?? $text;
     }
 
     /** @param array<string, mixed> $spec */
-    private function type(array $spec): string {
+    private function type(array $spec): string
+    {
         $type = (string) ($spec["type"] ?? "?");
         if ($type === "integer" && (isset($spec["min"]) || isset($spec["max"]))) {
             return sprintf("integer[%s..%s]", $spec["min"] ?? "−∞", $spec["max"] ?? "+∞");

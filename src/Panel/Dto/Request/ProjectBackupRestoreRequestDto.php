@@ -8,7 +8,8 @@ use DockerCli\Panel\Http\RequestData;
 use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class ProjectBackupRestoreRequestDto implements RequestDto {
+final readonly class ProjectBackupRestoreRequestDto implements RequestDto
+{
     /** @param list<string> $databases */
     public function __construct(
         public string $name,
@@ -19,9 +20,11 @@ final readonly class ProjectBackupRestoreRequestDto implements RequestDto {
         public bool $force = true,
         public bool $wipe = false,
         public array $databases = [],
-    ) {}
+    ) {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         $database = $request->body["database"] ?? "mysql";
         $location = $request->body["location"] ?? "";
         $files = $request->body["files"] ?? false;

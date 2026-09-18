@@ -8,12 +8,16 @@ use function DockerCli\Util\join_path;
 
 use Symfony\Component\Yaml\Yaml;
 
-final class NotificationRepository {
+final class NotificationRepository
+{
     public const LEVELS = ["info", "warn", "error", "debug"];
 
-    public function __construct(private readonly ?string $configDirectory = null) {}
+    public function __construct(private readonly ?string $configDirectory = null)
+    {
+    }
 
-    public function initialize(): void {
+    public function initialize(): void
+    {
         foreach (["current", "archive"] as $status) {
             $directory = $this->directory($status);
             if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
@@ -70,7 +74,8 @@ final class NotificationRepository {
     /**
      * @return list<array{file: string, time: string, origin: string, class: string, level: string, message: string}>
      */
-    public function current(): array {
+    public function current(): array
+    {
         $this->initialize();
         $result = [];
         foreach (glob(join_path($this->directory("current"), "*.yaml")) ?: [] as $file) {
@@ -108,7 +113,7 @@ final class NotificationRepository {
         }
         usort(
             $result,
-            static fn(array $left, array $right): int => [$right["time"], $right["file"]] <=> [
+            static fn (array $left, array $right): int => [$right["time"], $right["file"]] <=> [
                 $left["time"],
                 $left["file"],
             ],
@@ -116,7 +121,8 @@ final class NotificationRepository {
         return $result;
     }
 
-    public function archive(string $file): void {
+    public function archive(string $file): void
+    {
         if (basename($file) !== $file || preg_match('/^[A-Za-z0-9._-]+\.yaml$/D', $file) !== 1) {
             throw new \InvalidArgumentException("Некорректное имя уведомления.");
         }
@@ -130,7 +136,8 @@ final class NotificationRepository {
         }
     }
 
-    public function archiveAll(): void {
+    public function archiveAll(): void
+    {
         $this->initialize();
         foreach (glob(join_path($this->directory("current"), "*.yaml")) ?: [] as $source) {
             if (!is_file($source)) {
@@ -143,7 +150,8 @@ final class NotificationRepository {
         }
     }
 
-    private function directory(string $status): string {
+    private function directory(string $status): string
+    {
         $root = $this->configDirectory;
         if ($root === null) {
             $home = getenv("HOME");

@@ -14,7 +14,8 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-abstract class ProjectStateCommand extends AbstractCommand {
+abstract class ProjectStateCommand extends AbstractCommand
+{
     public function __construct(
         string $name,
         private readonly bool $enabled,
@@ -25,7 +26,8 @@ abstract class ProjectStateCommand extends AbstractCommand {
         $this->addArgument("project", InputArgument::OPTIONAL, "Кодовое имя зарегистрированного проекта.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $argument = $input->getArgument("project");
         $projectName = is_string($argument) && $argument !== "" ? $argument : $registry->projectNameFromContext();

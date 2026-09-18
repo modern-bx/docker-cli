@@ -8,12 +8,16 @@ use DockerCli\Panel\Http\RequestData;
 use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class ProjectsSettingsRequestDto implements RequestDto {
+final readonly class ProjectsSettingsRequestDto implements RequestDto
+{
     /** @param list<array{path: string, code: string, default: bool}> $locations */
     /** @param list<array{path: string, code: string, default: bool}> $databaseLocations */
-    public function __construct(public array $locations, public array $databaseLocations) {}
+    public function __construct(public array $locations, public array $databaseLocations)
+    {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         $locations = $request->body["locations"] ?? null;
         $databaseLocations = $request->body["databaseLocations"] ?? null;
 
@@ -24,7 +28,8 @@ final readonly class ProjectsSettingsRequestDto implements RequestDto {
     }
 
     /** @return list<array{path: string, code: string, default: bool}> */
-    private static function validateLocations(mixed $locations, string $type, bool $defaultRequired): array {
+    private static function validateLocations(mixed $locations, string $type, bool $defaultRequired): array
+    {
         if (!is_array($locations) || $locations === [] || !array_is_list($locations)) {
             throw new RequestValidationException(sprintf("Добавьте хотя бы одно расположение %s.", $type));
         }

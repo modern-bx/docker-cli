@@ -17,8 +17,10 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
-final class PlayRunCommand extends AbstractCommand {
-    public function __construct() {
+final class PlayRunCommand extends AbstractCommand
+{
+    public function __construct()
+    {
         parent::__construct("play:run");
         $this->setDescription("Запустить Playwright-сценарий в контексте " . "текущего проекта.");
         $this->addArgument(
@@ -42,7 +44,8 @@ final class PlayRunCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $registry = new ProjectRegistry();
         $projectName = $registry->projectNameFromContext();
         if ($projectName === null) {
@@ -248,7 +251,8 @@ final class PlayRunCommand extends AbstractCommand {
     }
 
     /** @return array<string, mixed> */
-    private function readDataDirectory(string $directory): array {
+    private function readDataDirectory(string $directory): array
+    {
         if (!is_dir($directory)) {
             return [];
         }
@@ -286,7 +290,8 @@ final class PlayRunCommand extends AbstractCommand {
         return $data;
     }
 
-    private function openViewerWhenReady(string $url, int $port): void {
+    private function openViewerWhenReady(string $url, int $port): void
+    {
         if (PHP_OS_FAMILY === "Darwin") {
             $opener = "open";
         } elseif (PHP_OS_FAMILY === "Windows") {
@@ -309,7 +314,8 @@ final class PlayRunCommand extends AbstractCommand {
         }
     }
 
-    private function normalizeScriptName(string $script): ?string {
+    private function normalizeScriptName(string $script): ?string
+    {
         $script = trim(str_replace("\\", "/", $script), "/");
         if ($script === "" || str_contains($script, "..")) {
             return null;
@@ -323,7 +329,8 @@ final class PlayRunCommand extends AbstractCommand {
     }
 
     /** @return list<string> */
-    private function mixinRequireArguments(SystemCompose $compose): array {
+    private function mixinRequireArguments(SystemCompose $compose): array
+    {
         $mixinsDirectory = join_path($compose->playwrightScriptsDirectory(), "mixins");
         if (!is_dir($mixinsDirectory)) {
             return [];
@@ -341,13 +348,15 @@ final class PlayRunCommand extends AbstractCommand {
         return $arguments;
     }
 
-    private function ensureDirectory(string $directory): void {
+    private function ensureDirectory(string $directory): void
+    {
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf('Unable to create directory "%s".', $directory));
         }
     }
 
-    private function containerPath(string $hostPath): string {
+    private function containerPath(string $hostPath): string
+    {
         $realPath = realpath($hostPath) ?: $hostPath;
         if (str_starts_with($realPath, "/home/")) {
             return $realPath;
@@ -356,7 +365,8 @@ final class PlayRunCommand extends AbstractCommand {
         return "/host" . $realPath;
     }
 
-    private function readEnvValue(string $envFile, string $key): string {
+    private function readEnvValue(string $envFile, string $key): string
+    {
         $contents = is_file($envFile) ? file_get_contents($envFile) : false;
         if ($contents === false) {
             return "";

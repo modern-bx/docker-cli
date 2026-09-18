@@ -8,7 +8,8 @@ use DockerCli\Panel\Http\RequestData;
 use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class ProjectBackupCreateRequestDto implements RequestDto {
+final readonly class ProjectBackupCreateRequestDto implements RequestDto
+{
     public function __construct(
         public string $name,
         public bool $database,
@@ -21,9 +22,11 @@ final readonly class ProjectBackupCreateRequestDto implements RequestDto {
         public string $chunkSize = "",
         public string $chunkCount = "",
         public string $comment = "",
-    ) {}
+    ) {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         foreach (["database", "files", "mysql", "postgres"] as $field) {
             if (!is_bool($request->body[$field] ?? null)) {
                 throw new RequestValidationException("Некорректные параметры создания бэкапа.");

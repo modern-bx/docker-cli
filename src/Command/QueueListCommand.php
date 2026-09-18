@@ -12,7 +12,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
-final class QueueListCommand extends AbstractCommand {
+final class QueueListCommand extends AbstractCommand
+{
     /** @var array<string, string> */
     private const STATUS_ALIASES = [
         "10" => "10-pending",
@@ -32,7 +33,8 @@ final class QueueListCommand extends AbstractCommand {
         "50-error" => "50-error",
     ];
 
-    public function __construct(private readonly ?QueueRepository $queues = null) {
+    public function __construct(private readonly ?QueueRepository $queues = null)
+    {
         parent::__construct("queue:list");
         $this->setDescription("Вывести список элементов очередей.");
         $this->addOption("queue", null, InputOption::VALUE_REQUIRED, "Код очереди. Без опции выводятся все очереди.");
@@ -40,7 +42,8 @@ final class QueueListCommand extends AbstractCommand {
         $this->addOption("short", null, InputOption::VALUE_NONE, "Вывести только относительные пути к элементам.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         try {
             $repository = $this->queues ?? new QueueRepository();
             $queue = $input->getOption("queue");
@@ -86,7 +89,8 @@ final class QueueListCommand extends AbstractCommand {
         return Command::SUCCESS;
     }
 
-    private function status(mixed $status): ?string {
+    private function status(mixed $status): ?string
+    {
         if ($status === null) {
             return null;
         }
@@ -98,7 +102,8 @@ final class QueueListCommand extends AbstractCommand {
     }
 
     /** @param array<string, mixed> $document */
-    private function description(array $document): string {
+    private function description(array $document): string
+    {
         $lines = [];
         foreach ($document["queue-item"]["tasks"] ?? [] as $task) {
             if (!is_array($task)) {
@@ -115,7 +120,8 @@ final class QueueListCommand extends AbstractCommand {
     }
 
     /** @param array<string, mixed> $document */
-    private function log(array $document): string {
+    private function log(array $document): string
+    {
         $lines = [];
         foreach ($document["trace"] ?? [] as $timestamp => $message) {
             $lines[] = sprintf("[%s] %s", $this->time($timestamp), $this->value($message));
@@ -123,7 +129,8 @@ final class QueueListCommand extends AbstractCommand {
         return $lines !== [] ? implode("\n", $lines) : "—";
     }
 
-    private function time(mixed $timestamp): string {
+    private function time(mixed $timestamp): string
+    {
         $timestamp = is_scalar($timestamp) ? (string) $timestamp : "";
         if (preg_match('/^(\d+)(?:\.(\d{1,6}))?$/D', $timestamp, $matches) !== 1) {
             return $timestamp !== "" ? $timestamp : "—";
@@ -132,7 +139,8 @@ final class QueueListCommand extends AbstractCommand {
         return sprintf("%s.%s UTC", gmdate("Y-m-d H:i:s", (int) $matches[1]), $microseconds);
     }
 
-    private function value(mixed $value): string {
+    private function value(mixed $value): string
+    {
         if ($value === null) {
             return "null";
         }

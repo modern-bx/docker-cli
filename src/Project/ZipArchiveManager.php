@@ -7,8 +7,10 @@ namespace DockerCli\Project;
 use RuntimeException;
 use ZipArchive;
 
-final class ZipArchiveManager {
-    public function compress(string $sqlFile): string {
+final class ZipArchiveManager
+{
+    public function compress(string $sqlFile): string
+    {
         $archiveFile = $sqlFile . ".zip";
         $archive = new ZipArchive();
         if ($archive->open($archiveFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
@@ -31,7 +33,8 @@ final class ZipArchiveManager {
     }
 
     /** @return list<string> */
-    public function extractSqlFiles(string $archiveFile, string $directory): array {
+    public function extractSqlFiles(string $archiveFile, string $directory): array
+    {
         $archive = new ZipArchive();
         if ($archive->open($archiveFile) !== true) {
             throw new RuntimeException(sprintf('Не удалось открыть zip-архив "%s".', $archiveFile));
@@ -49,7 +52,7 @@ final class ZipArchiveManager {
             }
             $entries[] = [$name, $index];
         }
-        usort($entries, static fn(array $left, array $right): int => strcmp($left[0], $right[0]));
+        usort($entries, static fn (array $left, array $right): int => strcmp($left[0], $right[0]));
 
         if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
             $archive->close();

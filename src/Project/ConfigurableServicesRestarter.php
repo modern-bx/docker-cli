@@ -9,12 +9,14 @@ use DockerCli\Config\SystemCompose;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class ConfigurableServicesRestarter {
+final class ConfigurableServicesRestarter
+{
     /** @var list<string> */
     private const SERVICES = ["traefik"];
     private const DNS_SERVICE = "dnsdock";
 
-    public function restart(OutputInterface $output): int {
+    public function restart(OutputInterface $output): int
+    {
         $compose = new SystemCompose();
         try {
             $compose->assertInitialized();
@@ -61,7 +63,8 @@ final class ConfigurableServicesRestarter {
     }
 
     /** @param list<string> $command */
-    private function run(array $command, SystemCompose $compose, OutputInterface $output): int {
+    private function run(array $command, SystemCompose $compose, OutputInterface $output): int
+    {
         $output->writeln("<comment>Выполняется: " . implode(" ", array_map("escapeshellarg", $command)) . "</comment>");
 
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());

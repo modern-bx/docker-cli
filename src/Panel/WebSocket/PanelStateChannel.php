@@ -16,7 +16,8 @@ use React\Http\Message\Response;
 use React\Stream\CompositeStream;
 use React\Stream\ThroughStream;
 
-final readonly class PanelStateChannel {
+final readonly class PanelStateChannel
+{
     public const PATH = "/ws";
     public const NAME = "panel:system";
 
@@ -25,13 +26,16 @@ final readonly class PanelStateChannel {
         private JwtTokenService $tokens,
         private ResponseEmitter $responses,
         private string $origin,
-    ) {}
+    ) {
+    }
 
-    public function handles(ServerRequestInterface $request): bool {
+    public function handles(ServerRequestInterface $request): bool
+    {
         return $request->getUri()->getPath() === self::PATH;
     }
 
-    public function upgrade(ServerRequestInterface $request): ResponseInterface {
+    public function upgrade(ServerRequestInterface $request): ResponseInterface
+    {
         parse_str($request->getUri()->getQuery(), $query);
         $token = $request->getCookieParams()[JwtTokenService::COOKIE] ?? null;
         if (
@@ -55,8 +59,8 @@ final readonly class PanelStateChannel {
         $outgoing = new ThroughStream();
         $incoming = new ThroughStream();
         $stream = new CompositeStream($outgoing, $incoming);
-        $timer = Loop::addPeriodicTimer(1.0, fn() => $this->sendState($outgoing));
-        Loop::futureTick(fn() => $this->sendState($outgoing));
+        $timer = Loop::addPeriodicTimer(1.0, fn () => $this->sendState($outgoing));
+        Loop::futureTick(fn () => $this->sendState($outgoing));
 
         $buffer = "";
         $incoming->on("data", function (string $data) use ($stream, $outgoing, &$buffer): void {
@@ -86,7 +90,7 @@ final readonly class PanelStateChannel {
                 $payload = implode(
                     "",
                     array_map(
-                        static fn(string $byte, int $index): string => $byte ^ $mask[$index % 4],
+                        static fn (string $byte, int $index): string => $byte ^ $mask[$index % 4],
                         str_split($payload),
                         array_keys(str_split($payload)),
                     ),
@@ -102,7 +106,7 @@ final readonly class PanelStateChannel {
                 }
             }
         });
-        $stream->on("close", static fn() => Loop::cancelTimer($timer));
+        $stream->on("close", static fn () => Loop::cancelTimer($timer));
 
         return new Response(
             101,
@@ -114,7 +118,8 @@ final readonly class PanelStateChannel {
         );
     }
 
-    private function sendState(ThroughStream $stream): void {
+    private function sendState(ThroughStream $stream): void
+    {
         if (!$stream->isWritable()) {
             return;
         }
@@ -132,7 +137,8 @@ final readonly class PanelStateChannel {
         }
     }
 
-    private function frame(string $payload, int $opcode = 0x1): string {
+    private function frame(string $payload, int $opcode = 0x1): string
+    {
         $length = strlen($payload);
         $header = chr(0x80 | $opcode);
         if ($length < 126) {

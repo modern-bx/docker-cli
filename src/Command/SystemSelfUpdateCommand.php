@@ -10,10 +10,12 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class SystemSelfUpdateCommand extends AbstractCommand {
+final class SystemSelfUpdateCommand extends AbstractCommand
+{
     private const SYSTEMD_UNIT_PATTERN = '/^docker-cli\.(?:panel|queue\.[a-zA-Z0-9_.@-]+)\.service$/D';
 
-    public function __construct(private readonly ?SystemCompose $compose = null) {
+    public function __construct(private readonly ?SystemCompose $compose = null)
+    {
         parent::__construct("system:self-update");
         $this->setDescription("Обновить docker-cli до последней сборки основной ветки.");
         $this->addOption(
@@ -24,7 +26,8 @@ final class SystemSelfUpdateCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $compose = $this->compose ?? new SystemCompose();
         $binary = \Phar::running(false);
         if ($binary === "") {
@@ -127,7 +130,8 @@ final class SystemSelfUpdateCommand extends AbstractCommand {
         }
     }
 
-    private function releaseUrl(SystemCompose $compose): string {
+    private function releaseUrl(SystemCompose $compose): string
+    {
         $namespace = trim($compose->envValue("SOURCE_IMAGE_NAMESPACE"), "/");
         $name = trim($compose->envValue("SOURCE_IMAGE_NAME", "docker-cli"), "/");
         $branch = trim($compose->envValue("SOURCE_IMAGE_MAIN_BRANCH", "main"));
@@ -136,8 +140,7 @@ final class SystemSelfUpdateCommand extends AbstractCommand {
                 "SOURCE_IMAGE_NAMESPACE" => $namespace,
                 "SOURCE_IMAGE_NAME" => $name,
                 "SOURCE_IMAGE_MAIN_BRANCH" => $branch,
-            ]
-            as $key => $value
+            ] as $key => $value
         ) {
             if ($value === "" || preg_match('/^[a-zA-Z0-9_.-]+$/D', $value) !== 1) {
                 throw new \RuntimeException(sprintf("Некорректное или пустое значение %s.", $key));
@@ -154,11 +157,13 @@ final class SystemSelfUpdateCommand extends AbstractCommand {
     }
 
     /** @return list<string> */
-    private function startCommand(string $binary, bool $noRebuildImages): array {
+    private function startCommand(string $binary, bool $noRebuildImages): array
+    {
         return [$binary, "system:start", ...$noRebuildImages ? ["--no-rebuild-images"] : []];
     }
 
-    private function download(string $url, string $directory): string {
+    private function download(string $url, string $directory): string
+    {
         $temporary = $directory . "/.docker-cli-update-" . bin2hex(random_bytes(8)) . ".phar";
         $context = stream_context_create([
             "http" => [
@@ -192,7 +197,8 @@ final class SystemSelfUpdateCommand extends AbstractCommand {
         return $temporary;
     }
 
-    private function validatePhar(string $file): void {
+    private function validatePhar(string $file): void
+    {
         try {
             $phar = new \Phar($file);
             if (!isset($phar["bin/docker-cli"]) || $phar->getSignature() === false) {
@@ -207,7 +213,8 @@ final class SystemSelfUpdateCommand extends AbstractCommand {
         }
     }
 
-    private function replaceBinary(string $binary, string $temporary): void {
+    private function replaceBinary(string $binary, string $temporary): void
+    {
         $permissions = fileperms($binary);
         if ($permissions === false || !@chmod($temporary, $permissions & 0777) || !@rename($temporary, $binary)) {
             throw new \RuntimeException(sprintf("Не удалось заменить исполняемый файл %s.", $binary));
@@ -216,7 +223,8 @@ final class SystemSelfUpdateCommand extends AbstractCommand {
     }
 
     /** @return list<string> */
-    private function runningSystemdUnits(): array {
+    private function runningSystemdUnits(): array
+    {
         [$status, $output] = $this->captureCommand([
             "systemctl",
             "list-units",
@@ -242,7 +250,8 @@ final class SystemSelfUpdateCommand extends AbstractCommand {
         return array_values(array_unique($units));
     }
 
-    private function currentSystemdUnit(): ?string {
+    private function currentSystemdUnit(): ?string
+    {
         foreach (@file("/proc/self/cgroup", FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
             if (
                 preg_match(
@@ -258,7 +267,8 @@ final class SystemSelfUpdateCommand extends AbstractCommand {
         return null;
     }
 
-    private function deferSystemdRestart(string $unit): void {
+    private function deferSystemdRestart(string $unit): void
+    {
         $script = sprintf("sleep 5; systemctl restart %s", escapeshellarg($unit));
         $process = proc_open(
             ["/bin/sh", "-c", $script . " >/dev/null 2>&1 &"],
@@ -271,7 +281,8 @@ final class SystemSelfUpdateCommand extends AbstractCommand {
     }
 
     /** @param list<string> $command */
-    private function runCommand(array $command, OutputInterface $output): int {
+    private function runCommand(array $command, OutputInterface $output): int
+    {
         $this->writeMessage(
             $output,
             "<comment>" . implode(" ", array_map("escapeshellarg", $command)) . "</comment>",
@@ -286,7 +297,8 @@ final class SystemSelfUpdateCommand extends AbstractCommand {
     }
 
     /** @param list<string> $command @return array{int, string} */
-    private function captureCommand(array $command): array {
+    private function captureCommand(array $command): array
+    {
         $process = proc_open($command, [["file", "/dev/null", "r"], ["pipe", "w"], ["pipe", "w"]], $pipes);
         if (!is_resource($process)) {
             return [Command::FAILURE, ""];

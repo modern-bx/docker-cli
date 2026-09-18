@@ -11,14 +11,17 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelTokenRevokeCommand extends AbstractCommand {
-    public function __construct() {
+final class PanelTokenRevokeCommand extends AbstractCommand
+{
+    public function __construct()
+    {
         parent::__construct("panel:token-revoke");
         $this->setDescription("Отозвать все токены сессий указанных " . "пользователей панели.");
         $this->addArgument("users", InputArgument::REQUIRED, "Логины пользователей через запятую.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $value = $input->getArgument("users");
         $users = array_values(array_filter(array_map("trim", explode(",", is_string($value) ? $value : ""))));
         if ($users === []) {

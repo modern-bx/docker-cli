@@ -41,11 +41,12 @@
             "@style",
             "@test"
         ],
-        "style": "php scripts/check-line-length.php",
-        "fix": "resources/panel/node_modules/.bin/prettier --plugin=resources/panel/node_modules/@prettier/plugin-php/src/index.mjs --print-width=120 --brace-style=1tbs --write 'src/**/*.php' 'scripts/**/*.php' 'tests/**/*.php' 'bin/docker-cli' && php scripts/split-long-strings.php && php scripts/check-line-length.php"
+        "style": "php-cs-fixer fix --dry-run --diff && php scripts/check-line-length.php",
+        "fix": "php-cs-fixer fix && php scripts/check-line-length.php"
     },
     "require-dev": {
-        "phpunit/phpunit": "^13.0"
+        "phpunit/phpunit": "^13.0",
+        "friendsofphp/php-cs-fixer": "^3.89"
     },
     "autoload-dev": {
         "psr-4": {

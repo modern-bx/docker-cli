@@ -8,8 +8,10 @@ use function DockerCli\Util\join_path;
 
 use Symfony\Component\Yaml\Yaml;
 
-final class ProjectRegistry {
-    public function projectsDirectory(): string {
+final class ProjectRegistry
+{
+    public function projectsDirectory(): string
+    {
         $home = getenv("HOME") ?: null;
         if ($home === null) {
             throw new \RuntimeException("Unable to determine HOME directory.");
@@ -19,7 +21,8 @@ final class ProjectRegistry {
     }
 
     /** @return list<string> */
-    public function registeredProjectNames(): array {
+    public function registeredProjectNames(): array
+    {
         $projectsDirectory = $this->projectsDirectory();
         if (!is_dir($projectsDirectory)) {
             return [];
@@ -35,24 +38,29 @@ final class ProjectRegistry {
         return $names;
     }
 
-    public function projectDirectory(string $projectName): string {
+    public function projectDirectory(string $projectName): string
+    {
         return join_path($this->projectsDirectory(), $projectName);
     }
 
-    public function projectConfigFile(string $projectName): string {
+    public function projectConfigFile(string $projectName): string
+    {
         return join_path($this->projectDirectory($projectName), "project.yaml");
     }
 
-    public function hasProject(string $projectName): bool {
+    public function hasProject(string $projectName): bool
+    {
         return is_file($this->projectConfigFile($projectName));
     }
 
-    public function isProjectProtected(string $projectName): bool {
+    public function isProjectProtected(string $projectName): bool
+    {
         return ($this->readProjectConfig($projectName)["data"]["project"]["protected"] ?? false) === true;
     }
 
     /** @return array<string, mixed> */
-    public function readProjectConfig(string $projectName): array {
+    public function readProjectConfig(string $projectName): array
+    {
         $file = $this->projectConfigFile($projectName);
         $data = Yaml::parseFile($file);
 
@@ -60,14 +68,16 @@ final class ProjectRegistry {
     }
 
     /** @param array<string, mixed> $config */
-    public function writeProjectConfig(string $projectName, array $config): void {
+    public function writeProjectConfig(string $projectName, array $config): void
+    {
         file_put_contents(
             $this->projectConfigFile($projectName),
             Yaml::dump($config, 6, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK),
         );
     }
 
-    public function projectNameFromContext(?string $startDirectory = null): ?string {
+    public function projectNameFromContext(?string $startDirectory = null): ?string
+    {
         $directory = $startDirectory ?? getcwd();
         if (!is_string($directory) || $directory === "") {
             return null;
@@ -96,7 +106,8 @@ final class ProjectRegistry {
         return $this->projectNameFromRegisteredRoots($contextDirectory);
     }
 
-    private function projectNameFromRegisteredRoots(string $contextDirectory): ?string {
+    private function projectNameFromRegisteredRoots(string $contextDirectory): ?string
+    {
         $matchedName = null;
         $matchedRootLength = -1;
 

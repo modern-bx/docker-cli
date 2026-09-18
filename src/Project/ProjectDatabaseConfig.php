@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace DockerCli\Project;
 
-final class ProjectDatabaseConfig {
+final class ProjectDatabaseConfig
+{
     /** @return array<string, mixed> */
-    public function ensure(array $projectConfig, array $dedicated = [], array $locations = []): array {
+    public function ensure(array $projectConfig, array $dedicated = [], array $locations = []): array
+    {
         $projectName = $projectConfig["data"]["project"]["name"] ?? null;
         if (!is_string($projectName) || $projectName === "") {
             throw new \RuntimeException("Project name is missing in project config.");

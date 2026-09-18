@@ -8,13 +8,15 @@ use DockerCli\Config\SystemCompose;
 
 use function DockerCli\Util\join_path;
 
-final class PanelGatewayAuthRenderer {
+final class PanelGatewayAuthRenderer
+{
     private const PANEL_RELATIVE_PATH = "config/panel";
     private const HTTP_AUTH_CONFIG_FILE = "http-auth.conf";
     private const HTTP_AUTH_MAP_FILE = "playwright-auth-map.conf";
     private const HTTP_AUTH_USER_FILE = ".htpasswd";
 
-    public function render(): void {
+    public function render(): void
+    {
         $compose = new SystemCompose();
         $panelDirectory = join_path($compose->directory(), self::PANEL_RELATIVE_PATH);
         if (!is_dir($panelDirectory) && !mkdir($panelDirectory, 0755, true) && !is_dir($panelDirectory)) {
@@ -42,7 +44,8 @@ final class PanelGatewayAuthRenderer {
     }
 
     /** @return array<string, string> */
-    private function readEnvValues(string $envFile): array {
+    private function readEnvValues(string $envFile): array
+    {
         if (!is_file($envFile)) {
             throw new \RuntimeException(
                 sprintf(

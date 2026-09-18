@@ -8,8 +8,11 @@ use DockerCli\Config\SystemCompose;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DataInitializer {
-    public function __construct(private readonly ?SystemCompose $compose = null) {}
+final class DataInitializer
+{
+    public function __construct(private readonly ?SystemCompose $compose = null)
+    {
+    }
 
     /** @param list<string> $drivers */
     public function initialize(
@@ -124,7 +127,8 @@ final class DataInitializer {
         );
     }
 
-    public function drop(string $projectName, OutputInterface $output): int {
+    public function drop(string $projectName, OutputInterface $output): int
+    {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
 
@@ -175,7 +179,8 @@ final class DataInitializer {
         );
     }
 
-    private function service(string $projectName, string $driver): string {
+    private function service(string $projectName, string $driver): string
+    {
         $registry = new ProjectRegistry();
         if (!$registry->hasProject($projectName)) {
             return $driver;
@@ -278,14 +283,16 @@ final class DataInitializer {
         );
     }
 
-    private function serviceForHostname(string $hostname, string $driver): string {
+    private function serviceForHostname(string $hostname, string $driver): string
+    {
         if (preg_match("/^docker-cli-" . preg_quote($driver, "/") . '-(.+)$/', $hostname, $matches) === 1) {
             return ($this->compose ?? new SystemCompose())->databaseService($matches[1], $driver);
         }
         return $driver;
     }
 
-    public function wipe(string $mysqlDatabase, string $postgresDatabase, OutputInterface $output): int {
+    public function wipe(string $mysqlDatabase, string $postgresDatabase, OutputInterface $output): int
+    {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
 
@@ -361,7 +368,8 @@ final class DataInitializer {
         );
     }
 
-    public function dump(string $dbms, string $database, string $outputFile, OutputInterface $output): int {
+    public function dump(string $dbms, string $database, string $outputFile, OutputInterface $output): int
+    {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
 
@@ -379,7 +387,8 @@ final class DataInitializer {
     }
 
     /** @param list<string> $files */
-    public function apply(string $dbms, string $database, array $files, OutputInterface $output): int {
+    public function apply(string $dbms, string $database, array $files, OutputInterface $output): int
+    {
         $compose = $this->compose ?? new SystemCompose();
         $compose->assertInitialized();
 
@@ -399,7 +408,8 @@ final class DataInitializer {
         return Command::SUCCESS;
     }
 
-    private function mysqlSql(string $name, string $password, bool $rebuild): string {
+    private function mysqlSql(string $name, string $password, bool $rebuild): string
+    {
         $identifier = str_replace("`", "``", $name);
         $user = str_replace("'", "''", $name);
         $password = str_replace("'", "''", $password);
@@ -412,7 +422,8 @@ final class DataInitializer {
             "GRANT ALL PRIVILEGES ON `{$identifier}`.* TO '{$user}'@'%'; FLUSH PRIVILEGES;";
     }
 
-    private function mysqlDropSql(string $name): string {
+    private function mysqlDropSql(string $name): string
+    {
         $identifier = str_replace("`", "``", $name);
         $user = str_replace("'", "''", $name);
 
@@ -420,7 +431,8 @@ final class DataInitializer {
     }
 
     /** @return array{string, string, string, string, string} */
-    private function postgresSql(string $name, string $password): array {
+    private function postgresSql(string $name, string $password): array
+    {
         $literalName = str_replace("'", "''", $name);
         $literalPassword = str_replace("'", "''", $password);
         $quotedIdentifier = '"' . str_replace('"', '""', $name) . '"';
@@ -439,7 +451,8 @@ final class DataInitializer {
     }
 
     /** @return array{string, string} */
-    private function postgresDropSql(string $name): array {
+    private function postgresDropSql(string $name): array
+    {
         $literalName = str_replace("'", "''", $name);
         $roleCleanupSql = str_replace(
             "<role>",
@@ -554,7 +567,8 @@ final class DataInitializer {
         );
     }
 
-    private function run(array $command, SystemCompose $compose, OutputInterface $output): int {
+    private function run(array $command, SystemCompose $compose, OutputInterface $output): int
+    {
         $output->writeln("<comment>" . implode(" ", array_map("escapeshellarg", $command)) . "</comment>");
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
         if (!is_resource($process)) {

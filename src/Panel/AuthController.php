@@ -11,15 +11,18 @@ use DockerCli\Panel\Dto\Request\SessionRequestDto;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Panel\Http\UnauthorizedException;
 
-final readonly class AuthController {
+final readonly class AuthController
+{
     public function __construct(
         private UserRepository $users,
         private JwtTokenService $tokens,
         private TokenRepository $tokenRepository,
-    ) {}
+    ) {
+    }
 
     #[Route("POST", "/api/auth/login", LoginRequestDto::class, AuthResponseDto::class, authenticated: false)]
-    public function login(LoginRequestDto $request): AuthResponseDto {
+    public function login(LoginRequestDto $request): AuthResponseDto
+    {
         try {
             $valid = $this->users->verifyPassword($request->login, $request->password);
             $login = UserRepository::normalizeLogin($request->login);
@@ -34,7 +37,8 @@ final readonly class AuthController {
     }
 
     #[Route("GET", "/api/auth/session", SessionRequestDto::class, AuthResponseDto::class)]
-    public function session(SessionRequestDto $request): AuthResponseDto {
+    public function session(SessionRequestDto $request): AuthResponseDto
+    {
         if (!$this->users->contains($request->login)) {
             throw new UnauthorizedException("Сессия истекла.");
         }
@@ -42,12 +46,14 @@ final readonly class AuthController {
     }
 
     #[Route("POST", "/api/auth/logout", SessionRequestDto::class, LogoutResponseDto::class)]
-    public function logout(SessionRequestDto $request): LogoutResponseDto {
+    public function logout(SessionRequestDto $request): LogoutResponseDto
+    {
         $this->tokenRepository->revoke([$request->login]);
         return new LogoutResponseDto();
     }
 
-    private function authorized(string $login, ?int $sessionStartedAt = null): AuthResponseDto {
+    private function authorized(string $login, ?int $sessionStartedAt = null): AuthResponseDto
+    {
         return new AuthResponseDto(
             $login,
             $this->tokens->issue($login, sessionStartedAt: $sessionStartedAt),

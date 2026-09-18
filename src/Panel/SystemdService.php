@@ -6,13 +6,17 @@ namespace DockerCli\Panel;
 
 use DockerCli\Service\SystemdUnitPolicy;
 
-final class SystemdService {
+final class SystemdService
+{
     public const NAME = "docker-cli.panel";
     public const UNIT_PATH = "/etc/systemd/system/" . self::NAME . ".service";
 
-    public function __construct(private readonly SystemdUnitPolicy $policy = new SystemdUnitPolicy()) {}
+    public function __construct(private readonly SystemdUnitPolicy $policy = new SystemdUnitPolicy())
+    {
+    }
 
-    public function install(string $binary, ?int $port = null, ?string $user = null): void {
+    public function install(string $binary, ?int $port = null, ?string $user = null): void
+    {
         $previousUnit = is_file(self::UNIT_PATH) ? file_get_contents(self::UNIT_PATH) : false;
         $previousPolicy = $this->policy->contents(self::NAME . ".service");
         $arguments = [$binary, "panel:up"];
@@ -60,7 +64,8 @@ final class SystemdService {
         }
     }
 
-    public function remove(): void {
+    public function remove(): void
+    {
         if (!is_file(self::UNIT_PATH)) {
             throw new \RuntimeException(sprintf("Сервис %s не установлен.", self::NAME));
         }
@@ -75,7 +80,8 @@ final class SystemdService {
     }
 
     /** @return array{0: int, 1: string} */
-    private function runSystemctl(string ...$arguments): array {
+    private function runSystemctl(string ...$arguments): array
+    {
         $pipes = [];
         $process = proc_open(
             ["systemctl", ...$arguments],
@@ -94,7 +100,8 @@ final class SystemdService {
         return [proc_close($process), trim($stderr !== "" ? $stderr : $stdout)];
     }
 
-    private function systemctl(string ...$arguments): void {
+    private function systemctl(string ...$arguments): void
+    {
         [$status, $message] = $this->runSystemctl(...$arguments);
         if ($status !== 0) {
             throw new \RuntimeException(
@@ -103,7 +110,8 @@ final class SystemdService {
         }
     }
 
-    private function escapeArgument(string $argument): string {
+    private function escapeArgument(string $argument): string
+    {
         return '"' . str_replace(["\\", '"', "%"], ["\\\\", '\\"', "%%"], $argument) . '"';
     }
 }

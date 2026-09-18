@@ -8,13 +8,16 @@ use DockerCli\Config\SystemCompose;
 
 use function DockerCli\Util\join_path;
 
-final class OfeliaConfigRenderer {
+final class OfeliaConfigRenderer
+{
     public function __construct(
         private readonly ?ProjectRegistry $projects = null,
         private readonly ?SystemCompose $compose = null,
-    ) {}
+    ) {
+    }
 
-    public function render(): string {
+    public function render(): string
+    {
         $projects = $this->projects ?? new ProjectRegistry();
         $compose = $this->compose ?? new SystemCompose();
         $file = join_path($compose->directory(), "config", "ofelia", "config.ini");

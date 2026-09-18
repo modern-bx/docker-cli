@@ -8,7 +8,8 @@ use DockerCli\Panel\Http\RequestData;
 use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class ProjectCreateRequestDto implements RequestDto {
+final readonly class ProjectCreateRequestDto implements RequestDto
+{
     /** @param array<string, mixed> $deploymentArguments */
     /** @param list<string> $dedicatedDatabases */
     public function __construct(
@@ -21,9 +22,11 @@ final readonly class ProjectCreateRequestDto implements RequestDto {
         public array $dedicatedDatabases,
         public string $locationMysql,
         public string $locationPostgres,
-    ) {}
+    ) {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         $code = $request->body["code"] ?? null;
         $location = $request->body["location"] ?? null;
         $language = $request->body["language"] ?? null;

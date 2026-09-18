@@ -9,15 +9,18 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class ImageBuildCommand extends ImageCommand {
-    public function __construct() {
+final class ImageBuildCommand extends ImageCommand
+{
+    public function __construct()
+    {
         parent::__construct("image:build");
         $this->setDescription("Собрать кастомные docker-cli образы из исходников.");
         $this->configureImageOptions();
         $this->addOption("no-cache", null, InputOption::VALUE_NONE, "Собрать образ без использования кеша Docker.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $tag = $this->imageTag($input);
         $dryRun = (bool) $input->getOption("dry-run");
         $noCache = (bool) $input->getOption("no-cache");

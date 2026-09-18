@@ -7,7 +7,8 @@ namespace DockerCli\Command;
 use Symfony\Component\Console\Output\ConsoleOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class CommandContext {
+final class CommandContext
+{
     public const FILE_ENVIRONMENT_VARIABLE = "DOCKER_CLI_COMMAND_CONTEXT_FILE";
 
     /**
@@ -19,15 +20,18 @@ final class CommandContext {
         private readonly ?string $transportFile = null,
         private readonly ?ContextUser $contextUser = null,
         private readonly ?OutputInterface $output = null,
-    ) {}
+    ) {
+    }
 
-    public static function fromEnvironment(ContextUser $contextUser, ?OutputInterface $output = null): self {
+    public static function fromEnvironment(ContextUser $contextUser, ?OutputInterface $output = null): self
+    {
         $file = getenv(self::FILE_ENVIRONMENT_VARIABLE);
 
         return new self(is_string($file) && $file !== "" ? $file : null, $contextUser, $output ?? new ConsoleOutput());
     }
 
-    public function addMessage(Message $message): void {
+    public function addMessage(Message $message): void
+    {
         $level = $message->getLevel()->value;
         if ($message->getConsole()) {
             $consoleLevel = in_array($message->getLevel(), [MessageLevel::Debug, MessageLevel::Warning], true)
@@ -61,7 +65,8 @@ final class CommandContext {
      * @return list<array{origin: string, class: string, level: string, message: string, notify: bool, timestamp:
      * string}>
      */
-    public function notifications(): array {
+    public function notifications(): array
+    {
         return $this->notifications;
     }
 
@@ -69,7 +74,8 @@ final class CommandContext {
      * @return list<array{origin: string, class: string, level: string, message: string, notify: bool, timestamp:
      * string}>
      */
-    public static function read(string $file): array {
+    public static function read(string $file): array
+    {
         $notifications = [];
         foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
             $notification = json_decode($line, true, 8, JSON_THROW_ON_ERROR);

@@ -12,10 +12,14 @@ use DockerCli\Panel\JwtTokenService;
 use Psr\Http\Message\ResponseInterface;
 use React\Http\Message\Response;
 
-final readonly class ResponseEmitter {
-    public function __construct(private string $assetsDirectory) {}
+final readonly class ResponseEmitter
+{
+    public function __construct(private string $assetsDirectory)
+    {
+    }
 
-    public function emit(object $dto): ResponseInterface {
+    public function emit(object $dto): ResponseInterface
+    {
         if ($dto instanceof FileResponseDto) {
             return $this->file($dto);
         }
@@ -39,7 +43,8 @@ final readonly class ResponseEmitter {
             : $response;
     }
 
-    public function json(int $status, \JsonSerializable $dto): ResponseInterface {
+    public function json(int $status, \JsonSerializable $dto): ResponseInterface
+    {
         return new Response(
             $status,
             ["Content-Type" => "application/json; charset=UTF-8", "Cache-Control" => "no-store"],
@@ -47,7 +52,8 @@ final readonly class ResponseEmitter {
         );
     }
 
-    private function file(FileResponseDto $dto): ResponseInterface {
+    private function file(FileResponseDto $dto): ResponseInterface
+    {
         if (str_contains($dto->relativePath, "..")) {
             return $this->json(404, new ErrorResponseDto("Страница не найдена."));
         }

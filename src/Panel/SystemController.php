@@ -16,15 +16,18 @@ use DockerCli\Queue\QueueItemValidator;
 use DockerCli\Queue\QueueRepository;
 use DockerCli\Task\TaskRepository;
 
-final class SystemController {
+final class SystemController
+{
     public function __construct(
         private readonly SystemCompose $compose,
         private readonly ?QueueRepository $queues = null,
         private readonly ?TaskRepository $tasks = null,
-    ) {}
+    ) {
+    }
 
     #[Route("POST", "/api/system/self-update", EmptyRequestDto::class, QueuedOperationDto::class)]
-    public function selfUpdate(EmptyRequestDto $request): QueuedOperationDto {
+    public function selfUpdate(EmptyRequestDto $request): QueuedOperationDto
+    {
         $item = [
             "meta" => ["schema" => "queue-item", "version" => "0.1"],
             "queue-item" => [
@@ -50,7 +53,8 @@ final class SystemController {
     }
 
     #[Route("GET", "/api/system", EmptyRequestDto::class, SystemStatusDto::class)]
-    public function status(EmptyRequestDto $request): SystemStatusDto {
+    public function status(EmptyRequestDto $request): SystemStatusDto
+    {
         $configured = $this->configuredServices();
         $running = $this->runningServices();
         $services = [];
@@ -58,7 +62,9 @@ final class SystemController {
             $services[] = new SystemServiceDto($name, $image, isset($running[$name]));
         }
 
-        $runningCount = count(array_filter($services, static fn(SystemServiceDto $service): bool => $service->running));
+        $runningCount = count(
+            array_filter($services, static fn (SystemServiceDto $service): bool => $service->running),
+        );
         $status = $runningCount === 0 ? "stopped" : ($runningCount === count($services) ? "running" : "partial");
 
         return new SystemStatusDto($status, $services);
@@ -80,7 +86,8 @@ final class SystemController {
             SystemStatusDto::class,
         ),
     ]
-    public function action(SystemActionRequestDto $request): SystemStatusDto {
+    public function action(SystemActionRequestDto $request): SystemStatusDto
+    {
         $action = $request->action;
         $service = $request->service;
         if (SystemActionEnum::isStart($action)) {
@@ -105,7 +112,8 @@ final class SystemController {
     }
 
     /** @return array<string, string> */
-    private function configuredServices(): array {
+    private function configuredServices(): array
+    {
         [$code, $output] = $this->run(["config", "--format", "json"], false);
         $config = json_decode($output, true);
         if ($code !== 0 || !is_array($config)) {
@@ -135,7 +143,8 @@ final class SystemController {
     }
 
     /** @return array<string, true> */
-    private function runningServices(): array {
+    private function runningServices(): array
+    {
         [$code, $output] = $this->run(["ps", "--all", "--format", "json"], false);
         if ($code !== 0) {
             throw new SystemActionException($output !== "" ? $output : "Не удалось получить состояние системы.");
@@ -167,7 +176,8 @@ final class SystemController {
     }
 
     /** @param list<string> $arguments @return array{int, string} */
-    private function run(array $arguments, bool $fail = true): array {
+    private function run(array $arguments, bool $fail = true): array
+    {
         $command = [...array_slice($this->compose->dockerComposeCommand(""), 0, -1), ...$arguments];
         $process = proc_open(
             $command,

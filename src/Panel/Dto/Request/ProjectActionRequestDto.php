@@ -10,10 +10,14 @@ use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 
 /** Route request for a project enable, disable, wipe, or delete action. */
-final readonly class ProjectActionRequestDto implements RequestDto {
-    public function __construct(public string $name, public ProjectActionEnum $action) {}
+final readonly class ProjectActionRequestDto implements RequestDto
+{
+    public function __construct(public string $name, public ProjectActionEnum $action)
+    {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         $action = ProjectActionEnum::tryFrom($request->route["action"]);
         if ($action === null) {
             throw new RequestValidationException("Неизвестное действие над проектом.");

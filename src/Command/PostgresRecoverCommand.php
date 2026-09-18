@@ -10,8 +10,10 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PostgresRecoverCommand extends AbstractCommand {
-    public function __construct(private readonly ?PostgresRecovery $recovery = null) {
+final class PostgresRecoverCommand extends AbstractCommand
+{
+    public function __construct(private readonly ?PostgresRecovery $recovery = null)
+    {
         parent::__construct("postgres:recover");
         $this->setDescription(
             "Извлечь пользовательские базы из каталога " . "data остановленного PostgreSQL-инстанса.",
@@ -21,7 +23,8 @@ final class PostgresRecoverCommand extends AbstractCommand {
         $this->addOption("database", null, InputOption::VALUE_REQUIRED, "Имена экспортируемых баз через запятую.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $from = $this->absolutePath((string) $input->getOption("from"));
         $to = $this->absolutePath((string) $input->getOption("to"));
         $databaseOption = $input->getOption("database");
@@ -49,7 +52,8 @@ final class PostgresRecoverCommand extends AbstractCommand {
         }
     }
 
-    private function absolutePath(string $path): string {
+    private function absolutePath(string $path): string
+    {
         if ($path === "") {
             return getcwd() ?: ".";
         }

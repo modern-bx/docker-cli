@@ -14,17 +14,20 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class ConfigSeedCommand extends AbstractCommand {
+final class ConfigSeedCommand extends AbstractCommand
+{
     private TranslatorInterface $translator;
 
-    public function __construct(?TranslatorInterface $translator = null) {
+    public function __construct(?TranslatorInterface $translator = null)
+    {
         $this->translator = $translator ?? TranslatorFactory::create();
         parent::__construct("config:seed");
         $this->setDescription($this->translator->trans("command.seed.description"));
         $this->addOption("yes", "y", InputOption::VALUE_NONE, $this->translator->trans("command.seed.yes_option"));
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $compose = new SystemCompose();
 
         try {
@@ -74,7 +77,8 @@ final class ConfigSeedCommand extends AbstractCommand {
     }
 
     /** @return array<string, string> */
-    private function readEnvFile(string $file): array {
+    private function readEnvFile(string $file): array
+    {
         $values = [];
         foreach (file($file, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
             $line = trim($line);
@@ -90,7 +94,8 @@ final class ConfigSeedCommand extends AbstractCommand {
     }
 
     /** @param array<string, string> $values */
-    private function writeEnvFile(string $file, array $values): void {
+    private function writeEnvFile(string $file, array $values): void
+    {
         $lines = file($file, FILE_IGNORE_NEW_LINES);
         if ($lines === false) {
             throw new \RuntimeException(sprintf('Unable to read env file "%s".', $file));
@@ -126,7 +131,8 @@ final class ConfigSeedCommand extends AbstractCommand {
      * @param array<string, string> $values
      * @return list<string>
      */
-    private function envKeyOrder(array $values): array {
+    private function envKeyOrder(array $values): array
+    {
         $orderedKeys = [
             "APP_LOCALE",
             "BASE_HOST",
@@ -159,7 +165,7 @@ final class ConfigSeedCommand extends AbstractCommand {
             array_unique(
                 array_merge(
                     array_values(
-                        array_filter($orderedKeys, static fn(string $key): bool => array_key_exists($key, $values)),
+                        array_filter($orderedKeys, static fn (string $key): bool => array_key_exists($key, $values)),
                     ),
                     array_keys($values),
                 ),
@@ -168,13 +174,15 @@ final class ConfigSeedCommand extends AbstractCommand {
     }
 
     /** @param array<string, string> $values */
-    private function setDefaultIfEmpty(array &$values, string $key, string $default): void {
+    private function setDefaultIfEmpty(array &$values, string $key, string $default): void
+    {
         if (($values[$key] ?? "") === "") {
             $values[$key] = $default;
         }
     }
 
-    private function randomSecret(): string {
+    private function randomSecret(): string
+    {
         return rtrim(strtr(base64_encode(random_bytes(32)), "+/", "-_"), "=");
     }
 }

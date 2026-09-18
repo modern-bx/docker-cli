@@ -15,7 +15,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class DataDumpCommand extends AbstractCommand {
+final class DataDumpCommand extends AbstractCommand
+{
     private const DBMS = ["mysql", "postgres"];
 
     public function __construct(
@@ -30,7 +31,8 @@ final class DataDumpCommand extends AbstractCommand {
         $this->addArgument("path", InputArgument::REQUIRED, "Путь к файлу дампа.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $dbms = $input->getOption("dbms");
         if (!is_string($dbms) || !in_array($dbms, self::DBMS, true)) {
             $this->writeMessage(
@@ -112,7 +114,8 @@ final class DataDumpCommand extends AbstractCommand {
         return $code;
     }
 
-    private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string {
+    private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string
+    {
         $projectName = $input->getOption("project");
         if (is_string($projectName) && $projectName !== "") {
             return $projectName;

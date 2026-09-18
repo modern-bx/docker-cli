@@ -10,10 +10,12 @@ use function DockerCli\Util\join_path;
 
 use Symfony\Component\Yaml\Yaml;
 
-final class ProjectsSettingsRepository {
+final class ProjectsSettingsRepository
+{
     private readonly string $file;
 
-    public function __construct(?string $file = null) {
+    public function __construct(?string $file = null)
+    {
         if ($file === null) {
             $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
             $file = join_path($home, ".config", "docker-cli", "state", "panel", "settings", "projects.yaml");
@@ -22,19 +24,22 @@ final class ProjectsSettingsRepository {
     }
 
     /** @return list<array{path: string, code: string, default: bool}> */
-    public function locations(): array {
+    public function locations(): array
+    {
         return $this->normalizeLocations($this->storedLocations("locations"));
     }
 
     /** @return list<array{path: string, code: string, default: bool}> */
-    public function databaseLocations(): array {
+    public function databaseLocations(): array
+    {
         return $this->normalizeLocations($this->storedLocations("databaseLocations"));
     }
 
     /** @param list<array{path: string, code?: mixed, default: bool}> $valid
      *  @return list<array{path: string, code: string, default: bool}>
      */
-    private function normalizeLocations(array $valid): array {
+    private function normalizeLocations(array $valid): array
+    {
         $used = [];
         foreach ($valid as &$location) {
             $code = $location["code"] ?? "";
@@ -54,7 +59,8 @@ final class ProjectsSettingsRepository {
      *     databaseLocations: list<array{path: string, code: string, default: bool}>
      * }
      */
-    public function save(array $locations, array $databaseLocations): array {
+    public function save(array $locations, array $databaseLocations): array
+    {
         $locations = $this->prepareLocations($locations, "locations");
         $databaseLocations = $this->prepareLocations($databaseLocations, "databaseLocations");
         $directory = dirname($this->file);
@@ -79,7 +85,8 @@ final class ProjectsSettingsRepository {
     /** @param list<array{path: string, code: string, default: bool}> $locations
      *  @return list<array{path: string, code: string, default: bool}>
      */
-    private function prepareLocations(array $locations, string $key): array {
+    private function prepareLocations(array $locations, string $key): array
+    {
         // Use the values actually persisted in the file to distinguish an
         // existing location from a newly added one. Existing location codes may
         // be changed, but must never be saved empty.
@@ -116,7 +123,8 @@ final class ProjectsSettingsRepository {
     }
 
     /** @return list<array{path: string, code?: mixed, default: bool}> */
-    private function storedLocations(string $key): array {
+    private function storedLocations(string $key): array
+    {
         if (!is_file($this->file)) {
             return [];
         }
@@ -132,7 +140,7 @@ final class ProjectsSettingsRepository {
         return array_values(
             array_filter(
                 $locations,
-                static fn($item): bool => is_array($item) &&
+                static fn ($item): bool => is_array($item) &&
                     is_string($item["path"] ?? null) &&
                     is_bool($item["default"] ?? null),
             ),

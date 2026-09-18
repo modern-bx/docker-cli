@@ -69,14 +69,18 @@ use DockerCli\Command\TreeLoadCommand;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
 
-final class ApplicationFactory {
+final class ApplicationFactory
+{
     public const APPLICATION_NAME = "docker-cli";
     public const APPLICATION_VERSION = "0.1.0";
 
     /** @param list<Command> $commands */
-    public function __construct(private readonly array $commands) {}
+    public function __construct(private readonly array $commands)
+    {
+    }
 
-    public static function createDefault(): self {
+    public static function createDefault(): self
+    {
         return new self([
             new BitrixGetInstallerCommand(),
             new ConfigInitCommand(),
@@ -143,7 +147,8 @@ final class ApplicationFactory {
         ]);
     }
 
-    public function create(): Application {
+    public function create(): Application
+    {
         $application = new Application(self::APPLICATION_NAME, self::APPLICATION_VERSION);
         $application->addCommands($this->commands);
         $application->setDefaultCommand("shell:run");

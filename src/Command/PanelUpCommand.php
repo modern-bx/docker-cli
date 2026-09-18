@@ -36,8 +36,10 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelUpCommand extends AbstractCommand {
-    public function __construct(private readonly SystemdService $systemdService = new SystemdService()) {
+final class PanelUpCommand extends AbstractCommand
+{
+    public function __construct(private readonly SystemdService $systemdService = new SystemdService())
+    {
         parent::__construct("panel:up");
         $this->setDescription("Запустить HTTP-сервер административной панели.");
         $this->addOption(
@@ -56,7 +58,8 @@ final class PanelUpCommand extends AbstractCommand {
         $this->addOption("path", null, InputOption::VALUE_REQUIRED, "Явный путь к бинарнику для systemd-сервиса.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         if ($input->getOption("daemon")) {
             $rawPort = $input->getOption("port");
             if ($rawPort !== null && !$this->isValidPort($rawPort)) {
@@ -169,7 +172,7 @@ final class PanelUpCommand extends AbstractCommand {
             "https://panel." . $compose->envValue("BASE_HOST", ""),
         );
         $server = new HttpServer(
-            static fn($request) => $channel->handles($request) ? $channel->upgrade($request) : $router($request),
+            static fn ($request) => $channel->handles($request) ? $channel->upgrade($request) : $router($request),
         );
         $server->listen($socket);
         $this->writeMessage(
@@ -181,7 +184,8 @@ final class PanelUpCommand extends AbstractCommand {
         return Command::SUCCESS;
     }
 
-    private function installSystemdService(InputInterface $input, OutputInterface $output, ?int $port): int {
+    private function installSystemdService(InputInterface $input, OutputInterface $output, ?int $port): int
+    {
         $rawUser = $input->getOption("user");
         if ($rawUser !== null && (!is_string($rawUser) || preg_match('/^[a-zA-Z0-9_.@-]+$/D', $rawUser) !== 1)) {
             $this->writeMessage($output, "<error>Некорректное имя пользователя для " . "systemd-сервиса.</error>");
@@ -233,11 +237,13 @@ final class PanelUpCommand extends AbstractCommand {
         return Command::SUCCESS;
     }
 
-    private function isValidPort(mixed $port): bool {
+    private function isValidPort(mixed $port): bool
+    {
         return is_string($port) && ctype_digit($port) && (int) $port >= 1 && (int) $port <= 65535;
     }
 
-    private function resolveBinary(string $binary): string {
+    private function resolveBinary(string $binary): string
+    {
         if (str_contains($binary, DIRECTORY_SEPARATOR)) {
             return realpath($binary) ?: $binary;
         }
@@ -251,7 +257,8 @@ final class PanelUpCommand extends AbstractCommand {
         return $binary;
     }
 
-    private function configureGateway(SystemCompose $compose, int $port): void {
+    private function configureGateway(SystemCompose $compose, int $port): void
+    {
         $file = $compose->directory() . "/config/panel/upstream.conf";
         if (!is_dir(dirname($file)) && !mkdir(dirname($file), 0755, true) && !is_dir(dirname($file))) {
             throw new \RuntimeException(sprintf('Unable to create panel config directory "%s".', dirname($file)));

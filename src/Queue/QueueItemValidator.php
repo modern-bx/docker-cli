@@ -6,11 +6,15 @@ namespace DockerCli\Queue;
 
 use DockerCli\Task\TaskRepository;
 
-final class QueueItemValidator {
-    public function __construct(private readonly TaskRepository $tasks) {}
+final class QueueItemValidator
+{
+    public function __construct(private readonly TaskRepository $tasks)
+    {
+    }
 
     /** @param mixed $item @return list<string> */
-    public function validate(mixed $item): array {
+    public function validate(mixed $item): array
+    {
         $errors = [];
         if (!is_array($item)) {
             return ["Корень YAML должен быть объектом."];

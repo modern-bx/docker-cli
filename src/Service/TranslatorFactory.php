@@ -12,8 +12,10 @@ use Symfony\Component\Translation\Loader\YamlFileLoader;
 use Symfony\Component\Translation\Translator;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class TranslatorFactory {
-    public static function create(?SystemCompose $compose = null): TranslatorInterface {
+final class TranslatorFactory
+{
+    public static function create(?SystemCompose $compose = null): TranslatorInterface
+    {
         $locale = self::readLocale($compose ?? new SystemCompose()) ?? "ru";
         $translator = new Translator($locale);
         $translator->setFallbackLocales(["ru"]);
@@ -27,7 +29,8 @@ final class TranslatorFactory {
         return $translator;
     }
 
-    private static function readLocale(SystemCompose $compose): ?string {
+    private static function readLocale(SystemCompose $compose): ?string
+    {
         $envFile = $compose->envFile();
         if (!is_file($envFile)) {
             return null;

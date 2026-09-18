@@ -12,7 +12,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class ProjectWipeCommand extends AbstractCommand {
+final class ProjectWipeCommand extends AbstractCommand
+{
     public function __construct(
         private readonly ?CommandContext $context = null,
         private readonly ?ProjectRegistry $registry = null,
@@ -23,7 +24,8 @@ final class ProjectWipeCommand extends AbstractCommand {
         $this->addOption("project", null, InputOption::VALUE_REQUIRED, "Кодовое имя зарегистрированного проекта.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $projectName = $input->getOption("project");
         if (!is_string($projectName) || $projectName === "") {
@@ -109,7 +111,8 @@ final class ProjectWipeCommand extends AbstractCommand {
         return ($this->hookRunner ?? new CommandHookRunner())->run("project:wipe", "after", $hookArguments);
     }
 
-    private function removePath(string $path): void {
+    private function removePath(string $path): void
+    {
         if (is_link($path) || !is_dir($path)) {
             if (!unlink($path)) {
                 throw new \RuntimeException(sprintf('Не удалось удалить "%s".', $path));

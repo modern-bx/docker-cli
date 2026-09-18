@@ -10,20 +10,24 @@ use DockerCli\Panel\Dto\SecuritySettingsDto;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Queue\QueueRepository;
 
-final readonly class SecuritySettingsController {
+final readonly class SecuritySettingsController
+{
     public function __construct(
         private SecuritySettingsRepository $settings,
         private ?QueueRepository $queues = null,
-    ) {}
+    ) {
+    }
 
     #[Route("GET", "/api/settings/security", EmptyRequestDto::class, SecuritySettingsDto::class)]
-    public function get(EmptyRequestDto $request): SecuritySettingsDto {
+    public function get(EmptyRequestDto $request): SecuritySettingsDto
+    {
         $auth = $this->settings->httpAuth();
         return new SecuritySettingsDto($this->settings->sessionHours(), $auth["login"], $auth["password"]);
     }
 
     #[Route("POST", "/api/settings/security", SecuritySettingsRequestDto::class, SecuritySettingsDto::class)]
-    public function save(SecuritySettingsRequestDto $request): SecuritySettingsDto {
+    public function save(SecuritySettingsRequestDto $request): SecuritySettingsDto
+    {
         $this->settings->saveSessionHours($request->maximumSessionHours);
         $this->settings->saveHttpAuth($request->httpAuthLogin, $request->httpAuthPassword);
         $file = $this->enqueueHttpAuthApply();
@@ -35,7 +39,8 @@ final readonly class SecuritySettingsController {
         );
     }
 
-    private function enqueueHttpAuthApply(): string {
+    private function enqueueHttpAuthApply(): string
+    {
         $item = [
             "meta" => ["schema" => "queue-item", "version" => "0.1"],
             "queue-item" => [

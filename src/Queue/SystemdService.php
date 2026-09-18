@@ -6,20 +6,26 @@ namespace DockerCli\Queue;
 
 use DockerCli\Service\SystemdUnitPolicy;
 
-final class SystemdService {
+final class SystemdService
+{
     private const UNIT_DIRECTORY = "/etc/systemd/system";
 
-    public function __construct(private readonly SystemdUnitPolicy $policy = new SystemdUnitPolicy()) {}
+    public function __construct(private readonly SystemdUnitPolicy $policy = new SystemdUnitPolicy())
+    {
+    }
 
-    public function name(string $queue): string {
+    public function name(string $queue): string
+    {
         return "docker-cli.queue." . $queue;
     }
 
-    public function unitPath(string $queue): string {
+    public function unitPath(string $queue): string
+    {
         return self::UNIT_DIRECTORY . "/" . $this->name($queue) . ".service";
     }
 
-    public function install(string $queue, string $binary, ?string $user = null): void {
+    public function install(string $queue, string $binary, ?string $user = null): void
+    {
         $name = $this->name($queue);
         $unitPath = $this->unitPath($queue);
         $previousUnit = is_file($unitPath) ? file_get_contents($unitPath) : false;
@@ -67,7 +73,8 @@ final class SystemdService {
         }
     }
 
-    public function remove(string $queue): void {
+    public function remove(string $queue): void
+    {
         $name = $this->name($queue);
         $unitPath = $this->unitPath($queue);
         if (!is_file($unitPath)) {
@@ -84,7 +91,8 @@ final class SystemdService {
     }
 
     /** @return array{0: int, 1: string} */
-    private function runSystemctl(string ...$arguments): array {
+    private function runSystemctl(string ...$arguments): array
+    {
         $pipes = [];
         $process = proc_open(
             ["systemctl", ...$arguments],
@@ -103,7 +111,8 @@ final class SystemdService {
         return [proc_close($process), trim($stderr !== "" ? $stderr : $stdout)];
     }
 
-    private function systemctl(string ...$arguments): void {
+    private function systemctl(string ...$arguments): void
+    {
         [$status, $message] = $this->runSystemctl(...$arguments);
         if ($status !== 0) {
             throw new \RuntimeException(
@@ -112,11 +121,13 @@ final class SystemdService {
         }
     }
 
-    private function escapeArgument(string $argument): string {
+    private function escapeArgument(string $argument): string
+    {
         return '"' . str_replace(["\\", '"', "%"], ["\\\\", '\\"', "%%"], $argument) . '"';
     }
 
-    private function servicePath(string $binary): string {
+    private function servicePath(string $binary): string
+    {
         $path = getenv("PATH");
         $directories = is_string($path) ? explode(PATH_SEPARATOR, $path) : [];
         array_unshift($directories, dirname($binary));
@@ -124,7 +135,7 @@ final class SystemdService {
         return implode(
             PATH_SEPARATOR,
             array_values(
-                array_unique(array_filter($directories, static fn(string $directory): bool => $directory !== "")),
+                array_unique(array_filter($directories, static fn (string $directory): bool => $directory !== "")),
             ),
         );
     }

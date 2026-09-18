@@ -10,8 +10,10 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class MysqlRecoverCommand extends AbstractCommand {
-    public function __construct(private readonly ?MysqlRecovery $recovery = null) {
+final class MysqlRecoverCommand extends AbstractCommand
+{
+    public function __construct(private readonly ?MysqlRecovery $recovery = null)
+    {
         parent::__construct("mysql:recover");
         $this->setDescription("Извлечь пользовательские базы из каталога " . "data остановленного MySQL-инстанса.");
         $this->addOption("from", null, InputOption::VALUE_REQUIRED, "Каталог data исходного MySQL-инстанса.", ".");
@@ -19,7 +21,8 @@ final class MysqlRecoverCommand extends AbstractCommand {
         $this->addOption("database", null, InputOption::VALUE_REQUIRED, "Имена экспортируемых баз через запятую.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $from = $this->absolutePath((string) $input->getOption("from"));
         $to = $this->absolutePath((string) $input->getOption("to"));
         $databaseOption = $input->getOption("database");
@@ -47,7 +50,8 @@ final class MysqlRecoverCommand extends AbstractCommand {
         }
     }
 
-    private function absolutePath(string $path): string {
+    private function absolutePath(string $path): string
+    {
         if ($path === "") {
             return getcwd() ?: ".";
         }

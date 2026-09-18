@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace DockerCli\Bootstrap;
 
-final class ArgvNormalizer {
+final class ArgvNormalizer
+{
     /**
      * Добавляет команду по умолчанию перед разделителем аргументов внешней команды.
      *
@@ -12,7 +13,8 @@ final class ArgvNormalizer {
      *
      * @return list<string>
      */
-    public function normalize(array $arguments): array {
+    public function normalize(array $arguments): array
+    {
         $separator = array_search("--", $arguments, true);
         if (!is_int($separator) || $separator === 0) {
             return $arguments;

@@ -8,11 +8,13 @@ use function DockerCli\Util\join_path;
 
 use Symfony\Component\Yaml\Yaml;
 
-final class UserRepository {
+final class UserRepository
+{
     private readonly string $file;
     private readonly string $dummyPasswordHash;
 
-    public function __construct(private readonly string $salt, ?string $file = null) {
+    public function __construct(private readonly string $salt, ?string $file = null)
+    {
         if ($salt === "") {
             throw new \InvalidArgumentException("Password salt must not be empty.");
         }
@@ -24,7 +26,8 @@ final class UserRepository {
         $this->dummyPasswordHash = $this->hashPassword(bin2hex(random_bytes(16)));
     }
 
-    public function add(string $login, string $password, string $comments = ""): bool {
+    public function add(string $login, string $password, string $comments = ""): bool
+    {
         $login = self::normalizeLogin($login);
         $this->validatePassword($password);
 
@@ -37,7 +40,8 @@ final class UserRepository {
         });
     }
 
-    public function rotatePassword(string $login, string $password): bool {
+    public function rotatePassword(string $login, string $password): bool
+    {
         $login = self::normalizeLogin($login);
         $this->validatePassword($password);
         return $this->update(function (array &$users) use ($login, $password): bool {
@@ -49,7 +53,8 @@ final class UserRepository {
         });
     }
 
-    public function updateComments(string $login, string $comments): bool {
+    public function updateComments(string $login, string $comments): bool
+    {
         $login = self::normalizeLogin($login);
         return $this->update(static function (array &$users) use ($login, $comments): bool {
             if (!isset($users[$login])) {
@@ -61,7 +66,8 @@ final class UserRepository {
     }
 
     /** @return list<array{login: string, comments: string}> */
-    public function users(): array {
+    public function users(): array
+    {
         $result = [];
         foreach ($this->read() as $login => $user) {
             $result[] = [
@@ -72,7 +78,8 @@ final class UserRepository {
         return $result;
     }
 
-    public function delete(string $login): bool {
+    public function delete(string $login): bool
+    {
         $login = self::normalizeLogin($login);
 
         return $this->update(static function (array &$users) use ($login): bool {
@@ -84,7 +91,8 @@ final class UserRepository {
         });
     }
 
-    public function verifyPassword(string $login, string $password): bool {
+    public function verifyPassword(string $login, string $password): bool
+    {
         $login = self::normalizeLogin($login);
         $users = $this->read();
         $storedHash = $users[$login]["password"] ?? null;
@@ -95,12 +103,14 @@ final class UserRepository {
         return $exists && $valid;
     }
 
-    public function contains(string $login): bool {
+    public function contains(string $login): bool
+    {
         $login = self::normalizeLogin($login);
         return isset($this->read()[$login]);
     }
 
-    public static function normalizeLogin(string $login): string {
+    public static function normalizeLogin(string $login): string
+    {
         $login = strtolower(trim($login));
         if (filter_var($login, FILTER_VALIDATE_EMAIL) === false) {
             throw new \InvalidArgumentException("Логин должен быть корректным email-адресом.");
@@ -108,13 +118,15 @@ final class UserRepository {
         return $login;
     }
 
-    private function validatePassword(string $password): void {
+    private function validatePassword(string $password): void
+    {
         if (strlen($password) < 16 || strlen($password) > 1024) {
             throw new \InvalidArgumentException("Пароль должен содержать от 16 до 1024 байт.");
         }
     }
 
-    private function hashPassword(string $password): string {
+    private function hashPassword(string $password): string
+    {
         $hash = password_hash(hash_hmac("sha256", $password, $this->salt), PASSWORD_DEFAULT);
         if (!is_string($hash)) {
             throw new \RuntimeException("Unable to hash password.");
@@ -123,7 +135,8 @@ final class UserRepository {
     }
 
     /** @return array<string, array{password: string, comments?: string}> */
-    private function read(): array {
+    private function read(): array
+    {
         if (!is_file($this->file)) {
             return [];
         }
@@ -139,7 +152,8 @@ final class UserRepository {
     }
 
     /** @param callable(array<string, array{password: string, comments?: string}> &): bool $callback */
-    private function update(callable $callback): bool {
+    private function update(callable $callback): bool
+    {
         $directory = dirname($this->file);
         if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf('Unable to create panel directory "%s".', $directory));

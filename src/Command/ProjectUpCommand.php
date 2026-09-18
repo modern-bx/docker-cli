@@ -31,7 +31,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
-final class ProjectUpCommand extends AbstractCommand {
+final class ProjectUpCommand extends AbstractCommand
+{
     use DockerComposeRunner;
 
     public function __construct(
@@ -77,7 +78,8 @@ final class ProjectUpCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $frameworkCode = $input->getOption("framework");
         $dedicatedDatabases = array_values(
             array_unique(
@@ -123,7 +125,7 @@ final class ProjectUpCommand extends AbstractCommand {
             $defaultLocation = current(
                 array_filter(
                     ($this->projectSettings ?? new ProjectsSettingsRepository())->databaseLocations(),
-                    static fn(array $location): bool => $location["default"],
+                    static fn (array $location): bool => $location["default"],
                 ),
             );
             if (is_array($defaultLocation)) {
@@ -373,7 +375,8 @@ final class ProjectUpCommand extends AbstractCommand {
         return $generatedName;
     }
 
-    private function normalizeProjectName(string $directoryName): string {
+    private function normalizeProjectName(string $directoryName): string
+    {
         $name = strtolower($directoryName);
         $name = preg_replace("/[^a-z0-9]+/", "-", $name) ?? "";
 
@@ -381,7 +384,8 @@ final class ProjectUpCommand extends AbstractCommand {
     }
 
     /** @return list<string> */
-    private function registeredProjectNames(string $projectsDirectory): array {
+    private function registeredProjectNames(string $projectsDirectory): array
+    {
         if (!is_dir($projectsDirectory)) {
             return [];
         }
@@ -394,12 +398,14 @@ final class ProjectUpCommand extends AbstractCommand {
         return $names;
     }
 
-    private function isValidProjectName(string $projectName): bool {
+    private function isValidProjectName(string $projectName): bool
+    {
         return (bool) preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $projectName);
     }
 
     /** @param array<string, mixed> $data */
-    private function writeYaml(string $file, array $data): void {
+    private function writeYaml(string $file, array $data): void
+    {
         file_put_contents($file, Yaml::dump($data, 4, 2));
     }
 }

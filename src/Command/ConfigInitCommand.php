@@ -20,10 +20,12 @@ use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Component\Yaml\Yaml;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class ConfigInitCommand extends AbstractCommand {
+final class ConfigInitCommand extends AbstractCommand
+{
     private TranslatorInterface $translator;
 
-    public function __construct(?TranslatorInterface $translator = null) {
+    public function __construct(?TranslatorInterface $translator = null)
+    {
         $this->translator = $translator ?? TranslatorFactory::create();
         parent::__construct("config:init");
         $this->setDescription($this->translator->trans("command.init.description"));
@@ -54,7 +56,8 @@ final class ConfigInitCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $update = (bool) $input->getOption("update");
         $migrate = (bool) $input->getOption("migrate");
         $rebuild = (bool) $input->getOption("rebuild");
@@ -102,7 +105,8 @@ final class ConfigInitCommand extends AbstractCommand {
         return Command::SUCCESS;
     }
 
-    private function projectsDirectory(): string {
+    private function projectsDirectory(): string
+    {
         $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
 
         return $home .
@@ -116,7 +120,8 @@ final class ConfigInitCommand extends AbstractCommand {
             "projects";
     }
 
-    private function ensureBitrixWizardPassword(SystemCompose $compose): bool {
+    private function ensureBitrixWizardPassword(SystemCompose $compose): bool
+    {
         $file =
             $compose->playwrightDataDirectory() .
             DIRECTORY_SEPARATOR .
@@ -140,7 +145,8 @@ final class ConfigInitCommand extends AbstractCommand {
         return true;
     }
 
-    private function randomPassword(): string {
+    private function randomPassword(): string
+    {
         $lowercase = "abcdefghijklmnopqrstuvwxyz";
         $uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         $digits = "0123456789";

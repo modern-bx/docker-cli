@@ -7,8 +7,10 @@ namespace DockerCli\Tests\Integration\Bootstrap;
 use DockerCli\Bootstrap\ApplicationFactory;
 use PHPUnit\Framework\TestCase;
 
-final class ApplicationFactoryTest extends TestCase {
-    public function testCreatesConfiguredApplication(): void {
+final class ApplicationFactoryTest extends TestCase
+{
+    public function testCreatesConfiguredApplication(): void
+    {
         $application = ApplicationFactory::createDefault()->create();
 
         self::assertSame(ApplicationFactory::APPLICATION_NAME, $application->getName());

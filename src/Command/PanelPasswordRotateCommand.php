@@ -13,14 +13,17 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelPasswordRotateCommand extends AbstractCommand {
-    public function __construct() {
+final class PanelPasswordRotateCommand extends AbstractCommand
+{
+    public function __construct()
+    {
         parent::__construct("panel:password-rotate");
         $this->setDescription("Сгенерировать новые пароли пользователям панели.");
         $this->addArgument("users", InputArgument::REQUIRED, "Логины пользователей через запятую.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $value = $input->getArgument("users");
         $logins = array_values(array_filter(array_map("trim", explode(",", is_string($value) ? $value : ""))));
         try {

@@ -6,7 +6,8 @@ namespace DockerCli\Project;
 
 use function DockerCli\Util\join_path;
 
-final class TreeArchiveManager {
+final class TreeArchiveManager
+{
     /** @var array<string, string> */
     private const EXTENSIONS = [
         "gzip" => "gz",
@@ -72,7 +73,8 @@ final class TreeArchiveManager {
         }
     }
 
-    private function createTar(string $projectRoot, string $tar, ?string $manifest): void {
+    private function createTar(string $projectRoot, string $tar, ?string $manifest): void
+    {
         $command = ["tar", "-cf", $tar, "-C", $projectRoot];
         if ($manifest !== null) {
             array_push($command, "--null", "--verbatim-files-from", "--no-recursion", "-T", $manifest);
@@ -140,7 +142,8 @@ final class TreeArchiveManager {
     }
 
     /** @param list<string> $include @param list<string> $exclude */
-    private function createManifest(string $projectRoot, array $include, array $exclude): string {
+    private function createManifest(string $projectRoot, array $include, array $exclude): string
+    {
         $paths = $this->selectedPaths($projectRoot, $include, $exclude);
         $manifest = tempnam(sys_get_temp_dir(), "docker-cli-tree-");
         if (
@@ -149,7 +152,7 @@ final class TreeArchiveManager {
                 $manifest,
                 $paths === []
                     ? ""
-                    : implode("\0", array_map(static fn(string $path): string => "./" . $path, $paths)) . "\0",
+                    : implode("\0", array_map(static fn (string $path): string => "./" . $path, $paths)) . "\0",
             ) === false
         ) {
             if (is_string($manifest)) {
@@ -161,17 +164,18 @@ final class TreeArchiveManager {
     }
 
     /** @param list<string> $include @param list<string> $exclude @return list<string> */
-    public function selectedPaths(string $projectRoot, array $include, array $exclude): array {
+    public function selectedPaths(string $projectRoot, array $include, array $exclude): array
+    {
         $include = array_values(
             array_filter(
                 array_map($this->normalizePattern(...), $include),
-                static fn(string $pattern): bool => $pattern !== "",
+                static fn (string $pattern): bool => $pattern !== "",
             ),
         );
         $exclude = array_values(
             array_filter(
                 array_map($this->normalizePattern(...), $exclude),
-                static fn(string $pattern): bool => $pattern !== "",
+                static fn (string $pattern): bool => $pattern !== "",
             ),
         );
         $paths = [];
@@ -200,7 +204,8 @@ final class TreeArchiveManager {
         return $paths;
     }
 
-    public function wipeProject(string $projectRoot): void {
+    public function wipeProject(string $projectRoot): void
+    {
         foreach (new \FilesystemIterator($projectRoot) as $item) {
             if ($item->getFilename() === ".docker-cli") {
                 continue;
@@ -209,7 +214,8 @@ final class TreeArchiveManager {
         }
     }
 
-    private function removePath(string $path): void {
+    private function removePath(string $path): void
+    {
         if (is_dir($path) && !is_link($path)) {
             foreach (new \FilesystemIterator($path) as $item) {
                 $this->removePath($item->getPathname());
@@ -222,7 +228,8 @@ final class TreeArchiveManager {
         }
     }
 
-    private function normalizePattern(string $pattern): string {
+    private function normalizePattern(string $pattern): string
+    {
         $pattern = str_replace("\\", "/", trim($pattern));
         while (str_starts_with($pattern, "./")) {
             $pattern = substr($pattern, 2);
@@ -231,7 +238,8 @@ final class TreeArchiveManager {
     }
 
     /** @param list<string> $patterns */
-    private function matchesAny(string $path, array $patterns): bool {
+    private function matchesAny(string $path, array $patterns): bool
+    {
         foreach ($patterns as $pattern) {
             $candidate = $path;
             while (true) {
@@ -248,7 +256,8 @@ final class TreeArchiveManager {
         return false;
     }
 
-    private function globMatches(string $pattern, string $path): bool {
+    private function globMatches(string $pattern, string $path): bool
+    {
         if (fnmatch($pattern, $path, FNM_PATHNAME)) {
             return true;
         }
@@ -257,7 +266,8 @@ final class TreeArchiveManager {
         return preg_match("~^" . $quoted . '$~u', $path) === 1;
     }
 
-    private function compress(string $tar, string $compressor): string {
+    private function compress(string $tar, string $compressor): string
+    {
         $extension = self::EXTENSIONS[$compressor];
         $target = $tar . "." . $extension;
         switch ($compressor) {
@@ -277,7 +287,8 @@ final class TreeArchiveManager {
     }
 
     /** @param list<string> $command */
-    private function run(array $command): void {
+    private function run(array $command): void
+    {
         if (!$this->executable($command[0])) {
             throw new \RuntimeException(sprintf("Команда «%s» не найдена.", $command[0]));
         }
@@ -291,7 +302,8 @@ final class TreeArchiveManager {
         }
     }
 
-    private function executable(string $command): bool {
+    private function executable(string $command): bool
+    {
         foreach (explode(PATH_SEPARATOR, getenv("PATH") ?: "") as $directory) {
             if ($directory !== "" && is_executable(join_path($directory, $command))) {
                 return true;
@@ -300,12 +312,14 @@ final class TreeArchiveManager {
         return false;
     }
 
-    private function relativePath(string $root, string $path): ?string {
+    private function relativePath(string $root, string $path): ?string
+    {
         $root = rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
         return str_starts_with($path, $root) ? substr($path, strlen($root)) : null;
     }
 
-    private function removeDirectory(string $directory): void {
+    private function removeDirectory(string $directory): void
+    {
         if (!is_dir($directory)) {
             return;
         }

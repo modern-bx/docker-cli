@@ -9,14 +9,17 @@ use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 use DockerCli\Panel\SecuritySettingsRepository;
 
-final readonly class SecuritySettingsRequestDto implements RequestDto {
+final readonly class SecuritySettingsRequestDto implements RequestDto
+{
     public function __construct(
         public int $maximumSessionHours,
         public string $httpAuthLogin,
         public string $httpAuthPassword,
-    ) {}
+    ) {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         $hours = $request->body["maximumSessionHours"] ?? null;
         if (!is_int($hours) || $hours < 1 || $hours > SecuritySettingsRepository::MAX_SESSION_HOURS) {
             throw new RequestValidationException(

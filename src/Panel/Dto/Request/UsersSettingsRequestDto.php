@@ -9,10 +9,14 @@ use DockerCli\Panel\Http\RequestDto;
 use DockerCli\Panel\Http\RequestValidationException;
 use DockerCli\Panel\UserRepository;
 
-final readonly class UsersSettingsRequestDto implements RequestDto {
-    public function __construct(public string $login, public string $comments, public string $currentLogin) {}
+final readonly class UsersSettingsRequestDto implements RequestDto
+{
+    public function __construct(public string $login, public string $comments, public string $currentLogin)
+    {
+    }
 
-    public static function fromRequest(RequestData $request): static {
+    public static function fromRequest(RequestData $request): static
+    {
         try {
             $login = UserRepository::normalizeLogin(
                 rawurldecode((string) ($request->route["login"] ?? ($request->body["login"] ?? ""))),

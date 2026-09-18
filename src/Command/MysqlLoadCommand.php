@@ -13,7 +13,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class MysqlLoadCommand extends AbstractCommand {
+final class MysqlLoadCommand extends AbstractCommand
+{
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?MysqlDumpLoader $dumpLoader = null,
@@ -41,7 +42,8 @@ final class MysqlLoadCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $project = $input->getOption("project") ?: $registry->projectNameFromContext();
         if (!is_string($project) || !$registry->hasProject($project)) {

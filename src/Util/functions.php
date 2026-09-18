@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace DockerCli\Util;
 
-function join_path(string ...$parts): string {
+function join_path(string ...$parts): string
+{
     if ($parts === []) {
         return "";
     }

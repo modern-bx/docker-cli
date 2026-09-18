@@ -4,20 +4,24 @@ declare(strict_types=1);
 
 namespace DockerCli\Service;
 
-final class SystemdUnitPolicy {
+final class SystemdUnitPolicy
+{
     private const DIRECTORY = "/etc/polkit-1/rules.d";
 
-    public function path(string $unit): string {
+    public function path(string $unit): string
+    {
         return self::DIRECTORY . "/50-docker-cli-" . $unit . ".rules";
     }
 
-    public function contents(string $unit): string|false {
+    public function contents(string $unit): string|false
+    {
         $path = $this->path($unit);
 
         return is_file($path) ? file_get_contents($path) : false;
     }
 
-    public function install(string $unit, ?string $user): void {
+    public function install(string $unit, ?string $user): void
+    {
         if ($user === null) {
             $this->remove($unit);
             return;
@@ -46,14 +50,16 @@ final class SystemdUnitPolicy {
         }
     }
 
-    public function remove(string $unit): void {
+    public function remove(string $unit): void
+    {
         $path = $this->path($unit);
         if (is_file($path) && !@unlink($path)) {
             throw new \RuntimeException(sprintf("Не удалось удалить правило управления сервисом %s.", $path));
         }
     }
 
-    public function restore(string $unit, string|false $contents): void {
+    public function restore(string $unit, string|false $contents): void
+    {
         if ($contents === false) {
             @unlink($this->path($unit));
             return;

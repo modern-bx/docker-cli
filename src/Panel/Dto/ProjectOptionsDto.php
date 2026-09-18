@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace DockerCli\Panel\Dto;
 
-final readonly class ProjectOptionsDto implements \JsonSerializable {
+final readonly class ProjectOptionsDto implements \JsonSerializable
+{
     /**
      * @param list<array{path: string, code: string, default: bool}> $locations @param list<array{path: string, code:
      * string, default: bool}> $databaseLocations @param list<ConceptDto> $languages @param list<string>
@@ -19,9 +20,11 @@ final readonly class ProjectOptionsDto implements \JsonSerializable {
         public string $defaultLanguageVersion,
         public array $frameworks,
         public array $deploymentScripts,
-    ) {}
+    ) {
+    }
 
-    public function jsonSerialize(): array {
+    public function jsonSerialize(): array
+    {
         return [
             "locations" => $this->locations,
             "databaseLocations" => $this->databaseLocations,

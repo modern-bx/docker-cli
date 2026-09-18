@@ -25,7 +25,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
-final class ProjectUpdateCommand extends AbstractCommand {
+final class ProjectUpdateCommand extends AbstractCommand
+{
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?CommandContext $context = null,
@@ -57,7 +58,8 @@ final class ProjectUpdateCommand extends AbstractCommand {
         );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $name = $input->getOption("name");
         $language = $input->getOption("language");
         $languageVersion = $input->getOption("language-version");
@@ -146,7 +148,7 @@ final class ProjectUpdateCommand extends AbstractCommand {
         $migrationDrivers = array_values(
             array_filter(
                 ["mysql", "postgres"],
-                fn(string $driver): bool => in_array($driver, $dedicated["drivers"], true) !==
+                fn (string $driver): bool => in_array($driver, $dedicated["drivers"], true) !==
                     (($config["data"]["databases"][$driver]["hostname"] ?? null) === "docker-cli-$driver-$oldName") ||
                     ($newName !== $oldName && in_array($driver, $dedicated["drivers"], true)),
             ),
@@ -236,7 +238,7 @@ final class ProjectUpdateCommand extends AbstractCommand {
                 ? array_values(
                     array_filter(
                         ["mysql", "postgres"],
-                        fn(string $driver): bool => ($config["data"]["databases"][$driver]["hostname"] ?? null) ===
+                        fn (string $driver): bool => ($config["data"]["databases"][$driver]["hostname"] ?? null) ===
                             "docker-cli-$driver-$name",
                     ),
                 )
@@ -271,7 +273,8 @@ final class ProjectUpdateCommand extends AbstractCommand {
     }
 
     /** @param list<string> $drivers @return array<string,string>|null */
-    private function dumpDatabases(array $config, array $drivers, OutputInterface $output): ?array {
+    private function dumpDatabases(array $config, array $drivers, OutputInterface $output): ?array
+    {
         $home = getenv("HOME");
         if ($drivers !== [] && (!is_string($home) || $home === "")) {
             return null;
@@ -307,11 +310,11 @@ final class ProjectUpdateCommand extends AbstractCommand {
     ): int {
         $compose = new SystemCompose();
         $services = array_map(
-            fn(string $driver): string => $compose->databaseService($name, $driver),
+            fn (string $driver): string => $compose->databaseService($name, $driver),
             array_values(
                 array_filter(
                     $drivers,
-                    fn(string $driver): bool => ($config["data"]["databases"][$driver]["hostname"] ?? "") ===
+                    fn (string $driver): bool => ($config["data"]["databases"][$driver]["hostname"] ?? "") ===
                         "docker-cli-$driver-$name",
                 ),
             ),
@@ -358,7 +361,8 @@ final class ProjectUpdateCommand extends AbstractCommand {
     }
 
     /** @param list<string> $drivers */
-    private function removeOldInstances(array $config, string $name, array $drivers, OutputInterface $output): void {
+    private function removeOldInstances(array $config, string $name, array $drivers, OutputInterface $output): void
+    {
         foreach ($drivers as $driver) {
             if (($config["data"]["databases"][$driver]["hostname"] ?? "") === "docker-cli-$driver") {
                 $database = (string) ($config["data"]["databases"][$driver]["database"] ?? $name);
@@ -398,12 +402,14 @@ final class ProjectUpdateCommand extends AbstractCommand {
             }
         }
     }
-    private function runProcess(array $command, SystemCompose $compose, OutputInterface $output): int {
+    private function runProcess(array $command, SystemCompose $compose, OutputInterface $output): int
+    {
         $output->writeln("<comment>" . implode(" ", array_map("escapeshellarg", $command)) . "</comment>");
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $compose->dockerProcessEnvironment());
         return is_resource($process) ? proc_close($process) : Command::FAILURE;
     }
-    private function removeDirectory(string $path): void {
+    private function removeDirectory(string $path): void
+    {
         foreach (scandir($path) ?: [] as $item) {
             if ($item !== "." && $item !== "..") {
                 $child = join_path($path, $item);

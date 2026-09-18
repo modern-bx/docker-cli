@@ -10,14 +10,17 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class QueuePauseCommand extends AbstractCommand {
-    public function __construct(private readonly ?QueueRepository $queues = null) {
+final class QueuePauseCommand extends AbstractCommand
+{
+    public function __construct(private readonly ?QueueRepository $queues = null)
+    {
         parent::__construct("queue:pause");
         $this->setDescription("Приостановить выборку новых элементов из очереди.");
         $this->addOption("queue", null, InputOption::VALUE_REQUIRED, "Код очереди.", "default");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         $queue = (string) $input->getOption("queue");
         try {
             ($this->queues ?? new QueueRepository())->pause($queue);

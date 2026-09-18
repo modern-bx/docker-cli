@@ -11,16 +11,19 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-abstract class AbstractShellCommand extends AbstractCommand {
+abstract class AbstractShellCommand extends AbstractCommand
+{
     use DockerComposeRunner;
 
-    public function __construct(string $name, private readonly ?ProjectRegistry $registry = null) {
+    public function __construct(string $name, private readonly ?ProjectRegistry $registry = null)
+    {
         parent::__construct($name);
         $this->addOption("project", null, InputOption::VALUE_REQUIRED, "Кодовое имя зарегистрированного проекта.");
     }
 
     /** @param list<string> $command */
-    protected function runInPhpFpm(InputInterface $input, OutputInterface $output, array $command): int {
+    protected function runInPhpFpm(InputInterface $input, OutputInterface $output, array $command): int
+    {
         $workingDirectory = $this->workingDirectory($input, $output);
         if ($workingDirectory === null) {
             return self::FAILURE;
@@ -52,7 +55,8 @@ abstract class AbstractShellCommand extends AbstractCommand {
         );
     }
 
-    private function workingDirectory(InputInterface $input, OutputInterface $output): ?string {
+    private function workingDirectory(InputInterface $input, OutputInterface $output): ?string
+    {
         $registry = $this->registry ?? new ProjectRegistry();
         $projectOption = $input->getOption("project");
         $projectName =
@@ -79,7 +83,8 @@ abstract class AbstractShellCommand extends AbstractCommand {
         return $this->containerPath($projectRoot);
     }
 
-    private function containerPath(string $hostPath): string {
+    private function containerPath(string $hostPath): string
+    {
         $hostPath = realpath($hostPath) ?: $hostPath;
         $home = getenv("HOME");
         if (is_string($home) && ($hostPath === $home || str_starts_with($hostPath, rtrim($home, "/") . "/"))) {

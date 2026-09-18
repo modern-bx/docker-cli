@@ -8,14 +8,17 @@ use function DockerCli\Util\join_path;
 
 use Symfony\Component\Console\Command\Command;
 
-final class CommandHookRunner {
+final class CommandHookRunner
+{
     public function __construct(
         private readonly ?string $hooksDirectory = null,
         private readonly ?HookJournal $journal = null,
-    ) {}
+    ) {
+    }
 
     /** @param list<string> $arguments */
-    public function run(string $command, string $timing, array $arguments): int {
+    public function run(string $command, string $timing, array $arguments): int
+    {
         if (!in_array($timing, ["before", "after"], true)) {
             throw new \InvalidArgumentException(sprintf('Неизвестное время вызова хука: "%s".', $timing));
         }
@@ -64,7 +67,8 @@ final class CommandHookRunner {
     }
 
     /** @param list<string> $arguments @return array{int, string, string} */
-    private function runHook(string $hook, string $command, string $timing, array $arguments): array {
+    private function runHook(string $hook, string $command, string $timing, array $arguments): array
+    {
         $process = proc_open(
             [$hook, "hook:command", $command . ":" . $timing, ...$arguments],
             [STDIN, ["pipe", "w"], ["pipe", "w"]],
@@ -83,7 +87,7 @@ final class CommandHookRunner {
         $stderr = "";
         while (true) {
             $read = array_values(
-                array_filter([$pipes[1], $pipes[2]], static fn($pipe): bool => is_resource($pipe) && !feof($pipe)),
+                array_filter([$pipes[1], $pipes[2]], static fn ($pipe): bool => is_resource($pipe) && !feof($pipe)),
             );
             if ($read === []) {
                 break;
@@ -115,7 +119,8 @@ final class CommandHookRunner {
     }
 
     /** @param list<string> $arguments @return array<string, mixed> */
-    private function metadata(string $hook, string $command, string $timing, array $arguments): array {
+    private function metadata(string $hook, string $command, string $timing, array $arguments): array
+    {
         $project = $this->projectName($arguments);
 
         return [
@@ -129,7 +134,8 @@ final class CommandHookRunner {
     }
 
     /** @param list<string> $arguments */
-    private function projectName(array $arguments): ?string {
+    private function projectName(array $arguments): ?string
+    {
         $skipNext = false;
         foreach ($arguments as $argument) {
             if ($skipNext) {
@@ -151,7 +157,8 @@ final class CommandHookRunner {
         return is_string($cwd) && $cwd !== "" ? basename($cwd) : null;
     }
 
-    private function directory(): string {
+    private function directory(): string
+    {
         if ($this->hooksDirectory !== null) {
             return join_path($this->hooksDirectory, "commands");
         }

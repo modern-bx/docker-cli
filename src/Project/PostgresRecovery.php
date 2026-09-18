@@ -6,12 +6,14 @@ namespace DockerCli\Project;
 
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PostgresRecovery {
+final class PostgresRecovery
+{
     /** @var null|\Closure(list<string>, bool): array{0: int, 1: string} */
     private readonly ?\Closure $runner;
 
     /** @param null|callable(list<string>, bool): array{0: int, 1: string} $runner */
-    public function __construct(?callable $runner = null) {
+    public function __construct(?callable $runner = null)
+    {
         $this->runner = $runner === null ? null : \Closure::fromCallable($runner);
     }
 
@@ -173,7 +175,8 @@ final class PostgresRecovery {
         }
     }
 
-    public function detectVersion(string $source): string {
+    public function detectVersion(string $source): string
+    {
         if (
             !is_dir($source) ||
             !is_file($source . "/PG_VERSION") ||
@@ -193,7 +196,8 @@ final class PostgresRecovery {
         return $version;
     }
 
-    private function prepareDestination(string $destination): void {
+    private function prepareDestination(string $destination): void
+    {
         if (file_exists($destination) && !is_dir($destination)) {
             throw new \InvalidArgumentException(sprintf('Путь назначения "%s" не является директорией.', $destination));
         }
@@ -207,7 +211,8 @@ final class PostgresRecovery {
         }
     }
 
-    private function waitUntilReady(string $container, string $role): void {
+    private function waitUntilReady(string $container, string $role): void
+    {
         for ($attempt = 0; $attempt < 60; ++$attempt) {
             [$code] = $this->run(
                 [
@@ -232,7 +237,8 @@ final class PostgresRecovery {
     }
 
     /** @return array{0: int, 1: string} */
-    private function mustRun(array $command, OutputInterface $output, bool $quiet = false): array {
+    private function mustRun(array $command, OutputInterface $output, bool $quiet = false): array
+    {
         if (!$quiet) {
             $output->writeln("<comment>" . implode(" ", array_map("escapeshellarg", $command)) . "</comment>");
         }
@@ -246,7 +252,8 @@ final class PostgresRecovery {
     }
 
     /** @return array{0: int, 1: string} */
-    private function run(array $command, bool $capture): array {
+    private function run(array $command, bool $capture): array
+    {
         if ($this->runner !== null) {
             return ($this->runner)($command, $capture);
         }
@@ -260,10 +267,12 @@ final class PostgresRecovery {
         return [proc_close($process), (string) $stdout];
     }
 
-    private function uid(): int {
+    private function uid(): int
+    {
         return function_exists("posix_getuid") ? posix_getuid() : 1000;
     }
-    private function gid(): int {
+    private function gid(): int
+    {
         return function_exists("posix_getgid") ? posix_getgid() : 1000;
     }
 }

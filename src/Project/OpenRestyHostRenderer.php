@@ -10,14 +10,16 @@ use function DockerCli\Util\join_path;
 
 use Symfony\Component\Yaml\Yaml;
 
-final class OpenRestyHostRenderer {
+final class OpenRestyHostRenderer
+{
     private const HOSTS_RELATIVE_PATH = "config/openresty/hosts";
     private const PROJECT_WEB_DNSDOCK_ALIAS = "PROJECT_WEB_DNSDOCK_ALIAS";
     private const HTTP_AUTH_CONFIG_FILE = "http-auth.conf";
     private const HTTP_AUTH_MAP_FILE = "00-http-auth-map.conf";
     private const HTTP_AUTH_USER_FILE = ".htpasswd";
 
-    public function render(): void {
+    public function render(): void
+    {
         $compose = new SystemCompose();
         $hostsDirectory = $this->hostsDirectory($compose);
         if (!is_dir($hostsDirectory) && !mkdir($hostsDirectory, 0755, true) && !is_dir($hostsDirectory)) {
@@ -75,7 +77,8 @@ final class OpenRestyHostRenderer {
         $this->writeProjectWebDnsdockAliases($compose->envFile(), $hostNames);
     }
 
-    public function hostsDirectory(SystemCompose $compose): string {
+    public function hostsDirectory(SystemCompose $compose): string
+    {
         return join_path($compose->directory(), self::HOSTS_RELATIVE_PATH);
     }
 
@@ -83,7 +86,8 @@ final class OpenRestyHostRenderer {
      * @return list<array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?:
      * int, language?: string, language_version?: string}>
      */
-    private function registeredProjects(): array {
+    private function registeredProjects(): array
+    {
         $projectsDirectory = $this->projectsDirectory();
         if (!is_dir($projectsDirectory)) {
             return [];
@@ -121,7 +125,7 @@ final class OpenRestyHostRenderer {
                         "document_root" => $documentRoot,
                         "xdebug_client_port" => $this->xdebugClientPort($project),
                     ],
-                    static fn(mixed $value): bool => $value !== null,
+                    static fn (mixed $value): bool => $value !== null,
                 );
             }
         }
@@ -161,7 +165,8 @@ final class OpenRestyHostRenderer {
     }
 
     /** @param array<string, string> $envValues */
-    private function httpAuthConfig(array $envValues, string $hostsDirectory): string {
+    private function httpAuthConfig(array $envValues, string $hostsDirectory): string
+    {
         $legacyConfig = join_path($hostsDirectory, self::HTTP_AUTH_CONFIG_FILE);
         if (is_file($legacyConfig)) {
             unlink($legacyConfig);
@@ -177,7 +182,8 @@ final class OpenRestyHostRenderer {
     }
 
     /** @param array<string, string> $envValues */
-    private function renderHttpAuthMap(array $envValues, string $hostsDirectory, bool $enabled): void {
+    private function renderHttpAuthMap(array $envValues, string $hostsDirectory, bool $enabled): void
+    {
         $mapPath = join_path($hostsDirectory, self::HTTP_AUTH_MAP_FILE);
         if (!$enabled) {
             if (is_file($mapPath)) {
@@ -191,7 +197,8 @@ final class OpenRestyHostRenderer {
     }
 
     /** @param array<string, mixed> $project */
-    private function xdebugClientPort(array $project): int {
+    private function xdebugClientPort(array $project): int
+    {
         $port = $project["xdebug"]["client_port"] ?? null;
         if (is_int($port)) {
             return $port;
@@ -208,7 +215,8 @@ final class OpenRestyHostRenderer {
      * @param array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?: int,
      * language?: string, language_version?: string} $project
      */
-    private function phpFpmUpstream(array $project): string {
+    private function phpFpmUpstream(array $project): string
+    {
         $language = $project["language"] ?? "php";
         $version = $project["language_version"] ?? PhpLanguageVersion::default();
 
@@ -219,13 +227,15 @@ final class OpenRestyHostRenderer {
         return sprintf("php-fpm-%s:9000", $version);
     }
 
-    private function projectsDirectory(): string {
+    private function projectsDirectory(): string
+    {
         $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
 
         return join_path($home, ".config", "docker-cli", "state", "projects");
     }
 
-    private function templateFile(string $framework): string {
+    private function templateFile(string $framework): string
+    {
         return join_path(
             dirname(__DIR__, 2),
             "resources",
@@ -237,7 +247,8 @@ final class OpenRestyHostRenderer {
         );
     }
 
-    private function containerDocumentRoot(string $documentRoot): string {
+    private function containerDocumentRoot(string $documentRoot): string
+    {
         if ($documentRoot === "/home" || str_starts_with($documentRoot, "/home/")) {
             return $documentRoot;
         }
@@ -246,7 +257,8 @@ final class OpenRestyHostRenderer {
     }
 
     /** @return array<string, string> */
-    private function readEnvValues(string $envFile): array {
+    private function readEnvValues(string $envFile): array
+    {
         if (!is_file($envFile)) {
             throw new \RuntimeException(
                 sprintf(
@@ -272,7 +284,8 @@ final class OpenRestyHostRenderer {
     }
 
     /** @param array<string, string> $envValues */
-    private function requiredEnvValue(array $envValues, string $key, string $envFile): string {
+    private function requiredEnvValue(array $envValues, string $key, string $envFile): string
+    {
         if (!array_key_exists($key, $envValues)) {
             throw new \RuntimeException(
                 sprintf(
@@ -297,7 +310,8 @@ final class OpenRestyHostRenderer {
     }
 
     /** @param array<string, string> $envValues */
-    private function openRestyPort(array $envValues, string $envFile): int {
+    private function openRestyPort(array $envValues, string $envFile): int
+    {
         $port = $envValues["OPENRESTY_PORT"] ?? "80";
         if (!ctype_digit($port)) {
             throw new \RuntimeException(
@@ -316,7 +330,8 @@ final class OpenRestyHostRenderer {
     }
 
     /** @param list<string> $hostNames */
-    private function writeProjectWebDnsdockAliases(string $envFile, array $hostNames): void {
+    private function writeProjectWebDnsdockAliases(string $envFile, array $hostNames): void
+    {
         if (!is_file($envFile)) {
             return;
         }
