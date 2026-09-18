@@ -20,7 +20,7 @@ task:
         - { name: Laravel, value: laravel }
         - { name: Bitrix, value: bitrix }
         - { name: Bitrix24, value: bitrix24 }
-    dedicated_db: { type: string, required: false }
+    dedicated-db: { type: string, required: false }
     location_mysql: { type: string, required: false }
     location_postgres: { type: string, required: false }
   action: |
