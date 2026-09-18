@@ -3375,7 +3375,7 @@
 >
   <Dialog.Backdrop class="login-error-backdrop" />
   <Dialog.Positioner class="login-error-positioner">
-    <Dialog.Content class={`login-error-dialog card preset-filled-surface-100-900 shadow-2xl${errorStatus >= 500 ? ' error-alert' : ''}`}>
+    <Dialog.Content class={`login-error-dialog card preset-filled-surface-100-900 shadow-2xl${errorStatus >= 500 ? ' error-alert' : ''}${errorTitle === 'Некорректная конфигурация баз данных' ? ' database-config-alert' : ''}`}>
       <Dialog.Title class="login-error-title">{errorStatus >= 500 ? 'Ошибка сервера' : errorTitle}</Dialog.Title>
       <Dialog.Description class="login-error-description">{error}</Dialog.Description>
       <div class="login-error-actions">
