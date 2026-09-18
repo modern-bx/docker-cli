@@ -1635,6 +1635,11 @@
 
   async function submitProjectUpdate() {
     if (!projectUpdateDialog || projectUpdating) return;
+    if (projectUpdateDialog.dedicated && !projectUpdateDialog.dedicatedMysql && !projectUpdateDialog.dedicatedPostgres) {
+      errorTitle = 'Некорректная конфигурация баз данных';
+      error = 'Выберите MySQL или PostgreSQL для выделенного инстанса либо отключите использование выделенных инстансов.';
+      return;
+    }
     projectUpdating = true;
     try {
       const data = await updateProject(api, projectUpdateDialog.project, { name: projectUpdateDialog.name, language: projectUpdateDialog.language, languageVersion: projectUpdateDialog.languageVersion, framework: projectUpdateDialog.framework, dedicatedDatabases: projectUpdateDialog.dedicated ? [projectUpdateDialog.dedicatedMysql && 'mysql', projectUpdateDialog.dedicatedPostgres && 'postgres'].filter(Boolean) : [], locationMysql: projectUpdateDialog.locationMysql, locationPostgres: projectUpdateDialog.locationPostgres });
