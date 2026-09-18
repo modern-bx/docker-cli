@@ -63,8 +63,12 @@ docker-cli image:publish --tag=1.0.0
 - `SOURCE_IMAGE_MAIN_BRANCH` — основная ветка для релиза самообновления, по умолчанию `main`;
 - `SOURCE_IMAGE_TAG`;
 - `SOURCE_IMAGE_DOCKER_BUILDKIT`.
+- `PHP_ENABLE_XDEBUG` — добавляет Xdebug во все PHP-FPM-образы, по умолчанию `1`;
+- `PHP_ENABLE_SPX` — добавляет PHP-SPX во все PHP-FPM-образы, по умолчанию `1`.
 
 По умолчанию `SOURCE_IMAGE_DOCKER_BUILDKIT=0`, чтобы обойти сетевые проблемы BuildKit при сборке PHP-FPM.
+Флаги PHP-расширений применяются при сборке сразу ко всем версиям; после их изменения используйте
+`docker-cli image:build --no-cache`.
 
 ## Публикация в GHCR
 

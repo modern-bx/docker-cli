@@ -36,6 +36,7 @@ export default defineConfig({
           { text: 'Домен в Cloudflare', link: '/guide/cloudflare' },
           { text: 'DNS и браузеры', link: '/guide/dns' },
           { text: 'Xdebug', link: '/guide/xdebug' },
+          { text: 'PHP-SPX', link: '/guide/spx' },
           { text: 'Задачи', link: '/guide/tasks' },
           { text: 'Очереди', link: '/guide/queues' },
           { text: 'Бэкапы', link: '/guide/backups' },

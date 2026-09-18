@@ -5,6 +5,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
 apt-get install -y --no-install-recommends \
+    curl \
     libfreetype6-dev \
     libjpeg62-turbo-dev \
     libldap2-dev \
@@ -37,12 +38,30 @@ docker-php-ext-install -j"$(nproc)" \
 
 pecl install \
     memcached \
-    redis \
-    xdebug
+    redis
 
 docker-php-ext-enable \
     memcached \
-    redis \
-    xdebug
+    redis
+
+if [ "${PHP_ENABLE_XDEBUG:-1}" = "1" ]; then
+    pecl install xdebug
+    docker-php-ext-enable xdebug
+fi
+
+if [ "${PHP_ENABLE_SPX:-1}" = "1" ]; then
+    apt-get install -y --no-install-recommends $PHPIZE_DEPS
+    curl -fsSL https://github.com/NoiseByNorthwest/php-spx/archive/refs/tags/v0.4.22.tar.gz \
+        | tar -xz -C /tmp
+    cd /tmp/php-spx-0.4.22
+    phpize
+    ./configure
+    make -j"$(nproc)"
+    make install
+    docker-php-ext-enable spx
+    cd /
+    apt-get purge -y --auto-remove $PHPIZE_DEPS
+    rm -rf /tmp/php-spx-0.4.22
+fi
 
 rm -rf /tmp/pear ~/.pearrc /var/lib/apt/lists/*

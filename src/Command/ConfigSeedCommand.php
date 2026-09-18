@@ -144,6 +144,8 @@ final class ConfigSeedCommand extends AbstractCommand
             "DOCKER_CLI_NETWORK_SUBNET",
             "HOST_UID",
             "HOST_GID",
+            "PHP_ENABLE_XDEBUG",
+            "PHP_ENABLE_SPX",
             "SOURCE_IMAGE_REGISTRY",
             "SOURCE_IMAGE_NAMESPACE",
             "SOURCE_IMAGE_NAME",

@@ -128,6 +128,9 @@ services:
       context: ./config/php-fpm-8.2
       dockerfile: Dockerfile
       network: host
+      args:
+        PHP_ENABLE_XDEBUG: ${PHP_ENABLE_XDEBUG:-1}
+        PHP_ENABLE_SPX: ${PHP_ENABLE_SPX:-1}
     image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/php-fpm-8.2:${SOURCE_IMAGE_TAG:-default}
     container_name: docker-cli-php-fpm-8.2
     environment:
@@ -158,6 +161,9 @@ services:
       context: ./config/php-fpm-8.3
       dockerfile: Dockerfile
       network: host
+      args:
+        PHP_ENABLE_XDEBUG: ${PHP_ENABLE_XDEBUG:-1}
+        PHP_ENABLE_SPX: ${PHP_ENABLE_SPX:-1}
     image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/php-fpm-8.3:${SOURCE_IMAGE_TAG:-default}
     container_name: docker-cli-php-fpm-8.3
     environment:
@@ -188,6 +194,9 @@ services:
       context: ./config/php-fpm-8.4
       dockerfile: Dockerfile
       network: host
+      args:
+        PHP_ENABLE_XDEBUG: ${PHP_ENABLE_XDEBUG:-1}
+        PHP_ENABLE_SPX: ${PHP_ENABLE_SPX:-1}
     image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/php-fpm-8.4:${SOURCE_IMAGE_TAG:-default}
     container_name: docker-cli-php-fpm-8.4
     environment:
@@ -218,6 +227,9 @@ services:
       context: ./config/php-fpm-8.5
       dockerfile: Dockerfile
       network: host
+      args:
+        PHP_ENABLE_XDEBUG: ${PHP_ENABLE_XDEBUG:-1}
+        PHP_ENABLE_SPX: ${PHP_ENABLE_SPX:-1}
     image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/php-fpm-8.5:${SOURCE_IMAGE_TAG:-default}
     container_name: docker-cli-php-fpm-8.5
     environment:
