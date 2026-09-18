@@ -14,6 +14,7 @@ task:
     location: { type: string }
     here: { type: boolean }
     exclude: { type: string }
+    mirror: { type: string }
     skip-db: { type: boolean }
     dbms: { type: string }
     dedicated-db: { type: string }
@@ -27,6 +28,7 @@ task:
     [ -n "${location:-}" ] && options+=(--location="$location")
     [ "${here:-false}" = true ] && options+=(--here)
     [ -n "${exclude:-}" ] && options+=(--exclude="$exclude")
+    [ "${mirror+x}" = x ] && options+=(--mirror="$mirror")
     [ "${skip_db:-false}" = true ] && options+=(--skip-db)
     [ -n "${dbms:-}" ] && options+=(--dbms="$dbms")
     [ -n "${dedicated_db:-}" ] && options+=(--dedicated-db="$dedicated_db")

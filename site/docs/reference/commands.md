@@ -166,7 +166,10 @@ bin/docker-cli project:clone --from=my-project --to=my-project-copy
 bin/docker-cli project:clone --to=/home/user/projects/my-project-copy
 bin/docker-cli project:clone --to=my-project-copy --location=work
 bin/docker-cli project:clone --to=my-project-copy --here
+bin/docker-cli project:clone --to=my-project-copy --mirror=tree
 ```
+
+Опция `--mirror[=tree,db]` включает ускоренные механизмы клонирования. Без значения выбираются оба режима. Сейчас для `tree` поддерживается CoW-копирование через `cp -a --reflink=always`, когда исходный и целевой каталоги находятся на одном разделе Btrfs; в остальных случаях используется обычное копирование. Режим `db` зарезервирован и пока не изменяет способ копирования баз данных.
 
 `--exclude` принимает разделённые запятыми glob-шаблоны файлов, которые не нужно
 копировать. `--skip-db` отключает клонирование баз, а `--dbms=mysql,postgres`

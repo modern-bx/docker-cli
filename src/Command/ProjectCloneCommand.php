@@ -43,6 +43,7 @@ final class ProjectCloneCommand extends AbstractCommand
         $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код расположения проектов.');
         $this->addOption('here', null, InputOption::VALUE_NONE, 'Создать проект рядом с исходным.');
         $this->addOption('exclude', null, InputOption::VALUE_REQUIRED, 'Список glob-шаблонов через запятую.');
+        $this->addOption('mirror', null, InputOption::VALUE_OPTIONAL, 'Ускоренное клонирование: tree, db или оба значения через запятую. Без значения включает оба режима.');
         $this->addOption('skip-db', null, InputOption::VALUE_NONE, 'Не клонировать базы данных.');
         $this->addOption('dbms', null, InputOption::VALUE_REQUIRED, 'Список СУБД для клонирования через запятую.');
         $this->addOption('dedicated-db', null, InputOption::VALUE_REQUIRED, 'Выделенные СУБД целевого проекта: mysql, postgres или false для системных инстансов. По умолчанию наследуются настройки исходного проекта.');
@@ -52,6 +53,8 @@ final class ProjectCloneCommand extends AbstractCommand
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $mirror = $this->resolveMirror($input, $output);
+        if ($mirror === null) return Command::INVALID;
         if ($input->getOption('here') && $input->getOption('location') !== null) {
             $this->writeMessage($output, '<error>Опции --here и --location нельзя использовать одновременно.</error>');
             return Command::FAILURE;
@@ -151,21 +154,27 @@ final class ProjectCloneCommand extends AbstractCommand
         $registry->writeProjectConfig($name, $config);
         (new DedicatedDatabaseComposeRenderer())->render();
         $metadata = join_path($destination, '.docker-cli');
-        if (!is_dir($metadata)) mkdir($metadata, 0775, true);
-        file_put_contents(join_path($metadata, 'project.yaml'), Yaml::dump(['meta' => ['schema' => 'project-meta', 'version' => 0.1], 'data' => ['project' => ['name' => $name]]], 4, 2));
 
         $excludes = ['.docker-cli'];
         $rawExclude = $input->getOption('exclude');
         if (is_string($rawExclude)) foreach (explode(',', $rawExclude) as $pattern) if (trim($pattern) !== '') $excludes[] = ltrim(trim($pattern), './');
-        $excludeArgs = implode(' ', array_map(static fn (string $pattern): string => '--exclude=' . escapeshellarg($pattern), $excludes));
-        $command = sprintf('tar %s -cf - . | (cd %s && tar -xf -)', $excludeArgs, escapeshellarg($destination));
         $filesStarted = microtime(true);
-        passthru('cd ' . escapeshellarg($sourceRoot) . ' && ' . $command, $status);
+        if ($rawExclude === null && in_array('tree', $mirror, true) && $this->canReflink($sourceRoot, $destination)) {
+            $command = sprintf('cp -a --reflink=always -- %s/. %s/', escapeshellarg($sourceRoot), escapeshellarg($destination));
+            passthru($command, $status);
+            if ($status === 0) $this->wipeMetadata($destination);
+        } else {
+            $excludeArgs = implode(' ', array_map(static fn (string $pattern): string => '--exclude=' . escapeshellarg($pattern), $excludes));
+            $command = sprintf('tar %s -cf - . | (cd %s && tar -xf -)', $excludeArgs, escapeshellarg($destination));
+            passthru('cd ' . escapeshellarg($sourceRoot) . ' && ' . $command, $status);
+        }
         $filesDuration = microtime(true) - $filesStarted;
         if ($status !== 0) {
             $this->writeMessage($output, '<error>Копирование проекта завершилось с ошибкой.</error>');
             return Command::FAILURE;
         }
+        if (!is_dir($metadata)) mkdir($metadata, 0775, true);
+        file_put_contents(join_path($metadata, 'project.yaml'), Yaml::dump(['meta' => ['schema' => 'project-meta', 'version' => 0.1], 'data' => ['project' => ['name' => $name]]], 4, 2));
         $databaseDuration = 0.0;
         if ($dbms !== []) {
             $databaseStarted = microtime(true);
@@ -234,6 +243,36 @@ final class ProjectCloneCommand extends AbstractCommand
         $mod100 = $value % 100;
         if ($mod100 >= 11 && $mod100 <= 14) return $many;
         return match ($value % 10) { 1 => $one, 2, 3, 4 => $few, default => $many };
+    }
+
+    /** @return list<string>|null */
+    private function resolveMirror(InputInterface $input, OutputInterface $output): ?array
+    {
+        if (!$input->hasParameterOption('--mirror')) return [];
+        $option = $input->getOption('mirror');
+        $modes = is_string($option) && trim($option) !== ''
+            ? array_values(array_unique(array_filter(array_map('trim', explode(',', $option)))))
+            : ['tree', 'db'];
+        if (array_diff($modes, ['tree', 'db']) !== []) {
+            $this->writeMessage($output, '<error>Опция --mirror должна содержать tree и/или db.</error>');
+            return null;
+        }
+        return $modes;
+    }
+
+    private function canReflink(string $source, string $destination): bool
+    {
+        $sourceStat = stat($source);
+        $destinationStat = stat($destination);
+        if ($sourceStat === false || $destinationStat === false || $sourceStat['dev'] !== $destinationStat['dev']) return false;
+        $type = shell_exec('stat -f -c %T -- ' . escapeshellarg($source) . ' 2>/dev/null');
+        return trim((string) $type) === 'btrfs';
+    }
+
+    private function wipeMetadata(string $destination): void
+    {
+        $metadata = join_path($destination, '.docker-cli');
+        if (is_dir($metadata) || is_link($metadata)) $this->remove($metadata);
     }
 
     /** @return list<string>|null */
