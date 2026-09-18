@@ -1,6 +1,7 @@
 /vendor/
 /build/
 /.phpunit.cache/
+/.php-cs-fixer.cache
 
 /.idea
 /resources/panel/node_modules/
