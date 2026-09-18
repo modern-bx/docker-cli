@@ -13,7 +13,6 @@ final readonly class RequestData
         public array $query,
         public ?string $login,
         public ?int $sessionStartedAt,
-    )
-    {
+    ) {
     }
 }

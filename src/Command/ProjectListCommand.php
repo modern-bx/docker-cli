@@ -13,8 +13,8 @@ final class ProjectListCommand extends AbstractCommand
 {
     public function __construct(private readonly ?ProjectRegistry $registry = null)
     {
-        parent::__construct('project:list');
-        $this->setDescription('Вывести кодовые имена зарегистрированных проектов.');
+        parent::__construct("project:list");
+        $this->setDescription("Вывести кодовые имена зарегистрированных проектов.");
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

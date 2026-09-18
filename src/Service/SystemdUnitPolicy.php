@@ -6,11 +6,11 @@ namespace DockerCli\Service;
 
 final class SystemdUnitPolicy
 {
-    private const DIRECTORY = '/etc/polkit-1/rules.d';
+    private const DIRECTORY = "/etc/polkit-1/rules.d";
 
     public function path(string $unit): string
     {
-        return self::DIRECTORY . '/50-docker-cli-' . $unit . '.rules';
+        return self::DIRECTORY . "/50-docker-cli-" . $unit . ".rules";
     }
 
     public function contents(string $unit): string|false
@@ -27,21 +27,26 @@ final class SystemdUnitPolicy
             return;
         }
 
-        $rule = sprintf(<<<'JAVASCRIPT'
-polkit.addRule(function(action, subject) {
-    if (action.id == "org.freedesktop.systemd1.manage-units" &&
-        action.lookup("unit") == %s &&
-        ["start", "stop", "restart"].indexOf(action.lookup("verb")) >= 0 &&
-        subject.user == %s) {
-        return polkit.Result.YES;
-    }
-});
+        $rule = sprintf(
+            <<<'JAVASCRIPT'
+            polkit.addRule(function(action, subject) {
+                if (action.id == "org.freedesktop.systemd1.manage-units" &&
+                    action.lookup("unit") == %s &&
+                    ["start", "stop", "restart"].indexOf(action.lookup("verb")) >= 0 &&
+                    subject.user == %s) {
+                    return polkit.Result.YES;
+                }
+            });
 
-JAVASCRIPT, json_encode($unit, JSON_THROW_ON_ERROR), json_encode($user, JSON_THROW_ON_ERROR));
+            JAVASCRIPT
+            ,
+            json_encode($unit, JSON_THROW_ON_ERROR),
+            json_encode($user, JSON_THROW_ON_ERROR),
+        );
 
         $path = $this->path($unit);
         if (@file_put_contents($path, $rule, LOCK_EX) === false || !@chmod($path, 0644)) {
-            throw new \RuntimeException(sprintf('Не удалось записать правило управления сервисом в %s.', $path));
+            throw new \RuntimeException(sprintf("Не удалось записать правило управления сервисом в %s.", $path));
         }
     }
 
@@ -49,7 +54,7 @@ JAVASCRIPT, json_encode($unit, JSON_THROW_ON_ERROR), json_encode($user, JSON_THR
     {
         $path = $this->path($unit);
         if (is_file($path) && !@unlink($path)) {
-            throw new \RuntimeException(sprintf('Не удалось удалить правило управления сервисом %s.', $path));
+            throw new \RuntimeException(sprintf("Не удалось удалить правило управления сервисом %s.", $path));
         }
     }
 

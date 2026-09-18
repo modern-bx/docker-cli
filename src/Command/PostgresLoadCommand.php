@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
-use DockerCli\Project\PostgresDumpLoader;
 use DockerCli\Project\BackupStorageLocator;
+use DockerCli\Project\PostgresDumpLoader;
 use DockerCli\Project\ProjectRegistry;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -15,88 +15,127 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class PostgresLoadCommand extends AbstractCommand
 {
-    public function __construct(private readonly ?ProjectRegistry $registry = null, private readonly ?PostgresDumpLoader $dumpLoader = null, private readonly ?BackupStorageLocator $storageLocator = null)
-    {
-        parent::__construct('postgres:load');
-        $this->setDescription('Параллельно восстановить PostgreSQL из directory-бэкапа.');
-        $this->addOption('path', null, InputOption::VALUE_REQUIRED, 'Путь к директории, созданной postgres:dump.');
-        $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Короткое имя директории бэкапа.');
-        $this->addOption('location', null, InputOption::VALUE_REQUIRED, 'Код централизованного хранилища бэкапов.');
-        $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
-        $this->addOption('jobs', 'j', InputOption::VALUE_REQUIRED, 'Число параллельных процессов.', '4');
+    public function __construct(
+        private readonly ?ProjectRegistry $registry = null,
+        private readonly ?PostgresDumpLoader $dumpLoader = null,
+        private readonly ?BackupStorageLocator $storageLocator = null,
+    ) {
+        parent::__construct("postgres:load");
+        $this->setDescription("Параллельно восстановить PostgreSQL из directory-бэкапа.");
+        $this->addOption("path", null, InputOption::VALUE_REQUIRED, "Путь к директории, созданной postgres:dump.");
+        $this->addOption("name", null, InputOption::VALUE_REQUIRED, "Короткое имя директории бэкапа.");
+        $this->addOption("location", null, InputOption::VALUE_REQUIRED, "Код централизованного хранилища бэкапов.");
+        $this->addOption("project", null, InputOption::VALUE_REQUIRED, "Код зарегистрированного проекта.");
+        $this->addOption("jobs", "j", InputOption::VALUE_REQUIRED, "Число параллельных процессов.", "4");
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $registry = $this->registry ?? new ProjectRegistry();
-        $project = $input->getOption('project') ?: $registry->projectNameFromContext();
+        $project = $input->getOption("project") ?: $registry->projectNameFromContext();
         if (!is_string($project) || !$registry->hasProject($project)) {
-            $this->writeMessage($output, '<error>Укажите зарегистрированный проект через --project или запустите команду из проекта.</error>');
+            $this->writeMessage(
+                $output,
+                "<error>Укажите зарегистрированный проект " .
+                    "через --project или запустите команду из " .
+                    "проекта.</error>",
+            );
             return Command::FAILURE;
         }
         if ($registry->isProjectProtected($project)) {
-            $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $project));
+            $this->writeMessage(
+                $output,
+                sprintf('<error>Проект "%s" защищен. Изменение его данных ' . "запрещено.</error>", $project),
+            );
             return Command::FAILURE;
         }
-        $jobs = filter_var($input->getOption('jobs'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $jobs = filter_var($input->getOption("jobs"), FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]]);
         if ($jobs === false) {
-            $this->writeMessage($output, '<error>Опция --jobs должна быть положительным целым числом.</error>');
+            $this->writeMessage($output, "<error>Опция --jobs должна быть положительным " . "целым числом.</error>");
             return Command::INVALID;
         }
-        $config = $registry->readProjectConfig($project)['data']['databases']['postgres'] ?? [];
-        $database = $config['database'] ?? $project;
-        $owner = $config['username'] ?? $database;
-        if (!is_string($database) || $database === '' || !is_string($owner) || $owner === '') {
-            $this->writeMessage($output, sprintf('<error>В конфигурации проекта "%s" некорректно задана база PostgreSQL.</error>', $project));
+        $config = $registry->readProjectConfig($project)["data"]["databases"]["postgres"] ?? [];
+        $database = $config["database"] ?? $project;
+        $owner = $config["username"] ?? $database;
+        if (!is_string($database) || $database === "" || !is_string($owner) || $owner === "") {
+            $this->writeMessage(
+                $output,
+                sprintf(
+                    '<error>В конфигурации проекта "%s" некорректно ' . "задана база PostgreSQL.</error>",
+                    $project,
+                ),
+            );
             return Command::FAILURE;
         }
-        $name = $input->getOption('name');
-        $path = $input->getOption('path');
-        $location = $input->getOption('location');
+        $name = $input->getOption("name");
+        $path = $input->getOption("path");
+        $location = $input->getOption("location");
         if (($name === null) === ($path === null)) {
-            $this->writeMessage($output, '<error>Укажите ровно одну из опций --name или --path.</error>');
+            $this->writeMessage($output, "<error>Укажите ровно одну из опций --name или --path.</error>");
             return Command::INVALID;
         }
-        if ($name !== null && (!is_string($name) || $name === '' || basename($name) !== $name)) {
-            $this->writeMessage($output, '<error>Опция --name должна содержать короткое имя директории бэкапа.</error>');
+        if ($name !== null && (!is_string($name) || $name === "" || basename($name) !== $name)) {
+            $this->writeMessage(
+                $output,
+                "<error>Опция --name должна содержать короткое " . "имя директории бэкапа.</error>",
+            );
             return Command::INVALID;
         }
-        if ($path !== null && (!is_string($path) || $path === '')) {
-            $this->writeMessage($output, '<error>Опция --path должна содержать путь к директории бэкапа.</error>');
+        if ($path !== null && (!is_string($path) || $path === "")) {
+            $this->writeMessage($output, "<error>Опция --path должна содержать путь к " . "директории бэкапа.</error>");
             return Command::INVALID;
         }
-        if ($location !== null && (!is_string($location) || $location === '' || $path !== null)) {
-            $this->writeMessage($output, '<error>Опцию --location можно использовать только вместе с --name.</error>');
+        if ($location !== null && (!is_string($location) || $location === "" || $path !== null)) {
+            $this->writeMessage(
+                $output,
+                "<error>Опцию --location можно использовать только " . "вместе с --name.</error>",
+            );
             return Command::INVALID;
         }
         try {
-            $backupRoot = $location === null ? '.docker-cli/backups/postgres' : ($this->storageLocator ?? new BackupStorageLocator())->databaseDirectory($location, 'postgres');
+            $backupRoot =
+                $location === null
+                    ? ".docker-cli/backups/postgres"
+                    : ($this->storageLocator ?? new BackupStorageLocator())->databaseDirectory($location, "postgres");
         } catch (\InvalidArgumentException $exception) {
-            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, "<error>" . $exception->getMessage() . "</error>");
             return Command::INVALID;
         }
-        $path = realpath($path ?? sprintf('%s/%s', $backupRoot, $name));
-        if ($path === false || !is_file($path . '/toc.dat')) {
-            $this->writeMessage($output, '<error>Указанная директория не является directory-бэкапом pg_dump.</error>');
+        $path = realpath($path ?? sprintf("%s/%s", $backupRoot, $name));
+        if ($path === false || !is_file($path . "/toc.dat")) {
+            $this->writeMessage(
+                $output,
+                "<error>Указанная директория не является " . "directory-бэкапом pg_dump.</error>",
+            );
             return Command::FAILURE;
         }
-        $metadata = json_decode((string) @file_get_contents($path . '/docker-cli.json'), true);
-        if (is_array($metadata) && (($metadata['project'] ?? null) !== $project || ($metadata['database'] ?? null) !== $database)) {
-            $this->writeMessage($output, '<error>Бэкап создан для другого проекта или базы данных.</error>');
+        $metadata = json_decode((string) @file_get_contents($path . "/docker-cli.json"), true);
+        if (
+            is_array($metadata) &&
+            (($metadata["project"] ?? null) !== $project || ($metadata["database"] ?? null) !== $database)
+        ) {
+            $this->writeMessage($output, "<error>Бэкап создан для другого проекта или " . "базы данных.</error>");
             return Command::FAILURE;
         }
         try {
             $code = ($this->dumpLoader ?? new PostgresDumpLoader())->load($database, $owner, $path, $jobs, $output);
         } catch (MissingConfigException) {
-            $this->writeMessage($output, '<error>Системная конфигурация не инициализирована.</error>');
+            $this->writeMessage($output, "<error>Системная конфигурация не инициализирована.</error>");
             return Command::FAILURE;
         }
         if ($code === Command::SUCCESS) {
-            CommandContext::fromEnvironment($this, $output)->addMessage(new Message(
-                sprintf('PostgreSQL-база "%s" проекта "%s" восстановлена из бэкапа "%s".', $database, $project, basename($path)),
-                MessageLevel::Info,
-                notify: true,
-            ));
+            CommandContext::fromEnvironment($this, $output)->addMessage(
+                new Message(
+                    sprintf(
+                        'PostgreSQL-база "%s" проекта "%s" восстановлена из бэкапа "%s".',
+                        $database,
+                        $project,
+                        basename($path),
+                    ),
+                    MessageLevel::Info,
+                    notify: true,
+                ),
+            );
         }
 
         return $code;

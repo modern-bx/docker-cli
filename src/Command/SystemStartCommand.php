@@ -21,17 +21,24 @@ final class SystemStartCommand extends AbstractCommand
     public function __construct(?TranslatorInterface $translator = null)
     {
         $this->translator = $translator ?? TranslatorFactory::create();
-        parent::__construct('system:start');
-        $this->setAliases(['start']);
-        $this->setDescription($this->translator->trans('command.start.description'));
-        $this->addOption('no-rebuild-images', null, InputOption::VALUE_NONE, 'Не собирать образы, даже если Dockerfile или Compose-конфигурация изменились.');
+        parent::__construct("system:start");
+        $this->setAliases(["start"]);
+        $this->setDescription($this->translator->trans("command.start.description"));
+        $this->addOption(
+            "no-rebuild-images",
+            null,
+            InputOption::VALUE_NONE,
+            "Не собирать образы, даже если Dockerfile или " . "Compose-конфигурация изменились.",
+        );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $arguments = ['-d'];
-        if ($input->getOption('no-rebuild-images')) $arguments[] = '--no-build';
+        $arguments = ["-d"];
+        if ($input->getOption("no-rebuild-images")) {
+            $arguments[] = "--no-build";
+        }
 
-        return $this->runOperation(new SystemCompose(), 'up', $arguments, $output, $this->translator);
+        return $this->runOperation(new SystemCompose(), "up", $arguments, $output, $this->translator);
     }
 }

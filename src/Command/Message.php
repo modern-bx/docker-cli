@@ -13,7 +13,7 @@ final class Message
     private bool $notify;
     private bool $console = true;
 
-    public function __construct(string $message, MessageLevel|string $level = 'info', bool $notify = false)
+    public function __construct(string $message, MessageLevel|string $level = "info", bool $notify = false)
     {
         $this->message = $message;
         $this->level = is_string($level) ? MessageLevel::from($level) : $level;

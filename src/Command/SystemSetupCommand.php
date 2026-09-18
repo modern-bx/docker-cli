@@ -14,22 +14,30 @@ final class SystemSetupCommand extends SystemUserCommand
 {
     public function __construct(private readonly ?SudoersManager $sudoers = null)
     {
-        parent::__construct('system:setup');
-        $this->setDescription('Настроить системные права для работы docker-cli.');
-        $this->addOption('user', null, InputOption::VALUE_REQUIRED, 'Логин пользователя; по умолчанию пользователь, вызвавший sudo.');
-        $this->addOption('update', null, InputOption::VALUE_NONE, 'Перезаписать существующую конфигурацию.');
+        parent::__construct("system:setup");
+        $this->setDescription("Настроить системные права для работы docker-cli.");
+        $this->addOption(
+            "user",
+            null,
+            InputOption::VALUE_REQUIRED,
+            "Логин пользователя; по умолчанию " . "пользователь, вызвавший sudo.",
+        );
+        $this->addOption("update", null, InputOption::VALUE_NONE, "Перезаписать существующую конфигурацию.");
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         try {
             $user = $this->resolveUser($input);
-            $file = ($this->sudoers ?? new SudoersManager())->setup($user, (bool) $input->getOption('update'));
+            $file = ($this->sudoers ?? new SudoersManager())->setup($user, (bool) $input->getOption("update"));
         } catch (\RuntimeException $exception) {
-            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, "<error>" . $exception->getMessage() . "</error>");
             return Command::FAILURE;
         }
-        $this->writeMessage($output, sprintf('<info>Права sudo для пользователя "%s" настроены в "%s".</info>', $user, $file));
+        $this->writeMessage(
+            $output,
+            sprintf('<info>Права sudo для пользователя "%s" настроены в "%s".</info>', $user, $file),
+        );
 
         return Command::SUCCESS;
     }

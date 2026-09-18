@@ -19,6 +19,10 @@ namespace Acme\Cli\Service;
 ## 2. Формат и структура
 
 - 4 пробела; tab запрещён.
+- PSR-2/PSR-12 имеют приоритет для расположения фигурных скобок классов, методов и функций.
+- Стиль K&R применяется только там, где он не конфликтует с PSR-2/PSR-12: для управляющих конструкций и
+  анонимных функций открывающая скобка остаётся на той же строке.
+- Максимальная длина строки — 120 символов; более длинные выражения MUST быть аккуратно перенесены.
 - LF, UTF-8, final newline.
 - Один основной class/interface/trait/enum на файл.
 - Namespace соответствует PSR-4 пути.
@@ -52,8 +56,7 @@ PHPDoc не должен повторять native types без добавочн
 Пример:
 
 ```php
-final readonly class ExportRequest
-{
+final readonly class ExportRequest {
     public function __construct(
         public string $format,
         public string $destination,

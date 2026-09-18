@@ -30,17 +30,12 @@ final class FrameworkDetectionService
     /** @return list<FrameworkDetectorInterface> */
     private static function defaultDetectors(): array
     {
-        return [
-            new Bitrix24Detector(),
-            new BitrixDetector(),
-            new LaravelDetector(),
-            new SymfonyDetector(),
-        ];
+        return [new Bitrix24Detector(), new BitrixDetector(), new LaravelDetector(), new SymfonyDetector()];
     }
 
     public function detect(?string $projectRoot = null): ?DetectedFramework
     {
-        $projectRoot = $this->normalizeProjectRoot($projectRoot ?? getcwd() ?: '.');
+        $projectRoot = $this->normalizeProjectRoot($projectRoot ?? getcwd() ?: ".");
 
         do {
             foreach ($this->detectors as $detector) {
@@ -63,7 +58,9 @@ final class FrameworkDetectionService
     {
         $realPath = realpath($projectRoot);
         if ($realPath === false || !is_dir($realPath)) {
-            throw new \InvalidArgumentException(sprintf('Project root "%s" does not exist or is not a directory.', $projectRoot));
+            throw new \InvalidArgumentException(
+                sprintf('Project root "%s" does not exist or is not a directory.', $projectRoot),
+            );
         }
 
         return rtrim($realPath, DIRECTORY_SEPARATOR);

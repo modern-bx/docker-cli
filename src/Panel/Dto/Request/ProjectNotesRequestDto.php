@@ -18,10 +18,14 @@ final readonly class ProjectNotesRequestDto implements RequestDto
 
     public static function fromRequest(RequestData $request): static
     {
-        if (!is_array($request->body['tags'] ?? null) || !is_string($request->body['description'] ?? null)) {
-            throw new RequestValidationException('Некорректные данные заметок.');
+        if (!is_array($request->body["tags"] ?? null) || !is_string($request->body["description"] ?? null)) {
+            throw new RequestValidationException("Некорректные данные заметок.");
         }
 
-        return new static(rawurldecode($request->route['name']), array_values($request->body['tags']), $request->body['description']);
+        return new static(
+            rawurldecode($request->route["name"]),
+            array_values($request->body["tags"]),
+            $request->body["description"],
+        );
     }
 }

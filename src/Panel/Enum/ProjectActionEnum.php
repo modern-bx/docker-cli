@@ -6,12 +6,12 @@ namespace DockerCli\Panel\Enum;
 
 enum ProjectActionEnum: string
 {
-    public const ROUTE_PATTERN = 'enable|disable|wipe|delete';
+    public const ROUTE_PATTERN = "enable|disable|wipe|delete";
 
-    case Enable = 'enable';
-    case Disable = 'disable';
-    case Wipe = 'wipe';
-    case Delete = 'delete';
+    case Enable = "enable";
+    case Disable = "disable";
+    case Wipe = "wipe";
+    case Delete = "delete";
 
     public static function isEnable(self|string $action): bool
     {

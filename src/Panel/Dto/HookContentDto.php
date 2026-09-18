@@ -13,6 +13,6 @@ final readonly class HookContentDto implements \JsonSerializable
     /** @return array{content: string} */
     public function jsonSerialize(): array
     {
-        return ['content' => $this->content];
+        return ["content" => $this->content];
     }
 }

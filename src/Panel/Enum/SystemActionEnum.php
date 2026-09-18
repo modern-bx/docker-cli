@@ -6,11 +6,11 @@ namespace DockerCli\Panel\Enum;
 
 enum SystemActionEnum: string
 {
-    public const ROUTE_PATTERN = 'start|stop|restart';
+    public const ROUTE_PATTERN = "start|stop|restart";
 
-    case Start = 'start';
-    case Stop = 'stop';
-    case Restart = 'restart';
+    case Start = "start";
+    case Stop = "stop";
+    case Restart = "restart";
 
     public static function isStart(self|string $action): bool
     {

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace DockerCli\Panel;
 
-use Symfony\Component\Yaml\Yaml;
-
 use function DockerCli\Util\join_path;
+
+use Symfony\Component\Yaml\Yaml;
 
 final class TokenRepository
 {
@@ -15,8 +15,8 @@ final class TokenRepository
     public function __construct(?string $directory = null)
     {
         if ($directory === null) {
-            $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
-            $directory = join_path($home, '.config', 'docker-cli', 'state', 'panel', 'sessions', 'tokens');
+            $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
+            $directory = join_path($home, ".config", "docker-cli", "state", "panel", "sessions", "tokens");
         }
         $this->directory = $directory;
     }
@@ -24,26 +24,26 @@ final class TokenRepository
     public function store(string $token, string $jti, string $login, int $issuedAt, int $expiresAt): void
     {
         $this->ensureDirectory();
-        $lock = fopen(join_path($this->directory, '.lock'), 'c+');
+        $lock = fopen(join_path($this->directory, ".lock"), "c+");
         if ($lock === false || !flock($lock, LOCK_EX)) {
-            throw new \RuntimeException('Unable to lock token directory.');
+            throw new \RuntimeException("Unable to lock token directory.");
         }
         try {
             $counter = 0;
             do {
                 if ($counter > 999) {
-                    throw new \RuntimeException('Unable to select a unique token filename.');
+                    throw new \RuntimeException("Unable to select a unique token filename.");
                 }
-                $file = join_path($this->directory, sprintf('%d.%03d.%s.yaml', $issuedAt * 1_000, $counter++, $login));
+                $file = join_path($this->directory, sprintf("%d.%03d.%s.yaml", $issuedAt * 1_000, $counter++, $login));
             } while (file_exists($file));
             $data = [
-                'meta' => ['schema' => 'token.jwt', 'version' => 0.1],
-                'token.jwt' => [
-                    'id' => $jti,
-                    'login' => $login,
-                    'issued_at' => $issuedAt,
-                    'expires_at' => $expiresAt,
-                    'sha256' => hash('sha256', $token),
+                "meta" => ["schema" => "token.jwt", "version" => 0.1],
+                "token.jwt" => [
+                    "id" => $jti,
+                    "login" => $login,
+                    "issued_at" => $issuedAt,
+                    "expires_at" => $expiresAt,
+                    "sha256" => hash("sha256", $token),
                 ],
             ];
             if (file_put_contents($file, Yaml::dump($data, 3, 2), LOCK_EX) === false) {
@@ -60,15 +60,17 @@ final class TokenRepository
     {
         $now ??= time();
         foreach ($this->records() as [$file, $record]) {
-            if (($record['expires_at'] ?? 0) <= $now) {
+            if (($record["expires_at"] ?? 0) <= $now) {
                 @unlink($file);
                 continue;
             }
-            if (($record['id'] ?? null) === $jti
-                && ($record['login'] ?? null) === $login
-                && ($record['expires_at'] ?? null) === $expiresAt
-                && is_string($record['sha256'] ?? null)
-                && hash_equals($record['sha256'], hash('sha256', $token))) {
+            if (
+                ($record["id"] ?? null) === $jti &&
+                ($record["login"] ?? null) === $login &&
+                ($record["expires_at"] ?? null) === $expiresAt &&
+                is_string($record["sha256"] ?? null) &&
+                hash_equals($record["sha256"], hash("sha256", $token))
+            ) {
                 return true;
             }
         }
@@ -82,7 +84,7 @@ final class TokenRepository
         $lookup = array_fill_keys(array_map(UserRepository::normalizeLogin(...), $logins), true);
         $removed = 0;
         foreach ($this->records() as [$file, $record]) {
-            if (is_string($record['login'] ?? null) && isset($lookup[$record['login']]) && @unlink($file)) {
+            if (is_string($record["login"] ?? null) && isset($lookup[$record["login"]]) && @unlink($file)) {
                 ++$removed;
             }
         }
@@ -93,22 +95,30 @@ final class TokenRepository
     /** @return list<array{string, array<string, mixed>}> */
     private function records(): array
     {
-        if (!is_dir($this->directory)) return [];
+        if (!is_dir($this->directory)) {
+            return [];
+        }
         $records = [];
         foreach (scandir($this->directory) ?: [] as $name) {
-            if (!str_ends_with($name, '.yaml')) continue;
+            if (!str_ends_with($name, ".yaml")) {
+                continue;
+            }
             $file = join_path($this->directory, $name);
             try {
                 $data = Yaml::parseFile($file);
             } catch (\Throwable) {
                 continue;
             }
-            $record = is_array($data)
-                && ($data['meta']['schema'] ?? null) === 'token.jwt'
-                && ($data['meta']['version'] ?? null) === 0.1
-                && is_array($data['token.jwt'] ?? null)
-                ? $data['token.jwt'] : null;
-            if (is_array($record)) $records[] = [$file, $record];
+            $record =
+                is_array($data) &&
+                ($data["meta"]["schema"] ?? null) === "token.jwt" &&
+                ($data["meta"]["version"] ?? null) === 0.1 &&
+                is_array($data["token.jwt"] ?? null)
+                    ? $data["token.jwt"]
+                    : null;
+            if (is_array($record)) {
+                $records[] = [$file, $record];
+            }
         }
         return $records;
     }

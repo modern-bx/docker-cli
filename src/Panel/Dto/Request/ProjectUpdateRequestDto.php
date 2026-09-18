@@ -12,30 +12,51 @@ use DockerCli\Panel\Http\RequestValidationException;
 final readonly class ProjectUpdateRequestDto implements RequestDto
 {
     /** @param list<string>|null $dedicatedDatabases */
-    public function __construct(public string $project, public ?string $name, public ?string $language, public ?string $languageVersion, public ?string $framework, public ?array $dedicatedDatabases, public string $locationMysql, public string $locationPostgres)
-    {
+    public function __construct(
+        public string $project,
+        public ?string $name,
+        public ?string $language,
+        public ?string $languageVersion,
+        public ?string $framework,
+        public ?array $dedicatedDatabases,
+        public string $locationMysql,
+        public string $locationPostgres,
+    ) {
     }
 
     public static function fromRequest(RequestData $request): static
     {
-        foreach (['name', 'language', 'languageVersion', 'framework'] as $field) {
+        foreach (["name", "language", "languageVersion", "framework"] as $field) {
             if (array_key_exists($field, $request->body) && !is_string($request->body[$field])) {
-                throw new RequestValidationException('Параметры проекта должны быть строками.');
+                throw new RequestValidationException("Параметры проекта должны быть строками.");
             }
         }
-        $dedicated = $request->body['dedicatedDatabases'] ?? null;
-        if ($dedicated !== null && (!is_array($dedicated) || !array_is_list($dedicated) || array_filter($dedicated, static fn (mixed $item): bool => !is_string($item) || !in_array($item, ['mysql', 'postgres'], true)) !== [] || count(array_unique($dedicated)) !== count($dedicated))) {
-            throw new RequestValidationException('Некорректный список выделенных СУБД.');
+        $dedicated = $request->body["dedicatedDatabases"] ?? null;
+        if (
+            $dedicated !== null &&
+            (!is_array($dedicated) ||
+                !array_is_list($dedicated) ||
+                array_filter(
+                    $dedicated,
+                    static fn (mixed $item): bool => !is_string($item) || !in_array($item, ["mysql", "postgres"], true),
+                ) !== [] ||
+                count(array_unique($dedicated)) !== count($dedicated))
+        ) {
+            throw new RequestValidationException("Некорректный список выделенных СУБД.");
         }
-        $locationMysql = $request->body['locationMysql'] ?? 'system';
-        $locationPostgres = $request->body['locationPostgres'] ?? 'system';
-        if (!is_string($locationMysql) || !is_string($locationPostgres)) throw new RequestValidationException('Некорректное расположение БД.');
+        $locationMysql = $request->body["locationMysql"] ?? "system";
+        $locationPostgres = $request->body["locationPostgres"] ?? "system";
+        if (!is_string($locationMysql) || !is_string($locationPostgres)) {
+            throw new RequestValidationException("Некорректное расположение БД.");
+        }
         return new static(
-            rawurldecode($request->route['name']),
-            isset($request->body['name']) && $request->body['name'] !== '' ? $request->body['name'] : null,
-            isset($request->body['language']) && $request->body['language'] !== '' ? $request->body['language'] : null,
-            isset($request->body['languageVersion']) && $request->body['languageVersion'] !== '' ? $request->body['languageVersion'] : null,
-            array_key_exists('framework', $request->body) ? $request->body['framework'] : null,
+            rawurldecode($request->route["name"]),
+            isset($request->body["name"]) && $request->body["name"] !== "" ? $request->body["name"] : null,
+            isset($request->body["language"]) && $request->body["language"] !== "" ? $request->body["language"] : null,
+            isset($request->body["languageVersion"]) && $request->body["languageVersion"] !== ""
+                ? $request->body["languageVersion"]
+                : null,
+            array_key_exists("framework", $request->body) ? $request->body["framework"] : null,
             $dedicated,
             $locationMysql,
             $locationPostgres,

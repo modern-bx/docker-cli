@@ -16,6 +16,6 @@ final readonly class AssetRequestDto implements RequestDto
 
     public static function fromRequest(RequestData $request): static
     {
-        return new static($request->route['path'] ?? 'index.html');
+        return new static($request->route["path"] ?? "index.html");
     }
 }

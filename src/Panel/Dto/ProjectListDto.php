@@ -15,6 +15,6 @@ final readonly class ProjectListDto implements \JsonSerializable
     /** @return array{projects: list<ProjectDto>} */
     public function jsonSerialize(): array
     {
-        return ['projects' => $this->projects];
+        return ["projects" => $this->projects];
     }
 }

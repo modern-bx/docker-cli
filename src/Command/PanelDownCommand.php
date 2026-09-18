@@ -13,8 +13,8 @@ final class PanelDownCommand extends AbstractCommand
 {
     public function __construct(private readonly SystemdService $service = new SystemdService())
     {
-        parent::__construct('panel:down');
-        $this->setDescription('Остановить и удалить systemd-сервис административной панели.');
+        parent::__construct("panel:down");
+        $this->setDescription("Остановить и удалить systemd-сервис " . "административной панели.");
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -22,13 +22,13 @@ final class PanelDownCommand extends AbstractCommand
         try {
             $this->service->remove();
         } catch (\RuntimeException $exception) {
-            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, "<error>" . $exception->getMessage() . "</error>");
             return Command::FAILURE;
         }
 
-        $this->writeMessage($output, sprintf('<info>Сервис %s остановлен и отключён.</info>', SystemdService::NAME));
-        $this->writeMessage($output, sprintf('<info>Файл конфигурации %s удалён.</info>', SystemdService::UNIT_PATH));
-        $this->writeMessage($output, '<info>Конфигурация systemd перечитана.</info>');
+        $this->writeMessage($output, sprintf("<info>Сервис %s остановлен и отключён.</info>", SystemdService::NAME));
+        $this->writeMessage($output, sprintf("<info>Файл конфигурации %s удалён.</info>", SystemdService::UNIT_PATH));
+        $this->writeMessage($output, "<info>Конфигурация systemd перечитана.</info>");
 
         return Command::SUCCESS;
     }

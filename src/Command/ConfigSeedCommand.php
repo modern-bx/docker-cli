@@ -21,9 +21,9 @@ final class ConfigSeedCommand extends AbstractCommand
     public function __construct(?TranslatorInterface $translator = null)
     {
         $this->translator = $translator ?? TranslatorFactory::create();
-        parent::__construct('config:seed');
-        $this->setDescription($this->translator->trans('command.seed.description'));
-        $this->addOption('yes', 'y', InputOption::VALUE_NONE, $this->translator->trans('command.seed.yes_option'));
+        parent::__construct("config:seed");
+        $this->setDescription($this->translator->trans("command.seed.description"));
+        $this->addOption("yes", "y", InputOption::VALUE_NONE, $this->translator->trans("command.seed.yes_option"));
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -33,32 +33,45 @@ final class ConfigSeedCommand extends AbstractCommand
         try {
             $compose->assertInitialized();
         } catch (MissingConfigException) {
-            $this->writeMessage($output, '<error>' . $this->translator->trans('config.missing', [
-                '%files%' => implode(', ', $compose->missingFiles()),
-                '%directory%' => $compose->directory(),
-            ]) . '</error>');
+            $this->writeMessage(
+                $output,
+                "<error>" .
+                    $this->translator->trans("config.missing", [
+                        "%files%" => implode(", ", $compose->missingFiles()),
+                        "%directory%" => $compose->directory(),
+                    ]) .
+                    "</error>",
+            );
 
             return Command::FAILURE;
         }
 
-        if (!$input->getOption('yes')) {
-            $question = new ConfirmationQuestion($this->translator->trans('command.seed.confirm') . ' ', false);
-            if (!$this->getHelper('question')->ask($input, $output, $question)) {
-                $this->writeMessage($output, '<comment>' . $this->translator->trans('command.seed.cancelled') . '</comment>');
+        if (!$input->getOption("yes")) {
+            $question = new ConfirmationQuestion($this->translator->trans("command.seed.confirm") . " ", false);
+            if (!$this->getHelper("question")->ask($input, $output, $question)) {
+                $this->writeMessage(
+                    $output,
+                    "<comment>" . $this->translator->trans("command.seed.cancelled") . "</comment>",
+                );
 
                 return Command::SUCCESS;
             }
         }
 
         $values = $this->readEnvFile($compose->envFile());
-        $this->setDefaultIfEmpty($values, 'MYSQL_ROOT_PASSWORD', $this->randomSecret());
-        $this->setDefaultIfEmpty($values, 'MYSQL_PASSWORD', $this->randomSecret());
-        $this->setDefaultIfEmpty($values, 'POSTGRES_PASSWORD', $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "MYSQL_ROOT_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "MYSQL_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "POSTGRES_PASSWORD", $this->randomSecret());
         $this->writeEnvFile($compose->envFile(), $values);
 
-        $this->writeMessage($output, '<info>' . $this->translator->trans('command.seed.completed', [
-            '%file%' => $compose->envFile(),
-        ]) . '</info>');
+        $this->writeMessage(
+            $output,
+            "<info>" .
+                $this->translator->trans("command.seed.completed", [
+                    "%file%" => $compose->envFile(),
+                ]) .
+                "</info>",
+        );
 
         return Command::SUCCESS;
     }
@@ -69,11 +82,11 @@ final class ConfigSeedCommand extends AbstractCommand
         $values = [];
         foreach (file($file, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
             $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+            if ($line === "" || str_starts_with($line, "#") || !str_contains($line, "=")) {
                 continue;
             }
 
-            [$key, $value] = explode('=', $line, 2);
+            [$key, $value] = explode("=", $line, 2);
             $values[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
         }
 
@@ -91,23 +104,23 @@ final class ConfigSeedCommand extends AbstractCommand
         $writtenKeys = [];
         foreach ($lines as $index => $line) {
             $trimmed = trim($line);
-            if ($trimmed === '' || str_starts_with($trimmed, '#') || !str_contains($trimmed, '=')) {
+            if ($trimmed === "" || str_starts_with($trimmed, "#") || !str_contains($trimmed, "=")) {
                 continue;
             }
 
-            [$key] = explode('=', $trimmed, 2);
+            [$key] = explode("=", $trimmed, 2);
             $key = trim($key);
             if (!array_key_exists($key, $values)) {
                 continue;
             }
 
-            $lines[$index] = $key . '=' . $values[$key];
+            $lines[$index] = $key . "=" . $values[$key];
             $writtenKeys[$key] = true;
         }
 
         foreach ($this->envKeyOrder($values) as $key) {
             if (!isset($writtenKeys[$key])) {
-                $lines[] = $key . '=' . $values[$key];
+                $lines[] = $key . "=" . $values[$key];
             }
         }
 
@@ -121,49 +134,55 @@ final class ConfigSeedCommand extends AbstractCommand
     private function envKeyOrder(array $values): array
     {
         $orderedKeys = [
-            'APP_LOCALE',
-            'BASE_HOST',
-            'PROJECT_WEB_DNSDOCK_ALIAS',
-            'OPENRESTY_PORT',
-            'HTTP_AUTH_LOGIN',
-            'HTTP_AUTH_PASSWORD',
-            'PLAYWRIGHT_IP',
-            'DOCKER_CLI_NETWORK_SUBNET',
-            'HOST_UID',
-            'HOST_GID',
-            'SOURCE_IMAGE_REGISTRY',
-            'SOURCE_IMAGE_NAMESPACE',
-            'SOURCE_IMAGE_NAME',
-            'SOURCE_IMAGE_MAIN_BRANCH',
-            'SOURCE_IMAGE_TAG',
-            'SOURCE_IMAGE_DOCKER_BUILDKIT',
-            'CLOUDFLARE_DNS_API_TOKEN',
-            'ACME_EMAIL',
-            'MYSQL_ROOT_PASSWORD',
-            'MYSQL_DATABASE',
-            'MYSQL_USER',
-            'MYSQL_PASSWORD',
-            'POSTGRES_DB',
-            'POSTGRES_USER',
-            'POSTGRES_PASSWORD',
+            "APP_LOCALE",
+            "BASE_HOST",
+            "PROJECT_WEB_DNSDOCK_ALIAS",
+            "OPENRESTY_PORT",
+            "HTTP_AUTH_LOGIN",
+            "HTTP_AUTH_PASSWORD",
+            "PLAYWRIGHT_IP",
+            "DOCKER_CLI_NETWORK_SUBNET",
+            "HOST_UID",
+            "HOST_GID",
+            "SOURCE_IMAGE_REGISTRY",
+            "SOURCE_IMAGE_NAMESPACE",
+            "SOURCE_IMAGE_NAME",
+            "SOURCE_IMAGE_MAIN_BRANCH",
+            "SOURCE_IMAGE_TAG",
+            "SOURCE_IMAGE_DOCKER_BUILDKIT",
+            "CLOUDFLARE_DNS_API_TOKEN",
+            "ACME_EMAIL",
+            "MYSQL_ROOT_PASSWORD",
+            "MYSQL_DATABASE",
+            "MYSQL_USER",
+            "MYSQL_PASSWORD",
+            "POSTGRES_DB",
+            "POSTGRES_USER",
+            "POSTGRES_PASSWORD",
         ];
 
-        return array_values(array_unique(array_merge(
-            array_values(array_filter($orderedKeys, static fn (string $key): bool => array_key_exists($key, $values))),
-            array_keys($values)
-        )));
+        return array_values(
+            array_unique(
+                array_merge(
+                    array_values(
+                        array_filter($orderedKeys, static fn (string $key): bool => array_key_exists($key, $values)),
+                    ),
+                    array_keys($values),
+                ),
+            ),
+        );
     }
 
     /** @param array<string, string> $values */
     private function setDefaultIfEmpty(array &$values, string $key, string $default): void
     {
-        if (($values[$key] ?? '') === '') {
+        if (($values[$key] ?? "") === "") {
             $values[$key] = $default;
         }
     }
 
     private function randomSecret(): string
     {
-        return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+        return rtrim(strtr(base64_encode(random_bytes(32)), "+/", "-_"), "=");
     }
 }

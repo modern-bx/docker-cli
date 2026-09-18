@@ -14,21 +14,24 @@ final class ProjectShowCommand extends AbstractCommand
 {
     public function __construct(private readonly ?ProjectRegistry $registry = null)
     {
-        parent::__construct('project:show');
-        $this->setDescription('Вывести YAML-конфигурацию текущего или указанного проекта.');
-        $this->addArgument('project', InputArgument::OPTIONAL, 'Кодовое имя зарегистрированного проекта.');
+        parent::__construct("project:show");
+        $this->setDescription("Вывести YAML-конфигурацию текущего или " . "указанного проекта.");
+        $this->addArgument("project", InputArgument::OPTIONAL, "Кодовое имя зарегистрированного проекта.");
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $registry = $this->registry ?? new ProjectRegistry();
-        $project = $input->getArgument('project');
-        $projectName = is_string($project) && $project !== ''
-            ? $project
-            : $registry->projectNameFromContext();
+        $project = $input->getArgument("project");
+        $projectName = is_string($project) && $project !== "" ? $project : $registry->projectNameFromContext();
 
         if ($projectName === null) {
-            $this->writeMessage($output, '<error>Запустите команду в директории зарегистрированного проекта или укажите проект.</error>');
+            $this->writeMessage(
+                $output,
+                "<error>Запустите команду в директории " .
+                    "зарегистрированного проекта или укажите " .
+                    "проект.</error>",
+            );
 
             return Command::FAILURE;
         }
@@ -41,7 +44,10 @@ final class ProjectShowCommand extends AbstractCommand
 
         $contents = file_get_contents($registry->projectConfigFile($projectName));
         if ($contents === false) {
-            $this->writeMessage($output, sprintf('<error>Не удалось прочитать конфигурацию проекта "%s".</error>', $projectName));
+            $this->writeMessage(
+                $output,
+                sprintf("<error>Не удалось прочитать конфигурацию " . 'проекта "%s".</error>', $projectName),
+            );
 
             return Command::FAILURE;
         }

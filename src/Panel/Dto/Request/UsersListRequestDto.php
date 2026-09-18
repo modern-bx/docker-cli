@@ -16,10 +16,10 @@ final readonly class UsersListRequestDto implements RequestDto
 
     public static function fromRequest(RequestData $request): static
     {
-        $page = filter_var($request->query['page'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $pageSize = filter_var($request->query['pageSize'] ?? 25, FILTER_VALIDATE_INT);
+        $page = filter_var($request->query["page"] ?? 1, FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]]);
+        $pageSize = filter_var($request->query["pageSize"] ?? 25, FILTER_VALIDATE_INT);
         if ($page === false || !in_array($pageSize, [25, 50, 100], true)) {
-            throw new RequestValidationException('Некорректные параметры страницы.');
+            throw new RequestValidationException("Некорректные параметры страницы.");
         }
         return new static($page, $pageSize);
     }

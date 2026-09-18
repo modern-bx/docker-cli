@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Config\SystemCompose;
-use DockerCli\Panel\UserRepository;
 use DockerCli\Panel\TokenRepository;
+use DockerCli\Panel\UserRepository;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -16,33 +16,36 @@ final class PanelUserDeleteCommand extends AbstractCommand
 {
     public function __construct()
     {
-        parent::__construct('panel:user-delete');
-        $this->setDescription('Удалить пользователя административной панели.');
-        $this->addArgument('login', InputArgument::REQUIRED, 'Логин пользователя (email).');
+        parent::__construct("panel:user-delete");
+        $this->setDescription("Удалить пользователя административной панели.");
+        $this->addArgument("login", InputArgument::REQUIRED, "Логин пользователя (email).");
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $login = $input->getArgument('login');
+        $login = $input->getArgument("login");
         try {
-            $login = UserRepository::normalizeLogin(is_string($login) ? $login : '');
+            $login = UserRepository::normalizeLogin(is_string($login) ? $login : "");
         } catch (\InvalidArgumentException $exception) {
-            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, "<error>" . $exception->getMessage() . "</error>");
             return Command::INVALID;
         }
-        $salt = (new SystemCompose())->envValue('PANEL_PASSWORD_SALT');
-        if ($salt === '') {
-            $this->writeMessage($output, '<error>Соль паролей не настроена. Выполните `docker-cli config:init`.</error>');
+        $salt = (new SystemCompose())->envValue("PANEL_PASSWORD_SALT");
+        if ($salt === "") {
+            $this->writeMessage(
+                $output,
+                "<error>Соль паролей не настроена. Выполните " . "`docker-cli config:init`.</error>",
+            );
             return Command::FAILURE;
         }
         $repository = new UserRepository($salt);
         if (!$repository->delete($login)) {
-            $this->writeMessage($output, sprintf('<comment>Пользователь %s не существует.</comment>', $login));
+            $this->writeMessage($output, sprintf("<comment>Пользователь %s не существует.</comment>", $login));
             return Command::SUCCESS;
         }
         $revoked = (new TokenRepository())->revoke([$login]);
-        $this->writeMessage($output, sprintf('<info>Пользователь %s удалён.</info>', $login));
-        $this->writeMessage($output, sprintf('<info>Отозвано токенов: %d.</info>', $revoked));
+        $this->writeMessage($output, sprintf("<info>Пользователь %s удалён.</info>", $login));
+        $this->writeMessage($output, sprintf("<info>Отозвано токенов: %d.</info>", $revoked));
         return Command::SUCCESS;
     }
 }

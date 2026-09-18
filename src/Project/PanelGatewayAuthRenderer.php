@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace DockerCli\Project;
 
 use DockerCli\Config\SystemCompose;
+
 use function DockerCli\Util\join_path;
 
 final class PanelGatewayAuthRenderer
 {
-    private const PANEL_RELATIVE_PATH = 'config/panel';
-    private const HTTP_AUTH_CONFIG_FILE = 'http-auth.conf';
-    private const HTTP_AUTH_MAP_FILE = 'playwright-auth-map.conf';
-    private const HTTP_AUTH_USER_FILE = '.htpasswd';
+    private const PANEL_RELATIVE_PATH = "config/panel";
+    private const HTTP_AUTH_CONFIG_FILE = "http-auth.conf";
+    private const HTTP_AUTH_MAP_FILE = "playwright-auth-map.conf";
+    private const HTTP_AUTH_USER_FILE = ".htpasswd";
 
     public function render(): void
     {
@@ -29,11 +30,11 @@ final class PanelGatewayAuthRenderer
             $panelDirectory,
             self::HTTP_AUTH_CONFIG_FILE,
             self::HTTP_AUTH_USER_FILE,
-            '/etc/nginx/panel/' . self::HTTP_AUTH_USER_FILE
+            "/etc/nginx/panel/" . self::HTTP_AUTH_USER_FILE,
         );
 
         $mapPath = join_path($panelDirectory, self::HTTP_AUTH_MAP_FILE);
-        if ($httpAuthConfig === '') {
+        if ($httpAuthConfig === "") {
             if (is_file($mapPath)) {
                 unlink($mapPath);
             }
@@ -46,17 +47,22 @@ final class PanelGatewayAuthRenderer
     private function readEnvValues(string $envFile): array
     {
         if (!is_file($envFile)) {
-            throw new \RuntimeException(sprintf('Env file "%s" not found. Run docker-cli config:init before rendering panel auth config.', $envFile));
+            throw new \RuntimeException(
+                sprintf(
+                    'Env file "%s" not found. Run docker-cli config:init before rendering panel auth config.',
+                    $envFile,
+                ),
+            );
         }
 
         $values = [];
         foreach (file($envFile, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
             $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+            if ($line === "" || str_starts_with($line, "#") || !str_contains($line, "=")) {
                 continue;
             }
 
-            [$key, $value] = explode('=', $line, 2);
+            [$key, $value] = explode("=", $line, 2);
             $values[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
         }
 

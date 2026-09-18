@@ -15,6 +15,6 @@ final readonly class SystemStatusDto implements \JsonSerializable
     /** @return array{status: 'running'|'partial'|'stopped', services: list<SystemServiceDto>} */
     public function jsonSerialize(): array
     {
-        return ['status' => $this->status, 'services' => $this->services];
+        return ["status" => $this->status, "services" => $this->services];
     }
 }

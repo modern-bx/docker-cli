@@ -9,10 +9,12 @@ use DockerCli\Panel\Http\RequestDto;
 
 final readonly class ProjectNameRequestDto implements RequestDto
 {
-    public function __construct(public string $name) {}
+    public function __construct(public string $name)
+    {
+    }
 
     public static function fromRequest(RequestData $request): static
     {
-        return new static(rawurldecode($request->route['name']));
+        return new static(rawurldecode($request->route["name"]));
     }
 }

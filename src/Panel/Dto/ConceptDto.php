@@ -13,6 +13,6 @@ final readonly class ConceptDto implements \JsonSerializable
     /** @return array{code: string, name: string} */
     public function jsonSerialize(): array
     {
-        return ['code' => $this->code, 'name' => $this->name];
+        return ["code" => $this->code, "name" => $this->name];
     }
 }

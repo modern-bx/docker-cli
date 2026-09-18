@@ -12,7 +12,11 @@ trait DatabaseCommandInput
         if (!is_string($value)) {
             return [];
         }
-        return array_values(array_unique(array_filter(array_map('trim', explode(',', $value)), static fn (string $item): bool => $item !== '')));
+        return array_values(
+            array_unique(
+                array_filter(array_map("trim", explode(",", $value)), static fn (string $item): bool => $item !== ""),
+            ),
+        );
     }
 
     /** @return list<string>|null */

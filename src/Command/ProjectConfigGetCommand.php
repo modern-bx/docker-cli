@@ -15,9 +15,13 @@ final class ProjectConfigGetCommand extends AbstractCommand
 {
     public function __construct(private readonly ?ProjectRegistry $registry = null)
     {
-        parent::__construct('project:config-get');
-        $this->setDescription('Вывести значение из конфигурации текущего проекта.');
-        $this->addArgument('path', InputArgument::REQUIRED, 'Путь внутри data проекта, например databases.mysql.password.');
+        parent::__construct("project:config-get");
+        $this->setDescription("Вывести значение из конфигурации текущего проекта.");
+        $this->addArgument(
+            "path",
+            InputArgument::REQUIRED,
+            "Путь внутри data проекта, например databases.mysql.password.",
+        );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -25,19 +29,25 @@ final class ProjectConfigGetCommand extends AbstractCommand
         $registry = $this->registry ?? new ProjectRegistry();
         $projectName = $registry->projectNameFromContext();
         if ($projectName === null || !$registry->hasProject($projectName)) {
-            $this->writeMessage($output, '<error>Запустите команду в директории зарегистрированного проекта.</error>');
+            $this->writeMessage(
+                $output,
+                "<error>Запустите команду в директории " . "зарегистрированного проекта.</error>",
+            );
             return Command::FAILURE;
         }
 
-        $path = $input->getArgument('path');
+        $path = $input->getArgument("path");
         if (!is_string($path) || !$this->isValidPath($path)) {
-            $this->writeMessage($output, '<error>Путь должен содержать непустые сегменты, разделенные точками.</error>');
+            $this->writeMessage(
+                $output,
+                "<error>Путь должен содержать непустые " . "сегменты, разделенные точками.</error>",
+            );
             return Command::FAILURE;
         }
 
         $config = $registry->readProjectConfig($projectName);
         $found = false;
-        $value = $this->getPath($config['data'] ?? [], explode('.', $path), $found);
+        $value = $this->getPath($config["data"] ?? [], explode(".", $path), $found);
         if (!$found) {
             $this->writeMessage($output, sprintf('<error>Путь "%s" не найден в конфигурации проекта.</error>', $path));
             return Command::FAILURE;
@@ -49,12 +59,12 @@ final class ProjectConfigGetCommand extends AbstractCommand
         }
 
         if (is_bool($value)) {
-            $output->writeln($value ? 'true' : 'false');
+            $output->writeln($value ? "true" : "false");
             return Command::SUCCESS;
         }
 
         if ($value === null) {
-            $output->writeln('null');
+            $output->writeln("null");
             return Command::SUCCESS;
         }
 
@@ -65,7 +75,7 @@ final class ProjectConfigGetCommand extends AbstractCommand
 
     private function isValidPath(string $path): bool
     {
-        return $path !== '' && !str_starts_with($path, '.') && !str_ends_with($path, '.') && !str_contains($path, '..');
+        return $path !== "" && !str_starts_with($path, ".") && !str_ends_with($path, ".") && !str_contains($path, "..");
     }
 
     /** @param list<string> $segments */

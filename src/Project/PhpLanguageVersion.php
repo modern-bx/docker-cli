@@ -8,12 +8,12 @@ use DockerCli\Config\SystemCompose;
 
 final class PhpLanguageVersion
 {
-    public const DEFAULT = '8.2';
-    public const SUPPORTED = ['8.2', '8.3', '8.4', '8.5'];
+    public const DEFAULT = "8.2";
+    public const SUPPORTED = ["8.2", "8.3", "8.4", "8.5"];
 
     public static function default(?SystemCompose $compose = null): string
     {
-        $version = ($compose ?? new SystemCompose())->envValue('PHP_DEFAULT_VERSION', self::DEFAULT);
+        $version = ($compose ?? new SystemCompose())->envValue("PHP_DEFAULT_VERSION", self::DEFAULT);
 
         return self::isSupported($version) ? $version : self::DEFAULT;
     }

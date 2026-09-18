@@ -14,6 +14,6 @@ final readonly class QueueStateDto implements \JsonSerializable
     /** @return array{name: string, paused: bool, items: list<QueueItemDto>} */
     public function jsonSerialize(): array
     {
-        return ['name' => $this->name, 'paused' => $this->paused, 'items' => $this->items];
+        return ["name" => $this->name, "paused" => $this->paused, "items" => $this->items];
     }
 }

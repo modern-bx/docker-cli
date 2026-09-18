@@ -14,6 +14,6 @@ final readonly class ErrorResponseDto implements \JsonSerializable
     /** @return array{error: string} */
     public function jsonSerialize(): array
     {
-        return ['error' => $this->error];
+        return ["error" => $this->error];
     }
 }

@@ -11,7 +11,7 @@ final class ZipArchiveManager
 {
     public function compress(string $sqlFile): string
     {
-        $archiveFile = $sqlFile . '.zip';
+        $archiveFile = $sqlFile . ".zip";
         $archive = new ZipArchive();
         if ($archive->open($archiveFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             throw new RuntimeException(sprintf('Не удалось создать архив "%s".', $archiveFile));
@@ -43,7 +43,11 @@ final class ZipArchiveManager
         $entries = [];
         for ($index = 0; $index < $archive->numFiles; ++$index) {
             $name = $archive->getNameIndex($index);
-            if (!is_string($name) || basename($name) !== $name || strtolower(pathinfo($name, PATHINFO_EXTENSION)) !== 'sql') {
+            if (
+                !is_string($name) ||
+                basename($name) !== $name ||
+                strtolower(pathinfo($name, PATHINFO_EXTENSION)) !== "sql"
+            ) {
                 continue;
             }
             $entries[] = [$name, $index];

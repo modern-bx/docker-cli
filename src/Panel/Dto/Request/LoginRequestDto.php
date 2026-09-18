@@ -17,11 +17,10 @@ final readonly class LoginRequestDto implements RequestDto
 
     public static function fromRequest(RequestData $request): static
     {
-        $login = $request->body['login'] ?? null;
-        $password = $request->body['password'] ?? null;
-        if (!is_string($login) || strlen($login) > 254
-            || !is_string($password) || strlen($password) > 1024) {
-            throw new RequestValidationException('Некорректный запрос.');
+        $login = $request->body["login"] ?? null;
+        $password = $request->body["password"] ?? null;
+        if (!is_string($login) || strlen($login) > 254 || !is_string($password) || strlen($password) > 1024) {
+            throw new RequestValidationException("Некорректный запрос.");
         }
 
         return new static($login, $password);

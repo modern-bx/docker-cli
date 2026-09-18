@@ -16,13 +16,13 @@ final readonly class ProjectsSettingsController
     {
     }
 
-    #[Route('GET', '/api/settings/projects', EmptyRequestDto::class, ProjectsSettingsDto::class)]
+    #[Route("GET", "/api/settings/projects", EmptyRequestDto::class, ProjectsSettingsDto::class)]
     public function get(EmptyRequestDto $request): ProjectsSettingsDto
     {
         return new ProjectsSettingsDto($this->settings->locations(), $this->settings->databaseLocations());
     }
 
-    #[Route('POST', '/api/settings/projects', ProjectsSettingsRequestDto::class, ProjectsSettingsDto::class)]
+    #[Route("POST", "/api/settings/projects", ProjectsSettingsRequestDto::class, ProjectsSettingsDto::class)]
     public function save(ProjectsSettingsRequestDto $request): ProjectsSettingsDto
     {
         try {
@@ -30,6 +30,6 @@ final readonly class ProjectsSettingsController
         } catch (\InvalidArgumentException $exception) {
             throw new RequestValidationException($exception->getMessage());
         }
-        return new ProjectsSettingsDto($settings['locations'], $settings['databaseLocations']);
+        return new ProjectsSettingsDto($settings["locations"], $settings["databaseLocations"]);
     }
 }

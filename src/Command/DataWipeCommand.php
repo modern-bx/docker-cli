@@ -18,9 +18,9 @@ final class DataWipeCommand extends AbstractCommand
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?DataInitializer $initializer = null,
     ) {
-        parent::__construct('data:wipe');
-        $this->setDescription('Очистить все таблицы в БД проекта, не удаляя БД и пользователей.');
-        $this->addArgument('project', InputArgument::OPTIONAL, 'Кодовое имя зарегистрированного проекта.');
+        parent::__construct("data:wipe");
+        $this->setDescription("Очистить все таблицы в БД проекта, не " . "удаляя БД и пользователей.");
+        $this->addArgument("project", InputArgument::OPTIONAL, "Кодовое имя зарегистрированного проекта.");
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -28,7 +28,12 @@ final class DataWipeCommand extends AbstractCommand
         $registry = $this->registry ?? new ProjectRegistry();
         $projectName = $this->resolveProjectName($input, $registry);
         if ($projectName === null) {
-            $this->writeMessage($output, '<error>Укажите код зарегистрированного проекта или запустите команду в директории зарегистрированного проекта.</error>');
+            $this->writeMessage(
+                $output,
+                "<error>Укажите код зарегистрированного " .
+                    "проекта или запустите команду в директории " .
+                    "зарегистрированного проекта.</error>",
+            );
             return Command::FAILURE;
         }
 
@@ -37,22 +42,42 @@ final class DataWipeCommand extends AbstractCommand
             return Command::FAILURE;
         }
         if ($registry->isProjectProtected($projectName)) {
-            $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
+            $this->writeMessage(
+                $output,
+                sprintf('<error>Проект "%s" защищен. Изменение его данных ' . "запрещено.</error>", $projectName),
+            );
             return Command::FAILURE;
         }
 
         $config = $registry->readProjectConfig($projectName);
-        $mysqlDatabase = $config['data']['databases']['mysql']['database'] ?? $projectName;
-        $postgresDatabase = $config['data']['databases']['postgres']['database'] ?? $projectName;
-        if (!is_string($mysqlDatabase) || $mysqlDatabase === '' || !is_string($postgresDatabase) || $postgresDatabase === '') {
-            $this->writeMessage($output, sprintf('<error>В конфигурации проекта "%s" не заданы БД MySQL или PostgreSQL.</error>', $projectName));
+        $mysqlDatabase = $config["data"]["databases"]["mysql"]["database"] ?? $projectName;
+        $postgresDatabase = $config["data"]["databases"]["postgres"]["database"] ?? $projectName;
+        if (
+            !is_string($mysqlDatabase) ||
+            $mysqlDatabase === "" ||
+            !is_string($postgresDatabase) ||
+            $postgresDatabase === ""
+        ) {
+            $this->writeMessage(
+                $output,
+                sprintf(
+                    '<error>В конфигурации проекта "%s" не заданы БД ' . "MySQL или PostgreSQL.</error>",
+                    $projectName,
+                ),
+            );
             return Command::FAILURE;
         }
 
         try {
             $code = ($this->initializer ?? new DataInitializer())->wipe($mysqlDatabase, $postgresDatabase, $output);
         } catch (MissingConfigException $exception) {
-            $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            $this->writeMessage(
+                $output,
+                sprintf(
+                    "<error>Системная конфигурация не " . "инициализирована. Отсутствуют файлы: %s.</error>",
+                    implode(", ", $exception->missingFiles()),
+                ),
+            );
             return Command::FAILURE;
         }
 
@@ -65,8 +90,8 @@ final class DataWipeCommand extends AbstractCommand
 
     private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string
     {
-        $projectName = $input->getArgument('project');
-        if (is_string($projectName) && $projectName !== '') {
+        $projectName = $input->getArgument("project");
+        if (is_string($projectName) && $projectName !== "") {
             return $projectName;
         }
 

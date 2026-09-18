@@ -17,6 +17,6 @@ final readonly class QueueItemDto implements \JsonSerializable
     /** @return array{file: string, status: string, queuedAt: string, code: string} */
     public function jsonSerialize(): array
     {
-        return ['file' => $this->file, 'status' => $this->status, 'queuedAt' => $this->queuedAt, 'code' => $this->code];
+        return ["file" => $this->file, "status" => $this->status, "queuedAt" => $this->queuedAt, "code" => $this->code];
     }
 }

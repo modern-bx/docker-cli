@@ -20,10 +20,15 @@ final class DataInitCommand extends AbstractCommand
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?DataInitializer $initializer = null,
     ) {
-        parent::__construct('data:init');
-        $this->setDescription('Создать БД и пользователя проекта во всех доступных СУБД.');
-        $this->addArgument('project', InputArgument::OPTIONAL, 'Кодовое имя зарегистрированного проекта.');
-        $this->addOption('rebuild', null, InputOption::VALUE_NONE, 'Удалить существующие БД и пользователей перед созданием.');
+        parent::__construct("data:init");
+        $this->setDescription("Создать БД и пользователя проекта во всех " . "доступных СУБД.");
+        $this->addArgument("project", InputArgument::OPTIONAL, "Кодовое имя зарегистрированного проекта.");
+        $this->addOption(
+            "rebuild",
+            null,
+            InputOption::VALUE_NONE,
+            "Удалить существующие БД и пользователей " . "перед созданием.",
+        );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -31,7 +36,12 @@ final class DataInitCommand extends AbstractCommand
         $registry = $this->registry ?? new ProjectRegistry();
         $projectName = $this->resolveProjectName($input, $registry);
         if ($projectName === null) {
-            $this->writeMessage($output, '<error>Укажите код зарегистрированного проекта или запустите команду в директории зарегистрированного проекта.</error>');
+            $this->writeMessage(
+                $output,
+                "<error>Укажите код зарегистрированного " .
+                    "проекта или запустите команду в директории " .
+                    "зарегистрированного проекта.</error>",
+            );
             return Command::FAILURE;
         }
 
@@ -43,16 +53,28 @@ final class DataInitCommand extends AbstractCommand
         $config = (new ProjectDatabaseConfig())->ensure($registry->readProjectConfig($projectName));
         $registry->writeProjectConfig($projectName, $config);
 
-        $mysqlPassword = $config['data']['databases']['mysql']['password'] ?? null;
-        $postgresPassword = $config['data']['databases']['postgres']['password'] ?? null;
+        $mysqlPassword = $config["data"]["databases"]["mysql"]["password"] ?? null;
+        $postgresPassword = $config["data"]["databases"]["postgres"]["password"] ?? null;
         if (!is_string($mysqlPassword) || !is_string($postgresPassword)) {
-            throw new \RuntimeException('Database passwords are missing from project config.');
+            throw new \RuntimeException("Database passwords are missing from project config.");
         }
 
         try {
-            $code = ($this->initializer ?? new DataInitializer())->initialize($projectName, $mysqlPassword, $postgresPassword, (bool) $input->getOption('rebuild'), $output);
+            $code = ($this->initializer ?? new DataInitializer())->initialize(
+                $projectName,
+                $mysqlPassword,
+                $postgresPassword,
+                (bool) $input->getOption("rebuild"),
+                $output,
+            );
         } catch (MissingConfigException $exception) {
-            $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+            $this->writeMessage(
+                $output,
+                sprintf(
+                    "<error>Системная конфигурация не " . "инициализирована. Отсутствуют файлы: %s.</error>",
+                    implode(", ", $exception->missingFiles()),
+                ),
+            );
             return Command::FAILURE;
         }
 
@@ -65,8 +87,8 @@ final class DataInitCommand extends AbstractCommand
 
     private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string
     {
-        $projectName = $input->getArgument('project');
-        if (is_string($projectName) && $projectName !== '') {
+        $projectName = $input->getArgument("project");
+        if (is_string($projectName) && $projectName !== "") {
             return $projectName;
         }
 

@@ -12,6 +12,6 @@ final readonly class BackupCommentDto implements \JsonSerializable
 
     public function jsonSerialize(): array
     {
-        return ['comment' => $this->comment];
+        return ["comment" => $this->comment];
     }
 }

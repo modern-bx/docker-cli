@@ -14,9 +14,12 @@ final readonly class BackupsSettingsDto implements \JsonSerializable
     {
     }
 
-    /** @return array{locations: list<array{path: string, code: string, default: bool}>, fileStrategies: list<array{name: string, code: string, include: list<string>, exclude: list<string>}>} */
+    /**
+     * @return array{locations: list<array{path: string, code: string, default: bool}>, fileStrategies:
+     * list<array{name: string, code: string, include: list<string>, exclude: list<string>}>}
+     */
     public function jsonSerialize(): array
     {
-        return ['locations' => $this->locations, 'fileStrategies' => $this->fileStrategies];
+        return ["locations" => $this->locations, "fileStrategies" => $this->fileStrategies];
     }
 }

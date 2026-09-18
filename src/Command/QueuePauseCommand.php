@@ -14,18 +14,18 @@ final class QueuePauseCommand extends AbstractCommand
 {
     public function __construct(private readonly ?QueueRepository $queues = null)
     {
-        parent::__construct('queue:pause');
-        $this->setDescription('Приостановить выборку новых элементов из очереди.');
-        $this->addOption('queue', null, InputOption::VALUE_REQUIRED, 'Код очереди.', 'default');
+        parent::__construct("queue:pause");
+        $this->setDescription("Приостановить выборку новых элементов из очереди.");
+        $this->addOption("queue", null, InputOption::VALUE_REQUIRED, "Код очереди.", "default");
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $queue = (string) $input->getOption('queue');
+        $queue = (string) $input->getOption("queue");
         try {
             ($this->queues ?? new QueueRepository())->pause($queue);
-        } catch (\InvalidArgumentException|\RuntimeException $exception) {
-            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
+        } catch (\InvalidArgumentException | \RuntimeException $exception) {
+            $this->writeMessage($output, "<error>" . $exception->getMessage() . "</error>");
             return Command::FAILURE;
         }
         $this->writeMessage($output, sprintf('<info>Очередь "%s" приостановлена.</info>', $queue));

@@ -13,11 +13,14 @@ use DockerCli\Panel\Http\UnauthorizedException;
 
 final readonly class AuthController
 {
-    public function __construct(private UserRepository $users, private JwtTokenService $tokens, private TokenRepository $tokenRepository)
-    {
+    public function __construct(
+        private UserRepository $users,
+        private JwtTokenService $tokens,
+        private TokenRepository $tokenRepository,
+    ) {
     }
 
-    #[Route('POST', '/api/auth/login', LoginRequestDto::class, AuthResponseDto::class, authenticated: false)]
+    #[Route("POST", "/api/auth/login", LoginRequestDto::class, AuthResponseDto::class, authenticated: false)]
     public function login(LoginRequestDto $request): AuthResponseDto
     {
         try {
@@ -27,22 +30,22 @@ final readonly class AuthController
             $valid = false;
         }
         if (!$valid) {
-            throw new UnauthorizedException('Неверный логин или пароль.');
+            throw new UnauthorizedException("Неверный логин или пароль.");
         }
 
         return $this->authorized($login);
     }
 
-    #[Route('GET', '/api/auth/session', SessionRequestDto::class, AuthResponseDto::class)]
+    #[Route("GET", "/api/auth/session", SessionRequestDto::class, AuthResponseDto::class)]
     public function session(SessionRequestDto $request): AuthResponseDto
     {
         if (!$this->users->contains($request->login)) {
-            throw new UnauthorizedException('Сессия истекла.');
+            throw new UnauthorizedException("Сессия истекла.");
         }
         return $this->authorized($request->login, $request->sessionStartedAt);
     }
 
-    #[Route('POST', '/api/auth/logout', SessionRequestDto::class, LogoutResponseDto::class)]
+    #[Route("POST", "/api/auth/logout", SessionRequestDto::class, LogoutResponseDto::class)]
     public function logout(SessionRequestDto $request): LogoutResponseDto
     {
         $this->tokenRepository->revoke([$request->login]);
@@ -51,6 +54,10 @@ final readonly class AuthController
 
     private function authorized(string $login, ?int $sessionStartedAt = null): AuthResponseDto
     {
-        return new AuthResponseDto($login, $this->tokens->issue($login, sessionStartedAt: $sessionStartedAt), JwtTokenService::LIFETIME);
+        return new AuthResponseDto(
+            $login,
+            $this->tokens->issue($login, sessionStartedAt: $sessionStartedAt),
+            JwtTokenService::LIFETIME,
+        );
     }
 }

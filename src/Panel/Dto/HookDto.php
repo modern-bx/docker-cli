@@ -13,6 +13,6 @@ final readonly class HookDto implements \JsonSerializable
 
     public function jsonSerialize(): array
     {
-        return ['hook' => $this->hook];
+        return ["hook" => $this->hook];
     }
 }

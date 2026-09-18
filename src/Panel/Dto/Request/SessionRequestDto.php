@@ -18,7 +18,7 @@ final readonly class SessionRequestDto implements RequestDto
     public static function fromRequest(RequestData $request): static
     {
         if ($request->login === null || $request->sessionStartedAt === null) {
-            throw new RequestValidationException('Сессия истекла.');
+            throw new RequestValidationException("Сессия истекла.");
         }
 
         return new static($request->login, $request->sessionStartedAt);

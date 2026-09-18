@@ -16,9 +16,9 @@ final readonly class QueueItemRequestDto implements RequestDto
 
     public static function fromRequest(RequestData $request): static
     {
-        $file = rawurldecode($request->route['file'] ?? '');
+        $file = rawurldecode($request->route["file"] ?? "");
         if (basename($file) !== $file || preg_match('/^[A-Za-z0-9._-]+\.yaml$/D', $file) !== 1) {
-            throw new RequestValidationException('Некорректное имя элемента очереди.');
+            throw new RequestValidationException("Некорректное имя элемента очереди.");
         }
         return new static($file);
     }

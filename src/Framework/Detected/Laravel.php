@@ -10,6 +10,6 @@ final class Laravel extends DetectedFramework
 {
     public function getDocumentRoot(): string
     {
-        return join_path($this->projectRoot, 'public');
+        return join_path($this->projectRoot, "public");
     }
 }

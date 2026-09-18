@@ -16,9 +16,9 @@ final readonly class QueueActionRequestDto implements RequestDto
 
     public static function fromRequest(RequestData $request): static
     {
-        $action = $request->route['action'] ?? '';
-        if (!in_array($action, ['pause', 'resume'], true)) {
-            throw new RequestValidationException('Неизвестное действие над очередью.');
+        $action = $request->route["action"] ?? "";
+        if (!in_array($action, ["pause", "resume"], true)) {
+            throw new RequestValidationException("Неизвестное действие над очередью.");
         }
         return new static($action);
     }

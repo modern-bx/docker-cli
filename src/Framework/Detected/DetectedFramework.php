@@ -6,9 +6,8 @@ namespace DockerCli\Framework\Detected;
 
 abstract class DetectedFramework
 {
-    public function __construct(
-        protected readonly string $projectRoot,
-    ) {
+    public function __construct(protected readonly string $projectRoot)
+    {
     }
 
     public function getProjectRoot(): string

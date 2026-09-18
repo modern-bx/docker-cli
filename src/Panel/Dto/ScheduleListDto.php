@@ -13,6 +13,6 @@ final readonly class ScheduleListDto implements \JsonSerializable
 
     public function jsonSerialize(): array
     {
-        return ['items' => $this->items];
+        return ["items" => $this->items];
     }
 }

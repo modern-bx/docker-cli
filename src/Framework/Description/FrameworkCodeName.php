@@ -6,8 +6,8 @@ namespace DockerCli\Framework\Description;
 
 enum FrameworkCodeName: string
 {
-    case Bitrix24 = 'bitrix24';
-    case Bitrix = 'bitrix';
-    case Laravel = 'laravel';
-    case Symfony = 'symfony';
+    case Bitrix24 = "bitrix24";
+    case Bitrix = "bitrix";
+    case Laravel = "laravel";
+    case Symfony = "symfony";
 }

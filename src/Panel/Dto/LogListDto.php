@@ -14,6 +14,6 @@ final readonly class LogListDto implements \JsonSerializable
     /** @return array{items: list<array<string, mixed>>, total: int, projects: list<string>} */
     public function jsonSerialize(): array
     {
-        return ['items' => $this->items, 'total' => $this->total, 'projects' => $this->projects];
+        return ["items" => $this->items, "total" => $this->total, "projects" => $this->projects];
     }
 }

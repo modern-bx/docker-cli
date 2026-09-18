@@ -7,11 +7,9 @@ namespace DockerCli\Config;
 final class MissingConfigException extends \RuntimeException
 {
     /** @param list<string> $missingFiles */
-    public function __construct(
-        private readonly array $missingFiles,
-        private readonly string $configDirectory,
-    ) {
-        parent::__construct('Docker CLI configuration files are missing.');
+    public function __construct(private readonly array $missingFiles, private readonly string $configDirectory)
+    {
+        parent::__construct("Docker CLI configuration files are missing.");
     }
 
     /** @return list<string> */

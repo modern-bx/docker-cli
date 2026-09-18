@@ -17,31 +17,44 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class DataApplyCommand extends AbstractCommand
 {
-    private const DBMS = ['mysql', 'postgres'];
+    private const DBMS = ["mysql", "postgres"];
 
     public function __construct(
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?DataInitializer $initializer = null,
     ) {
-        parent::__construct('data:apply');
-        $this->setDescription('Выполнить SQL-файлы в БД проекта.');
-        $this->addOption('dbms', null, InputOption::VALUE_REQUIRED, 'СУБД проекта: mysql или postgres.');
-        $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта.');
-        $this->addArgument('path', InputArgument::IS_ARRAY | InputArgument::REQUIRED, 'SQL-файл, ZIP-архив, директория или glob-выражение. Можно указать несколько путей.');
+        parent::__construct("data:apply");
+        $this->setDescription("Выполнить SQL-файлы в БД проекта.");
+        $this->addOption("dbms", null, InputOption::VALUE_REQUIRED, "СУБД проекта: mysql или postgres.");
+        $this->addOption("project", null, InputOption::VALUE_REQUIRED, "Код зарегистрированного проекта.");
+        $this->addArgument(
+            "path",
+            InputArgument::IS_ARRAY | InputArgument::REQUIRED,
+            "SQL-файл, ZIP-архив, директория или " . "glob-выражение. Можно указать несколько " . "путей.",
+        );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $dbms = $input->getOption('dbms');
+        $dbms = $input->getOption("dbms");
         if (!is_string($dbms) || !in_array($dbms, self::DBMS, true)) {
-            $this->writeMessage($output, '<error>Укажите поддерживаемую СУБД через --dbms: mysql или postgres.</error>');
+            $this->writeMessage(
+                $output,
+                "<error>Укажите поддерживаемую СУБД через --dbms: " . "mysql или postgres.</error>",
+            );
             return Command::FAILURE;
         }
 
         $registry = $this->registry ?? new ProjectRegistry();
         $projectName = $this->resolveProjectName($input, $registry);
         if ($projectName === null) {
-            $this->writeMessage($output, '<error>Укажите код зарегистрированного проекта через --project или запустите команду в директории зарегистрированного проекта.</error>');
+            $this->writeMessage(
+                $output,
+                "<error>Укажите код зарегистрированного " .
+                    "проекта через --project или запустите команду в " .
+                    "директории зарегистрированного " .
+                    "проекта.</error>",
+            );
             return Command::FAILURE;
         }
 
@@ -50,11 +63,14 @@ final class DataApplyCommand extends AbstractCommand
             return Command::FAILURE;
         }
         if ($registry->isProjectProtected($projectName)) {
-            $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
+            $this->writeMessage(
+                $output,
+                sprintf('<error>Проект "%s" защищен. Изменение его данных ' . "запрещено.</error>", $projectName),
+            );
             return Command::FAILURE;
         }
 
-        $paths = $input->getArgument('path');
+        $paths = $input->getArgument("path");
         if (!is_array($paths)) {
             $paths = [];
         }
@@ -67,26 +83,38 @@ final class DataApplyCommand extends AbstractCommand
             }
 
             $config = $registry->readProjectConfig($projectName);
-            $database = $config['data']['databases'][$dbms]['database'] ?? $projectName;
-            if (!is_string($database) || $database === '') {
-                $this->writeMessage($output, sprintf('<error>В конфигурации проекта "%s" не задана БД для %s.</error>', $projectName, $dbms));
+            $database = $config["data"]["databases"][$dbms]["database"] ?? $projectName;
+            if (!is_string($database) || $database === "") {
+                $this->writeMessage(
+                    $output,
+                    sprintf('<error>В конфигурации проекта "%s" не задана БД для %s.</error>', $projectName, $dbms),
+                );
                 return Command::FAILURE;
             }
 
             try {
                 $code = ($this->initializer ?? new DataInitializer())->apply($dbms, $database, $files, $output);
             } catch (MissingConfigException $exception) {
-                $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+                $this->writeMessage(
+                    $output,
+                    sprintf(
+                        "<error>Системная конфигурация не " . "инициализирована. Отсутствуют файлы: %s.</error>",
+                        implode(", ", $exception->missingFiles()),
+                    ),
+                );
                 return Command::FAILURE;
             }
 
             if ($code === Command::SUCCESS) {
-                $this->writeMessage($output, sprintf('<info>SQL-файлы применены к БД "%s" проекта "%s".</info>', $database, $projectName));
+                $this->writeMessage(
+                    $output,
+                    sprintf('<info>SQL-файлы применены к БД "%s" проекта "%s".</info>', $database, $projectName),
+                );
             }
 
             return $code;
         } catch (RuntimeException $exception) {
-            $this->writeMessage($output, sprintf('<error>%s</error>', $exception->getMessage()));
+            $this->writeMessage($output, sprintf("<error>%s</error>", $exception->getMessage()));
             return Command::FAILURE;
         } finally {
             foreach ($temporaryDirectories as $directory) {
@@ -97,8 +125,8 @@ final class DataApplyCommand extends AbstractCommand
 
     private function resolveProjectName(InputInterface $input, ProjectRegistry $registry): ?string
     {
-        $projectName = $input->getOption('project');
-        if (is_string($projectName) && $projectName !== '') {
+        $projectName = $input->getOption("project");
+        if (is_string($projectName) && $projectName !== "") {
             return $projectName;
         }
 
@@ -113,7 +141,7 @@ final class DataApplyCommand extends AbstractCommand
     {
         $files = [];
         foreach ($paths as $path) {
-            if (!is_string($path) || $path === '') {
+            if (!is_string($path) || $path === "") {
                 continue;
             }
 
@@ -128,7 +156,10 @@ final class DataApplyCommand extends AbstractCommand
                 $matches = [];
                 foreach (scandir($path) ?: [] as $name) {
                     $file = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $name;
-                    if (is_file($file) && in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['sql', 'zip'], true)) {
+                    if (
+                        is_file($file) &&
+                        in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ["sql", "zip"], true)
+                    ) {
                         $matches[] = $file;
                     }
                 }
@@ -165,16 +196,19 @@ final class DataApplyCommand extends AbstractCommand
     private function addFile(string $file, array &$files, array &$temporaryDirectories, OutputInterface $output): bool
     {
         $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-        if ($extension === 'sql') {
+        if ($extension === "sql") {
             $files[] = $this->normalizePath($file);
             return true;
         }
-        if ($extension !== 'zip') {
-            $this->writeMessage($output, sprintf('<error>Файл "%s" не является sql-файлом или zip-архивом.</error>', $file));
+        if ($extension !== "zip") {
+            $this->writeMessage(
+                $output,
+                sprintf('<error>Файл "%s" не является sql-файлом или zip-архивом.</error>', $file),
+            );
             return false;
         }
 
-        $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'docker-cli-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . "docker-cli-" . bin2hex(random_bytes(8));
         $temporaryDirectories[] = $directory;
         $extracted = (new ZipArchiveManager())->extractSqlFiles($file, $directory);
         foreach ($extracted as $sqlFile) {
@@ -186,7 +220,7 @@ final class DataApplyCommand extends AbstractCommand
 
     private function removeDirectory(string $directory): void
     {
-        foreach (glob($directory . DIRECTORY_SEPARATOR . '*') ?: [] as $file) {
+        foreach (glob($directory . DIRECTORY_SEPARATOR . "*") ?: [] as $file) {
             @unlink($file);
         }
         @rmdir($directory);

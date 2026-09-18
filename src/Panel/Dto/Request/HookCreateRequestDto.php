@@ -21,13 +21,19 @@ final readonly class HookCreateRequestDto implements RequestDto
 
     public static function fromRequest(RequestData $request): static
     {
-        $name = $request->body['name'] ?? null;
-        $enabled = $request->body['enabled'] ?? null;
-        $level = $request->body['level'] ?? null;
-        $command = $request->body['command'] ?? null;
-        $timing = $request->body['timing'] ?? null;
-        if (!is_string($name) || !is_bool($enabled) || !is_string($level) || !is_string($command) || !is_string($timing)) {
-            throw new RequestValidationException('Некорректные параметры хука.');
+        $name = $request->body["name"] ?? null;
+        $enabled = $request->body["enabled"] ?? null;
+        $level = $request->body["level"] ?? null;
+        $command = $request->body["command"] ?? null;
+        $timing = $request->body["timing"] ?? null;
+        if (
+            !is_string($name) ||
+            !is_bool($enabled) ||
+            !is_string($level) ||
+            !is_string($command) ||
+            !is_string($timing)
+        ) {
+            throw new RequestValidationException("Некорректные параметры хука.");
         }
 
         return new static($name, $enabled, $level, $command, $timing);

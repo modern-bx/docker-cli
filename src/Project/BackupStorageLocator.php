@@ -17,16 +17,16 @@ final readonly class BackupStorageLocator
     public function databaseDirectory(string $location, string $database): string
     {
         foreach (($this->settings ?? new BackupsSettingsRepository())->locations() as $storage) {
-            if ($storage['code'] === $location) {
-                return join_path($storage['path'], $database);
+            if ($storage["code"] === $location) {
+                return join_path($storage["path"], $database);
             }
         }
 
-        throw new \InvalidArgumentException(sprintf('Хранилище бэкапов с кодом «%s» не найдено.', $location));
+        throw new \InvalidArgumentException(sprintf("Хранилище бэкапов с кодом «%s» не найдено.", $location));
     }
 
     public function treeDirectory(string $location): string
     {
-        return $this->databaseDirectory($location, 'tree');
+        return $this->databaseDirectory($location, "tree");
     }
 }

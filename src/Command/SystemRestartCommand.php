@@ -21,19 +21,29 @@ final class SystemRestartCommand extends AbstractCommand
     public function __construct(?TranslatorInterface $translator = null)
     {
         $this->translator = $translator ?? TranslatorFactory::create();
-        parent::__construct('system:restart');
-        $this->setAliases(['restart']);
-        $this->setDescription($this->translator->trans('command.restart.description'));
-        $this->addOption('service', null, InputOption::VALUE_REQUIRED, 'Сервисы для перезапуска, разделённые запятыми.');
-        $this->addOption('no-rebuild-images', null, InputOption::VALUE_NONE, 'Не собирать образы при повторном запуске системы.');
+        parent::__construct("system:restart");
+        $this->setAliases(["restart"]);
+        $this->setDescription($this->translator->trans("command.restart.description"));
+        $this->addOption(
+            "service",
+            null,
+            InputOption::VALUE_REQUIRED,
+            "Сервисы для перезапуска, разделённые запятыми.",
+        );
+        $this->addOption(
+            "no-rebuild-images",
+            null,
+            InputOption::VALUE_NONE,
+            "Не собирать образы при повторном запуске системы.",
+        );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $compose = new SystemCompose();
-        $serviceOption = $input->getOption('service');
-        if (is_string($serviceOption) && trim($serviceOption) !== '') {
-            $services = array_values(array_unique(array_filter(array_map('trim', explode(',', $serviceOption)))));
+        $serviceOption = $input->getOption("service");
+        if (is_string($serviceOption) && trim($serviceOption) !== "") {
+            $services = array_values(array_unique(array_filter(array_map("trim", explode(",", $serviceOption)))));
             foreach ($services as $service) {
                 if (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/', $service) !== 1) {
                     $this->writeMessage($output, sprintf('<error>Некорректное имя сервиса "%s".</error>', $service));
@@ -41,16 +51,18 @@ final class SystemRestartCommand extends AbstractCommand
                 }
             }
 
-            return $this->runOperation($compose, 'restart', $services, $output, $this->translator);
+            return $this->runOperation($compose, "restart", $services, $output, $this->translator);
         }
-        $stopCode = $this->runOperation($compose, 'down', ['--remove-orphans'], $output, $this->translator);
+        $stopCode = $this->runOperation($compose, "down", ["--remove-orphans"], $output, $this->translator);
         if ($stopCode !== Command::SUCCESS) {
             return $stopCode;
         }
 
-        $arguments = ['-d'];
-        if ($input->getOption('no-rebuild-images')) $arguments[] = '--no-build';
+        $arguments = ["-d"];
+        if ($input->getOption("no-rebuild-images")) {
+            $arguments[] = "--no-build";
+        }
 
-        return $this->runOperation($compose, 'up', $arguments, $output, $this->translator);
+        return $this->runOperation($compose, "up", $arguments, $output, $this->translator);
     }
 }

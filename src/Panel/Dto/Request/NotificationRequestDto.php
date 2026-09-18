@@ -10,13 +10,15 @@ use DockerCli\Panel\Http\RequestValidationException;
 
 final readonly class NotificationRequestDto implements RequestDto
 {
-    public function __construct(public string $file) {}
+    public function __construct(public string $file)
+    {
+    }
 
     public static function fromRequest(RequestData $request): static
     {
-        $file = rawurldecode($request->route['file'] ?? '');
+        $file = rawurldecode($request->route["file"] ?? "");
         if (basename($file) !== $file || preg_match('/^[A-Za-z0-9._-]+\.yaml$/D', $file) !== 1) {
-            throw new RequestValidationException('Некорректное имя уведомления.');
+            throw new RequestValidationException("Некорректное имя уведомления.");
         }
         return new static($file);
     }

@@ -21,15 +21,17 @@ final class ProjectNameGenerator
             }
         }
 
-        throw new \RuntimeException('Unable to generate a unique project name: all adjective-animal combinations are already used.');
+        throw new \RuntimeException(
+            "Unable to generate a unique project name: all adjective-animal combinations are already used.",
+        );
     }
 
     /** @return list<string> */
     private function candidates(): array
     {
         $directory = dirname((new \ReflectionClass(Alliteration::class))->getFileName());
-        $adjectives = $this->readWords($directory . '/adjectives.txt');
-        $nouns = $this->readWords($directory . '/nouns.txt');
+        $adjectives = $this->readWords($directory . "/adjectives.txt");
+        $nouns = $this->readWords($directory . "/nouns.txt");
 
         $nounsByLetter = [];
         foreach ($nouns as $noun) {
@@ -39,7 +41,7 @@ final class ProjectNameGenerator
         $candidates = [];
         foreach ($adjectives as $adjective) {
             foreach ($nounsByLetter[$adjective[0]] ?? [] as $noun) {
-                $candidate = $adjective . '-' . $noun;
+                $candidate = $adjective . "-" . $noun;
                 if (preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $candidate) === 1) {
                     $candidates[] = $candidate;
                 }
@@ -57,9 +59,11 @@ final class ProjectNameGenerator
             throw new \RuntimeException(sprintf('Unable to read name generator word list "%s".', $file));
         }
 
-        return array_values(array_filter(array_map(
-            static fn (string $word): string => strtolower(trim($word)),
-            $words,
-        ), static fn (string $word): bool => $word !== ''));
+        return array_values(
+            array_filter(
+                array_map(static fn (string $word): string => strtolower(trim($word)), $words),
+                static fn (string $word): bool => $word !== "",
+            ),
+        );
     }
 }

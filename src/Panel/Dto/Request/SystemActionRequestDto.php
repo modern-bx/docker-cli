@@ -18,11 +18,11 @@ final readonly class SystemActionRequestDto implements RequestDto
 
     public static function fromRequest(RequestData $request): static
     {
-        $action = SystemActionEnum::tryFrom($request->route['action']);
+        $action = SystemActionEnum::tryFrom($request->route["action"]);
         if ($action === null) {
-            throw new RequestValidationException('Неизвестное системное действие.');
+            throw new RequestValidationException("Неизвестное системное действие.");
         }
 
-        return new static($action, isset($request->route['service']) ? rawurldecode($request->route['service']) : null);
+        return new static($action, isset($request->route["service"]) ? rawurldecode($request->route["service"]) : null);
     }
 }

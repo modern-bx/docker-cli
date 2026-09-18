@@ -13,6 +13,6 @@ final readonly class QueuedOperationDto implements \JsonSerializable
     /** @return array{file: string} */
     public function jsonSerialize(): array
     {
-        return ['file' => $this->file];
+        return ["file" => $this->file];
     }
 }

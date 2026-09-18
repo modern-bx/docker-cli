@@ -13,6 +13,6 @@ final readonly class DeploymentScriptDto implements \JsonSerializable
 
     public function jsonSerialize(): array
     {
-        return ['code' => $this->code, 'name' => $this->name, 'parameters' => $this->parameters];
+        return ["code" => $this->code, "name" => $this->name, "parameters" => $this->parameters];
     }
 }

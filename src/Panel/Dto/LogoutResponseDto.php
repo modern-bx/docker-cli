@@ -9,6 +9,6 @@ final readonly class LogoutResponseDto implements \JsonSerializable
     /** @return array{success: true} */
     public function jsonSerialize(): array
     {
-        return ['success' => true];
+        return ["success" => true];
     }
 }

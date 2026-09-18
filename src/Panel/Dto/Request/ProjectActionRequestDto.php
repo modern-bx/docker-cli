@@ -18,11 +18,11 @@ final readonly class ProjectActionRequestDto implements RequestDto
 
     public static function fromRequest(RequestData $request): static
     {
-        $action = ProjectActionEnum::tryFrom($request->route['action']);
+        $action = ProjectActionEnum::tryFrom($request->route["action"]);
         if ($action === null) {
-            throw new RequestValidationException('Неизвестное действие над проектом.');
+            throw new RequestValidationException("Неизвестное действие над проектом.");
         }
 
-        return new static(rawurldecode($request->route['name']), $action);
+        return new static(rawurldecode($request->route["name"]), $action);
     }
 }

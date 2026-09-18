@@ -17,10 +17,10 @@ final readonly class ProjectSecurityRequestDto implements RequestDto
 
     public static function fromRequest(RequestData $request): static
     {
-        if (!is_bool($request->body['protected'] ?? null)) {
-            throw new RequestValidationException('Некорректные настройки безопасности.');
+        if (!is_bool($request->body["protected"] ?? null)) {
+            throw new RequestValidationException("Некорректные настройки безопасности.");
         }
 
-        return new static(rawurldecode($request->route['name']), $request->body['protected']);
+        return new static(rawurldecode($request->route["name"]), $request->body["protected"]);
     }
 }

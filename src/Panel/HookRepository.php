@@ -9,7 +9,15 @@ use function DockerCli\Util\join_path;
 final readonly class HookRepository
 {
     private const OUTPUT_LIMIT = 65536;
-    private const COMMANDS = ['project:clone', 'project:disable', 'project:down', 'project:enable', 'project:update', 'project:up', 'project:wipe'];
+    private const COMMANDS = [
+        "project:clone",
+        "project:disable",
+        "project:down",
+        "project:enable",
+        "project:update",
+        "project:up",
+        "project:wipe",
+    ];
 
     public function __construct(private ?string $hooksDirectory = null)
     {
@@ -18,40 +26,51 @@ final readonly class HookRepository
     /** @return list<array{id: string, level: string, command: string, timing: string, enabled: bool, hook: string}> */
     public function all(): array
     {
-        $commandsDirectory = join_path($this->directory(), 'commands');
+        $commandsDirectory = join_path($this->directory(), "commands");
         if (!is_dir($commandsDirectory)) {
             return [];
         }
 
         $hooks = [];
         foreach (scandir($commandsDirectory) ?: [] as $directoryName) {
-            if ($directoryName === '.' || $directoryName === '..') {
+            if ($directoryName === "." || $directoryName === "..") {
                 continue;
             }
 
             $directory = join_path($commandsDirectory, $directoryName);
-            if (!is_dir($directory) || !preg_match('/^(?<command>.+)\.(?<timing>before|after)$/', $directoryName, $matches)) {
+            if (
+                !is_dir($directory) ||
+                !preg_match('/^(?<command>.+)\.(?<timing>before|after)$/', $directoryName, $matches)
+            ) {
                 continue;
             }
 
             foreach (scandir($directory) ?: [] as $fileName) {
                 $file = join_path($directory, $fileName);
-                if ($fileName === '.' || $fileName === '..' || !is_file($file)) {
+                if ($fileName === "." || $fileName === ".." || !is_file($file)) {
                     continue;
                 }
 
                 $hooks[] = [
-                    'id' => 'commands/' . $directoryName . '/' . $fileName,
-                    'level' => 'command',
-                    'command' => str_replace('.', ':', $matches['command']),
-                    'timing' => $matches['timing'],
-                    'enabled' => !str_starts_with($fileName, '.'),
-                    'hook' => $fileName,
+                    "id" => "commands/" . $directoryName . "/" . $fileName,
+                    "level" => "command",
+                    "command" => str_replace(".", ":", $matches["command"]),
+                    "timing" => $matches["timing"],
+                    "enabled" => !str_starts_with($fileName, "."),
+                    "hook" => $fileName,
                 ];
             }
         }
 
-        usort($hooks, static fn (array $left, array $right): int => [$left['level'], $left['command'], $left['timing'], $left['hook']] <=> [$right['level'], $right['command'], $right['timing'], $right['hook']]);
+        usort(
+            $hooks,
+            static fn (array $left, array $right): int => [
+                $left["level"],
+                $left["command"],
+                $left["timing"],
+                $left["hook"],
+            ] <=> [$right["level"], $right["command"], $right["timing"], $right["hook"]],
+        );
 
         return $hooks;
     }
@@ -66,22 +85,26 @@ final readonly class HookRepository
     public function create(string $name, bool $enabled, string $level, string $command, string $timing): array
     {
         $name = trim($name);
-        if ($name === '' || $name === '.' || $name === '..' || basename($name) !== $name || str_contains($name, "\0")) {
-            throw new \RuntimeException('Некорректное имя хука.');
+        if ($name === "" || $name === "." || $name === ".." || basename($name) !== $name || str_contains($name, "\0")) {
+            throw new \RuntimeException("Некорректное имя хука.");
         }
-        if ($level !== 'command' || !in_array($command, self::COMMANDS, true) || !in_array($timing, ['before', 'after'], true)) {
-            throw new \RuntimeException('Некорректные параметры хука.');
+        if (
+            $level !== "command" ||
+            !in_array($command, self::COMMANDS, true) ||
+            !in_array($timing, ["before", "after"], true)
+        ) {
+            throw new \RuntimeException("Некорректные параметры хука.");
         }
 
-        $name = ltrim($name, '.');
-        if ($name === '') {
-            throw new \RuntimeException('Некорректное имя хука.');
+        $name = ltrim($name, ".");
+        if ($name === "") {
+            throw new \RuntimeException("Некорректное имя хука.");
         }
-        $fileName = $enabled ? $name : '.' . $name;
-        $directoryName = str_replace(':', '.', $command) . '.' . $timing;
-        $directory = join_path($this->directory(), 'commands', $directoryName);
+        $fileName = $enabled ? $name : "." . $name;
+        $directoryName = str_replace(":", ".", $command) . "." . $timing;
+        $directory = join_path($this->directory(), "commands", $directoryName);
         if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
-            throw new \RuntimeException('Не удалось создать каталог хука.');
+            throw new \RuntimeException("Не удалось создать каталог хука.");
         }
         $path = join_path($directory, $fileName);
         if (file_exists($path)) {
@@ -90,10 +113,17 @@ final readonly class HookRepository
         $content = $this->templateContent(pathinfo($name, PATHINFO_EXTENSION), $command, $timing);
         if (file_put_contents($path, $content, LOCK_EX) === false || !chmod($path, 0755)) {
             @unlink($path);
-            throw new \RuntimeException('Не удалось создать хук.');
+            throw new \RuntimeException("Не удалось создать хук.");
         }
 
-        return ['id' => 'commands/' . $directoryName . '/' . $fileName, 'level' => $level, 'command' => $command, 'timing' => $timing, 'enabled' => $enabled, 'hook' => $fileName];
+        return [
+            "id" => "commands/" . $directoryName . "/" . $fileName,
+            "level" => $level,
+            "command" => $command,
+            "timing" => $timing,
+            "enabled" => $enabled,
+            "hook" => $fileName,
+        ];
     }
 
     public function toggle(string $id): void
@@ -101,9 +131,9 @@ final readonly class HookRepository
         $path = $this->existingHookPath($id);
         $directory = dirname($path);
         $fileName = basename($path);
-        $targetName = str_starts_with($fileName, '.') ? substr($fileName, 1) : '.' . $fileName;
-        if ($targetName === '') {
-            throw new \RuntimeException('Некорректное имя хука.');
+        $targetName = str_starts_with($fileName, ".") ? substr($fileName, 1) : "." . $fileName;
+        if ($targetName === "") {
+            throw new \RuntimeException("Некорректное имя хука.");
         }
 
         $target = join_path($directory, $targetName);
@@ -111,7 +141,7 @@ final readonly class HookRepository
             throw new \RuntimeException(sprintf('Файл "%s" уже существует.', $targetName));
         }
         if (!rename($path, $target)) {
-            throw new \RuntimeException('Не удалось переключить хук.');
+            throw new \RuntimeException("Не удалось переключить хук.");
         }
     }
 
@@ -119,40 +149,46 @@ final readonly class HookRepository
     {
         $content = file_get_contents($this->existingHookPath($id));
         if ($content === false) {
-            throw new \RuntimeException('Не удалось прочитать хук.');
+            throw new \RuntimeException("Не удалось прочитать хук.");
         }
 
         return $content;
     }
 
-    public function save(string $id, string $content, string $name, bool $enabled, string $command, string $timing): void
-    {
+    public function save(
+        string $id,
+        string $content,
+        string $name,
+        bool $enabled,
+        string $command,
+        string $timing,
+    ): void {
         $path = $this->existingHookPath($id);
-        $name = ltrim(trim($name), '.');
-        if ($name === '' || basename($name) !== $name || str_contains($name, "\0")) {
-            throw new \RuntimeException('Некорректное имя хука.');
+        $name = ltrim(trim($name), ".");
+        if ($name === "" || basename($name) !== $name || str_contains($name, "\0")) {
+            throw new \RuntimeException("Некорректное имя хука.");
         }
-        if (!in_array($command, self::COMMANDS, true) || !in_array($timing, ['before', 'after'], true)) {
-            throw new \RuntimeException('Некорректные параметры хука.');
+        if (!in_array($command, self::COMMANDS, true) || !in_array($timing, ["before", "after"], true)) {
+            throw new \RuntimeException("Некорректные параметры хука.");
         }
 
-        $fileName = $enabled ? $name : '.' . $name;
-        $directory = join_path($this->directory(), 'commands', str_replace(':', '.', $command) . '.' . $timing);
+        $fileName = $enabled ? $name : "." . $name;
+        $directory = join_path($this->directory(), "commands", str_replace(":", ".", $command) . "." . $timing);
         if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
-            throw new \RuntimeException('Не удалось создать каталог хука.');
+            throw new \RuntimeException("Не удалось создать каталог хука.");
         }
         $target = join_path($directory, $fileName);
         if ($target !== $path && file_exists($target)) {
             throw new \RuntimeException(sprintf('Файл "%s" уже существует.', $fileName));
         }
         if ($target !== $path && !rename($path, $target)) {
-            throw new \RuntimeException('Не удалось переместить хук.');
+            throw new \RuntimeException("Не удалось переместить хук.");
         }
         if (file_put_contents($target, $content, LOCK_EX) === false) {
             if ($target !== $path) {
                 @rename($target, $path);
             }
-            throw new \RuntimeException('Не удалось сохранить хук.');
+            throw new \RuntimeException("Не удалось сохранить хук.");
         }
     }
 
@@ -163,26 +199,26 @@ final readonly class HookRepository
         $arguments = $this->profileArguments($profile);
         $process = proc_open(
             [$path, ...$arguments],
-            [['file', '/dev/null', 'r'], ['pipe', 'w'], ['pipe', 'w']],
+            [["file", "/dev/null", "r"], ["pipe", "w"], ["pipe", "w"]],
             $pipes,
             $workingDirectory,
         );
         if (!is_resource($process)) {
-            throw new \RuntimeException('Не удалось запустить хук.');
+            throw new \RuntimeException("Не удалось запустить хук.");
         }
 
         $stdout = $this->readOutput($pipes[1]);
         $stderr = $this->readOutput($pipes[2]);
         $exitCode = proc_close($process);
 
-        return ['exitCode' => $exitCode, 'stdout' => $stdout, 'stderr' => $stderr];
+        return ["exitCode" => $exitCode, "stdout" => $stdout, "stderr" => $stderr];
     }
 
     public function delete(string $id): void
     {
         $path = $this->existingHookPath($id);
         if (!unlink($path)) {
-            throw new \RuntimeException('Не удалось удалить хук.');
+            throw new \RuntimeException("Не удалось удалить хук.");
         }
     }
 
@@ -190,8 +226,8 @@ final readonly class HookRepository
     private function profileArguments(string $profile): array
     {
         $arguments = [];
-        foreach (preg_split('/\s+/', trim($profile)) ?: [] as $argument) {
-            if ($argument !== '') {
+        foreach (preg_split("/\s+/", trim($profile)) ?: [] as $argument) {
+            if ($argument !== "") {
                 $arguments[] = $argument;
             }
         }
@@ -202,13 +238,13 @@ final readonly class HookRepository
     private function readOutput(mixed $pipe): string
     {
         if (!is_resource($pipe)) {
-            return '';
+            return "";
         }
 
         $output = stream_get_contents($pipe, self::OUTPUT_LIMIT + 1);
         fclose($pipe);
         if ($output === false) {
-            return '';
+            return "";
         }
         if (strlen($output) > self::OUTPUT_LIMIT) {
             return substr($output, 0, self::OUTPUT_LIMIT) . "\n… output truncated …\n";
@@ -221,7 +257,7 @@ final readonly class HookRepository
     {
         $path = $this->hookPath($id);
         if (!is_file($path)) {
-            throw new \RuntimeException('Хук не найден.');
+            throw new \RuntimeException("Хук не найден.");
         }
 
         return $path;
@@ -229,25 +265,29 @@ final readonly class HookRepository
 
     private function templateContent(string $extension, string $command, string $timing): string
     {
-        $template = join_path(dirname(__DIR__, 2), 'resources', 'hooks', 'templates', strtolower($extension));
+        $template = join_path(dirname(__DIR__, 2), "resources", "hooks", "templates", strtolower($extension));
         if (!is_file($template)) {
-            return '';
+            return "";
         }
         $content = file_get_contents($template);
         if ($content === false) {
-            throw new \RuntimeException('Не удалось прочитать шаблон хука.');
+            throw new \RuntimeException("Не удалось прочитать шаблон хука.");
         }
 
-        return str_replace(['{{COMMAND}}', '{{TIMING}}'], [$command, $timing], $content);
+        return str_replace(["{{COMMAND}}", "{{TIMING}}"], [$command, $timing], $content);
     }
 
     private function hookPath(string $id): string
     {
-        $path = join_path($this->directory(), ...explode('/', $id));
+        $path = join_path($this->directory(), ...explode("/", $id));
         $realRoot = realpath($this->directory());
         $realDirectory = realpath(dirname($path));
-        if ($realRoot === false || $realDirectory === false || !str_starts_with($realDirectory . DIRECTORY_SEPARATOR, $realRoot . DIRECTORY_SEPARATOR)) {
-            throw new \RuntimeException('Хук не найден.');
+        if (
+            $realRoot === false ||
+            $realDirectory === false ||
+            !str_starts_with($realDirectory . DIRECTORY_SEPARATOR, $realRoot . DIRECTORY_SEPARATOR)
+        ) {
+            throw new \RuntimeException("Хук не найден.");
         }
 
         return $path;
@@ -259,8 +299,8 @@ final readonly class HookRepository
             return $this->hooksDirectory;
         }
 
-        $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
+        $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
 
-        return join_path($home, '.config', 'docker-cli', 'actions', 'hooks');
+        return join_path($home, ".config", "docker-cli", "actions", "hooks");
     }
 }

@@ -12,9 +12,12 @@ final readonly class ProjectsSettingsDto implements \JsonSerializable
     {
     }
 
-    /** @return array{locations: list<array{path: string, code: string, default: bool}>, databaseLocations: list<array{path: string, code: string, default: bool}>} */
+    /**
+     * @return array{locations: list<array{path: string, code: string, default: bool}>, databaseLocations:
+     * list<array{path: string, code: string, default: bool}>}
+     */
     public function jsonSerialize(): array
     {
-        return ['locations' => $this->locations, 'databaseLocations' => $this->databaseLocations];
+        return ["locations" => $this->locations, "databaseLocations" => $this->databaseLocations];
     }
 }

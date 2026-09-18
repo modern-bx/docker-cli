@@ -20,13 +20,13 @@ final class SystemStopCommand extends AbstractCommand
     public function __construct(?TranslatorInterface $translator = null)
     {
         $this->translator = $translator ?? TranslatorFactory::create();
-        parent::__construct('system:stop');
-        $this->setAliases(['stop']);
-        $this->setDescription($this->translator->trans('command.stop.description'));
+        parent::__construct("system:stop");
+        $this->setAliases(["stop"]);
+        $this->setDescription($this->translator->trans("command.stop.description"));
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        return $this->runOperation(new SystemCompose(), 'down', ['--remove-orphans'], $output, $this->translator);
+        return $this->runOperation(new SystemCompose(), "down", ["--remove-orphans"], $output, $this->translator);
     }
 }
