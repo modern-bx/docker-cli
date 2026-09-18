@@ -6,7 +6,7 @@ namespace DockerCli\System;
 
 final class SudoersManager
 {
-    private const COMMANDS = ["/usr/bin/cp", "/usr/bin/chown", "/usr/bin/chmod"];
+    private const COMMANDS = ["/usr/bin/cp", "/usr/bin/chown", "/usr/bin/chmod", "/usr/bin/rm", "/usr/bin/rmdir"];
 
     public function __construct(private readonly string $directory = "/etc/sudoers.d")
     {

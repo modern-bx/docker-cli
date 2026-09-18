@@ -11,6 +11,7 @@ use DockerCli\Hook\CommandHookRunner;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\DataInitializer;
 use DockerCli\Project\DedicatedDatabaseComposeRenderer;
+use DockerCli\Project\DedicatedDatabaseDirectoryRemover;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
 
@@ -30,6 +31,7 @@ final class ProjectDownCommand extends AbstractCommand
         private readonly ?DataInitializer $dataInitializer = null,
         private readonly ?CommandContext $context = null,
         private readonly ?CommandHookRunner $hookRunner = null,
+        private readonly ?DedicatedDatabaseDirectoryRemover $dedicatedDatabaseDirectoryRemover = null,
     ) {
         parent::__construct("project:down");
         $this->setDescription("Удалить регистрацию проекта docker-cli.");
@@ -161,6 +163,23 @@ final class ProjectDownCommand extends AbstractCommand
             if ($removeCode !== Command::SUCCESS) {
                 return $removeCode;
             }
+            if (
+                !($this->dedicatedDatabaseDirectoryRemover ?? new DedicatedDatabaseDirectoryRemover())->remove(
+                    $projectName,
+                    $dedicated,
+                    $projectConfig,
+                )
+            ) {
+                $this->writeMessage(
+                    $output,
+                    sprintf(
+                        '<error>Не удалось удалить данные выделенных инстансов проекта "%s".</error>',
+                        $projectName,
+                    ),
+                );
+
+                return Command::FAILURE;
+            }
         }
 
         $projectDirectory = join_path($this->projectsDirectory(), $projectName);
@@ -168,9 +187,6 @@ final class ProjectDownCommand extends AbstractCommand
             $this->removeDirectory($projectDirectory);
         }
         (new DedicatedDatabaseComposeRenderer())->render();
-        // Dedicated database directories are bind mounts and may be owned by
-        // the database image user. --drop removes the project database and
-        // role through the DBMS, but host storage is intentionally preserved.
 
         if ($input->getOption("erase")) {
             $this->removeDirectory($metadataDirectory);
