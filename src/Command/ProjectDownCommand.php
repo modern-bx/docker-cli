@@ -11,6 +11,7 @@ use DockerCli\Hook\CommandHookRunner;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\DataInitializer;
 use DockerCli\Project\DedicatedDatabaseComposeRenderer;
+use DockerCli\Project\DedicatedDatabaseDirectoryRemover;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
 
@@ -25,11 +26,15 @@ use Symfony\Component\Yaml\Yaml;
 
 final class ProjectDownCommand extends AbstractCommand
 {
+    private const CONTAINER_REMOVAL_ATTEMPTS = 50;
+    private const CONTAINER_REMOVAL_DELAY_MICROSECONDS = 100_000;
+
     public function __construct(
         private readonly ?FrameworkDetectionService $detectionService = null,
         private readonly ?DataInitializer $dataInitializer = null,
         private readonly ?CommandContext $context = null,
         private readonly ?CommandHookRunner $hookRunner = null,
+        private readonly ?DedicatedDatabaseDirectoryRemover $dedicatedDatabaseDirectoryRemover = null,
     ) {
         parent::__construct("project:down");
         $this->setDescription("Удалить регистрацию проекта docker-cli.");
@@ -129,7 +134,11 @@ final class ProjectDownCommand extends AbstractCommand
 
         if ($input->getOption("drop")) {
             try {
-                $dropCode = ($this->dataInitializer ?? new DataInitializer())->drop($projectName, $output);
+                $dropCode = ($this->dataInitializer ?? new DataInitializer())->drop(
+                    $projectName,
+                    $output,
+                    array_values(array_diff(["mysql", "postgres"], $dedicated)),
+                );
             } catch (MissingConfigException $exception) {
                 $this->writeMessage(
                     $output,
@@ -161,6 +170,23 @@ final class ProjectDownCommand extends AbstractCommand
             if ($removeCode !== Command::SUCCESS) {
                 return $removeCode;
             }
+            if (
+                !($this->dedicatedDatabaseDirectoryRemover ?? new DedicatedDatabaseDirectoryRemover())->remove(
+                    $projectName,
+                    $dedicated,
+                    $projectConfig,
+                )
+            ) {
+                $this->writeMessage(
+                    $output,
+                    sprintf(
+                        '<error>Не удалось удалить данные выделенных инстансов проекта "%s".</error>',
+                        $projectName,
+                    ),
+                );
+
+                return Command::FAILURE;
+            }
         }
 
         $projectDirectory = join_path($this->projectsDirectory(), $projectName);
@@ -168,9 +194,6 @@ final class ProjectDownCommand extends AbstractCommand
             $this->removeDirectory($projectDirectory);
         }
         (new DedicatedDatabaseComposeRenderer())->render();
-        // Dedicated database directories are bind mounts and may be owned by
-        // the database image user. --drop removes the project database and
-        // role through the DBMS, but host storage is intentionally preserved.
 
         if ($input->getOption("erase")) {
             $this->removeDirectory($metadataDirectory);
@@ -273,10 +296,18 @@ final class ProjectDownCommand extends AbstractCommand
                 return Command::FAILURE;
             }
             $code = proc_close($process);
-            $exists = $this->containerExists($container);
-            if ($code !== Command::SUCCESS && $exists !== false) {
-                return $code;
+            for ($attempt = 0; $attempt < self::CONTAINER_REMOVAL_ATTEMPTS; $attempt++) {
+                $exists = $this->containerExists($container);
+                if ($exists === false) {
+                    continue 2;
+                }
+                if ($exists === null) {
+                    return Command::FAILURE;
+                }
+                usleep(self::CONTAINER_REMOVAL_DELAY_MICROSECONDS);
             }
+
+            return $code === Command::SUCCESS ? Command::FAILURE : $code;
         }
 
         return Command::SUCCESS;

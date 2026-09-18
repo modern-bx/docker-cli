@@ -13,8 +13,12 @@
   import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
   import { vscodeDark, vscodeLight } from '@uiw/codemirror-theme-vscode';
   import { Combobox, Dialog, Tabs, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { Archive, Bell, CircleHelp, Copy, Download, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Settings, Square, Trash2, Undo2 } from '@lucide/svelte';
+  import { CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Settings, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
+  import AppHeader from './components/AppHeader.svelte';
+  import LoginForm from './components/LoginForm.svelte';
+  import PageSizeSelect from './components/PageSizeSelect.svelte';
+  import WorkspaceNavigation from './components/WorkspaceNavigation.svelte';
   import BackupDateFilter from './BackupDateFilter.svelte';
   import HttpRefreshBoundary from './HttpRefreshBoundary.svelte';
   import { addProjectSchedule, cloneProject, createHookSettings, createPanelUser, createProject, createProjectBackup, deletePanelUser, deleteProjectBackup, deleteProjectSchedule, deleteHookSettings, getBackupsSettings, getHookContent, getHooksSettings, getLogs, getProjectBackups, getProjectOptions, getProjectSchedule, getProjects, getProjectsSettings, getSecuritySettings, getSystemStatus, getUsersSettings, queueSystemSelfUpdate, toggleHookSettings, updateProject, updateProjectBackupComment, updateProjectSchedule, restoreProjectBackup, rotatePanelUserPassword, runProjectAction, runSystemAction, saveBackupsSettings, runHookSettings, saveHookContent, saveProjectNotes, saveProjectSecurity, saveProjectsSettings, saveSecuritySettings, updatePanelUser } from './api.js';
@@ -88,7 +92,6 @@
   const logLevelCollection = useListCollection({ items: logLevels });
   const logContextCollection = useListCollection({ items: logContexts });
   const logCategoryFilters = [{ field: 'level', label: 'Уровень', items: logLevels, collection: logLevelCollection }, { field: 'context', label: 'Контекст', items: logContexts, collection: logContextCollection }];
-  const pageSizeCollection = useListCollection({ items: [25, 50, 100].map((value) => ({ value: String(value), label: String(value) })) });
   let login = '';
   let password = '';
   let currentLogin = '';
@@ -2080,204 +2083,57 @@
 <svelte:head><title>{authenticated ? 'docker-cli' : 'Вход — docker-cli'}</title></svelte:head>
 
 <div class:panel-shell={authenticated && !loading} class="min-h-screen bg-surface-50-950 text-surface-950-50 flex flex-col">
-  <header class="app-header h-16 border-b border-surface-200-800 bg-surface-100-900 flex items-center px-5 md:px-8 shadow-sm">
-    {#if authenticated}<a href="#/projects" class="font-bold text-xl no-underline">docker-cli</a>{/if}
-    {#if authenticated}
-      <div class="system-header header-menu">
-        <div class="queue-main-control">
-          <button class="btn preset-tonal system-trigger" type="button" aria-expanded={queueOpen} onclick={() => { queueOpen = !queueOpen; systemOpen = false; themeOpen = false; profileOpen = false; }}>
-            <span class={`queue-summary-dot ${queueStatus}`} aria-hidden="true"></span><span>Очередь</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
-          </button>
-          {#if queueOpen}
-            <div class="queue-menu card preset-filled-surface-100-900 shadow-2xl">
-              <div class="queue-menu-actions">
-                <button class="btn btn-sm preset-tonal" type="button" disabled={queueActionPending} onclick={toggleQueue}>
-                  {#if queuePaused}<Play size={14} aria-hidden="true" />{:else}<Square size={14} aria-hidden="true" />{/if}
-                  {queueActionPending ? 'Подождите…' : queuePaused ? 'Возобновить' : 'Приостановить'}
-                </button>
-              </div>
-              <div class="system-menu-divider" aria-hidden="true"></div>
-              {#if queueItems.length === 0}<p class="system-empty">Очередь пуста</p>{/if}
-              {#each queueItems as item (item.file)}
-                <div class="queue-item">
-                  <span class={`queue-dot status-${item.status}`} aria-hidden="true"></span>
-                  <time datetime={item.queuedAt}>{formatQueueDate(item.queuedAt)}</time>
-                  <button class="queue-item-code queue-item-link" type="button" title={`Открыть журнал элемента ${item.code}`} onclick={() => openQueueItemJournal(item)}>{item.code}</button>
-                  {#if item.status !== '20-active'}
-                    <div class="queue-item-actions">
-                      <button class="btn btn-sm preset-tonal" type="button" onclick={() => archiveQueueItem(item)}><Archive size={14} aria-hidden="true" />Архивировать</button>
-                      <button class="btn-icon preset-tonal" type="button" aria-label="Удалить элемент очереди" title="Удалить" onclick={() => { queueOpen = false; queueConfirmation = item; }}><Trash2 size={14} aria-hidden="true" /></button>
-                    </div>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </div>
-        <div class="system-main-control">
-          <button class="btn preset-tonal system-trigger" type="button" aria-expanded={systemOpen} onclick={() => { systemOpen = !systemOpen; queueOpen = false; themeOpen = false; profileOpen = false; }}>
-            <span class={`system-dot ${systemStatus}`} aria-hidden="true"></span><span>Система</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
-          </button>
-          {#if systemOpen}
-            <div class="system-menu card preset-filled-surface-100-900 shadow-2xl">
-              <div class="system-menu-global-actions">
-                {#if hasStoppedServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('start')}><Play size={14} aria-hidden="true" />Запустить</button>{/if}
-                {#if hasRunningServices}<button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('stop')}><Square size={14} aria-hidden="true" />Остановить</button>{/if}
-                <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart')}><RotateCw size={14} aria-hidden="true" />Перезапустить</button>
-              </div>
-              <div class="system-menu-divider" aria-hidden="true"></div>
-              <div class="system-menu-global-actions">
-                <button class="btn btn-sm preset-tonal" type="button" disabled={systemUpdatePending} onclick={enqueueSystemUpdate}><Download size={14} aria-hidden="true" />{systemUpdatePending ? 'Добавляем…' : 'Обновить'}</button>
-              </div>
-              <div class="system-menu-divider" aria-hidden="true"></div>
-              {#if systemServices.length === 0}<p class="system-empty">Сервисы не найдены</p>{/if}
-              {#each systemServices as service (service.name)}
-                {@const serviceUrl = systemServiceUrl(service)}
-                <div class="system-service">
-                  <span class={`system-dot ${service.running ? 'running' : 'stopped'}`} aria-hidden="true"></span>
-                  {#if serviceUrl}
-                    <a class="system-service-name system-service-link" href={serviceUrl} target="_blank" rel="noopener noreferrer" title={service.image}>{service.name}<ExternalLink size={13} aria-hidden="true" /></a>
-                  {:else}
-                    <span class="system-service-name" title={service.image}>{service.name}</span>
-                  {/if}
-                  <div class="system-actions">
-                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction(service.running ? 'stop' : 'start', service.name)}>
-                      {#if service.running}<Square size={14} aria-hidden="true" />{:else}<Play size={14} aria-hidden="true" />{/if}
-                      {service.running ? 'Остановить' : 'Запустить'}
-                    </button>
-                    <button class="btn btn-sm preset-tonal" type="button" onclick={() => requestSystemAction('restart', service.name)}><RotateCw size={14} aria-hidden="true" />Перезапустить</button>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      </div>
-    {/if}
-    <div class="ml-auto flex items-center gap-3">
-      {#if authenticated}
-        <div class="relative header-menu">
-          <button class="btn-icon preset-tonal notification-trigger" type="button" aria-label="Уведомления" aria-haspopup="dialog" aria-expanded={notificationsOpen} onclick={() => { notificationsOpen = !notificationsOpen; themeOpen = false; profileOpen = false; systemOpen = false; queueOpen = false; }}>
-            <Bell size={19} aria-hidden="true" />
-            {#if notifications.length > 0}<span class={`notification-badge ${notificationBadgeLevel}`}>{notifications.length}</span>{/if}
-          </button>
-          {#if notificationsOpen}
-            <div class="notification-menu card preset-filled-surface-100-900 absolute right-0 mt-2 shadow-2xl z-20" role="dialog" aria-label="Уведомления">
-              <div class="notification-menu-actions">
-                <button class="btn btn-sm preset-tonal" type="button" disabled={notifications.length === 0} onclick={archiveAllNotifications}>Очистить</button>
-              </div>
-              <div class="system-menu-divider" aria-hidden="true"></div>
-              {#if notifications.length === 0}<p class="notification-empty">Уведомлений нет</p>{/if}
-              {#each notifications as notification (notification.file)}
-                <article class="notification-item">
-                  <div>
-                    <time datetime={notification.time}>{formatQueueDate(notification.time)}</time>
-                    <div class="notification-message">{@html renderNotificationMarkdown(notification.message)}</div>
-                  </div>
-                  <button class="btn-icon preset-tonal notification-delete" type="button" aria-label="Удалить уведомление" title="Удалить" onclick={() => archiveNotification(notification)}><Trash2 size={16} aria-hidden="true" /></button>
-                </article>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      {/if}
-      <div class="relative header-menu">
-        <button class="btn-icon preset-tonal theme-trigger" type="button" aria-label="Настроить оформление" aria-haspopup="dialog" aria-expanded={themeOpen} onclick={() => { themeOpen = !themeOpen; notificationsOpen = false; profileOpen = false; }}>
-          <span class="theme-dot" aria-hidden="true"></span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
-        </button>
-        {#if themeOpen}
-          <div class="theme-menu card preset-filled-surface-100-900 absolute right-0 mt-2 p-4 shadow-2xl z-20" role="dialog" aria-label="Настройки оформления">
-            <div class="flex items-center justify-between mb-3">
-              <strong>Тема</strong>
-              <span class="text-sm text-surface-500">{themes.find(([value]) => value === theme)?.[1]}</span>
-            </div>
-            <div class="theme-grid" role="list" aria-label="Цветовая тема">
-              {#each themes as [value, label]}
-                <button class:active={theme === value} class="theme-option" type="button" data-theme={value} aria-label={label} aria-pressed={theme === value} title={label} onclick={() => setTheme(value)}>
-                  <span class="swatch"><i></i><i></i><i></i></span>
-                  <span>{label}</span>
-                </button>
-              {/each}
-            </div>
-            <div class="mode-switch mt-4" aria-label="Цветовой режим">
-              {#each modes as [value, label]}
-                <button class:active={mode === value} type="button" aria-pressed={mode === value} onclick={() => setMode(value)}>
-                  <span aria-hidden="true">{value === 'light' ? '☀' : value === 'dark' ? '☾' : '◐'}</span>
-                  {label}
-                </button>
-              {/each}
-            </div>
-            <div class="font-switch mt-4">
-              <span id="font-switch-label">Шрифт</span>
-              <Combobox
-                collection={fontCollection}
-                value={[font]}
-                openOnClick
-                onValueChange={(details) => details.value[0] && setFont(details.value[0])}
-              >
-                <Combobox.Control class="font-combobox-control">
-                  <Combobox.Input aria-labelledby="font-switch-label" class="font-combobox-input" readonly />
-                  <Combobox.Trigger class="font-combobox-trigger" />
-                </Combobox.Control>
-                <Combobox.Positioner class="font-combobox-positioner">
-                  <Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">
-                    {#each fonts as item}
-                      <Combobox.Item {item} class="font-combobox-item">
-                        <Combobox.ItemText>{item.label}</Combobox.ItemText>
-                        <Combobox.ItemIndicator class="font-combobox-indicator" />
-                      </Combobox.Item>
-                    {/each}
-                  </Combobox.Content>
-                </Combobox.Positioner>
-              </Combobox>
-            </div>
-          </div>
-        {/if}
-      </div>
-      {#if authenticated}
-        <div class="relative header-menu">
-          <button class="btn preset-tonal" type="button" aria-expanded={profileOpen} onclick={() => { profileOpen = !profileOpen; themeOpen = false; editorThemeOpen = false; notificationsOpen = false; }}>{currentLogin}</button>
-          {#if profileOpen}
-            <div class="card preset-filled-surface-100-900 absolute right-0 mt-2 min-w-44 p-2 shadow-xl z-10">
-              <button class="btn w-full justify-start hover:preset-tonal-error" type="button" onclick={logout}>Выйти</button>
-            </div>
-          {/if}
-        </div>
-      {/if}
-    </div>
-  </header>
+  <AppHeader
+    {authenticated}
+    bind:queueOpen
+    {queueStatus}
+    {queueItems}
+    {queuePaused}
+    {queueActionPending}
+    bind:systemOpen
+    {systemStatus}
+    {systemServices}
+    {hasStoppedServices}
+    {hasRunningServices}
+    {systemUpdatePending}
+    bind:notificationsOpen
+    {notifications}
+    {notificationBadgeLevel}
+    bind:themeOpen
+    {themes}
+    {theme}
+    {modes}
+    {mode}
+    {fonts}
+    {font}
+    {fontCollection}
+    bind:profileOpen
+    {currentLogin}
+    {toggleQueue}
+    {openQueueItemJournal}
+    {archiveQueueItem}
+    requestQueueDelete={(item) => { queueOpen = false; queueConfirmation = item; }}
+    {formatQueueDate}
+    {requestSystemAction}
+    {enqueueSystemUpdate}
+    {systemServiceUrl}
+    {archiveAllNotifications}
+    {archiveNotification}
+    {renderNotificationMarkdown}
+    {setTheme}
+    {setMode}
+    {setFont}
+    {logout}
+  />
 
   <main class:workspace={authenticated && !loading} class="flex-1 flex items-center justify-center p-5">
     {#if loading}
       <div class="animate-pulse text-surface-500">Проверка сессии…</div>
     {:else if !authenticated}
-      <section class="card preset-filled-surface-100-900 w-full max-w-md p-7 md:p-9 shadow-xl" aria-labelledby="login-title">
-        <h1 id="login-title" class="h2 text-center mb-2">Вход в панель</h1>
-        <p class="text-center text-surface-500 mb-8">Введите данные пользователя docker-cli</p>
-        <form class="space-y-5" onsubmit={(event) => { event.preventDefault(); submit(); }}>
-          <label class="label">
-            <span class="label-text">Логин</span>
-            <input class="input" type="email" bind:value={login} autocomplete="username" placeholder="admin@example.com" required />
-          </label>
-          <label class="label">
-            <span class="label-text">Пароль</span>
-            <input class="input" type="password" bind:value={password} autocomplete="current-password" required />
-          </label>
-          <button class="btn preset-filled-primary-500 w-full" type="submit" disabled={submitting}>
-            {submitting ? 'Входим…' : 'Войти'}
-          </button>
-        </form>
-      </section>
+      <LoginForm bind:login bind:password {submitting} onSubmit={submit} />
     {:else}
       <section class="projects-view" aria-label="Рабочая область">
-        <nav class="tabs" aria-label="Разделы панели">
-          <a class:active={activeSection === 'projects'} class="tab" href="#/projects" aria-current={activeSection === 'projects' ? 'page' : undefined}>Проекты</a>
-          <a class:active={activeSection === 'logs'} class="tab" href="#/journal" aria-current={activeSection === 'logs' ? 'page' : undefined}>Журнал</a>
-          <a class:active={activeSection === 'settings'} class="tab" href="#/settings/projects" aria-current={activeSection === 'settings' ? 'page' : undefined}>Настройки</a>
-        </nav>
+        <WorkspaceNavigation {activeSection} />
         {#if activeSection === 'projects'}
         <div class="projects-layout">
           <aside class="project-sidebar" aria-label="Список проектов">
@@ -2444,7 +2300,7 @@
                   <footer class="log-pagination">
                     <span>{backupTotal ? `${(backupPage - 1) * backupPageSize + 1}–${Math.min(backupPage * backupPageSize, backupTotal)} из ${backupTotal}` : '0 бэкапов'}</span>
                     <div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={backupPage === 1 || backupsLoading} onclick={() => { backupPage -= 1; loadProjectBackups(); }}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={backupPage >= Math.ceil(backupTotal / backupPageSize) || backupsLoading} onclick={() => { backupPage += 1; loadProjectBackups(); }}>Вперёд</button></div>
-                    <div class="log-page-size" aria-label="Количество бэкапов на странице"><Combobox collection={pageSizeCollection} value={[String(backupPageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { backupPageSize = Number(details.value[0]); backupPage = 1; loadProjectBackups(); } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество бэкапов на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
+                    <PageSizeSelect value={backupPageSize} label="Количество бэкапов на странице" onChange={(size) => { backupPageSize = size; backupPage = 1; loadProjectBackups(); }} />
                   </footer>
                 </section>
                 {:else if projectDetailTab === 'scheduler'}
@@ -2458,7 +2314,7 @@
                       {:else}{#each pagedScheduleItems as item}<tr class:schedule-disabled={!item.enabled} oncontextmenu={(event) => openScheduleContextMenu(event, item)}><td class="scheduler-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с командой ${item.command}`} aria-haspopup="menu" onclick={(event) => openScheduleContextMenu(event, item)}><Menu size={18} aria-hidden="true" /></button></td><td class="scheduler-enabled">{item.enabled ? 'Да' : 'Нет'}</td><td><code>{item.schedule}</code></td><td><code>{item.command}</code></td><td>{item.workingDirectory || '—'}</td></tr>{/each}{/if}
                     </tbody></table>
                   </div>
-                  <footer class="log-pagination scheduler-pagination"><span>{filteredScheduleItems.length ? `${(schedulePage - 1) * schedulePageSize + 1}–${Math.min(schedulePage * schedulePageSize, filteredScheduleItems.length)} из ${filteredScheduleItems.length}` : '0 команд'}</span><div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={schedulePage === 1 || scheduleLoading} onclick={() => schedulePage -= 1}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={schedulePage >= schedulePageCount || scheduleLoading} onclick={() => schedulePage += 1}>Вперёд</button></div><div class="log-page-size" aria-label="Количество команд на странице"><Combobox collection={pageSizeCollection} value={[String(schedulePageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { schedulePageSize = Number(details.value[0]); schedulePage = 1; } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество команд на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div></footer>
+                  <footer class="log-pagination scheduler-pagination"><span>{filteredScheduleItems.length ? `${(schedulePage - 1) * schedulePageSize + 1}–${Math.min(schedulePage * schedulePageSize, filteredScheduleItems.length)} из ${filteredScheduleItems.length}` : '0 команд'}</span><div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={schedulePage === 1 || scheduleLoading} onclick={() => schedulePage -= 1}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={schedulePage >= schedulePageCount || scheduleLoading} onclick={() => schedulePage += 1}>Вперёд</button></div><PageSizeSelect value={schedulePageSize} label="Количество команд на странице" onChange={(size) => { schedulePageSize = size; schedulePage = 1; }} /></footer>
                 </section>
                 {:else}
                   <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadLogs} />
@@ -2498,7 +2354,7 @@
                   <footer class="log-pagination">
                     <span>{logTotal ? `${(logPage - 1) * logPageSize + 1}–${Math.min(logPage * logPageSize, logTotal)} из ${logTotal}` : '0 записей'}</span>
                     <div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={logPage === 1 || logsLoading} onclick={() => changeLogPage(logPage - 1)}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={logPage >= Math.ceil(logTotal / logPageSize) || logsLoading} onclick={() => changeLogPage(logPage + 1)}>Вперёд</button></div>
-                    <div class="log-page-size" aria-label="Количество записей на странице"><Combobox collection={pageSizeCollection} value={[String(logPageSize)]} openOnClick onValueChange={(details) => details.value[0] && changeLogPageSize(details.value[0])}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество записей на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
+                    <PageSizeSelect value={logPageSize} label="Количество записей на странице" onChange={(size) => changeLogPageSize(String(size))} />
                   </footer>
                 </section>
                 {/if}
@@ -2560,7 +2416,7 @@
                 <button class="btn btn-sm preset-tonal" type="button" disabled={logPage === 1 || logsLoading} onclick={() => changeLogPage(logPage - 1)}>Назад</button>
                 <button class="btn btn-sm preset-tonal" type="button" disabled={logPage >= Math.ceil(logTotal / logPageSize) || logsLoading} onclick={() => changeLogPage(logPage + 1)}>Вперёд</button>
               </div>
-              <div class="log-page-size" aria-label="Количество записей на странице"><Combobox collection={pageSizeCollection} value={[String(logPageSize)]} openOnClick onValueChange={(details) => details.value[0] && changeLogPageSize(details.value[0])}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество записей на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
+              <PageSizeSelect value={logPageSize} label="Количество записей на странице" onChange={(size) => changeLogPageSize(String(size))} />
             </footer>
           </section>
         {:else if activeSection === 'settings'}
@@ -2702,7 +2558,7 @@
               <footer class="log-pagination users-pagination">
                 <span>{usersTotal ? `${(usersPage - 1) * usersPageSize + 1}–${Math.min(usersPage * usersPageSize, usersTotal)} из ${usersTotal}` : '0 пользователей'}</span>
                 <div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={usersPage === 1 || usersLoading} onclick={() => { usersPage -= 1; loadUsersSettings(); }}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={usersPage >= Math.ceil(usersTotal / usersPageSize) || usersLoading} onclick={() => { usersPage += 1; loadUsersSettings(); }}>Вперёд</button></div>
-                <div class="log-page-size"><Combobox collection={pageSizeCollection} value={[String(usersPageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { usersPageSize = Number(details.value[0]); usersPage = 1; loadUsersSettings(); } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество пользователей на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div>
+                <PageSizeSelect value={usersPageSize} label="Количество пользователей на странице" onChange={(size) => { usersPageSize = size; usersPage = 1; loadUsersSettings(); }} />
               </footer>
             </div>
             {:else if settingsTab === 'hooks'}
@@ -2723,7 +2579,7 @@
                   {:else}{#each pagedHooks as hook (hook.id)}<tr class:schedule-disabled={!hook.enabled} oncontextmenu={(event) => openHookContextMenu(event, hook)}><td class="scheduler-menu-column"><button class="backup-menu-trigger" type="button" aria-label={`Действия с хуком ${hook.hook}`} aria-haspopup="menu" onclick={(event) => openHookContextMenu(event, hook)}><Menu size={18} aria-hidden="true" /></button></td><td>{hook.level === 'command' ? 'Команда' : hook.level}</td><td><code>{hook.command}</code></td><td><code>{hook.timing}</code></td><td class="scheduler-enabled">{hook.enabled ? 'Да' : 'Нет'}</td><td><code>{hook.hook}</code></td></tr>{/each}{/if}
                 </tbody></table>
               </div>
-              <footer class="log-pagination scheduler-pagination hooks-pagination"><span>{filteredHooks.length ? `${(hookPage - 1) * hookPageSize + 1}–${Math.min(hookPage * hookPageSize, filteredHooks.length)} из ${filteredHooks.length}` : '0 хуков'}</span><div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={hookPage === 1 || hooksLoading} onclick={() => hookPage -= 1}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={hookPage >= hookPageCount || hooksLoading} onclick={() => hookPage += 1}>Вперёд</button></div><div class="log-page-size" aria-label="Количество хуков на странице"><Combobox collection={pageSizeCollection} value={[String(hookPageSize)]} openOnClick onValueChange={(details) => { if (details.value[0]) { hookPageSize = Number(details.value[0]); hookPage = 1; } }}><Combobox.Control class="page-size-control font-combobox-control"><Combobox.Input class="font-combobox-input" aria-label="Количество хуков на странице" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each [25, 50, 100] as value}<Combobox.Item item={{ value: String(value), label: String(value) }} class="font-combobox-item"><Combobox.ItemText>{value}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></div></footer>
+              <footer class="log-pagination scheduler-pagination hooks-pagination"><span>{filteredHooks.length ? `${(hookPage - 1) * hookPageSize + 1}–${Math.min(hookPage * hookPageSize, filteredHooks.length)} из ${filteredHooks.length}` : '0 хуков'}</span><div class="log-pagination-controls"><button class="btn btn-sm preset-tonal" type="button" disabled={hookPage === 1 || hooksLoading} onclick={() => hookPage -= 1}>Назад</button><button class="btn btn-sm preset-tonal" type="button" disabled={hookPage >= hookPageCount || hooksLoading} onclick={() => hookPage += 1}>Вперёд</button></div><PageSizeSelect value={hookPageSize} label="Количество хуков на странице" onChange={(size) => { hookPageSize = size; hookPage = 1; }} /></footer>
             </div>
             {:else}
               <HttpRefreshBoundary coordinator={pageRefresh} refresh={loadSecuritySettings} />
