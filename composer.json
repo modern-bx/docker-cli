@@ -45,12 +45,17 @@
         "fix": "php-cs-fixer fix && php scripts/check-line-length.php"
     },
     "require-dev": {
-        "phpunit/phpunit": "^13.0",
+        "phpunit/phpunit": "^11.5",
         "friendsofphp/php-cs-fixer": "^3.89"
     },
     "autoload-dev": {
         "psr-4": {
             "DockerCli\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "platform": {
+            "php": "8.2.0"
         }
     }
 }
