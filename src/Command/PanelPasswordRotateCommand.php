@@ -13,32 +13,32 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-final class PanelPasswordRotateCommand extends AbstractCommand
-{
-    public function __construct()
-    {
-        parent::__construct('panel:password-rotate');
-        $this->setDescription('Сгенерировать новые пароли пользователям панели.');
-        $this->addArgument('users', InputArgument::REQUIRED, 'Логины пользователей через запятую.');
+final class PanelPasswordRotateCommand extends AbstractCommand {
+    public function __construct() {
+        parent::__construct("panel:password-rotate");
+        $this->setDescription("Сгенерировать новые пароли пользователям панели.");
+        $this->addArgument("users", InputArgument::REQUIRED, "Логины пользователей через запятую.");
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int
-    {
-        $value = $input->getArgument('users');
-        $logins = array_values(array_filter(array_map('trim', explode(',', is_string($value) ? $value : ''))));
+    protected function execute(InputInterface $input, OutputInterface $output): int {
+        $value = $input->getArgument("users");
+        $logins = array_values(array_filter(array_map("trim", explode(",", is_string($value) ? $value : ""))));
         try {
             $logins = array_map(UserRepository::normalizeLogin(...), $logins);
         } catch (\InvalidArgumentException $exception) {
-            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, "<error>" . $exception->getMessage() . "</error>");
             return Command::INVALID;
         }
         if ($logins === []) {
-            $this->writeMessage($output, '<error>Укажите хотя бы одного пользователя.</error>');
+            $this->writeMessage($output, "<error>Укажите хотя бы одного пользователя.</error>");
             return Command::INVALID;
         }
-        $salt = (new SystemCompose())->envValue('PANEL_PASSWORD_SALT');
-        if ($salt === '') {
-            $this->writeMessage($output, '<error>Соль паролей не настроена. Выполните `docker-cli config:init`.</error>');
+        $salt = (new SystemCompose())->envValue("PANEL_PASSWORD_SALT");
+        if ($salt === "") {
+            $this->writeMessage(
+                $output,
+                "<error>Соль паролей не настроена. Выполните " . "`docker-cli config:init`.</error>",
+            );
             return Command::FAILURE;
         }
         $users = new UserRepository($salt);
@@ -48,12 +48,15 @@ final class PanelPasswordRotateCommand extends AbstractCommand
         foreach (array_unique($logins) as $login) {
             $password = $generator->generate();
             if (!$users->rotatePassword($login, $password)) {
-                $this->writeMessage($output, sprintf('<error>Пользователь %s не существует.</error>', $login));
+                $this->writeMessage($output, sprintf("<error>Пользователь %s не существует.</error>", $login));
                 $failed = true;
                 continue;
             }
             $revoked = $tokens->revoke([$login]);
-            $this->writeMessage($output, sprintf('<info>%s: %s (отозвано токенов: %d)</info>', $login, $password, $revoked));
+            $this->writeMessage(
+                $output,
+                sprintf("<info>%s: %s (отозвано токенов: %d)</info>", $login, $password, $revoked),
+            );
         }
         return $failed ? Command::FAILURE : Command::SUCCESS;
     }

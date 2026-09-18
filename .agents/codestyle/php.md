@@ -19,6 +19,8 @@ namespace Acme\Cli\Service;
 ## 2. Формат и структура
 
 - 4 пробела; tab запрещён.
+- Фигурные скобки открываются в стиле K&R: на той же строке, что объявление или управляющая конструкция.
+- Максимальная длина строки — 120 символов; более длинные выражения MUST быть аккуратно перенесены.
 - LF, UTF-8, final newline.
 - Один основной class/interface/trait/enum на файл.
 - Namespace соответствует PSR-4 пути.
@@ -52,8 +54,7 @@ PHPDoc не должен повторять native types без добавочн
 Пример:
 
 ```php
-final readonly class ExportRequest
-{
+final readonly class ExportRequest {
     public function __construct(
         public string $format,
         public string $destination,

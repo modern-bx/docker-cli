@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace DockerCli\Panel;
 
+use DockerCli\Panel\NotificationActionException as NotificationError;
+use DockerCli\Panel\ProjectActionException as ProjectError;
+use DockerCli\Panel\QueueActionException as QueueError;
+use DockerCli\Panel\SystemActionException as SystemError;
 use DockerCli\Panel\Dto\ErrorResponseDto;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Panel\Http\ControllerInvoker;
@@ -13,14 +17,14 @@ use DockerCli\Panel\Http\ResponseEmitter;
 use DockerCli\Panel\Http\UnauthorizedException;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
+
+use function FastRoute\simpleDispatcher;
+
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use React\Http\Message\Response;
 
-use function FastRoute\simpleDispatcher;
-
-final readonly class Router
-{
+final readonly class Router {
     private Dispatcher $dispatcher;
 
     /** @param list<object> $controllers */
@@ -39,7 +43,13 @@ final readonly class Router
                         continue;
                     }
                     if ($attributes === []) {
-                        throw new \LogicException(sprintf('Public controller method %s::%s() must declare a Route attribute.', $controller::class, $method->getName()));
+                        throw new \LogicException(
+                            sprintf(
+                                "Public controller method %s::%s() must declare a Route attribute.",
+                                $controller::class,
+                                $method->getName(),
+                            ),
+                        );
                     }
                     foreach ($attributes as $attribute) {
                         $route = $attribute->newInstance();
@@ -50,25 +60,31 @@ final readonly class Router
         });
     }
 
-    public function __invoke(ServerRequestInterface $request): ResponseInterface
-    {
+    public function __invoke(ServerRequestInterface $request): ResponseInterface {
         $match = $this->dispatcher->dispatch($request->getMethod(), $request->getUri()->getPath());
         if ($match[0] === Dispatcher::NOT_FOUND) {
-            return $this->responses->json(404, new ErrorResponseDto('Страница не найдена.'));
+            return $this->responses->json(404, new ErrorResponseDto("Страница не найдена."));
         }
         if ($match[0] === Dispatcher::METHOD_NOT_ALLOWED) {
-            return new Response(405, ['Allow' => implode(', ', $match[1])]);
+            return new Response(405, ["Allow" => implode(", ", $match[1])]);
         }
 
         [$controller, $method, $route] = $match[1];
-        $handler = function (ServerRequestInterface $request) use ($controller, $method, $route, $match): ResponseInterface {
+        $handler = function (ServerRequestInterface $request) use (
+            $controller,
+            $method,
+            $route,
+            $match,
+        ): ResponseInterface {
             try {
-                return $this->responses->emit($this->invoker->invoke($controller, $method, $route, $request, $match[2]));
+                return $this->responses->emit(
+                    $this->invoker->invoke($controller, $method, $route, $request, $match[2]),
+                );
             } catch (RequestValidationException $exception) {
                 return $this->responses->json(400, new ErrorResponseDto($exception->getMessage()));
             } catch (UnauthorizedException $exception) {
                 return $this->responses->json(401, new ErrorResponseDto($exception->getMessage()));
-            } catch (ProjectActionException|QueueActionException|SystemActionException|NotificationActionException $exception) {
+            } catch (ProjectError | QueueError | SystemError | NotificationError $exception) {
                 return $this->responses->json($exception->httpStatus, new ErrorResponseDto($exception->getMessage()));
             }
         };

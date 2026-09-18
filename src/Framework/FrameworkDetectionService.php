@@ -11,36 +11,26 @@ use DockerCli\Framework\Detector\FrameworkDetectorInterface;
 use DockerCli\Framework\Detector\LaravelDetector;
 use DockerCli\Framework\Detector\SymfonyDetector;
 
-final class FrameworkDetectionService
-{
+final class FrameworkDetectionService {
     /** @var list<FrameworkDetectorInterface> */
     private readonly array $detectors;
 
     /** @param list<FrameworkDetectorInterface>|null $detectors */
-    public function __construct(?array $detectors = null)
-    {
+    public function __construct(?array $detectors = null) {
         $this->detectors = $detectors ?? self::defaultDetectors();
     }
 
-    public static function createDefault(): self
-    {
+    public static function createDefault(): self {
         return new self();
     }
 
     /** @return list<FrameworkDetectorInterface> */
-    private static function defaultDetectors(): array
-    {
-        return [
-            new Bitrix24Detector(),
-            new BitrixDetector(),
-            new LaravelDetector(),
-            new SymfonyDetector(),
-        ];
+    private static function defaultDetectors(): array {
+        return [new Bitrix24Detector(), new BitrixDetector(), new LaravelDetector(), new SymfonyDetector()];
     }
 
-    public function detect(?string $projectRoot = null): ?DetectedFramework
-    {
-        $projectRoot = $this->normalizeProjectRoot($projectRoot ?? getcwd() ?: '.');
+    public function detect(?string $projectRoot = null): ?DetectedFramework {
+        $projectRoot = $this->normalizeProjectRoot($projectRoot ?? getcwd() ?: ".");
 
         do {
             foreach ($this->detectors as $detector) {
@@ -59,11 +49,12 @@ final class FrameworkDetectionService
         } while (true);
     }
 
-    private function normalizeProjectRoot(string $projectRoot): string
-    {
+    private function normalizeProjectRoot(string $projectRoot): string {
         $realPath = realpath($projectRoot);
         if ($realPath === false || !is_dir($realPath)) {
-            throw new \InvalidArgumentException(sprintf('Project root "%s" does not exist or is not a directory.', $projectRoot));
+            throw new \InvalidArgumentException(
+                sprintf('Project root "%s" does not exist or is not a directory.', $projectRoot),
+            );
         }
 
         return rtrim($realPath, DIRECTORY_SEPARATOR);

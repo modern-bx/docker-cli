@@ -5,47 +5,49 @@ declare(strict_types=1);
 namespace DockerCli\Project;
 
 use DockerCli\Config\SystemCompose;
-use Symfony\Component\Yaml\Yaml;
+
 use function DockerCli\Util\join_path;
 
-final class OpenRestyHostRenderer
-{
-    private const HOSTS_RELATIVE_PATH = 'config/openresty/hosts';
-    private const PROJECT_WEB_DNSDOCK_ALIAS = 'PROJECT_WEB_DNSDOCK_ALIAS';
-    private const HTTP_AUTH_CONFIG_FILE = 'http-auth.conf';
-    private const HTTP_AUTH_MAP_FILE = '00-http-auth-map.conf';
-    private const HTTP_AUTH_USER_FILE = '.htpasswd';
+use Symfony\Component\Yaml\Yaml;
 
-    public function render(): void
-    {
+final class OpenRestyHostRenderer {
+    private const HOSTS_RELATIVE_PATH = "config/openresty/hosts";
+    private const PROJECT_WEB_DNSDOCK_ALIAS = "PROJECT_WEB_DNSDOCK_ALIAS";
+    private const HTTP_AUTH_CONFIG_FILE = "http-auth.conf";
+    private const HTTP_AUTH_MAP_FILE = "00-http-auth-map.conf";
+    private const HTTP_AUTH_USER_FILE = ".htpasswd";
+
+    public function render(): void {
         $compose = new SystemCompose();
         $hostsDirectory = $this->hostsDirectory($compose);
         if (!is_dir($hostsDirectory) && !mkdir($hostsDirectory, 0755, true) && !is_dir($hostsDirectory)) {
             throw new \RuntimeException(sprintf('Unable to create OpenResty hosts directory "%s".', $hostsDirectory));
         }
 
-        foreach (glob(join_path($hostsDirectory, '*.web.conf')) ?: [] as $hostFile) {
+        foreach (glob(join_path($hostsDirectory, "*.web.conf")) ?: [] as $hostFile) {
             unlink($hostFile);
         }
 
         $envValues = $this->readEnvValues($compose->envFile());
-        $baseHost = $this->requiredEnvValue($envValues, 'BASE_HOST', $compose->envFile());
+        $baseHost = $this->requiredEnvValue($envValues, "BASE_HOST", $compose->envFile());
         $openRestyPort = $this->openRestyPort($envValues, $compose->envFile());
         $httpAuthConfig = $this->httpAuthConfig($envValues, $hostsDirectory);
-        $this->renderHttpAuthMap($envValues, $hostsDirectory, $httpAuthConfig !== '');
+        $this->renderHttpAuthMap($envValues, $hostsDirectory, $httpAuthConfig !== "");
         $hostNames = [];
         $disabledHostNames = [];
         foreach ($this->registeredProjects() as $project) {
-            $hostName = sprintf('web-%s.%s', $project['name'], $baseHost);
+            $hostName = sprintf("web-%s.%s", $project["name"], $baseHost);
             $hostNames[] = $hostName;
-            if (!$project['enabled']) {
+            if (!$project["enabled"]) {
                 $disabledHostNames[] = $hostName;
                 continue;
             }
 
-            $template = $this->templateFile($project['framework']);
+            $template = $this->templateFile($project["framework"]);
             if (!is_file($template)) {
-                throw new \RuntimeException(sprintf('OpenResty host template for framework "%s" not found.', $project['framework']));
+                throw new \RuntimeException(
+                    sprintf('OpenResty host template for framework "%s" not found.', $project["framework"]),
+                );
             }
 
             $contents = file_get_contents($template);
@@ -53,16 +55,19 @@ final class OpenRestyHostRenderer
                 throw new \RuntimeException(sprintf('Unable to read OpenResty host template "%s".', $template));
             }
 
-            $target = join_path($hostsDirectory, $project['name'] . '.web.conf');
-            file_put_contents($target, strtr($contents, [
-                '{{ project_name }}' => $project['name'],
-                '{{ host_name }}' => $hostName,
-                '{{ document_root }}' => $this->containerDocumentRoot($project['document_root']),
-                '{{ php_fpm_upstream }}' => $this->phpFpmUpstream($project),
-                '{{ xdebug_client_port }}' => (string) ($project['xdebug_client_port'] ?? 9003),
-                '{{ openresty_port }}' => (string) $openRestyPort,
-                '{{ http_auth_config }}' => $httpAuthConfig,
-            ]));
+            $target = join_path($hostsDirectory, $project["name"] . ".web.conf");
+            file_put_contents(
+                $target,
+                strtr($contents, [
+                    "{{ project_name }}" => $project["name"],
+                    "{{ host_name }}" => $hostName,
+                    "{{ document_root }}" => $this->containerDocumentRoot($project["document_root"]),
+                    "{{ php_fpm_upstream }}" => $this->phpFpmUpstream($project),
+                    "{{ xdebug_client_port }}" => (string) ($project["xdebug_client_port"] ?? 9003),
+                    "{{ openresty_port }}" => (string) $openRestyPort,
+                    "{{ http_auth_config }}" => $httpAuthConfig,
+                ]),
+            );
         }
 
         $this->renderFallbackHost($hostsDirectory, $openRestyPort, [$baseHost, ...$disabledHostNames], $httpAuthConfig);
@@ -70,48 +75,54 @@ final class OpenRestyHostRenderer
         $this->writeProjectWebDnsdockAliases($compose->envFile(), $hostNames);
     }
 
-    public function hostsDirectory(SystemCompose $compose): string
-    {
+    public function hostsDirectory(SystemCompose $compose): string {
         return join_path($compose->directory(), self::HOSTS_RELATIVE_PATH);
     }
 
-    /** @return list<array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?: int, language?: string, language_version?: string}> */
-    private function registeredProjects(): array
-    {
+    /**
+     * @return list<array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?:
+     * int, language?: string, language_version?: string}>
+     */
+    private function registeredProjects(): array {
         $projectsDirectory = $this->projectsDirectory();
         if (!is_dir($projectsDirectory)) {
             return [];
         }
 
         $projects = [];
-        foreach (glob(join_path($projectsDirectory, '*', 'project.yaml')) ?: [] as $projectFile) {
+        foreach (glob(join_path($projectsDirectory, "*", "project.yaml")) ?: [] as $projectFile) {
             $data = Yaml::parseFile($projectFile);
             if (!is_array($data)) {
                 continue;
             }
 
-            $project = $data['data']['project'] ?? null;
+            $project = $data["data"]["project"] ?? null;
             if (!is_array($project)) {
                 continue;
             }
 
-            $name = $project['name'] ?? null;
-            $framework = $project['framework'] ?? null;
-            $documentRoot = $project['document_root'] ?? null;
+            $name = $project["name"] ?? null;
+            $framework = $project["framework"] ?? null;
+            $documentRoot = $project["document_root"] ?? null;
             if (is_string($name) && $framework === null && is_string($documentRoot)) {
-                $framework = 'generic';
+                $framework = "generic";
             }
 
             if (is_string($name) && is_string($framework) && is_string($documentRoot)) {
-                $projects[] = array_filter([
-                    'name' => $name,
-                    'enabled' => ($project['enabled'] ?? true) !== false,
-                    'framework' => $framework,
-                    'language' => is_string($project['language'] ?? null) ? $project['language'] : null,
-                    'language_version' => PhpLanguageVersion::isSupported($project['language_version'] ?? null) ? $project['language_version'] : null,
-                    'document_root' => $documentRoot,
-                    'xdebug_client_port' => $this->xdebugClientPort($project),
-                ], static fn (mixed $value): bool => $value !== null);
+                $projects[] = array_filter(
+                    [
+                        "name" => $name,
+                        "enabled" => ($project["enabled"] ?? true) !== false,
+                        "framework" => $framework,
+                        "language" => is_string($project["language"] ?? null) ? $project["language"] : null,
+                        "language_version" => PhpLanguageVersion::isSupported($project["language_version"] ?? null)
+                            ? $project["language_version"]
+                            : null,
+                        "document_root" => $documentRoot,
+                        "xdebug_client_port" => $this->xdebugClientPort($project),
+                    ],
+                    static fn(mixed $value): bool => $value !== null,
+                );
             }
         }
 
@@ -119,24 +130,38 @@ final class OpenRestyHostRenderer
     }
 
     /** @param list<string> $hostNames */
-    private function renderFallbackHost(string $hostsDirectory, int $port, array $hostNames, string $httpAuthConfig): void
-    {
-        $template = join_path(dirname(__DIR__, 2), 'resources', 'compose', 'system', 'config', 'openresty', 'fallback.conf');
+    private function renderFallbackHost(
+        string $hostsDirectory,
+        int $port,
+        array $hostNames,
+        string $httpAuthConfig,
+    ): void {
+        $template = join_path(
+            dirname(__DIR__, 2),
+            "resources",
+            "compose",
+            "system",
+            "config",
+            "openresty",
+            "fallback.conf",
+        );
         $contents = file_get_contents($template);
         if ($contents === false) {
             throw new \RuntimeException(sprintf('Unable to read OpenResty fallback template "%s".', $template));
         }
 
-        file_put_contents(join_path($hostsDirectory, 'fallback.web.conf'), strtr($contents, [
-            '{{ openresty_port }}' => (string) $port,
-            '{{ host_names }}' => implode(' ', $hostNames),
-            '{{ http_auth_config }}' => $httpAuthConfig,
-        ]));
+        file_put_contents(
+            join_path($hostsDirectory, "fallback.web.conf"),
+            strtr($contents, [
+                "{{ openresty_port }}" => (string) $port,
+                "{{ host_names }}" => implode(" ", $hostNames),
+                "{{ http_auth_config }}" => $httpAuthConfig,
+            ]),
+        );
     }
 
     /** @param array<string, string> $envValues */
-    private function httpAuthConfig(array $envValues, string $hostsDirectory): string
-    {
+    private function httpAuthConfig(array $envValues, string $hostsDirectory): string {
         $legacyConfig = join_path($hostsDirectory, self::HTTP_AUTH_CONFIG_FILE);
         if (is_file($legacyConfig)) {
             unlink($legacyConfig);
@@ -147,13 +172,12 @@ final class OpenRestyHostRenderer
             $hostsDirectory,
             null,
             self::HTTP_AUTH_USER_FILE,
-            '/etc/nginx/conf.d/' . self::HTTP_AUTH_USER_FILE
+            "/etc/nginx/conf.d/" . self::HTTP_AUTH_USER_FILE,
         );
     }
 
     /** @param array<string, string> $envValues */
-    private function renderHttpAuthMap(array $envValues, string $hostsDirectory, bool $enabled): void
-    {
+    private function renderHttpAuthMap(array $envValues, string $hostsDirectory, bool $enabled): void {
         $mapPath = join_path($hostsDirectory, self::HTTP_AUTH_MAP_FILE);
         if (!$enabled) {
             if (is_file($mapPath)) {
@@ -167,9 +191,8 @@ final class OpenRestyHostRenderer
     }
 
     /** @param array<string, mixed> $project */
-    private function xdebugClientPort(array $project): int
-    {
-        $port = $project['xdebug']['client_port'] ?? null;
+    private function xdebugClientPort(array $project): int {
+        $port = $project["xdebug"]["client_port"] ?? null;
         if (is_int($port)) {
             return $port;
         }
@@ -181,55 +204,67 @@ final class OpenRestyHostRenderer
         return 9003;
     }
 
-    /** @param array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?: int, language?: string, language_version?: string} $project */
-    private function phpFpmUpstream(array $project): string
-    {
-        $language = $project['language'] ?? 'php';
-        $version = $project['language_version'] ?? PhpLanguageVersion::default();
+    /**
+     * @param array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?: int,
+     * language?: string, language_version?: string} $project
+     */
+    private function phpFpmUpstream(array $project): string {
+        $language = $project["language"] ?? "php";
+        $version = $project["language_version"] ?? PhpLanguageVersion::default();
 
-        if ($language !== 'php') {
+        if ($language !== "php") {
             throw new \RuntimeException(sprintf('Unsupported project language "%s" for PHP-FPM upstream.', $language));
         }
 
-        return sprintf('php-fpm-%s:9000', $version);
+        return sprintf("php-fpm-%s:9000", $version);
     }
 
-    private function projectsDirectory(): string
-    {
-        $home = getenv('HOME') ?: throw new \RuntimeException('HOME environment variable is not set.');
+    private function projectsDirectory(): string {
+        $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
 
-        return join_path($home, '.config', 'docker-cli', 'state', 'projects');
+        return join_path($home, ".config", "docker-cli", "state", "projects");
     }
 
-    private function templateFile(string $framework): string
-    {
-        return join_path(dirname(__DIR__, 2), 'resources', 'compose', 'system', self::HOSTS_RELATIVE_PATH, $framework, 'web.conf');
+    private function templateFile(string $framework): string {
+        return join_path(
+            dirname(__DIR__, 2),
+            "resources",
+            "compose",
+            "system",
+            self::HOSTS_RELATIVE_PATH,
+            $framework,
+            "web.conf",
+        );
     }
 
-    private function containerDocumentRoot(string $documentRoot): string
-    {
-        if ($documentRoot === '/home' || str_starts_with($documentRoot, '/home/')) {
+    private function containerDocumentRoot(string $documentRoot): string {
+        if ($documentRoot === "/home" || str_starts_with($documentRoot, "/home/")) {
             return $documentRoot;
         }
 
-        return join_path('/host', $documentRoot);
+        return join_path("/host", $documentRoot);
     }
 
     /** @return array<string, string> */
-    private function readEnvValues(string $envFile): array
-    {
+    private function readEnvValues(string $envFile): array {
         if (!is_file($envFile)) {
-            throw new \RuntimeException(sprintf('Env file "%s" not found. Run docker-cli config:init and set BASE_HOST before rendering OpenResty hosts.', $envFile));
+            throw new \RuntimeException(
+                sprintf(
+                    'Env file "%s" not found. Run docker-cli config:init and set BASE_HOST before ' .
+                        "rendering OpenResty hosts.",
+                    $envFile,
+                ),
+            );
         }
 
         $values = [];
         foreach (file($envFile, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
             $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+            if ($line === "" || str_starts_with($line, "#") || !str_contains($line, "=")) {
                 continue;
             }
 
-            [$key, $value] = explode('=', $line, 2);
+            [$key, $value] = explode("=", $line, 2);
             $values[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
         }
 
@@ -237,38 +272,51 @@ final class OpenRestyHostRenderer
     }
 
     /** @param array<string, string> $envValues */
-    private function requiredEnvValue(array $envValues, string $key, string $envFile): string
-    {
+    private function requiredEnvValue(array $envValues, string $key, string $envFile): string {
         if (!array_key_exists($key, $envValues)) {
-            throw new \RuntimeException(sprintf('%s is not defined in env file "%s". Set your own domain before rendering OpenResty hosts.', $key, $envFile));
+            throw new \RuntimeException(
+                sprintf(
+                    '%s is not defined in env file "%s". Set your own domain before rendering OpenResty hosts.',
+                    $key,
+                    $envFile,
+                ),
+            );
         }
 
-        if ($envValues[$key] === '') {
-            throw new \RuntimeException(sprintf('%s is empty in env file "%s". Set your own domain before rendering OpenResty hosts.', $key, $envFile));
+        if ($envValues[$key] === "") {
+            throw new \RuntimeException(
+                sprintf(
+                    '%s is empty in env file "%s". Set your own domain before rendering OpenResty hosts.',
+                    $key,
+                    $envFile,
+                ),
+            );
         }
 
         return $envValues[$key];
     }
 
     /** @param array<string, string> $envValues */
-    private function openRestyPort(array $envValues, string $envFile): int
-    {
-        $port = $envValues['OPENRESTY_PORT'] ?? '80';
+    private function openRestyPort(array $envValues, string $envFile): int {
+        $port = $envValues["OPENRESTY_PORT"] ?? "80";
         if (!ctype_digit($port)) {
-            throw new \RuntimeException(sprintf('OPENRESTY_PORT must be a number from 1 to 65535 in env file "%s".', $envFile));
+            throw new \RuntimeException(
+                sprintf('OPENRESTY_PORT must be a number from 1 to 65535 in env file "%s".', $envFile),
+            );
         }
 
         $portNumber = (int) $port;
         if ($portNumber < 1 || $portNumber > 65535) {
-            throw new \RuntimeException(sprintf('OPENRESTY_PORT must be a number from 1 to 65535 in env file "%s".', $envFile));
+            throw new \RuntimeException(
+                sprintf('OPENRESTY_PORT must be a number from 1 to 65535 in env file "%s".', $envFile),
+            );
         }
 
         return $portNumber;
     }
 
     /** @param list<string> $hostNames */
-    private function writeProjectWebDnsdockAliases(string $envFile, array $hostNames): void
-    {
+    private function writeProjectWebDnsdockAliases(string $envFile, array $hostNames): void {
         if (!is_file($envFile)) {
             return;
         }
@@ -278,9 +326,9 @@ final class OpenRestyHostRenderer
             throw new \RuntimeException(sprintf('Unable to read env file "%s".', $envFile));
         }
 
-        $line = self::PROJECT_WEB_DNSDOCK_ALIAS . '=' . implode(',', $hostNames);
-        if (preg_match('/^' . self::PROJECT_WEB_DNSDOCK_ALIAS . '=.*$/m', $contents) === 1) {
-            $updated = preg_replace('/^' . self::PROJECT_WEB_DNSDOCK_ALIAS . '=.*$/m', $line, $contents);
+        $line = self::PROJECT_WEB_DNSDOCK_ALIAS . "=" . implode(",", $hostNames);
+        if (preg_match("/^" . self::PROJECT_WEB_DNSDOCK_ALIAS . '=.*$/m', $contents) === 1) {
+            $updated = preg_replace("/^" . self::PROJECT_WEB_DNSDOCK_ALIAS . '=.*$/m', $line, $contents);
             if ($updated === null) {
                 throw new \RuntimeException(sprintf('Unable to update env file "%s".', $envFile));
             }
@@ -290,7 +338,7 @@ final class OpenRestyHostRenderer
             return;
         }
 
-        $separator = str_ends_with($contents, PHP_EOL) || $contents === '' ? '' : PHP_EOL;
+        $separator = str_ends_with($contents, PHP_EOL) || $contents === "" ? "" : PHP_EOL;
         file_put_contents($envFile, $contents . $separator . $line . PHP_EOL);
     }
 }

@@ -10,26 +10,21 @@ use DockerCli\Panel\Dto\Request\ProjectsSettingsRequestDto;
 use DockerCli\Panel\Http\Attribute\Route;
 use DockerCli\Panel\Http\RequestValidationException;
 
-final readonly class ProjectsSettingsController
-{
-    public function __construct(private ProjectsSettingsRepository $settings)
-    {
-    }
+final readonly class ProjectsSettingsController {
+    public function __construct(private ProjectsSettingsRepository $settings) {}
 
-    #[Route('GET', '/api/settings/projects', EmptyRequestDto::class, ProjectsSettingsDto::class)]
-    public function get(EmptyRequestDto $request): ProjectsSettingsDto
-    {
+    #[Route("GET", "/api/settings/projects", EmptyRequestDto::class, ProjectsSettingsDto::class)]
+    public function get(EmptyRequestDto $request): ProjectsSettingsDto {
         return new ProjectsSettingsDto($this->settings->locations(), $this->settings->databaseLocations());
     }
 
-    #[Route('POST', '/api/settings/projects', ProjectsSettingsRequestDto::class, ProjectsSettingsDto::class)]
-    public function save(ProjectsSettingsRequestDto $request): ProjectsSettingsDto
-    {
+    #[Route("POST", "/api/settings/projects", ProjectsSettingsRequestDto::class, ProjectsSettingsDto::class)]
+    public function save(ProjectsSettingsRequestDto $request): ProjectsSettingsDto {
         try {
             $settings = $this->settings->save($request->locations, $request->databaseLocations);
         } catch (\InvalidArgumentException $exception) {
             throw new RequestValidationException($exception->getMessage());
         }
-        return new ProjectsSettingsDto($settings['locations'], $settings['databaseLocations']);
+        return new ProjectsSettingsDto($settings["locations"], $settings["databaseLocations"]);
     }
 }

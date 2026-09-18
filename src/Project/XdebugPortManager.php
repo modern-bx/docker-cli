@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace DockerCli\Project;
 
-use Symfony\Component\Yaml\Yaml;
 use function DockerCli\Util\join_path;
 
-final class XdebugPortManager
-{
+use Symfony\Component\Yaml\Yaml;
+
+final class XdebugPortManager {
     private const FIRST_PROJECT_PORT = 9004;
 
-    public function nextPort(string $projectsDirectory): int
-    {
+    public function nextPort(string $projectsDirectory): int {
         $port = self::FIRST_PROJECT_PORT;
         $usedPorts = $this->registeredPorts($projectsDirectory);
 
@@ -23,13 +22,12 @@ final class XdebugPortManager
         return $port;
     }
 
-    public function rebuildProjectPorts(string $projectsDirectory): bool
-    {
+    public function rebuildProjectPorts(string $projectsDirectory): bool {
         if (!is_dir($projectsDirectory)) {
             return false;
         }
 
-        $projectFiles = glob(join_path($projectsDirectory, '*', 'project.yaml')) ?: [];
+        $projectFiles = glob(join_path($projectsDirectory, "*", "project.yaml")) ?: [];
         sort($projectFiles);
 
         $changed = false;
@@ -41,14 +39,14 @@ final class XdebugPortManager
                 continue;
             }
 
-            if (!isset($data['data']) || !is_array($data['data'])) {
-                $data['data'] = [];
+            if (!isset($data["data"]) || !is_array($data["data"])) {
+                $data["data"] = [];
             }
-            if (!isset($data['data']['project']) || !is_array($data['data']['project'])) {
+            if (!isset($data["data"]["project"]) || !is_array($data["data"]["project"])) {
                 continue;
             }
 
-            $currentPort = $data['data']['project']['xdebug']['client_port'] ?? null;
+            $currentPort = $data["data"]["project"]["xdebug"]["client_port"] ?? null;
             if ($this->portNumber($currentPort) !== null) {
                 continue;
             }
@@ -57,10 +55,10 @@ final class XdebugPortManager
                 ++$port;
             }
 
-            if (!isset($data['data']['project']['xdebug']) || !is_array($data['data']['project']['xdebug'])) {
-                $data['data']['project']['xdebug'] = [];
+            if (!isset($data["data"]["project"]["xdebug"]) || !is_array($data["data"]["project"]["xdebug"])) {
+                $data["data"]["project"]["xdebug"] = [];
             }
-            $data['data']['project']['xdebug']['client_port'] = $port;
+            $data["data"]["project"]["xdebug"]["client_port"] = $port;
             file_put_contents($projectFile, Yaml::dump($data, 4, 2));
             $usedPorts[] = $port;
             $changed = true;
@@ -72,20 +70,19 @@ final class XdebugPortManager
     }
 
     /** @return list<int> */
-    private function registeredPorts(string $projectsDirectory): array
-    {
+    private function registeredPorts(string $projectsDirectory): array {
         if (!is_dir($projectsDirectory)) {
             return [];
         }
 
         $ports = [];
-        foreach (glob(join_path($projectsDirectory, '*', 'project.yaml')) ?: [] as $projectFile) {
+        foreach (glob(join_path($projectsDirectory, "*", "project.yaml")) ?: [] as $projectFile) {
             $data = Yaml::parseFile($projectFile);
             if (!is_array($data)) {
                 continue;
             }
 
-            $port = $this->portNumber($data['data']['project']['xdebug']['client_port'] ?? null);
+            $port = $this->portNumber($data["data"]["project"]["xdebug"]["client_port"] ?? null);
             if ($port !== null) {
                 $ports[] = $port;
             }
@@ -94,8 +91,7 @@ final class XdebugPortManager
         return $ports;
     }
 
-    private function portNumber(mixed $port): ?int
-    {
+    private function portNumber(mixed $port): ?int {
         if (is_int($port)) {
             return $port;
         }

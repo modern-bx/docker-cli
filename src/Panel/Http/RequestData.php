@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace DockerCli\Panel\Http;
 
-final readonly class RequestData
-{
+final readonly class RequestData {
     /** @param array<string, string> $route @param array<string, mixed> $body @param array<string, mixed> $query */
     public function __construct(
         public array $route,
@@ -13,7 +12,5 @@ final readonly class RequestData
         public array $query,
         public ?string $login,
         public ?int $sessionStartedAt,
-    )
-    {
-    }
+    ) {}
 }

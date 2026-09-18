@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace DockerCli\Project;
 
-final class DatabasePasswordGenerator
-{
-    public function generate(): string
-    {
-        $lowercase = 'abcdefghijklmnopqrstuvwxyz';
-        $uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        $digits = '0123456789';
+final class DatabasePasswordGenerator {
+    public function generate(): string {
+        $lowercase = "abcdefghijklmnopqrstuvwxyz";
+        $uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        $digits = "0123456789";
         $alphabet = $lowercase . $uppercase . $digits;
         $characters = [
             $lowercase[random_int(0, strlen($lowercase) - 1)],
@@ -27,6 +25,6 @@ final class DatabasePasswordGenerator
             [$characters[$i], $characters[$position]] = [$characters[$position], $characters[$i]];
         }
 
-        return implode('', $characters);
+        return implode("", $characters);
     }
 }

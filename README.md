@@ -52,3 +52,16 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+## Разработка
+
+После установки PHP-зависимостей полную локальную проверку изменений запускает
+единая команда:
+
+```bash
+composer install
+composer quality
+```
+
+`composer quality` проверяет синтаксис PHP-файлов и запускает автотесты. Отдельно тесты
+можно запустить через `composer test`.

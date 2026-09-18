@@ -7,15 +7,16 @@ namespace DockerCli\Command;
 use DockerCli\Notification\NotificationRepository;
 use DockerCli\Project\ProjectRegistry;
 use DockerCli\Task\TaskRepository;
+
+use function DockerCli\Util\join_path;
+
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use function DockerCli\Util\join_path;
 
-final class TaskRunCommand extends AbstractCommand
-{
+final class TaskRunCommand extends AbstractCommand {
     /** @var array<string, array{message: string, level: string}> */
     private array $journal = [];
 
@@ -24,35 +25,52 @@ final class TaskRunCommand extends AbstractCommand
         private readonly ?ProjectRegistry $registry = null,
         private readonly ?NotificationRepository $notifications = null,
     ) {
-        parent::__construct('task:run');
-        $this->setDescription('Найти и выполнить пользовательскую задачу.');
-        $this->addOption('project', null, InputOption::VALUE_REQUIRED, 'Код зарегистрированного проекта для задачи с context: project.');
-        $this->addOption('no-delete', null, InputOption::VALUE_NONE, 'Не удалять скомпилированный временный скрипт после выполнения.');
-        $this->addArgument('task-code', InputArgument::REQUIRED, 'Код задачи.');
-        $this->addArgument('task-args', InputArgument::IS_ARRAY, 'Значения параметров: name=value или позиционные значения в порядке спеки.');
+        parent::__construct("task:run");
+        $this->setDescription("Найти и выполнить пользовательскую задачу.");
+        $this->addOption(
+            "project",
+            null,
+            InputOption::VALUE_REQUIRED,
+            "Код зарегистрированного проекта для " . "задачи с context: project.",
+        );
+        $this->addOption(
+            "no-delete",
+            null,
+            InputOption::VALUE_NONE,
+            "Не удалять скомпилированный временный " . "скрипт после выполнения.",
+        );
+        $this->addArgument("task-code", InputArgument::REQUIRED, "Код задачи.");
+        $this->addArgument(
+            "task-args",
+            InputArgument::IS_ARRAY,
+            "Значения параметров: name=value или позиционные " . "значения в порядке спеки.",
+        );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int
-    {
-        $code = (string) $input->getArgument('task-code');
+    protected function execute(InputInterface $input, OutputInterface $output): int {
+        $code = (string) $input->getArgument("task-code");
         try {
             $definition = ($this->repository ?? new TaskRepository())->find($code);
-            $task = $definition['task'];
+            $task = $definition["task"];
             $this->validateTask($task, $code);
-            $values = $this->mapArguments($task['parameters'] ?? [], $input->getArgument('task-args'));
-            $project = $this->resolveProject($task, $input->getOption('project'));
+            $values = $this->mapArguments($task["parameters"] ?? [], $input->getArgument("task-args"));
+            $project = $this->resolveProject($task, $input->getOption("project"));
             $cwd = $this->workingDirectory($task, $project);
-            if (($task['context'] ?? null) === 'project') {
-                $values['project'] = $project;
+            if (($task["context"] ?? null) === "project") {
+                $values["project"] = $project;
             }
             $this->ensureDirectory($cwd);
             $script = $this->compileScript($task, $values);
-            $scriptFile = tempnam($cwd, '.docker-cli-task-');
-            if ($scriptFile === false || file_put_contents($scriptFile, $script) === false || !chmod($scriptFile, 0700)) {
+            $scriptFile = tempnam($cwd, ".docker-cli-task-");
+            if (
+                $scriptFile === false ||
+                file_put_contents($scriptFile, $script) === false ||
+                !chmod($scriptFile, 0700)
+            ) {
                 throw new \RuntimeException(sprintf('Не удалось создать временный скрипт в "%s".', $cwd));
             }
         } catch (\Throwable $exception) {
-            $this->writeMessage($output, '<error>' . $exception->getMessage() . '</error>');
+            $this->writeMessage($output, "<error>" . $exception->getMessage() . "</error>");
 
             return Command::INVALID;
         }
@@ -61,49 +79,59 @@ final class TaskRunCommand extends AbstractCommand
         $environment = is_array($environment) ? $environment : [];
         $contextDirectory = $this->contextDirectory();
         if (!is_dir($contextDirectory) && !mkdir($contextDirectory, 0775, true) && !is_dir($contextDirectory)) {
-            $this->writeMessage($output, '<error>Не удалось создать директорию контекста выполнения команды.</error>');
+            $this->writeMessage(
+                $output,
+                "<error>Не удалось создать директорию " . "контекста выполнения команды.</error>",
+            );
             return Command::FAILURE;
         }
-        $contextFile = tempnam($contextDirectory, 'context-');
+        $contextFile = tempnam($contextDirectory, "context-");
         if ($contextFile === false) {
-            $this->writeMessage($output, '<error>Не удалось создать контекст выполнения команды.</error>');
+            $this->writeMessage($output, "<error>Не удалось создать контекст выполнения " . "команды.</error>");
             return Command::FAILURE;
         }
         $environment[CommandContext::FILE_ENVIRONMENT_VARIABLE] = $contextFile;
         foreach ($values as $name => $value) {
             $environment[$this->normalizeName($name)] = (string) $value;
         }
-        $environment['DOCKER_CLI_EXECUTABLE'] = $this->executable();
+        $environment["DOCKER_CLI_EXECUTABLE"] = $this->executable();
 
         try {
-            $process = proc_open(['bash', $scriptFile], [STDIN, STDOUT, STDERR], $pipes, $cwd, $environment);
+            $process = proc_open(["bash", $scriptFile], [STDIN, STDOUT, STDERR], $pipes, $cwd, $environment);
             if (!is_resource($process)) {
-                $this->writeMessage($output, '<error>Не удалось запустить bash.</error>');
+                $this->writeMessage($output, "<error>Не удалось запустить bash.</error>");
 
                 return Command::FAILURE;
             }
 
             $exitCode = proc_close($process);
             foreach (CommandContext::read($contextFile) as $message) {
-                $timestamp = $message['timestamp'];
+                $timestamp = $message["timestamp"];
                 while (isset($this->journal[$timestamp])) {
-                    $timestamp = sprintf('%.6f', (float) $timestamp + 0.000001);
+                    $timestamp = sprintf("%.6f", (float) $timestamp + 0.000001);
                 }
                 $this->journal[$timestamp] = [
-                    'message' => $message['message'],
-                    'level' => $message['level'],
+                    "message" => $message["message"],
+                    "level" => $message["level"],
                 ];
-                if ($message['notify']) {
+                if ($message["notify"]) {
                     ($this->notifications ?? new NotificationRepository())->create(
-                        $task['code'], 'task', $message['level'], $message['message'],
+                        $task["code"],
+                        "task",
+                        $message["level"],
+                        $message["message"],
                     );
                 }
             }
 
             return is_int($exitCode) ? $exitCode : Command::FAILURE;
         } finally {
-            if ($input->getOption('no-delete')) {
-                $this->writeMessage($output, sprintf('<comment>Скомпилированный скрипт сохранен: %s</comment>', $scriptFile), MessageLevel::Debug);
+            if ($input->getOption("no-delete")) {
+                $this->writeMessage(
+                    $output,
+                    sprintf("<comment>Скомпилированный скрипт сохранен: %s</comment>", $scriptFile),
+                    MessageLevel::Debug,
+                );
             } else {
                 @unlink($scriptFile);
             }
@@ -112,92 +140,96 @@ final class TaskRunCommand extends AbstractCommand
     }
 
     /** @return array<string, array{message: string, level: string}> */
-    public function journal(): array
-    {
+    public function journal(): array {
         return $this->journal;
     }
 
-    private function contextDirectory(): string
-    {
-        $home = getenv('HOME');
-        if (!is_string($home) || $home === '') {
-            throw new \RuntimeException('Не удалось определить домашнюю директорию (HOME).');
+    private function contextDirectory(): string {
+        $home = getenv("HOME");
+        if (!is_string($home) || $home === "") {
+            throw new \RuntimeException("Не удалось определить домашнюю директорию (HOME).");
         }
 
-        return join_path($home, '.config', 'docker-cli', 'cache', '.notifications', 'context');
+        return join_path($home, ".config", "docker-cli", "cache", ".notifications", "context");
     }
 
     /** @param array<string, mixed> $task */
-    private function validateTask(array $task, string $code): void
-    {
-        foreach (['name', 'code', 'type', 'action'] as $key) {
-            if (!isset($task[$key]) || !is_string($task[$key]) || $task[$key] === '') {
+    private function validateTask(array $task, string $code): void {
+        foreach (["name", "code", "type", "action"] as $key) {
+            if (!isset($task[$key]) || !is_string($task[$key]) || $task[$key] === "") {
                 throw new \RuntimeException(sprintf('В задаче "%s" отсутствует строковое поле task.%s.', $code, $key));
             }
         }
-        if ($task['type'] !== 'shell') {
-            throw new \RuntimeException(sprintf('Тип задачи "%s" не поддерживается; допустим только shell.', $task['type']));
+        if ($task["type"] !== "shell") {
+            throw new \RuntimeException(
+                sprintf('Тип задачи "%s" не поддерживается; допустим только shell.', $task["type"]),
+            );
         }
-        if ($task['code'] !== $code) {
-            throw new \RuntimeException('Код найденной задачи не совпадает с запрошенным.');
+        if ($task["code"] !== $code) {
+            throw new \RuntimeException("Код найденной задачи не совпадает с запрошенным.");
         }
-        if (isset($task['parameters']) && !is_array($task['parameters'])) {
-            throw new \RuntimeException('task.parameters должен быть объектом.');
+        if (isset($task["parameters"]) && !is_array($task["parameters"])) {
+            throw new \RuntimeException("task.parameters должен быть объектом.");
         }
-        if (isset($task['return'])) {
-            $this->validateParameter('return', $task['return'], true);
+        if (isset($task["return"])) {
+            $this->validateParameter("return", $task["return"], true);
         }
-        $this->validateTags($task['tags'] ?? null, 'задачи');
-        foreach ($task['parameters'] ?? [] as $name => $spec) {
-            if (!is_string($name) || $name === '' || preg_match('/^[A-Za-z_][A-Za-z0-9_-]*$/', $name) !== 1) {
+        $this->validateTags($task["tags"] ?? null, "задачи");
+        foreach ($task["parameters"] ?? [] as $name => $spec) {
+            if (!is_string($name) || $name === "" || preg_match('/^[A-Za-z_][A-Za-z0-9_-]*$/', $name) !== 1) {
                 throw new \RuntimeException(sprintf('Некорректное имя параметра "%s".', (string) $name));
             }
             $this->validateParameter($name, $spec);
         }
     }
 
-    private function validateTags(mixed $tags, string $owner): void
-    {
+    private function validateTags(mixed $tags, string $owner): void {
         if ($tags === null) {
             return;
         }
         if (!is_array($tags)) {
-            throw new \RuntimeException(sprintf('Теги %s должны быть списком.', $owner));
+            throw new \RuntimeException(sprintf("Теги %s должны быть списком.", $owner));
         }
         foreach ($tags as $tag) {
             if (!is_string($tag) || preg_match('/^[A-Za-z][A-Za-z0-9._-]*$/', $tag) !== 1) {
-                throw new \RuntimeException(sprintf('Некорректный тег %s: "%s".', $owner, is_scalar($tag) ? (string) $tag : get_debug_type($tag)));
+                throw new \RuntimeException(
+                    sprintf(
+                        'Некорректный тег %s: "%s".',
+                        $owner,
+                        is_scalar($tag) ? (string) $tag : get_debug_type($tag),
+                    ),
+                );
             }
         }
     }
 
-    private function validateParameter(string $name, mixed $spec, bool $return = false): void
-    {
-        if (!is_array($spec) || !in_array($spec['type'] ?? null, ['string', 'integer', 'boolean', 'list'], true)) {
+    private function validateParameter(string $name, mixed $spec, bool $return = false): void {
+        if (!is_array($spec) || !in_array($spec["type"] ?? null, ["string", "integer", "boolean", "list"], true)) {
             throw new \RuntimeException(sprintf('Параметр "%s" имеет неподдерживаемый тип.', $name));
         }
-        if ($return && $spec['type'] === 'list') {
-            throw new \RuntimeException('Возвращаемый тип list не поддерживается.');
+        if ($return && $spec["type"] === "list") {
+            throw new \RuntimeException("Возвращаемый тип list не поддерживается.");
         }
-        if (($spec['type'] ?? null) === 'list' && isset($spec['items']) && !is_array($spec['items'])) {
+        if (($spec["type"] ?? null) === "list" && isset($spec["items"]) && !is_array($spec["items"])) {
             throw new \RuntimeException(sprintf('Поле items list-параметра "%s" должно быть списком.', $name));
         }
-        foreach (($spec['type'] ?? null) === 'list' ? ($spec['items'] ?? []) : [] as $item) {
-            if (!is_array($item) || !array_key_exists('name', $item) || !array_key_exists('value', $item)) {
-                throw new \RuntimeException(sprintf('Каждый элемент list-параметра "%s" должен содержать name и value.', $name));
+        foreach (($spec["type"] ?? null) === "list" ? $spec["items"] ?? [] : [] as $item) {
+            if (!is_array($item) || !array_key_exists("name", $item) || !array_key_exists("value", $item)) {
+                throw new \RuntimeException(
+                    sprintf('Каждый элемент list-параметра "%s" должен ' . "содержать name и value.", $name),
+                );
             }
         }
     }
 
     /** @param array<string, mixed> $parameters @param list<mixed> $arguments @return array<string, string|int> */
-    private function mapArguments(array $parameters, array $arguments): array
-    {
+    private function mapArguments(array $parameters, array $arguments): array {
         $named = [];
         $positional = [];
         foreach ($arguments as $argument) {
             $argument = (string) $argument;
-            if (str_contains($argument, '=')) {
-                [$name, $value] = explode('=', $argument, 2);
+            if (str_contains($argument, "=")) {
+                [$name, $value] = explode("=", $argument, 2);
                 if (!array_key_exists($name, $parameters)) {
                     throw new \RuntimeException(sprintf('Неизвестный параметр "%s".', $name));
                 }
@@ -210,49 +242,55 @@ final class TaskRunCommand extends AbstractCommand
         $values = [];
         foreach ($parameters as $name => $spec) {
             $value = $named[$name] ?? array_shift($positional);
-            if ($value === null || $value === '') {
-                if (($spec['required'] ?? false) === true) {
+            if ($value === null || $value === "") {
+                if (($spec["required"] ?? false) === true) {
                     throw new \RuntimeException(sprintf('Обязательный параметр "%s" не передан.', $name));
                 }
                 continue;
             }
-            if (($spec['type'] ?? null) === 'integer') {
+            if (($spec["type"] ?? null) === "integer") {
                 $validated = filter_var($value, FILTER_VALIDATE_INT);
                 if ($validated === false) {
                     throw new \RuntimeException(sprintf('Параметр "%s" должен быть целым числом.', $name));
                 }
-                if (isset($spec['min']) && $validated < $spec['min'] || isset($spec['max']) && $validated > $spec['max']) {
+                if (
+                    (isset($spec["min"]) && $validated < $spec["min"]) ||
+                    (isset($spec["max"]) && $validated > $spec["max"])
+                ) {
                     throw new \RuntimeException(sprintf('Параметр "%s" находится вне допустимого диапазона.', $name));
                 }
                 $value = $validated;
-            } elseif (($spec['type'] ?? null) === 'boolean') {
+            } elseif (($spec["type"] ?? null) === "boolean") {
                 $validated = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
                 if ($validated === null) {
-                    throw new \RuntimeException(sprintf('Параметр "%s" должен быть логическим значением true или false.', $name));
+                    throw new \RuntimeException(
+                        sprintf('Параметр "%s" должен быть логическим ' . "значением true или false.", $name),
+                    );
                 }
-                $value = $validated ? 'true' : 'false';
-            } elseif (($spec['type'] ?? null) === 'list') {
-                $allowed = is_array($spec['items'] ?? null) ? array_column($spec['items'], 'value') : [];
-                if ($allowed !== [] && !in_array($value, array_map('strval', $allowed), true)) {
-                    throw new \RuntimeException(sprintf('Недопустимое значение параметра "%s". Допустимо: %s.', $name, implode(', ', $allowed)));
+                $value = $validated ? "true" : "false";
+            } elseif (($spec["type"] ?? null) === "list") {
+                $allowed = is_array($spec["items"] ?? null) ? array_column($spec["items"], "value") : [];
+                if ($allowed !== [] && !in_array($value, array_map("strval", $allowed), true)) {
+                    throw new \RuntimeException(
+                        sprintf('Недопустимое значение параметра "%s". Допустимо: %s.', $name, implode(", ", $allowed)),
+                    );
                 }
             }
             $values[$name] = $value;
         }
         if ($positional !== []) {
-            throw new \RuntimeException('Переданы лишние позиционные аргументы.');
+            throw new \RuntimeException("Переданы лишние позиционные аргументы.");
         }
 
         return $values;
     }
 
     /** @param array<string, mixed> $task */
-    private function resolveProject(array $task, mixed $project): ?string
-    {
-        if (($task['context'] ?? null) !== 'project') {
+    private function resolveProject(array $task, mixed $project): ?string {
+        if (($task["context"] ?? null) !== "project") {
             return null;
         }
-        if (is_string($project) && $project !== '') {
+        if (is_string($project) && $project !== "") {
             return $project;
         }
 
@@ -260,19 +298,22 @@ final class TaskRunCommand extends AbstractCommand
     }
 
     /** @param array<string, mixed> $task */
-    private function workingDirectory(array $task, mixed $project): string
-    {
-        if (($task['context'] ?? null) !== 'project') {
-            return '/tmp/.docker-cli';
+    private function workingDirectory(array $task, mixed $project): string {
+        if (($task["context"] ?? null) !== "project") {
+            return "/tmp/.docker-cli";
         }
-        if (!is_string($project) || $project === '') {
-            throw new \RuntimeException('Для задачи с context: project необходимо запустить команду в директории проекта или указать --project.');
+        if (!is_string($project) || $project === "") {
+            throw new \RuntimeException(
+                "Для задачи с context: project необходимо запустить " .
+                    "команду в директории проекта или указать " .
+                    "--project.",
+            );
         }
         $registry = $this->registry ?? new ProjectRegistry();
         if (!$registry->hasProject($project)) {
             throw new \RuntimeException(sprintf('Проект "%s" не зарегистрирован.', $project));
         }
-        $root = $registry->readProjectConfig($project)['data']['project']['document_root'] ?? null;
+        $root = $registry->readProjectConfig($project)["data"]["project"]["document_root"] ?? null;
         if (!is_string($root) || !is_dir($root)) {
             throw new \RuntimeException(sprintf('Document root проекта "%s" не существует.', $project));
         }
@@ -281,38 +322,51 @@ final class TaskRunCommand extends AbstractCommand
     }
 
     /** @param array<string, mixed> $task @param array<string, string|int> $values */
-    private function compileScript(array $task, array $values): string
-    {
-        $action = preg_replace_callback('/\{\{\s*([A-Za-z_][A-Za-z0-9_-]*)\s*\}\}/', function (array $match) use ($values): string {
-            if (!array_key_exists($match[1], $values)) {
-                throw new \RuntimeException(sprintf('В action используется не переданный параметр "%s".', $match[1]));
-            }
+    private function compileScript(array $task, array $values): string {
+        $action = preg_replace_callback(
+            "/\{\{\s*([A-Za-z_][A-Za-z0-9_-]*)\s*\}\}/",
+            function (array $match) use ($values): string {
+                if (!array_key_exists($match[1], $values)) {
+                    throw new \RuntimeException(
+                        sprintf('В action используется не переданный параметр "%s".', $match[1]),
+                    );
+                }
 
-            return escapeshellarg((string) $values[$match[1]]);
-        }, $task['action']);
+                return escapeshellarg((string) $values[$match[1]]);
+            },
+            $task["action"],
+        );
 
-        return sprintf("#!/usr/bin/env bash\n# Задача: %s (%s)\n# Параметры: %s\nset -Eeuo pipefail\ndocker-cli() { \"\$DOCKER_CLI_EXECUTABLE\" \"\$@\"; }\n%s\n", str_replace("\n", ' ', $task['name']), $task['code'], implode(', ', array_keys($task['parameters'] ?? [])), $action);
+        return sprintf(
+            "#!/usr/bin/env bash\n" .
+                "# Задача: %s (%s)\n" .
+                "# Параметры: %s\n" .
+                "set -Eeuo pipefail\n" .
+                "docker-cli() { \"\$DOCKER_CLI_EXECUTABLE\" \"\$@\"; }\n" .
+                "%s\n",
+            str_replace("\n", " ", $task["name"]),
+            $task["code"],
+            implode(", ", array_keys($task["parameters"] ?? [])),
+            $action,
+        );
     }
 
-    private function executable(): string
-    {
+    private function executable(): string {
         $phar = \Phar::running(false);
-        if ($phar !== '') {
+        if ($phar !== "") {
             return $phar;
         }
 
-        $binary = (string) ($_SERVER['argv'][0] ?? 'docker-cli');
+        $binary = (string) ($_SERVER["argv"][0] ?? "docker-cli");
 
         return realpath($binary) ?: $binary;
     }
 
-    private function normalizeName(string $name): string
-    {
-        return str_replace('-', '_', $name);
+    private function normalizeName(string $name): string {
+        return str_replace("-", "_", $name);
     }
 
-    private function ensureDirectory(string $directory): void
-    {
+    private function ensureDirectory(string $directory): void {
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf('Не удалось создать директорию "%s".', $directory));
         }

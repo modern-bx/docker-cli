@@ -4,31 +4,29 @@ declare(strict_types=1);
 
 namespace DockerCli\Project;
 
-use Symfony\Component\Yaml\Yaml;
 use function DockerCli\Util\join_path;
 
-final class ProjectRegistry
-{
-    public function projectsDirectory(): string
-    {
-        $home = getenv('HOME') ?: null;
+use Symfony\Component\Yaml\Yaml;
+
+final class ProjectRegistry {
+    public function projectsDirectory(): string {
+        $home = getenv("HOME") ?: null;
         if ($home === null) {
-            throw new \RuntimeException('Unable to determine HOME directory.');
+            throw new \RuntimeException("Unable to determine HOME directory.");
         }
 
-        return join_path($home, '.config', 'docker-cli', 'state', 'projects');
+        return join_path($home, ".config", "docker-cli", "state", "projects");
     }
 
     /** @return list<string> */
-    public function registeredProjectNames(): array
-    {
+    public function registeredProjectNames(): array {
         $projectsDirectory = $this->projectsDirectory();
         if (!is_dir($projectsDirectory)) {
             return [];
         }
 
         $names = [];
-        foreach (glob(join_path($projectsDirectory, '*'), GLOB_ONLYDIR) ?: [] as $directory) {
+        foreach (glob(join_path($projectsDirectory, "*"), GLOB_ONLYDIR) ?: [] as $directory) {
             $names[] = basename($directory);
         }
 
@@ -37,29 +35,24 @@ final class ProjectRegistry
         return $names;
     }
 
-    public function projectDirectory(string $projectName): string
-    {
+    public function projectDirectory(string $projectName): string {
         return join_path($this->projectsDirectory(), $projectName);
     }
 
-    public function projectConfigFile(string $projectName): string
-    {
-        return join_path($this->projectDirectory($projectName), 'project.yaml');
+    public function projectConfigFile(string $projectName): string {
+        return join_path($this->projectDirectory($projectName), "project.yaml");
     }
 
-    public function hasProject(string $projectName): bool
-    {
+    public function hasProject(string $projectName): bool {
         return is_file($this->projectConfigFile($projectName));
     }
 
-    public function isProjectProtected(string $projectName): bool
-    {
-        return ($this->readProjectConfig($projectName)['data']['project']['protected'] ?? false) === true;
+    public function isProjectProtected(string $projectName): bool {
+        return ($this->readProjectConfig($projectName)["data"]["project"]["protected"] ?? false) === true;
     }
 
     /** @return array<string, mixed> */
-    public function readProjectConfig(string $projectName): array
-    {
+    public function readProjectConfig(string $projectName): array {
         $file = $this->projectConfigFile($projectName);
         $data = Yaml::parseFile($file);
 
@@ -67,27 +60,28 @@ final class ProjectRegistry
     }
 
     /** @param array<string, mixed> $config */
-    public function writeProjectConfig(string $projectName, array $config): void
-    {
-        file_put_contents($this->projectConfigFile($projectName), Yaml::dump($config, 6, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
+    public function writeProjectConfig(string $projectName, array $config): void {
+        file_put_contents(
+            $this->projectConfigFile($projectName),
+            Yaml::dump($config, 6, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK),
+        );
     }
 
-    public function projectNameFromContext(?string $startDirectory = null): ?string
-    {
+    public function projectNameFromContext(?string $startDirectory = null): ?string {
         $directory = $startDirectory ?? getcwd();
-        if (!is_string($directory) || $directory === '') {
+        if (!is_string($directory) || $directory === "") {
             return null;
         }
 
         $directory = realpath($directory) ?: $directory;
         $contextDirectory = $directory;
         while (true) {
-            $metaFile = join_path($directory, '.docker-cli', 'project.yaml');
+            $metaFile = join_path($directory, ".docker-cli", "project.yaml");
             if (is_file($metaFile)) {
                 $data = Yaml::parseFile($metaFile);
-                $name = is_array($data) ? ($data['data']['project']['name'] ?? null) : null;
+                $name = is_array($data) ? $data["data"]["project"]["name"] ?? null : null;
 
-                if (is_string($name) && $name !== '') {
+                if (is_string($name) && $name !== "") {
                     return $name;
                 }
             }
@@ -102,14 +96,13 @@ final class ProjectRegistry
         return $this->projectNameFromRegisteredRoots($contextDirectory);
     }
 
-    private function projectNameFromRegisteredRoots(string $contextDirectory): ?string
-    {
+    private function projectNameFromRegisteredRoots(string $contextDirectory): ?string {
         $matchedName = null;
         $matchedRootLength = -1;
 
         foreach ($this->registeredProjectNames() as $projectName) {
-            $root = $this->readProjectConfig($projectName)['data']['project']['root'] ?? null;
-            if (!is_string($root) || $root === '') {
+            $root = $this->readProjectConfig($projectName)["data"]["project"]["root"] ?? null;
+            if (!is_string($root) || $root === "") {
                 continue;
             }
 

@@ -6,10 +6,8 @@ namespace DockerCli\Framework\Detected;
 
 use function DockerCli\Util\join_path;
 
-final class Symfony extends DetectedFramework
-{
-    public function getDocumentRoot(): string
-    {
-        return join_path($this->projectRoot, 'public');
+final class Symfony extends DetectedFramework {
+    public function getDocumentRoot(): string {
+        return join_path($this->projectRoot, "public");
     }
 }

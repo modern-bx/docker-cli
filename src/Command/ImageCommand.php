@@ -5,96 +5,107 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Config\SystemCompose;
+
+use function DockerCli\Util\join_path;
+
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use function DockerCli\Util\join_path;
 
-abstract class ImageCommand extends AbstractCommand
-{
+abstract class ImageCommand extends AbstractCommand {
     /** @var list<array{name: string, context: string, service: string}> */
     private const IMAGES = [
         [
-            'name' => 'php-fpm-8.2',
-            'context' => 'config/php-fpm-8.2',
-            'service' => 'php-fpm-8.2',
+            "name" => "php-fpm-8.2",
+            "context" => "config/php-fpm-8.2",
+            "service" => "php-fpm-8.2",
         ],
         [
-            'name' => 'php-fpm-8.3',
-            'context' => 'config/php-fpm-8.3',
-            'service' => 'php-fpm-8.3',
+            "name" => "php-fpm-8.3",
+            "context" => "config/php-fpm-8.3",
+            "service" => "php-fpm-8.3",
         ],
         [
-            'name' => 'php-fpm-8.4',
-            'context' => 'config/php-fpm-8.4',
-            'service' => 'php-fpm-8.4',
+            "name" => "php-fpm-8.4",
+            "context" => "config/php-fpm-8.4",
+            "service" => "php-fpm-8.4",
         ],
         [
-            'name' => 'php-fpm-8.5',
-            'context' => 'config/php-fpm-8.5',
-            'service' => 'php-fpm-8.5',
+            "name" => "php-fpm-8.5",
+            "context" => "config/php-fpm-8.5",
+            "service" => "php-fpm-8.5",
         ],
         [
-            'name' => 'playwright',
-            'context' => 'config/playwright',
-            'service' => 'playwright',
+            "name" => "playwright",
+            "context" => "config/playwright",
+            "service" => "playwright",
         ],
     ];
 
-    protected function configureImageOptions(): void
-    {
-        $this->addOption('tag', null, InputOption::VALUE_REQUIRED, 'Тег образа. По умолчанию берется SOURCE_IMAGE_TAG, последний git-тег текущей ветки или default. Для имени vendor/namespace задайте SOURCE_IMAGE_NAMESPACE.');
-        $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Показать docker-команды без выполнения.');
+    protected function configureImageOptions(): void {
+        $this->addOption(
+            "tag",
+            null,
+            InputOption::VALUE_REQUIRED,
+            "Тег образа. По умолчанию берется SOURCE_IMAGE_TAG, " .
+                "последний git-тег текущей ветки или default. Для " .
+                "имени vendor/namespace задайте SOURCE_IMAGE_NAMESPACE.",
+        );
+        $this->addOption("dry-run", null, InputOption::VALUE_NONE, "Показать docker-команды без выполнения.");
     }
 
     /** @return list<array{name: string, context: string, service: string}> */
-    protected function images(): array
-    {
+    protected function images(): array {
         $root = (new SystemCompose())->directory();
 
         return array_map(
-            static fn (array $image): array => [
-                'name' => $image['name'],
-                'context' => join_path($root, $image['context']),
-                'service' => $image['service'],
+            static fn(array $image): array => [
+                "name" => $image["name"],
+                "context" => join_path($root, $image["context"]),
+                "service" => $image["service"],
             ],
-            self::IMAGES
+            self::IMAGES,
         );
     }
 
-    protected function imageTag(InputInterface $input): string
-    {
-        $optionTag = $input->getOption('tag');
-        if (is_string($optionTag) && $optionTag !== '') {
+    protected function imageTag(InputInterface $input): string {
+        $optionTag = $input->getOption("tag");
+        if (is_string($optionTag) && $optionTag !== "") {
             return $this->normalizeTag($optionTag);
         }
 
-        $envTag = $this->imageEnv()['SOURCE_IMAGE_TAG'] ?? null;
-        if (is_string($envTag) && $envTag !== '') {
+        $envTag = $this->imageEnv()["SOURCE_IMAGE_TAG"] ?? null;
+        if (is_string($envTag) && $envTag !== "") {
             return $this->normalizeTag($envTag);
         }
 
-        return $this->latestGitTag() ?? 'default';
+        return $this->latestGitTag() ?? "default";
     }
 
-    protected function localImageReference(string $name, string $tag): string
-    {
-        return sprintf('%s/%s:%s', $this->imageNamespace(), $this->imageName($name), $tag);
+    protected function localImageReference(string $name, string $tag): string {
+        return sprintf("%s/%s:%s", $this->imageNamespace(), $this->imageName($name), $tag);
     }
 
-    protected function remoteImageReference(string $name, string $tag): string
-    {
-        return sprintf('%s/%s/%s:%s', $this->imageRegistry(), $this->imageNamespace(), $this->imageName($name), $tag);
+    protected function remoteImageReference(string $name, string $tag): string {
+        return sprintf("%s/%s/%s:%s", $this->imageRegistry(), $this->imageNamespace(), $this->imageName($name), $tag);
     }
 
     /**
      * @param list<string> $command
      * @param array<string, string> $extraEnv
      */
-    protected function runDockerCommand(array $command, OutputInterface $output, bool $dryRun, array $extraEnv = []): int
-    {
-        $this->writeMessage($output, '<comment>' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>', MessageLevel::Debug);
+    protected function runDockerCommand(
+        array $command,
+        OutputInterface $output,
+        bool $dryRun,
+        array $extraEnv = [],
+    ): int {
+        $this->writeMessage(
+            $output,
+            "<comment>" . implode(" ", array_map("escapeshellarg", $command)) . "</comment>",
+            MessageLevel::Debug,
+        );
         if ($dryRun) {
             return Command::SUCCESS;
         }
@@ -104,35 +115,34 @@ abstract class ImageCommand extends AbstractCommand
             $env = [];
         }
         $imageEnv = $this->imageEnv();
-        $buildKit = $imageEnv['SOURCE_IMAGE_DOCKER_BUILDKIT'] ?? null;
-        if (is_string($buildKit) && $buildKit !== '') {
-            $env['DOCKER_BUILDKIT'] = $buildKit;
-            $env['COMPOSE_DOCKER_CLI_BUILD'] = $buildKit;
+        $buildKit = $imageEnv["SOURCE_IMAGE_DOCKER_BUILDKIT"] ?? null;
+        if (is_string($buildKit) && $buildKit !== "") {
+            $env["DOCKER_BUILDKIT"] = $buildKit;
+            $env["COMPOSE_DOCKER_CLI_BUILD"] = $buildKit;
         }
         $env = array_replace($env, $extraEnv);
 
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, null, $env);
         if (!is_resource($process)) {
-            throw new \RuntimeException('Unable to start docker process.');
+            throw new \RuntimeException("Unable to start docker process.");
         }
 
         return proc_close($process);
     }
 
     /** @return list<string> */
-    protected function composeBuildCommand(string $service, bool $noCache = false): array
-    {
+    protected function composeBuildCommand(string $service, bool $noCache = false): array {
         $command = [
-            'docker',
-            'compose',
-            '--env-file',
+            "docker",
+            "compose",
+            "--env-file",
             $this->composeEnvFile(),
-            '--file',
+            "--file",
             $this->composeFile(),
-            'build',
+            "build",
         ];
         if ($noCache) {
-            $command[] = '--no-cache';
+            $command[] = "--no-cache";
         }
         $command[] = $service;
 
@@ -140,49 +150,48 @@ abstract class ImageCommand extends AbstractCommand
     }
 
     /** @return array<string, string> */
-    protected function imageCommandEnvironment(string $tag): array
-    {
+    protected function imageCommandEnvironment(string $tag): array {
         return [
-            'SOURCE_IMAGE_REGISTRY' => $this->imageRegistry(),
-            'SOURCE_IMAGE_NAMESPACE' => $this->imageNamespace(),
-            'SOURCE_IMAGE_NAME' => $this->sourceImageName(),
-            'SOURCE_IMAGE_TAG' => $tag,
+            "SOURCE_IMAGE_REGISTRY" => $this->imageRegistry(),
+            "SOURCE_IMAGE_NAMESPACE" => $this->imageNamespace(),
+            "SOURCE_IMAGE_NAME" => $this->sourceImageName(),
+            "SOURCE_IMAGE_TAG" => $tag,
         ];
     }
 
-    private function imageRegistry(): string
-    {
-        $registry = $this->imageEnv()['SOURCE_IMAGE_REGISTRY'] ?? 'ghcr.io';
+    private function imageRegistry(): string {
+        $registry = $this->imageEnv()["SOURCE_IMAGE_REGISTRY"] ?? "ghcr.io";
 
-        return trim((string) $registry, '/');
+        return trim((string) $registry, "/");
     }
 
-    private function imageNamespace(): string
-    {
-        $namespace = trim((string) ($this->imageEnv()['SOURCE_IMAGE_NAMESPACE'] ?? ''), '/');
-        if ($namespace === '') {
-            throw new \RuntimeException('SOURCE_IMAGE_NAMESPACE is not set. Set the image vendor/namespace before building or publishing custom images.');
+    private function imageNamespace(): string {
+        $namespace = trim((string) ($this->imageEnv()["SOURCE_IMAGE_NAMESPACE"] ?? ""), "/");
+        if ($namespace === "") {
+            throw new \RuntimeException(
+                "SOURCE_IMAGE_NAMESPACE is not set. Set the image vendor/namespace before " .
+                    "building or publishing custom images.",
+            );
         }
 
         return $namespace;
     }
 
-    private function imageName(string $serviceName): string
-    {
-        return $this->sourceImageName() . '/' . $serviceName;
+    private function imageName(string $serviceName): string {
+        return $this->sourceImageName() . "/" . $serviceName;
     }
 
-    private function sourceImageName(): string
-    {
-        $name = trim((string) ($this->imageEnv()['SOURCE_IMAGE_NAME'] ?? ''), '/');
+    private function sourceImageName(): string {
+        $name = trim((string) ($this->imageEnv()["SOURCE_IMAGE_NAME"] ?? ""), "/");
 
-        return $name !== '' ? $name : 'docker-cli';
+        return $name !== "" ? $name : "docker-cli";
     }
 
     /** @return array<string, string> */
-    private function imageEnv(): array
-    {
-        $env = $this->readEnvFile(join_path($this->repositoryRoot(), 'resources', 'compose', 'system', SystemCompose::ENV_FILE));
+    private function imageEnv(): array {
+        $env = $this->readEnvFile(
+            join_path($this->repositoryRoot(), "resources", "compose", "system", SystemCompose::ENV_FILE),
+        );
         $composeEnv = (new SystemCompose())->envFile();
         if (is_file($composeEnv)) {
             $env = array_replace($env, $this->readEnvFile($composeEnv));
@@ -192,8 +201,7 @@ abstract class ImageCommand extends AbstractCommand
     }
 
     /** @return array<string, string> */
-    private function readEnvFile(string $file): array
-    {
+    private function readEnvFile(string $file): array {
         if (!is_file($file)) {
             return [];
         }
@@ -201,29 +209,28 @@ abstract class ImageCommand extends AbstractCommand
         $values = [];
         foreach (file($file, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
             $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+            if ($line === "" || str_starts_with($line, "#") || !str_contains($line, "=")) {
                 continue;
             }
 
-            [$key, $value] = explode('=', $line, 2);
+            [$key, $value] = explode("=", $line, 2);
             $values[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
         }
 
         return $values;
     }
 
-    private function latestGitTag(): ?string
-    {
+    private function latestGitTag(): ?string {
         $repositoryRoot = $this->repositoryRoot();
-        if (!is_dir(join_path($repositoryRoot, '.git'))) {
+        if (!is_dir(join_path($repositoryRoot, ".git"))) {
             return null;
         }
 
-        $command = ['git', 'tag', '--merged', 'HEAD', '--sort=-v:refname'];
+        $command = ["git", "tag", "--merged", "HEAD", "--sort=-v:refname"];
         $descriptors = [
-            0 => ['file', '/dev/null', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
+            0 => ["file", "/dev/null", "r"],
+            1 => ["pipe", "w"],
+            2 => ["pipe", "w"],
         ];
         $process = proc_open($command, $descriptors, $pipes, $repositoryRoot);
         if (!is_resource($process)) {
@@ -248,32 +255,30 @@ abstract class ImageCommand extends AbstractCommand
         return null;
     }
 
-    private function normalizeTag(string $tag): string
-    {
+    private function normalizeTag(string $tag): string {
         $tag = trim($tag);
         if (preg_match('/^v?(\d+\.\d+\.\d+)$/', $tag, $matches) === 1) {
             return $matches[1];
         }
 
-        if ($tag === 'default') {
+        if ($tag === "default") {
             return $tag;
         }
 
-        throw new \InvalidArgumentException(sprintf('Invalid source image tag "%s". Use a version like 1.0.0 or default.', $tag));
+        throw new \InvalidArgumentException(
+            sprintf('Invalid source image tag "%s". Use a version like 1.0.0 or default.', $tag),
+        );
     }
 
-    private function composeFile(): string
-    {
+    private function composeFile(): string {
         return (new SystemCompose())->composeFile();
     }
 
-    private function composeEnvFile(): string
-    {
+    private function composeEnvFile(): string {
         return (new SystemCompose())->envFile();
     }
 
-    private function repositoryRoot(): string
-    {
+    private function repositoryRoot(): string {
         return dirname(__DIR__, 2);
     }
 }

@@ -5,44 +5,59 @@ declare(strict_types=1);
 namespace DockerCli\Command;
 
 use DockerCli\Config\MissingConfigException;
+use DockerCli\Config\SystemCompose;
 use DockerCli\Framework\FrameworkDetectionService;
 use DockerCli\Hook\CommandHookRunner;
 use DockerCli\Project\ConfigurableServicesRestarter;
 use DockerCli\Project\DataInitializer;
 use DockerCli\Project\DedicatedDatabaseComposeRenderer;
-use DockerCli\Config\SystemCompose;
 use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\ProjectRegistry;
+
+use function DockerCli\Util\join_path;
+
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
-use function DockerCli\Util\join_path;
 
-final class ProjectDownCommand extends AbstractCommand
-{
+final class ProjectDownCommand extends AbstractCommand {
     public function __construct(
         private readonly ?FrameworkDetectionService $detectionService = null,
         private readonly ?DataInitializer $dataInitializer = null,
         private readonly ?CommandContext $context = null,
         private readonly ?CommandHookRunner $hookRunner = null,
     ) {
-        parent::__construct('project:down');
-        $this->setDescription('Удалить регистрацию проекта docker-cli.');
-        $this->addOption('no-restart', null, InputOption::VALUE_NONE, 'Не перезапускать общие проектные сервисы.');
-        $this->addOption('wipe', null, InputOption::VALUE_NONE, 'Удалить файлы проекта, сохранив .docker-cli.');
-        $this->addOption('erase', null, InputOption::VALUE_NONE, 'Полностью удалить директорию проекта.');
-        $this->addOption('drop', null, InputOption::VALUE_NONE, 'Удалить базы данных и пользователей проекта во всех СУБД.');
-        $this->addOption('force', 'f', InputOption::VALUE_NONE, 'Подтвердить необратимые действия --wipe, --erase или --drop.');
+        parent::__construct("project:down");
+        $this->setDescription("Удалить регистрацию проекта docker-cli.");
+        $this->addOption("no-restart", null, InputOption::VALUE_NONE, "Не перезапускать общие проектные сервисы.");
+        $this->addOption("wipe", null, InputOption::VALUE_NONE, "Удалить файлы проекта, сохранив .docker-cli.");
+        $this->addOption("erase", null, InputOption::VALUE_NONE, "Полностью удалить директорию проекта.");
+        $this->addOption(
+            "drop",
+            null,
+            InputOption::VALUE_NONE,
+            "Удалить базы данных и пользователей " . "проекта во всех СУБД.",
+        );
+        $this->addOption(
+            "force",
+            "f",
+            InputOption::VALUE_NONE,
+            "Подтвердить необратимые действия --wipe, --erase или --drop.",
+        );
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int
-    {
-        $destructive = $input->getOption('wipe') || $input->getOption('erase') || $input->getOption('drop');
-        if ($destructive && !$input->getOption('force')) {
-            $this->writeMessage($output, '<error>Опции --wipe, --erase и --drop выполняют необратимые действия. Повторите команду с --force.</error>');
+    protected function execute(InputInterface $input, OutputInterface $output): int {
+        $destructive = $input->getOption("wipe") || $input->getOption("erase") || $input->getOption("drop");
+        if ($destructive && !$input->getOption("force")) {
+            $this->writeMessage(
+                $output,
+                "<error>Опции --wipe, --erase и --drop выполняют " .
+                    "необратимые действия. Повторите команду с " .
+                    "--force.</error>",
+            );
 
             return Command::FAILURE;
         }
@@ -50,14 +65,14 @@ final class ProjectDownCommand extends AbstractCommand
         $framework = ($this->detectionService ?? FrameworkDetectionService::createDefault())->detect();
         $registry = new ProjectRegistry();
         $projectRoot = $framework?->getProjectRoot() ?? $this->projectRootFromContext($registry);
-        if ($projectRoot === null || $projectRoot === '') {
-            $this->writeMessage($output, '<error>Не удалось определить директорию проекта.</error>');
+        if ($projectRoot === null || $projectRoot === "") {
+            $this->writeMessage($output, "<error>Не удалось определить директорию проекта.</error>");
 
             return Command::FAILURE;
         }
 
-        $metadataDirectory = join_path($projectRoot, '.docker-cli');
-        $metaFile = join_path($metadataDirectory, 'project.yaml');
+        $metadataDirectory = join_path($projectRoot, ".docker-cli");
+        $metaFile = join_path($metadataDirectory, "project.yaml");
         if (!is_file($metaFile)) {
             $this->writeMessage($output, sprintf('<error>Файл "%s" не найден.</error>', $metaFile));
 
@@ -65,46 +80,75 @@ final class ProjectDownCommand extends AbstractCommand
         }
 
         $projectName = $this->readProjectName($metaFile);
-        if ($projectName === null || $projectName === '') {
+        if ($projectName === null || $projectName === "") {
             $this->writeMessage($output, sprintf('<error>В файле "%s" не найдено имя проекта.</error>', $metaFile));
 
             return Command::FAILURE;
         }
         $projectConfig = $registry->hasProject($projectName) ? $registry->readProjectConfig($projectName) : [];
-        $dedicated = array_values(array_filter(['mysql', 'postgres'], static fn (string $driver): bool =>
-            ($projectConfig['data']['databases'][$driver]['hostname'] ?? null) === sprintf('docker-cli-%s-%s', $driver, $projectName)
-        ));
+        $dedicated = array_values(
+            array_filter(
+                ["mysql", "postgres"],
+                static fn(string $driver): bool => ($projectConfig["data"]["databases"][$driver]["hostname"] ??
+                    null) ===
+                    sprintf("docker-cli-%s-%s", $driver, $projectName),
+            ),
+        );
         if ($destructive && $registry->hasProject($projectName) && $registry->isProjectProtected($projectName)) {
-            $this->writeMessage($output, sprintf('<error>Проект "%s" защищен. Изменение его данных запрещено.</error>', $projectName));
+            $this->writeMessage(
+                $output,
+                sprintf('<error>Проект "%s" защищен. Изменение его данных ' . "запрещено.</error>", $projectName),
+            );
             return Command::FAILURE;
         }
 
         $hookArguments = $input instanceof ArgvInput ? $input->getRawTokens(true) : [];
-        $beforeHookCode = ($this->hookRunner ?? new CommandHookRunner())->run('project:down', 'before', $hookArguments);
+        $beforeHookCode = ($this->hookRunner ?? new CommandHookRunner())->run("project:down", "before", $hookArguments);
         if ($beforeHookCode !== Command::SUCCESS) {
             return $beforeHookCode;
         }
 
-        if ($input->getOption('wipe') || $input->getOption('erase')) {
+        if ($input->getOption("wipe") || $input->getOption("erase")) {
             try {
                 $this->leaveProjectWorkingDirectory($projectRoot);
                 $this->wipeProjectRoot($projectRoot);
             } catch (\RuntimeException $exception) {
-                $this->writeMessage($output, sprintf('<error>Не удалось очистить файлы проекта "%s": %s</error>', $projectName, $exception->getMessage()));
+                $this->writeMessage(
+                    $output,
+                    sprintf(
+                        '<error>Не удалось очистить файлы проекта "%s": %s</error>',
+                        $projectName,
+                        $exception->getMessage(),
+                    ),
+                );
                 return Command::FAILURE;
             }
         }
 
-        if ($input->getOption('drop')) {
+        if ($input->getOption("drop")) {
             try {
                 $dropCode = ($this->dataInitializer ?? new DataInitializer())->drop($projectName, $output);
             } catch (MissingConfigException $exception) {
-                $this->writeMessage($output, sprintf('<error>Системная конфигурация не инициализирована. Отсутствуют файлы: %s.</error>', implode(', ', $exception->missingFiles())));
+                $this->writeMessage(
+                    $output,
+                    sprintf(
+                        "<error>Системная конфигурация не " . "инициализирована. Отсутствуют файлы: %s.</error>",
+                        implode(", ", $exception->missingFiles()),
+                    ),
+                );
 
                 return Command::FAILURE;
             }
             if ($dropCode !== Command::SUCCESS) {
-                $this->writeMessage($output, sprintf('<error>Не удалось удалить базы данных и пользователей проекта "%s". Регистрация проекта сохранена.</error>', $projectName));
+                $this->writeMessage(
+                    $output,
+                    sprintf(
+                        "<error>Не удалось удалить базы данных и " .
+                            'пользователей проекта "%s". Регистрация ' .
+                            "проекта сохранена.</error>",
+                        $projectName,
+                    ),
+                );
 
                 return $dropCode;
             }
@@ -126,16 +170,19 @@ final class ProjectDownCommand extends AbstractCommand
         // the database image user. --drop removes the project database and
         // role through the DBMS, but host storage is intentionally preserved.
 
-        if ($input->getOption('erase')) {
+        if ($input->getOption("erase")) {
             $this->removeDirectory($metadataDirectory);
             if (!rmdir($projectRoot)) {
-                $this->writeMessage($output, sprintf('<error>Не удалось удалить директорию проекта "%s".</error>', $projectRoot));
+                $this->writeMessage(
+                    $output,
+                    sprintf('<error>Не удалось удалить директорию проекта "%s".</error>', $projectRoot),
+                );
                 return Command::FAILURE;
             }
         }
         (new OpenRestyHostRenderer())->render();
 
-        if (!$input->getOption('no-restart')) {
+        if (!$input->getOption("no-restart")) {
             $restartCode = (new ConfigurableServicesRestarter())->restart($output);
             if ($restartCode !== Command::SUCCESS) {
                 return $restartCode;
@@ -143,49 +190,45 @@ final class ProjectDownCommand extends AbstractCommand
         }
 
         ($this->context ?? CommandContext::fromEnvironment($this, $output))->addMessage(
-            new Message(sprintf('Проект **%s** успешно удален из контура.', $projectName), notify: true),
+            new Message(sprintf("Проект **%s** успешно удален из контура.", $projectName), notify: true),
         );
 
-        return ($this->hookRunner ?? new CommandHookRunner())->run('project:down', 'after', $hookArguments);
+        return ($this->hookRunner ?? new CommandHookRunner())->run("project:down", "after", $hookArguments);
     }
 
-    private function projectRootFromContext(ProjectRegistry $registry): ?string
-    {
+    private function projectRootFromContext(ProjectRegistry $registry): ?string {
         $projectName = $registry->projectNameFromContext();
         if ($projectName === null || !$registry->hasProject($projectName)) {
             return null;
         }
 
         $projectConfig = $registry->readProjectConfig($projectName);
-        $projectRoot = $projectConfig['data']['project']['root'] ?? null;
+        $projectRoot = $projectConfig["data"]["project"]["root"] ?? null;
 
-        return is_string($projectRoot) && $projectRoot !== '' ? $projectRoot : null;
+        return is_string($projectRoot) && $projectRoot !== "" ? $projectRoot : null;
     }
 
-    private function projectsDirectory(): string
-    {
-        $home = getenv('HOME') ?: null;
+    private function projectsDirectory(): string {
+        $home = getenv("HOME") ?: null;
         if ($home === null) {
-            throw new \RuntimeException('Unable to determine HOME directory.');
+            throw new \RuntimeException("Unable to determine HOME directory.");
         }
 
-        return join_path($home, '.config', 'docker-cli', 'state', 'projects');
+        return join_path($home, ".config", "docker-cli", "state", "projects");
     }
 
-    private function readProjectName(string $file): ?string
-    {
+    private function readProjectName(string $file): ?string {
         $data = Yaml::parseFile($file);
         if (!is_array($data)) {
             return null;
         }
 
-        $name = $data['data']['project']['name'] ?? null;
+        $name = $data["data"]["project"]["name"] ?? null;
 
         return is_string($name) ? $name : null;
     }
 
-    private function removeDirectory(string $directory): void
-    {
+    private function removeDirectory(string $directory): void {
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::CHILD_FIRST,
@@ -203,10 +246,9 @@ final class ProjectDownCommand extends AbstractCommand
     }
 
     /** @param list<string> $drivers */
-    private function removeDedicatedContainers(string $projectName, array $drivers, OutputInterface $output): int
-    {
+    private function removeDedicatedContainers(string $projectName, array $drivers, OutputInterface $output): int {
         foreach ($drivers as $driver) {
-            $container = sprintf('docker-cli-%s-%s', $driver, $projectName);
+            $container = sprintf("docker-cli-%s-%s", $driver, $projectName);
             $exists = $this->containerExists($container);
             if ($exists === null) {
                 return Command::FAILURE;
@@ -214,8 +256,11 @@ final class ProjectDownCommand extends AbstractCommand
             if (!$exists) {
                 continue;
             }
-            $command = ['docker', 'container', 'rm', '--force', $container];
-            $this->writeMessage($output, '<comment>Выполняется: ' . implode(' ', array_map('escapeshellarg', $command)) . '</comment>');
+            $command = ["docker", "container", "rm", "--force", $container];
+            $this->writeMessage(
+                $output,
+                "<comment>Выполняется: " . implode(" ", array_map("escapeshellarg", $command)) . "</comment>",
+            );
             $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes);
             if (!is_resource($process)) {
                 return Command::FAILURE;
@@ -230,11 +275,10 @@ final class ProjectDownCommand extends AbstractCommand
         return Command::SUCCESS;
     }
 
-    private function containerExists(string $container): ?bool
-    {
+    private function containerExists(string $container): ?bool {
         $process = proc_open(
-            ['docker', 'container', 'inspect', $container],
-            [['file', '/dev/null', 'r'], ['file', '/dev/null', 'w'], ['pipe', 'w']],
+            ["docker", "container", "inspect", $container],
+            [["file", "/dev/null", "r"], ["file", "/dev/null", "w"], ["pipe", "w"]],
             $pipes,
         );
         if (!is_resource($process)) {
@@ -247,31 +291,37 @@ final class ProjectDownCommand extends AbstractCommand
             return true;
         }
 
-        return str_contains($error, 'No such container') || str_contains($error, 'No such object') ? false : null;
+        return str_contains($error, "No such container") || str_contains($error, "No such object") ? false : null;
     }
 
-    private function wipeProjectRoot(string $projectRoot): void
-    {
+    private function wipeProjectRoot(string $projectRoot): void {
         $realRoot = realpath($projectRoot);
-        if ($realRoot === false || $realRoot === DIRECTORY_SEPARATOR || !is_dir(join_path($realRoot, '.docker-cli'))) {
-            throw new \RuntimeException('небезопасная директория проекта.');
+        if ($realRoot === false || $realRoot === DIRECTORY_SEPARATOR || !is_dir(join_path($realRoot, ".docker-cli"))) {
+            throw new \RuntimeException("небезопасная директория проекта.");
         }
         foreach (scandir($realRoot) ?: [] as $entry) {
-            if ($entry === '.' || $entry === '..' || $entry === '.docker-cli') continue;
+            if ($entry === "." || $entry === ".." || $entry === ".docker-cli") {
+                continue;
+            }
             $path = join_path($realRoot, $entry);
-            if (is_dir($path) && !is_link($path)) $this->removeDirectory($path); elseif (!unlink($path)) {
+            if (is_dir($path) && !is_link($path)) {
+                $this->removeDirectory($path);
+            } elseif (!unlink($path)) {
                 throw new \RuntimeException(sprintf('не удалось удалить "%s".', $path));
             }
         }
     }
 
-    private function leaveProjectWorkingDirectory(string $projectRoot): void
-    {
+    private function leaveProjectWorkingDirectory(string $projectRoot): void {
         $workingDirectory = getcwd();
         $realRoot = realpath($projectRoot);
         $realWorkingDirectory = is_string($workingDirectory) ? realpath($workingDirectory) : false;
-        if ($realRoot === false || $realWorkingDirectory === false
-            || ($realWorkingDirectory !== $realRoot && !str_starts_with($realWorkingDirectory, $realRoot . DIRECTORY_SEPARATOR))) {
+        if (
+            $realRoot === false ||
+            $realWorkingDirectory === false ||
+            ($realWorkingDirectory !== $realRoot &&
+                !str_starts_with($realWorkingDirectory, $realRoot . DIRECTORY_SEPARATOR))
+        ) {
             return;
         }
 
@@ -280,7 +330,12 @@ final class ProjectDownCommand extends AbstractCommand
             $safeDirectory = sys_get_temp_dir();
         }
         if (!chdir($safeDirectory)) {
-            throw new \RuntimeException(sprintf('Не удалось перейти в безопасную директорию "%s" перед удалением проекта.', $safeDirectory));
+            throw new \RuntimeException(
+                sprintf(
+                    "Не удалось перейти в безопасную директорию " . '"%s" перед удалением проекта.',
+                    $safeDirectory,
+                ),
+            );
         }
     }
 }
