@@ -664,6 +664,30 @@ composer build-panel
 
 ## Системное окружение
 
+### `sudo docker-cli system:setup` / `sudo docker-cli system:rollback`
+
+`system:setup` создаёт в `/etc/sudoers.d` правило, разрешающее выбранному пользователю
+запускать `cp`, `chown` и `chmod` через sudo без ввода пароля. По умолчанию используется
+пользователь, вызвавший `sudo`; другой логин можно передать через `--user`:
+
+```bash
+sudo docker-cli system:setup
+sudo docker-cli system:setup --user=developer
+sudo docker-cli system:setup --user=developer --update
+```
+
+Если файл правила уже существует, команда завершится ошибкой. Опция `--update`
+разрешает перезаписать его. `system:rollback` удаляет правило независимо от того, какой
+программой оно было создано:
+
+```bash
+sudo docker-cli system:rollback
+sudo docker-cli system:rollback --user=developer
+```
+
+Эти команды не читают пользовательскую конфигурацию docker-cli, поэтому могут
+выполняться с домашней директорией пользователя `root`.
+
 ### `bin/docker-cli system:start` / `bin/docker-cli start`
 
 Запускает системный compose-проект:
