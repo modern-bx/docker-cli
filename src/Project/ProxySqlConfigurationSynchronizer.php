@@ -67,9 +67,9 @@ final class ProxySqlConfigurationSynchronizer
                 if (!is_array($database)) {
                     continue;
                 }
-                $hostname = $database["hostname"] ?? null;
-                $username = $database["username"] ?? null;
-                $name = $database["database"] ?? null;
+                $hostname = $database["hostname"] ?? "docker-cli-{$driver}";
+                $username = $database["username"] ?? $projectName;
+                $name = $database["database"] ?? $projectName;
                 $password = $database["password"] ?? null;
                 if (!is_string($hostname) || !is_string($username) || !is_string($name) || !is_string($password)) {
                     continue;
