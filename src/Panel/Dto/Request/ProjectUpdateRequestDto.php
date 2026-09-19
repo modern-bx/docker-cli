@@ -18,6 +18,8 @@ final readonly class ProjectUpdateRequestDto implements RequestDto
         public ?string $language,
         public ?string $languageVersion,
         public ?string $framework,
+        public ?bool $external,
+        public ?int $externalPort,
         public ?array $dedicatedDatabases,
         public string $locationMysql,
         public string $locationPostgres,
@@ -32,6 +34,14 @@ final readonly class ProjectUpdateRequestDto implements RequestDto
             }
         }
         $dedicated = $request->body["dedicatedDatabases"] ?? null;
+        $external = $request->body["external"] ?? null;
+        if ($external !== null && !is_bool($external)) {
+            throw new RequestValidationException("Признак внешнего сервиса должен быть булевым значением.");
+        }
+        $externalPort = $request->body["externalPort"] ?? null;
+        if ($externalPort !== null && (!is_int($externalPort) || $externalPort < 1 || $externalPort > 65535)) {
+            throw new RequestValidationException("Порт внешнего сервиса должен быть числом от 1 до 65535.");
+        }
         if (
             $dedicated !== null &&
             (!is_array($dedicated) ||
@@ -57,6 +67,8 @@ final readonly class ProjectUpdateRequestDto implements RequestDto
                 ? $request->body["languageVersion"]
                 : null,
             array_key_exists("framework", $request->body) ? $request->body["framework"] : null,
+            $external,
+            $externalPort,
             $dedicated,
             $locationMysql,
             $locationPostgres,

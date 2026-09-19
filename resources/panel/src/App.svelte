@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { EditorState } from '@codemirror/state';
   import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
   import { defaultKeymap, history as cmHistory, historyKeymap } from '@codemirror/commands';
@@ -13,7 +13,7 @@
   import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
   import { vscodeDark, vscodeLight } from '@uiw/codemirror-theme-vscode';
   import { Combobox, Dialog, Tabs, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Settings, Trash2, Undo2 } from '@lucide/svelte';
+  import { CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Server, Settings, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import AppHeader from './components/AppHeader.svelte';
   import LoginForm from './components/LoginForm.svelte';
@@ -56,7 +56,7 @@
   const modes = [
     ['light', 'Светлая'], ['dark', 'Тёмная'], ['system', 'Системная'],
   ];
-  const projectDetailTabs = ['info', 'notes', 'security', 'backups', 'scheduler', 'journal'];
+  const projectDetailTabs = ['info', 'notes', 'backups', 'scheduler', 'journal'];
   const cronTemplates = [['* * * * *', 'Каждую минуту'], ['0 * * * *', 'Каждый час'], ['0 0 * * *', 'Каждый день в полночь'], ['0 9 * * 1-5', 'По будням в 09:00'], ['0 0 * * 0', 'Каждое воскресенье'], ['0 0 1 * *', 'Первого числа месяца']];
   const scheduleStatusOptions = [{ value: 'all', label: 'Все статусы' }, { value: 'enabled', label: 'Включена' }, { value: 'disabled', label: 'Выключена' }];
   const scheduleStatusCollection = useListCollection({ items: scheduleStatusOptions });
@@ -161,6 +161,7 @@
   let systemConfirmation = null;
   let projectConfirmation = null;
   let projectContextMenu = null;
+  let projectContextMenuElement;
   let projectAddDialog = null;
   let projectCloneDialog = null;
   let projectCloning = false;
@@ -1516,7 +1517,7 @@
     queueOpen = false;
   }
 
-  function openProjectContextMenu(event, project) {
+  async function openProjectContextMenu(event, project) {
     if (event.ctrlKey) {
       projectContextMenu = null;
       return;
@@ -1528,8 +1529,18 @@
     navigateToProject(project.name, projectDetailTab);
     projectContextMenu = {
       project,
-      x: Math.max(8, Math.min(x, window.innerWidth - 184)),
-      y: Math.max(8, Math.min(y, window.innerHeight - 152)),
+      x,
+      y,
+    };
+    await tick();
+    if (!projectContextMenuElement || projectContextMenu?.project.name !== project.name) return;
+    const menuBounds = projectContextMenuElement.getBoundingClientRect();
+    projectContextMenu = {
+      ...projectContextMenu,
+      x: Math.max(8, Math.min(x, window.innerWidth - menuBounds.width - 8)),
+      y: y + menuBounds.height > window.innerHeight - 8
+        ? Math.max(8, y - menuBounds.height)
+        : Math.max(8, y),
     };
   }
 
@@ -1583,7 +1594,7 @@
       const location = projectAddOptions.locations.find((item) => item.default) || projectAddOptions.locations[0];
       const databaseLocation = projectAddOptions.databaseLocations.find((item) => item.default) ? 'default' : 'system';
       const language = projectAddOptions.languages[0];
-      projectAddDialog = { code: '', location: location?.code || '', language: language?.code || '', languageVersion: projectAddOptions.defaultLanguageVersion, framework: projectAddOptions.frameworks[language?.code]?.[0]?.code || '', deploymentScript: '', deploymentArguments: {}, dedicated: false, mysql: false, postgres: false, locationMysql: databaseLocation, locationPostgres: databaseLocation };
+      projectAddDialog = { code: '', external: false, externalPort: 8080, location: location?.code || '', language: language?.code || '', languageVersion: projectAddOptions.defaultLanguageVersion, framework: projectAddOptions.frameworks[language?.code]?.[0]?.code || '', deploymentScript: '', deploymentArguments: {}, dedicated: false, mysql: false, postgres: false, locationMysql: databaseLocation, locationPostgres: databaseLocation };
     } catch (cause) {
       errorTitle = 'Не удалось открыть добавление проекта';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить параметры проекта.';
@@ -1597,7 +1608,7 @@
       const dedicatedMysql = project.mysqlHost === `docker-cli-mysql-${project.name}`;
       const dedicatedPostgres = project.postgresHost === `docker-cli-postgres-${project.name}`;
       const databaseLocation = projectAddOptions.databaseLocations.find((item) => item.default) ? 'default' : 'system';
-      projectUpdateDialog = { project: project.name, name: project.name, language, languageVersion: project.languageVersion || projectAddOptions.defaultLanguageVersion, framework: project.framework?.code || '', dedicated: dedicatedMysql || dedicatedPostgres, dedicatedMysql, dedicatedPostgres, locationMysql: databaseLocation, locationPostgres: databaseLocation };
+      projectUpdateDialog = { project: project.name, name: project.name, external: project.external, externalPort: project.externalPort || 8080, language, languageVersion: project.languageVersion || projectAddOptions.defaultLanguageVersion, framework: project.framework?.code || '', dedicated: dedicatedMysql || dedicatedPostgres, dedicatedMysql, dedicatedPostgres, locationMysql: databaseLocation, locationPostgres: databaseLocation };
       projectContextMenu = null;
     } catch (cause) {
       errorTitle = 'Не удалось открыть изменение проекта';
@@ -1624,10 +1635,12 @@
     if (!projectAddDialog) return;
     projectAdding = true;
     try {
-      const data = await createProject(api, {
+      const payload = {
         ...projectAddDialog,
         dedicatedDatabases: projectAddDialog.dedicated ? ['mysql', 'postgres'].filter((driver) => projectAddDialog[driver]) : [],
-      });
+      };
+      if (!projectAddDialog.external) delete payload.externalPort;
+      const data = await createProject(api, payload);
       projects = data.projects;
       projectAddDialog = null;
       notifyQueuedOperation('Добавление проекта');
@@ -1647,7 +1660,9 @@
     }
     projectUpdating = true;
     try {
-      const data = await updateProject(api, projectUpdateDialog.project, { name: projectUpdateDialog.name, language: projectUpdateDialog.language, languageVersion: projectUpdateDialog.languageVersion, framework: projectUpdateDialog.framework, dedicatedDatabases: projectUpdateDialog.dedicated ? [projectUpdateDialog.dedicatedMysql && 'mysql', projectUpdateDialog.dedicatedPostgres && 'postgres'].filter(Boolean) : [], locationMysql: projectUpdateDialog.locationMysql, locationPostgres: projectUpdateDialog.locationPostgres });
+      const changes = { name: projectUpdateDialog.name, external: projectUpdateDialog.external, language: projectUpdateDialog.language, languageVersion: projectUpdateDialog.languageVersion, framework: projectUpdateDialog.framework, dedicatedDatabases: projectUpdateDialog.dedicated ? [projectUpdateDialog.dedicatedMysql && 'mysql', projectUpdateDialog.dedicatedPostgres && 'postgres'].filter(Boolean) : [], locationMysql: projectUpdateDialog.locationMysql, locationPostgres: projectUpdateDialog.locationPostgres };
+      if (projectUpdateDialog.external) changes.externalPort = projectUpdateDialog.externalPort;
+      const data = await updateProject(api, projectUpdateDialog.project, changes);
       projects = data.projects;
       projectUpdateDialog = null;
       notifyQueuedOperation('Изменение проекта');
@@ -2187,6 +2202,7 @@
                               <Tooltip.Positioner><Tooltip.Content class="project-notes-tooltip card preset-filled-surface-900-100 shadow-xl">{project.description}</Tooltip.Content></Tooltip.Positioner>
                             </Tooltip>
                           {/if}
+                          {#if project.external}<Server size={14} aria-label="Внешний сервис" />{/if}
                           {#if project.protected}<Lock size={14} aria-label="Защищённый проект" />{/if}
                         </span>
                         <span class="project-tags">
@@ -2206,7 +2222,6 @@
               <nav class="project-detail-tabs" aria-label={`Разделы проекта ${selectedProject.name}`}>
                 <a class:active={projectDetailTab === 'info'} class="project-detail-tab" href={projectHash(selectedProject.name, 'info')} aria-current={projectDetailTab === 'info' ? 'page' : undefined}>Общее</a>
                 <a class:active={projectDetailTab === 'notes'} class="project-detail-tab" href={projectHash(selectedProject.name, 'notes')} aria-current={projectDetailTab === 'notes' ? 'page' : undefined}>Заметки</a>
-                <a class:active={projectDetailTab === 'security'} class="project-detail-tab" href={projectHash(selectedProject.name, 'security')} aria-current={projectDetailTab === 'security' ? 'page' : undefined}>Безопасность</a>
                 <a class:active={projectDetailTab === 'backups'} class="project-detail-tab" href={projectHash(selectedProject.name, 'backups')} aria-current={projectDetailTab === 'backups' ? 'page' : undefined}>Бэкапы</a>
                 <a class:active={projectDetailTab === 'scheduler'} class="project-detail-tab" href={projectHash(selectedProject.name, 'scheduler')} aria-current={projectDetailTab === 'scheduler' ? 'page' : undefined}>Планировщик</a>
                 <a class:active={projectDetailTab === 'journal'} class="project-detail-tab" href={projectHash(selectedProject.name, 'journal')} aria-current={projectDetailTab === 'journal' ? 'page' : undefined}>Журнал</a>
@@ -2218,6 +2233,8 @@
                     <div><dt>Название</dt><dd>{selectedProject.name}</dd></div>
                     <div><dt>Язык</dt><dd>{selectedProject.language?.name ? `${selectedProject.language.name}${selectedProject.languageVersion ? ` ${selectedProject.languageVersion}` : ''}` : 'Не указан'}</dd></div>
                     <div><dt>Фреймворк</dt><dd>{selectedProject.framework?.name || 'Без фреймворка'}</dd></div>
+                    <div><dt>Внешний сервис</dt><dd>{selectedProject.external ? 'Да' : 'Нет'}</dd></div>
+                    {#if selectedProject.external}<div><dt>Внешний порт</dt><dd><code>{selectedProject.externalPort}</code></dd></div>{/if}
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
                     <div><dt>Основной хост</dt><dd>{#if selectedProject.url}<a class="project-host" href={selectedProject.url} target="_blank" rel="noreferrer">{selectedProject.url}<ExternalLink size={14} aria-hidden="true" /></a>{:else}Не указан{/if}</dd></div>
                     <div><dt>Хост MySQL</dt><dd><code>{selectedProject.mysqlHost || 'docker-cli-mysql'}</code></dd></div>
@@ -2241,6 +2258,19 @@
                     </button>
                   </div>
                 </section>
+                <section class="project-tab-content security-content card preset-filled-surface-100-900" aria-label="Безопасность">
+                  <h3>Безопасность</h3>
+                  <div class="security-setting">
+                    <label class="security-option">
+                      <input class="checkbox" type="checkbox" checked={selectedProject.protected} disabled={securitySaving} onchange={(event) => setProjectProtected(event.currentTarget.checked)} />
+                      <span>Защищенный проект</span>
+                    </label>
+                    <Tooltip positioning={{ placement: 'right' }}>
+                      <Tooltip.Trigger class="security-help" aria-label="О защите проекта"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                      <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Для защищенных проектов запрещены команды, которые могут изменить их данные - и файлы, и базы данных</Tooltip.Content></Tooltip.Positioner>
+                    </Tooltip>
+                  </div>
+                </section>
                 {:else if projectDetailTab === 'notes'}
                 <div class="project-toolbar">
                   <button class="btn preset-filled-primary-500" type="button" disabled={notesSaving} onclick={saveNotes}>
@@ -2261,17 +2291,6 @@
                     <span class="label-text">Заметки</span>
                     <textarea class="textarea notes-textarea" bind:value={noteDescription} rows="8" placeholder="Произвольные заметки о проекте"></textarea>
                   </label>
-                </section>
-                {:else if projectDetailTab === 'security'}
-                <section class="project-tab-content security-content card preset-filled-surface-100-900" aria-label="Безопасность">
-                  <label class="security-option">
-                    <input class="checkbox" type="checkbox" checked={selectedProject.protected} disabled={securitySaving} onchange={(event) => setProjectProtected(event.currentTarget.checked)} />
-                    <span>Защищенный проект</span>
-                  </label>
-                  <Tooltip positioning={{ placement: 'right' }}>
-                    <Tooltip.Trigger class="security-help" aria-label="О защите проекта"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
-                    <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Для защищенных проектов запрещены команды, которые могут изменить их данные - и файлы, и базы данных</Tooltip.Content></Tooltip.Positioner>
-                  </Tooltip>
                 </section>
                 {:else if projectDetailTab === 'backups'}
                   <HttpRefreshBoundary coordinator={pageRefresh} refresh={refreshProjectBackups} />
@@ -2760,6 +2779,7 @@
 
 {#if projectContextMenu}
   <div
+    bind:this={projectContextMenuElement}
     class="project-context-menu card preset-filled-surface-100-900 shadow-2xl"
     role="menu"
     aria-label={`Действия с проектом ${projectContextMenu.project.name}`}
@@ -2828,6 +2848,8 @@
       {#if projectUpdateDialog}
         <form class="project-add-form" onsubmit={(event) => { event.preventDefault(); submitProjectUpdate(); }}>
           <label class="label"><span class="label-text">Имя</span><input class="input" bind:value={projectUpdateDialog.name} required pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
+          <label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectUpdateDialog.external} /><span>Внешний сервис</span></label>
+          {#if projectUpdateDialog.external}<label class="label"><span class="label-text">Порт внешнего сервиса</span><input class="input" type="number" min="1" max="65535" bind:value={projectUpdateDialog.externalPort} required /></label>{/if}
           <label class="label"><span class="label-text">Язык</span><Combobox collection={projectLanguageCollection} value={[projectUpdateDialog.language]} openOnClick onValueChange={(details) => { if (details.value[0]) { projectUpdateDialog.language = details.value[0]; projectUpdateDialog.framework = projectAddOptions.frameworks[projectUpdateDialog.language]?.[0]?.code || ''; } }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languages.map((language) => ({ value: language.code, label: language.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           {#if projectUpdateDialog.language === 'php'}
             <label class="label"><span class="label-text">Версия PHP</span><Combobox collection={projectLanguageVersionCollection} value={[projectUpdateDialog.languageVersion]} openOnClick onValueChange={(details) => { if (details.value[0]) projectUpdateDialog.languageVersion = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languageVersions.map((version) => ({ value: version, label: version })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
@@ -2856,6 +2878,8 @@
       <form class="project-add-form" onsubmit={(event) => { event.preventDefault(); addProject(); }}>
         <div class="project-add-main">
           <label class="label"><span class="label-text">Код (опционально)</span><input class="input" bind:value={projectAddDialog.code} pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" /></label>
+          <label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectAddDialog.external} /><span>Внешний сервис</span></label>
+          {#if projectAddDialog.external}<label class="label"><span class="label-text">Порт внешнего сервиса</span><input class="input" type="number" min="1" max="65535" bind:value={projectAddDialog.externalPort} required /></label>{/if}
           <label class="label"><span class="label-text project-clone-help-heading">Расположение файлов<Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" type="button" aria-label="О расположении файлов проекта"><CircleHelp size={16} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Определяет родительский каталог, в котором будет создан новый проект.</Tooltip.Content></Tooltip.Positioner></Tooltip></span><Combobox collection={projectLocationCollection} value={[projectAddDialog.location]} openOnClick onValueChange={(details) => { if (details.value[0]) projectAddDialog.location = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly required /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectLocationOptions as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <label class="label"><span class="label-text">Язык</span><Combobox collection={projectLanguageCollection} value={[projectAddDialog.language]} openOnClick onValueChange={(details) => { if (details.value[0]) { projectAddDialog.language = details.value[0]; projectAddDialog.framework = projectAddOptions.frameworks[projectAddDialog.language]?.[0]?.code || ''; } }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languages.map((language) => ({ value: language.code, label: language.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <label class="label"><span class="label-text">Версия PHP</span><Combobox collection={projectLanguageVersionCollection} value={[projectAddDialog.languageVersion]} openOnClick onValueChange={(details) => { if (details.value[0]) projectAddDialog.languageVersion = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly required /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languageVersions.map((version) => ({ value: version, label: version })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>

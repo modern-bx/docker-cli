@@ -18,6 +18,8 @@ final readonly class ProjectCreateRequestDto implements RequestDto
         public string $language,
         public ?string $languageVersion,
         public ?string $framework,
+        public bool $external,
+        public ?int $externalPort,
         public ?string $deploymentScript,
         public array $deploymentArguments,
         public array $dedicatedDatabases,
@@ -33,6 +35,8 @@ final readonly class ProjectCreateRequestDto implements RequestDto
         $language = $request->body["language"] ?? null;
         $languageVersion = $request->body["languageVersion"] ?? null;
         $framework = $request->body["framework"] ?? null;
+        $external = $request->body["external"] ?? false;
+        $externalPort = $request->body["externalPort"] ?? null;
         $deploymentScript = $request->body["deploymentScript"] ?? null;
         $deploymentArguments = $request->body["deploymentArguments"] ?? [];
         $dedicatedDatabases = $request->body["dedicatedDatabases"] ?? [];
@@ -44,6 +48,8 @@ final readonly class ProjectCreateRequestDto implements RequestDto
             !is_string($language) ||
             ($languageVersion !== null && !is_string($languageVersion)) ||
             ($framework !== null && !is_string($framework)) ||
+            !is_bool($external) ||
+            ($externalPort !== null && (!is_int($externalPort) || $externalPort < 1 || $externalPort > 65535)) ||
             ($deploymentScript !== null && !is_string($deploymentScript)) ||
             !is_array($deploymentArguments) ||
             (array_is_list($deploymentArguments) && $deploymentArguments !== []) ||
@@ -64,6 +70,8 @@ final readonly class ProjectCreateRequestDto implements RequestDto
             $language,
             is_string($languageVersion) && $languageVersion !== "" ? $languageVersion : null,
             is_string($framework) && $framework !== "" ? $framework : null,
+            $external,
+            $externalPort,
             $deploymentScript,
             $deploymentArguments,
             $dedicatedDatabases,

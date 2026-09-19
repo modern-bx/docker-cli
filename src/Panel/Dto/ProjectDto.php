@@ -9,7 +9,8 @@ namespace DockerCli\Panel\Dto;
  *
  * @phpstan-type ProjectPayload array{
  *     name: string, language: ConceptDto|null, languageVersion: string|null, framework: ConceptDto|null,
- *     enabled: bool, protected: bool, url: string|null, mysqlHost: string, postgresHost: string,
+ *     external: bool, externalPort: int|null, enabled: bool, protected: bool, url: string|null, mysqlHost: string,
+ *     postgresHost: string,
  *     tags: list<string>, description: string, root: string
  * }
  */
@@ -20,6 +21,8 @@ final readonly class ProjectDto implements \JsonSerializable
         public ?ConceptDto $language,
         public ?string $languageVersion,
         public ?ConceptDto $framework,
+        public bool $external,
+        public ?int $externalPort,
         public bool $enabled,
         public bool $protected,
         public ?string $url,
@@ -40,6 +43,8 @@ final readonly class ProjectDto implements \JsonSerializable
             "language" => $this->language,
             "languageVersion" => $this->languageVersion,
             "framework" => $this->framework,
+            "external" => $this->external,
+            "externalPort" => $this->externalPort,
             "enabled" => $this->enabled,
             "protected" => $this->protected,
             "url" => $this->url,

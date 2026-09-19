@@ -19,6 +19,8 @@ task:
         - { name: Laravel, value: laravel }
         - { name: Bitrix, value: bitrix }
         - { name: Bitrix24, value: bitrix24 }
+    external: { type: boolean, required: false }
+    external-port: { type: integer, required: false, min: 1, max: 65535 }
     dedicated-db: { type: string, required: false }
     location-mysql: { type: string, required: false }
     location-postgres: { type: string, required: false }
@@ -28,6 +30,8 @@ task:
     cd "$project_root"
     options=(--language={{ language }} --language-version={{ language-version }})
     [ -n "${framework:-}" ] && options+=(--framework="$framework")
+    [ "${external:-false}" = true ] && options+=(--external)
+    [ -n "${external_port:-}" ] && options+=(--external-port="$external_port")
     [ -n "${dedicated_db:-}" ] && options+=(--dedicated-db="$dedicated_db")
     [ -n "${location_mysql:-}" ] && options+=(--location-mysql="$location_mysql")
     [ -n "${location_postgres:-}" ] && options+=(--location-postgres="$location_postgres")

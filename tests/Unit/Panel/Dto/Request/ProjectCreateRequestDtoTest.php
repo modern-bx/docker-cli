@@ -24,4 +24,20 @@ final class ProjectCreateRequestDtoTest extends TestCase
 
         self::assertSame("8.4", $dto->languageVersion);
     }
+
+    public function testReadsExternalPort(): void
+    {
+        $request = new RequestData(
+            [],
+            ["location" => "default", "language" => "php", "external" => true, "externalPort" => 8081],
+            [],
+            null,
+            null,
+        );
+
+        $dto = ProjectCreateRequestDto::fromRequest($request);
+
+        self::assertTrue($dto->external);
+        self::assertSame(8081, $dto->externalPort);
+    }
 }
