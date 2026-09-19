@@ -15,6 +15,7 @@ use DockerCli\Project\OpenRestyHostRenderer;
 use DockerCli\Project\PhpLanguageVersion;
 use DockerCli\Project\PostgresDumpLoader;
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Project\ProxySqlConfigurationSynchronizer;
 
 use function DockerCli\Util\join_path;
 
@@ -246,6 +247,10 @@ final class ProjectUpdateCommand extends AbstractCommand
                     $this->removeDirectory($snapshot);
                 }
             }
+        }
+        $proxySqlCode = (new ProxySqlConfigurationSynchronizer())->synchronize($output);
+        if ($proxySqlCode !== Command::SUCCESS) {
+            return $proxySqlCode;
         }
 
         if ($routingChanged) {
