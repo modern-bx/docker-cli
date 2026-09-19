@@ -193,11 +193,11 @@ final class TaskRunCommand extends AbstractCommand
         if ($tags === null) {
             return;
         }
-        if (!is_array($tags)) {
+        if (!is_array($tags) || !array_is_list($tags)) {
             throw new \RuntimeException(sprintf("Теги %s должны быть списком.", $owner));
         }
         foreach ($tags as $tag) {
-            if (!is_string($tag) || preg_match('/^[A-Za-z][A-Za-z0-9._-]*$/', $tag) !== 1) {
+            if (!is_string($tag) || preg_match('/^[A-Za-z][A-Za-z0-9._:-]*$/', $tag) !== 1) {
                 throw new \RuntimeException(
                     sprintf(
                         'Некорректный тег %s: "%s".',
