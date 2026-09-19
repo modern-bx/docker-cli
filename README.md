@@ -16,7 +16,6 @@
 [![Последний PHAR](https://img.shields.io/badge/PHAR-main--latest-111827.svg)](https://github.com/modern-bx/docker-cli/releases/tag/main-latest)
 
 [Быстрый старт](#быстрый-старт) ·
-[Возможности](#возможности) ·
 [Документация](https://modern-bx.github.io/docker-cli/) ·
 [Поддержать проект](#поддержать-проект)
 
