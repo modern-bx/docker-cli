@@ -62,6 +62,19 @@ final class PhpImageConfigurationTest extends TestCase
         self::assertStringContainsString('try_files $uri $uri/ /index.php$is_args$args;', $configuration);
     }
 
+    public function testOpenRestyCanResolveHostServices(): void
+    {
+        $compose = $this->read("resources/compose/system/compose.yaml");
+        $openRestyStart = strpos($compose, "  openresty:\n");
+        $adminerStart = strpos($compose, "  adminer:\n");
+
+        self::assertIsInt($openRestyStart);
+        self::assertIsInt($adminerStart);
+        $openResty = substr($compose, $openRestyStart, $adminerStart - $openRestyStart);
+
+        self::assertStringContainsString('"host.docker.internal:host-gateway"', $openResty);
+    }
+
     #[DataProvider("phpVersions")]
     public function testPhpImageSupportsConditionalXdebugAndSpx(string $version): void
     {
