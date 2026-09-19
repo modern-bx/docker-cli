@@ -7,11 +7,18 @@ task:
   type: shell
   context: project
   tags: [project:init]
-  description: Устанавливает стандартный скелет Laravel, настраивает MySQL и выполняет миграции.
+  description: Устанавливает Laravel Installer и стандартный скелет, настраивает MySQL и выполняет миграции.
   action: |
     install_directory="laravel-install-${RANDOM}-${RANDOM}"
     trap 'rm -rf -- "$install_directory"' EXIT
-    docker-cli shell:run --project="$project" "laravel new '$install_directory' --no-interaction"
+    docker-cli shell:run --project="$project" "
+    set -Eeuo pipefail
+    if ! command -v laravel >/dev/null 2>&1; then
+      composer global require laravel/installer --no-interaction
+      export PATH=\"\$(composer global config bin-dir --absolute):\$PATH\"
+    fi
+    laravel new '$install_directory' --no-interaction
+    "
     rm -rf -- "$install_directory/.git"
     cp -a "$install_directory"/. .
     rm -rf -- "$install_directory"

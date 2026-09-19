@@ -79,6 +79,9 @@ final class CoreTasksTest extends TestCase
         self::assertSame("project", $task["context"]);
         self::assertContains("project:init", $task["tags"]);
         self::assertArrayNotHasKey("parameters", $task);
+        self::assertStringContainsString("if ! command -v laravel", $task["action"]);
+        self::assertStringContainsString("composer global require laravel/installer --no-interaction", $task["action"]);
+        self::assertStringContainsString("composer global config bin-dir --absolute", $task["action"]);
         self::assertStringContainsString("laravel new", $task["action"]);
         self::assertStringContainsString("DB_CONNECTION=mysql", $task["action"]);
         self::assertStringContainsString("databases.mysql.password", $task["action"]);
