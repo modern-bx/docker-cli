@@ -2,7 +2,8 @@ datadir="/var/lib/proxysql"
 
 admin_variables =
 {
-    admin_credentials="__PROXYSQL_ADMIN_USER__:__PROXYSQL_ADMIN_PASSWORD__"
+    admin_credentials="admin:__PROXYSQL_ADMIN_PASSWORD__;__PROXYSQL_ADMIN_USER__:__PROXYSQL_ADMIN_PASSWORD__"
+    stats_credentials="__PROXYSQL_WEB_USER__:__PROXYSQL_WEB_PASSWORD__"
     mysql_ifaces="0.0.0.0:6032"
     restapi_enabled=true
     web_enabled=true

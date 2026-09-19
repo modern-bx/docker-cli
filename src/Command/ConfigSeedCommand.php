@@ -64,6 +64,8 @@ final class ConfigSeedCommand extends AbstractCommand
         $this->setDefaultIfEmpty($values, "POSTGRES_PASSWORD", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "PROXYSQL_ADMIN_USER", "proxysql");
         $this->setDefaultIfEmpty($values, "PROXYSQL_ADMIN_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "PROXYSQL_WEB_USER", "proxysql-web");
+        $this->setDefaultIfEmpty($values, "PROXYSQL_WEB_PASSWORD", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "PROXYWEB_ADMIN_USER", "proxyweb");
         $this->setDefaultIfEmpty($values, "PROXYWEB_ADMIN_PASSWORD", $this->randomSecret());
         $this->writeEnvFile($compose->envFile(), $values);
@@ -167,6 +169,8 @@ final class ConfigSeedCommand extends AbstractCommand
             "POSTGRES_PASSWORD",
             "PROXYSQL_ADMIN_USER",
             "PROXYSQL_ADMIN_PASSWORD",
+            "PROXYSQL_WEB_USER",
+            "PROXYSQL_WEB_PASSWORD",
             "PROXYWEB_ADMIN_USER",
             "PROXYWEB_ADMIN_PASSWORD",
         ];

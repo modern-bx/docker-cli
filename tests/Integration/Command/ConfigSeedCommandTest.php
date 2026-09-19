@@ -35,6 +35,8 @@ final class ConfigSeedCommandTest extends TestCase
             $values = $this->readEnvironment($compose->envFile());
             self::assertSame("operator", $values["PROXYSQL_ADMIN_USER"]);
             self::assertNotSame("", $values["PROXYSQL_ADMIN_PASSWORD"]);
+            self::assertSame("proxysql-web", $values["PROXYSQL_WEB_USER"]);
+            self::assertNotSame("", $values["PROXYSQL_WEB_PASSWORD"]);
             self::assertSame("proxyweb", $values["PROXYWEB_ADMIN_USER"]);
             self::assertNotSame("", $values["PROXYWEB_ADMIN_PASSWORD"]);
         } finally {

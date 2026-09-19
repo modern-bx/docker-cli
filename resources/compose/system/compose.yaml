@@ -137,11 +137,21 @@ services:
         sed \
           -e "s|__PROXYSQL_ADMIN_USER__|$${PROXYSQL_ADMIN_USER}|g" \
           -e "s|__PROXYSQL_ADMIN_PASSWORD__|$${PROXYSQL_ADMIN_PASSWORD}|g" \
+          -e "s|__PROXYSQL_WEB_USER__|$${PROXYSQL_WEB_USER}|g" \
+          -e "s|__PROXYSQL_WEB_PASSWORD__|$${PROXYSQL_WEB_PASSWORD}|g" \
           /etc/proxysql/proxysql.cnf.template > /tmp/proxysql.cnf
-        exec proxysql -f -c /tmp/proxysql.cnf
+        initial=""
+        marker=/var/lib/proxysql/.docker-cli-admin-credentials-v3
+        if [ -f /var/lib/proxysql/proxysql.db ] && [ ! -f "$${marker}" ]; then
+          initial=--initial
+        fi
+        touch "$${marker}"
+        exec proxysql -f --idle-threads -D /var/lib/proxysql -c /tmp/proxysql.cnf $${initial}
     environment:
       PROXYSQL_ADMIN_USER: ${PROXYSQL_ADMIN_USER:?PROXYSQL_ADMIN_USER is required}
       PROXYSQL_ADMIN_PASSWORD: ${PROXYSQL_ADMIN_PASSWORD:?PROXYSQL_ADMIN_PASSWORD is required}
+      PROXYSQL_WEB_USER: ${PROXYSQL_WEB_USER:?PROXYSQL_WEB_USER is required}
+      PROXYSQL_WEB_PASSWORD: ${PROXYSQL_WEB_PASSWORD:?PROXYSQL_WEB_PASSWORD is required}
       DNSDOCK_NAME: proxysql
       DNSDOCK_IMAGE: system
     volumes:
@@ -151,7 +161,6 @@ services:
       traefik.enable: "true"
       traefik.http.routers.proxysql.rule: Host(`proxysql.${BASE_HOST}`)
       traefik.http.routers.proxysql.entrypoints: websecure
-      traefik.http.routers.proxysql.middlewares: system-http-auth
       traefik.http.routers.proxysql.tls: "true"
       traefik.http.routers.proxysql.tls.certresolver: cloudflare
       traefik.http.services.proxysql.loadbalancer.server.port: "6080"

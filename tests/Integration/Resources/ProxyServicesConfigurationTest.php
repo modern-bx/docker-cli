@@ -55,6 +55,11 @@ final class ProxyServicesConfigurationTest extends TestCase
         self::assertTrue(
             $dynamicConfiguration["http"]["serversTransports"]["proxysql-web"]["insecureSkipVerify"] ?? null,
         );
+        self::assertArrayNotHasKey(
+            "traefik.http.routers.proxysql.middlewares",
+            $services["proxysql"]["labels"] ?? [],
+        );
+        self::assertSame(["proxysql"], $services["proxyweb"]["depends_on"] ?? null);
     }
 
     public function testProxySqlEnablesWebUiAndRegistersSystemDatabases(): void
@@ -63,10 +68,23 @@ final class ProxyServicesConfigurationTest extends TestCase
 
         self::assertStringContainsString("web_enabled=true", $configuration);
         self::assertStringContainsString("web_port=6080", $configuration);
+        self::assertStringContainsString(
+            'admin_credentials="admin:__PROXYSQL_ADMIN_PASSWORD__;' .
+                '__PROXYSQL_ADMIN_USER__:__PROXYSQL_ADMIN_PASSWORD__"',
+            $configuration,
+        );
+        self::assertStringContainsString(
+            'stats_credentials="__PROXYSQL_WEB_USER__:__PROXYSQL_WEB_PASSWORD__"',
+            $configuration,
+        );
         self::assertStringContainsString('address="mysql"', $configuration);
         self::assertStringContainsString("port=3306", $configuration);
         self::assertStringContainsString('address="postgres"', $configuration);
         self::assertStringContainsString("port=5432", $configuration);
+
+        $compose = $this->read("resources/compose/system/compose.yaml");
+        self::assertStringContainsString("initial=--initial", $compose);
+        self::assertStringContainsString(".docker-cli-admin-credentials-v3", $compose);
     }
 
     public function testProxyWebContainsDefaultProxySqlServer(): void
