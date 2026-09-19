@@ -1,0 +1,39 @@
+global:
+  default_server: proxysql
+  read_only: false
+  hide_tables: []
+  config_diff_skip_variable:
+    - admin-cluster_mysql_servers_diffs_before_sync
+    - mysql-server_capabilities
+    - pgsql-interfaces
+servers:
+  proxysql:
+    dsn:
+      - host: proxysql
+        user: proxysql
+        passwd: proxysql
+        port: 6032
+        db: main
+    read_only: false
+auth:
+  admin_user: proxyweb
+  admin_password: proxyweb
+  readonly_user: readonly
+  readonly_password: readonly
+  okta:
+    enabled: false
+    issuer: ""
+    client_id: ""
+    client_secret: ""
+    admin_group: ""
+    readonly_group: ""
+    scopes: openid profile email groups
+    disable_local_login: false
+flask:
+  SECRET_KEY: 12345678901234567890
+  SEND_FILE_MAX_AGE_DEFAULT: 0
+  TEMPLATES_AUTO_RELOAD: true
+misc:
+  apply_config: []
+  update_config: []
+  adhoc_report: []

@@ -6,6 +6,8 @@ namespace DockerCli\Config;
 
 use function DockerCli\Util\join_path;
 
+use Symfony\Component\Yaml\Yaml;
+
 final class SystemCompose
 {
     public const PROJECT_NAME = "docker-cli";
@@ -125,6 +127,9 @@ final class SystemCompose
             $created = true;
         }
         if ($this->ensurePanelSecrets()) {
+            $created = true;
+        }
+        if ($this->ensureProxyWebConfiguration()) {
             $created = true;
         }
 
@@ -326,6 +331,49 @@ final class SystemCompose
         return true;
     }
 
+    private function ensureProxyWebConfiguration(): bool
+    {
+        $file = join_path($this->directory(), "config", "proxyweb", "config.yml");
+        if (!is_file($file)) {
+            return false;
+        }
+
+        $configuration = Yaml::parseFile($file);
+        if (!is_array($configuration)) {
+            throw new \RuntimeException(sprintf('Конфигурация ProxyWeb в файле "%s" имеет неверный формат.', $file));
+        }
+
+        $defaults = [
+            "auth" => [
+                "okta" => [
+                    "enabled" => false,
+                    "issuer" => "",
+                    "client_id" => "",
+                    "client_secret" => "",
+                    "admin_group" => "",
+                    "readonly_group" => "",
+                    "scopes" => "openid profile email groups",
+                    "disable_local_login" => false,
+                ],
+            ],
+            "misc" => [
+                "apply_config" => [],
+                "update_config" => [],
+                "adhoc_report" => [],
+            ],
+        ];
+        $updated = array_replace_recursive($defaults, $configuration);
+        if ($updated === $configuration) {
+            return false;
+        }
+
+        if (file_put_contents($file, Yaml::dump($updated, 8, 2), LOCK_EX) === false) {
+            throw new \RuntimeException(sprintf('Не удалось обновить конфигурацию ProxyWeb в файле "%s".', $file));
+        }
+
+        return true;
+    }
+
     private function hostUserId(): int
     {
         if (function_exists("posix_getuid")) {
@@ -362,6 +410,7 @@ final class SystemCompose
             join_path($postgresData, "data"),
             join_path($postgresData, "logs"),
             join_path($data, "mailpit"),
+            join_path($data, "proxysql"),
             join_path($this->directory(), "config", "openresty", "hosts"),
             join_path($this->directory(), "config", "ofelia"),
             join_path($this->directory(), "config", "panel"),
@@ -474,6 +523,16 @@ final class SystemCompose
                 "php-fpm-8.5",
             ),
             join_path($this->directory(), "config", "panel") => join_path($composeResources, "config", "panel"),
+            join_path($this->directory(), "config", "proxysql") => join_path(
+                $composeResources,
+                "config",
+                "proxysql",
+            ),
+            join_path($this->directory(), "config", "traefik") => join_path(
+                $composeResources,
+                "config",
+                "traefik",
+            ),
             $this->playwrightScriptsDirectory() => join_path($resources, "playwright", "scripts"),
             $this->coreTasksDirectory() => join_path($resources, "tasks", "core"),
         ];
@@ -526,6 +585,11 @@ final class SystemCompose
                 $resources,
                 "php-spx",
                 "settings.css",
+            ),
+            join_path($this->directory(), "config", "proxyweb", "config.yml") => join_path(
+                $resources,
+                "proxyweb",
+                "config.yml",
             ),
         ];
     }

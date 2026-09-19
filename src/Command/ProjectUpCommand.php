@@ -18,6 +18,7 @@ use DockerCli\Project\PhpLanguageVersion;
 use DockerCli\Project\ProjectDatabaseConfig;
 use DockerCli\Project\ProjectNameGenerator;
 use DockerCli\Project\ProjectRegistry;
+use DockerCli\Project\ProxySqlConfigurationSynchronizer;
 use DockerCli\Project\XdebugPortManager;
 use DockerCli\Service\TranslatorFactory;
 
@@ -339,6 +340,10 @@ final class ProjectUpCommand extends AbstractCommand
         }
         if ($dataInitCode !== Command::SUCCESS) {
             return $dataInitCode;
+        }
+        $proxySqlCode = (new ProxySqlConfigurationSynchronizer())->synchronize($output);
+        if ($proxySqlCode !== Command::SUCCESS) {
+            return $proxySqlCode;
         }
 
         (new OpenRestyHostRenderer())->render();

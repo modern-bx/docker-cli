@@ -7,6 +7,7 @@ namespace DockerCli\Tests\Integration\Resources;
 use DockerCli\Config\SystemCompose;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Yaml\Yaml;
 
 final class PhpImageConfigurationTest extends TestCase
 {
@@ -48,6 +49,36 @@ final class PhpImageConfigurationTest extends TestCase
             $compose->init(updateStatic: true);
 
             self::assertSame("/* Пользовательские стили. */\n", file_get_contents($settingsFile));
+        } finally {
+            putenv($previousHome === false ? "HOME" : "HOME=" . $previousHome);
+            $this->removeDirectory($temporaryHome);
+        }
+    }
+
+    public function testConfigInitCompletesExistingProxyWebConfiguration(): void
+    {
+        $previousHome = getenv("HOME");
+        $temporaryHome = sys_get_temp_dir() . "/docker-cli-proxyweb-" . bin2hex(random_bytes(8));
+        mkdir($temporaryHome, 0755, true);
+        putenv("HOME=" . $temporaryHome);
+
+        try {
+            $compose = new SystemCompose();
+            $compose->init();
+            $configurationFile = $compose->directory() . "/config/proxyweb/config.yml";
+            $configuration = Yaml::parseFile($configurationFile);
+            self::assertIsArray($configuration);
+            unset($configuration["auth"]["okta"], $configuration["misc"]);
+            $configuration["auth"]["admin_user"] = "сохранённый-пользователь";
+            file_put_contents($configurationFile, Yaml::dump($configuration, 8, 2));
+
+            $compose->init();
+
+            $migrated = Yaml::parseFile($configurationFile);
+            self::assertIsArray($migrated);
+            self::assertSame("сохранённый-пользователь", $migrated["auth"]["admin_user"] ?? null);
+            self::assertFalse($migrated["auth"]["okta"]["enabled"] ?? null);
+            self::assertSame([], $migrated["misc"]["apply_config"] ?? null);
         } finally {
             putenv($previousHome === false ? "HOME" : "HOME=" . $previousHome);
             $this->removeDirectory($temporaryHome);

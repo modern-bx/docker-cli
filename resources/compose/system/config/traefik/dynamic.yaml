@@ -1,0 +1,4 @@
+http:
+  serversTransports:
+    proxysql-web:
+      insecureSkipVerify: true
