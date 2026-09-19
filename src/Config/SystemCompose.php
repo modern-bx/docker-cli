@@ -362,6 +362,7 @@ final class SystemCompose
             join_path($postgresData, "data"),
             join_path($postgresData, "logs"),
             join_path($data, "mailpit"),
+            join_path($data, "proxysql"),
             join_path($this->directory(), "config", "openresty", "hosts"),
             join_path($this->directory(), "config", "ofelia"),
             join_path($this->directory(), "config", "panel"),
@@ -474,6 +475,11 @@ final class SystemCompose
                 "php-fpm-8.5",
             ),
             join_path($this->directory(), "config", "panel") => join_path($composeResources, "config", "panel"),
+            join_path($this->directory(), "config", "proxysql") => join_path(
+                $composeResources,
+                "config",
+                "proxysql",
+            ),
             $this->playwrightScriptsDirectory() => join_path($resources, "playwright", "scripts"),
             $this->coreTasksDirectory() => join_path($resources, "tasks", "core"),
         ];
@@ -526,6 +532,11 @@ final class SystemCompose
                 $resources,
                 "php-spx",
                 "settings.css",
+            ),
+            join_path($this->directory(), "config", "proxyweb", "config.yml") => join_path(
+                $resources,
+                "proxyweb",
+                "config.yml",
             ),
         ];
     }

@@ -49,7 +49,7 @@ services:
       - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
     environment:
       CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
-      DNSDOCK_ALIAS: ${BASE_HOST},dockhand.${BASE_HOST},adminer.${BASE_HOST},mailpit.${BASE_HOST},panel.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
+      DNSDOCK_ALIAS: ${BASE_HOST},dockhand.${BASE_HOST},adminer.${BASE_HOST},mailpit.${BASE_HOST},panel.${BASE_HOST},proxysql.${BASE_HOST},proxyweb.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
     ports:
       - "${TRAEFIK_HTTP_PORT:-80}:80"
       - "${TRAEFIK_HTTPS_PORT:-443}:443"
@@ -64,6 +64,8 @@ services:
           - adminer.${BASE_HOST}
           - mailpit.${BASE_HOST}
           - panel.${BASE_HOST}
+          - proxysql.${BASE_HOST}
+          - proxyweb.${BASE_HOST}
     restart: unless-stopped
 
   mysql:
@@ -121,6 +123,73 @@ services:
         aliases:
           - postgres
           - postgres.${BASE_HOST}
+    restart: unless-stopped
+
+  proxysql:
+    image: proxysql/proxysql:3.0.11
+    container_name: docker-cli-proxysql
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        sed \
+          -e "s|__PROXYSQL_ADMIN_USER__|$${PROXYSQL_ADMIN_USER}|g" \
+          -e "s|__PROXYSQL_ADMIN_PASSWORD__|$${PROXYSQL_ADMIN_PASSWORD}|g" \
+          /etc/proxysql/proxysql.cnf.template > /tmp/proxysql.cnf
+        exec proxysql -f -c /tmp/proxysql.cnf
+    environment:
+      PROXYSQL_ADMIN_USER: ${PROXYSQL_ADMIN_USER:?PROXYSQL_ADMIN_USER is required}
+      PROXYSQL_ADMIN_PASSWORD: ${PROXYSQL_ADMIN_PASSWORD:?PROXYSQL_ADMIN_PASSWORD is required}
+      DNSDOCK_NAME: proxysql
+      DNSDOCK_IMAGE: system
+    volumes:
+      - ./config/proxysql/proxysql.cnf.template:/etc/proxysql/proxysql.cnf.template:ro
+      - ./data/proxysql:/var/lib/proxysql
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.proxysql.rule: Host(`proxysql.${BASE_HOST}`)
+      traefik.http.routers.proxysql.entrypoints: websecure
+      traefik.http.routers.proxysql.middlewares: system-http-auth
+      traefik.http.routers.proxysql.tls: "true"
+      traefik.http.routers.proxysql.tls.certresolver: cloudflare
+      traefik.http.services.proxysql.loadbalancer.server.port: "6080"
+    networks:
+      docker-cli:
+        aliases:
+          - proxysql
+          - proxysql.${BASE_HOST}
+    restart: unless-stopped
+
+  proxyweb:
+    image: proxyweb/proxyweb:2.3.0
+    container_name: docker-cli-proxyweb
+    depends_on:
+      - proxysql
+    environment:
+      PROXYWEB_ADMIN_USER: ${PROXYWEB_ADMIN_USER:?PROXYWEB_ADMIN_USER is required}
+      PROXYWEB_ADMIN_PASSWORD: ${PROXYWEB_ADMIN_PASSWORD:?PROXYWEB_ADMIN_PASSWORD is required}
+      PROXYWEB_SERVER_PROXYSQL_USER: ${PROXYSQL_ADMIN_USER:?PROXYSQL_ADMIN_USER is required}
+      PROXYWEB_SERVER_PROXYSQL_PASSWORD: ${PROXYSQL_ADMIN_PASSWORD:?PROXYSQL_ADMIN_PASSWORD is required}
+      PROXYWEB_SERVER_PROXYSQL_HOST: proxysql
+      PROXYWEB_SERVER_PROXYSQL_PORT: "6032"
+      PROXYWEB_SERVER_PROXYSQL_DATABASE: main
+      DNSDOCK_NAME: proxyweb
+      DNSDOCK_IMAGE: system
+    volumes:
+      - ./config/proxyweb/config.yml:/app/config/config.yml
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.proxyweb.rule: Host(`proxyweb.${BASE_HOST}`)
+      traefik.http.routers.proxyweb.entrypoints: websecure
+      traefik.http.routers.proxyweb.middlewares: system-http-auth
+      traefik.http.routers.proxyweb.tls: "true"
+      traefik.http.routers.proxyweb.tls.certresolver: cloudflare
+      traefik.http.services.proxyweb.loadbalancer.server.port: "5000"
+    networks:
+      docker-cli:
+        aliases:
+          - proxyweb
+          - proxyweb.${BASE_HOST}
     restart: unless-stopped
 
   php-fpm-8.2:
