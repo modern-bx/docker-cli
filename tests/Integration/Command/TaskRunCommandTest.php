@@ -15,13 +15,18 @@ final class TaskRunCommandTest extends TestCase
     public function testAcceptsProjectInitTagWithColon(): void
     {
         $repository = new TaskRepository(dirname(__DIR__, 3) . "/resources/tasks/core");
-        $tester = new CommandTester(new TaskRunCommand($repository));
+        $command = new TaskRunCommand($repository);
+        $tester = new CommandTester($command);
 
         $exitCode = $tester->execute(["task-code" => "core.project.init.bitrix"]);
 
         self::assertSame(Command::INVALID, $exitCode);
         self::assertStringContainsString('Обязательный параметр "edition" не передан.', $tester->getDisplay());
         self::assertStringNotContainsString("Некорректный тег задачи", $tester->getDisplay());
+        self::assertSame(
+            ['Обязательный параметр "edition" не передан.'],
+            array_column($command->journal(), "message"),
+        );
     }
 
     public function testProjectInitializationRunsFromProjectRootBeforeDocumentRootExists(): void
@@ -44,6 +49,15 @@ final class TaskRunCommandTest extends TestCase
               tags: [project:init]
               action: pwd > initialization-directory.txt
             YAML);
+        file_put_contents($tasksDirectory . "/maintenance.yaml", <<<YAML
+            meta: { schema: task, version: 0.1 }
+            task:
+              name: Проверка резервной директории
+              code: test.project.maintenance
+              type: shell
+              context: project
+              action: pwd > maintenance-directory.txt
+            YAML);
         file_put_contents($projectState . "/project.yaml", <<<YAML
             data:
               project:
@@ -60,6 +74,12 @@ final class TaskRunCommandTest extends TestCase
 
             self::assertSame(Command::SUCCESS, $exitCode);
             $actualDirectory = file_get_contents($projectRoot . "/initialization-directory.txt");
+            self::assertSame($projectRoot, trim((string) $actualDirectory));
+
+            $exitCode = $tester->execute(["task-code" => "test.project.maintenance", "--project" => "example"]);
+
+            self::assertSame(Command::SUCCESS, $exitCode);
+            $actualDirectory = file_get_contents($projectRoot . "/maintenance-directory.txt");
             self::assertSame($projectRoot, trim((string) $actualDirectory));
         } finally {
             putenv($previousHome === false ? "HOME" : "HOME=" . $previousHome);

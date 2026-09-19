@@ -72,6 +72,10 @@ final class TaskRunCommand extends AbstractCommand
                 throw new \RuntimeException(sprintf('Не удалось создать временный скрипт в "%s".', $cwd));
             }
         } catch (\Throwable $exception) {
+            $this->journal[sprintf("%.6f", microtime(true))] = [
+                "message" => $exception->getMessage(),
+                "level" => MessageLevel::Error->value,
+            ];
             $this->writeMessage($output, "<error>" . $exception->getMessage() . "</error>");
 
             return Command::INVALID;
@@ -325,10 +329,13 @@ final class TaskRunCommand extends AbstractCommand
         }
         $projectConfig = $registry->readProjectConfig($project)["data"]["project"] ?? [];
         $isProjectInitialization = in_array("project:init", $task["tags"] ?? [], true);
-        $directory = $projectConfig[$isProjectInitialization ? "root" : "document_root"] ?? null;
+        $projectRoot = $projectConfig["root"] ?? null;
+        $documentRoot = $projectConfig["document_root"] ?? null;
+        $directory = $isProjectInitialization || !is_string($documentRoot) || !is_dir($documentRoot)
+            ? $projectRoot
+            : $documentRoot;
         if (!is_string($directory) || !is_dir($directory)) {
-            $directoryName = $isProjectInitialization ? "Корневая директория" : "Document root";
-            throw new \RuntimeException(sprintf('%s проекта "%s" не существует.', $directoryName, $project));
+            throw new \RuntimeException(sprintf('Рабочая директория проекта "%s" не существует.', $project));
         }
 
         return $directory;
