@@ -19,6 +19,13 @@ final class ProxySqlConfigurationSynchronizer
     public function synchronize(OutputInterface $output): int
     {
         $compose = $this->compose ?? new SystemCompose();
+        $input = tmpfile();
+        if ($input === false) {
+            throw new \RuntimeException("Не удалось подготовить конфигурацию ProxySQL.");
+        }
+        $this->write($input, $this->sql());
+        rewind($input);
+
         $command = array_merge(
             $compose->dockerComposeCommand("exec"),
             [
@@ -33,18 +40,19 @@ final class ProxySqlConfigurationSynchronizer
 
         $process = proc_open(
             $command,
-            [["pipe", "r"], STDOUT, STDERR],
+            [$input, STDOUT, STDERR],
             $pipes,
             null,
             $compose->dockerProcessEnvironment(),
         );
         if (!is_resource($process)) {
+            fclose($input);
             throw new \RuntimeException("Не удалось запустить синхронизацию ProxySQL.");
         }
-        fwrite($pipes[0], $this->sql());
-        fclose($pipes[0]);
+        $exitCode = proc_close($process);
+        fclose($input);
 
-        return proc_close($process) === 0 ? Command::SUCCESS : Command::FAILURE;
+        return $exitCode === 0 ? Command::SUCCESS : Command::FAILURE;
     }
 
     public function sql(): string
@@ -59,9 +67,9 @@ final class ProxySqlConfigurationSynchronizer
                 if (!is_array($database)) {
                     continue;
                 }
-                $hostname = $database["hostname"] ?? null;
-                $username = $database["username"] ?? null;
-                $name = $database["database"] ?? null;
+                $hostname = $database["hostname"] ?? "docker-cli-{$driver}";
+                $username = $database["username"] ?? $projectName;
+                $name = $database["database"] ?? $projectName;
                 $password = $database["password"] ?? null;
                 if (!is_string($hostname) || !is_string($username) || !is_string($name) || !is_string($password)) {
                     continue;
@@ -76,8 +84,20 @@ final class ProxySqlConfigurationSynchronizer
             }
         }
 
-        return $this->driverSql("mysql", $servers["mysql"], $routes["mysql"])
-            . $this->driverSql("pgsql", $servers["postgres"], $routes["postgres"]);
+        return "BEGIN;\n"
+            . $this->driverSql("mysql", $servers["mysql"], $routes["mysql"])
+            . $this->driverSql("pgsql", $servers["postgres"], $routes["postgres"])
+            . "COMMIT;\n"
+            . "SET mysql-monitor_enabled='false';\n"
+            . "LOAD MYSQL VARIABLES TO RUNTIME; SAVE MYSQL VARIABLES TO DISK;\n"
+            . "SET pgsql-monitor_enabled='false';\n"
+            . "LOAD PGSQL VARIABLES TO RUNTIME; SAVE PGSQL VARIABLES TO DISK;\n"
+            . "LOAD MYSQL SERVERS TO RUNTIME; SAVE MYSQL SERVERS TO DISK;\n"
+            . "LOAD MYSQL USERS TO RUNTIME; SAVE MYSQL USERS TO DISK;\n"
+            . "LOAD MYSQL QUERY RULES TO RUNTIME; SAVE MYSQL QUERY RULES TO DISK;\n"
+            . "LOAD PGSQL SERVERS TO RUNTIME; SAVE PGSQL SERVERS TO DISK;\n"
+            . "LOAD PGSQL USERS TO RUNTIME; SAVE PGSQL USERS TO DISK;\n"
+            . "LOAD PGSQL QUERY RULES TO RUNTIME; SAVE PGSQL QUERY RULES TO DISK;\n";
     }
 
     /** @param array<string, int> $servers @param array<string, array{string,string,string,int}> $routes */
@@ -121,11 +141,7 @@ final class ProxySqlConfigurationSynchronizer
                 $hostgroup,
             );
         }
-        $upper = strtoupper($prefix);
-
-        return $sql . "LOAD {$upper} SERVERS TO RUNTIME; SAVE {$upper} SERVERS TO DISK;\n"
-            . "LOAD {$upper} USERS TO RUNTIME; SAVE {$upper} USERS TO DISK;\n"
-            . "LOAD {$upper} QUERY RULES TO RUNTIME; SAVE {$upper} QUERY RULES TO DISK;\n";
+        return $sql;
     }
 
     private function hostgroup(string $driver, string $hostname): int
@@ -136,5 +152,20 @@ final class ProxySqlConfigurationSynchronizer
     private function escape(string $value): string
     {
         return str_replace("'", "''", $value);
+    }
+
+    /** @param resource $stream */
+    private function write($stream, string $contents): void
+    {
+        $offset = 0;
+        $length = strlen($contents);
+        while ($offset < $length) {
+            $written = fwrite($stream, substr($contents, $offset));
+            if ($written === false || $written === 0) {
+                fclose($stream);
+                throw new \RuntimeException("Не удалось подготовить конфигурацию ProxySQL.");
+            }
+            $offset += $written;
+        }
     }
 }

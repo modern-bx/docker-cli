@@ -118,7 +118,7 @@ bin/docker-cli -- 'echo "$USER"'
 Перед выполнением стандартные профили Bash не загружаются, но при наличии явно
 подключается `/home/docker-cli/.docker-cli.profile`.
 
-### `bin/docker-cli project:up [name] [--language-version]`
+### `bin/docker-cli project:up [name] [--language-version] [--external] [--external-port]`
 
 Регистрирует Laravel, Symfony, Bitrix или Bitrix24 проект из текущей директории или вложенного пути. Опция `--force` разрешает регистрацию, даже если определить фреймворк не удалось.
 
@@ -148,6 +148,10 @@ bin/docker-cli project:up my-project --no-restart
 останавливает выполнение цепочки и возвращается как код завершения команды. Результат каждого запуска пишется в `~/.config/docker-cli/journal/hooks/default.jsonl`: код возврата `0` и вывод в `stdout` получают уровень `info`, ненулевой код возврата и вывод в `stderr` — уровень `error`; уровни `debug` и `warning` зарезервированы в фильтрах журнала, но пока не используются. Примеры хуков хранятся в `resources/actions/hooks` и копируются только командой `config:init --examples`; их имена начинаются с точки, поэтому после копирования они остаются отключенными, пока пользователь не переименует их. Подробности, формат JSONL-журнала и работа в панели описаны в [руководстве по хукам](/guide/hooks).
 
 `--no-restart` пропускает перезапуск общего пула проектных сервисов.
+
+`--external` направляет web-хост проекта на сервис, запущенный на хост-машине. `--external-port` задаёт его
+порт и применяется только вместе с `--external`; без него используется `EXTERNAL_SERVICE_PORT` из системного
+`.env`.
 
 ### `bin/docker-cli project:list`
 
@@ -190,7 +194,7 @@ bin/docker-cli project:clone --to=my-project-copy --mirror=tree
 DNS-алиасы через Traefik и Dnsdock и выполняет reload OpenResty, поэтому новый
 проект сразу открывается на собственном хосте.
 
-### `bin/docker-cli project:update [--name] [--language] [--framework] [--language-version]`
+### `bin/docker-cli project:update [--name] [--language] [--framework] [--language-version] [--external]`
 
 Изменяет имя, язык, фреймворк и версию PHP проекта. `--language-version` принимает `8.2`, `8.3`, `8.4` или `8.5`. Команду нужно запускать из директории
 зарегистрированного проекта. Если язык или фреймворк изменились, команда пересобирает
@@ -199,7 +203,12 @@ DNS-алиасы через Traefik и Dnsdock и выполняет reload Open
 
 ```bash
 bin/docker-cli project:update --name=new-project --language=php --framework=symfony --language-version=8.4
+bin/docker-cli project:update --external --external-port=3000
+bin/docker-cli project:update --no-external
 ```
+
+`--external` включает проксирование на сервис хост-машины, `--no-external` возвращает обычный проектный
+upstream, а `--external-port` изменяет порт внешнего сервиса.
 
 ### `bin/docker-cli project:disable [project]` / `bin/docker-cli project:enable [project]`
 

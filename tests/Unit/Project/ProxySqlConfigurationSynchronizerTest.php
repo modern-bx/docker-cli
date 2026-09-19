@@ -21,6 +21,7 @@ final class ProxySqlConfigurationSynchronizerTest extends TestCase
             $registry = new ProjectRegistry();
             $this->writeProject($registry, "alpha", "docker-cli-mysql", "docker-cli-postgres");
             $this->writeProject($registry, "beta", "docker-cli-mysql-beta", "docker-cli-postgres-beta");
+            $this->writeLegacyProjectWithoutHostnames($registry, "delta");
 
             $sql = (new ProxySqlConfigurationSynchronizer($registry))->sql();
 
@@ -32,6 +33,12 @@ final class ProxySqlConfigurationSynchronizerTest extends TestCase
             self::assertStringContainsString("username, database, destination_hostgroup", $sql);
             self::assertStringContainsString("'alpha', 'alpha'", $sql);
             self::assertStringContainsString("'beta', 'beta'", $sql);
+            self::assertStringContainsString("'delta', 'mysql-delta', 0, 'docker-cli'", $sql);
+            self::assertStringContainsString("'delta', 'postgres-delta', 0, 'docker-cli'", $sql);
+            self::assertStringContainsString("'delta', 'delta', 0, 1, 'docker-cli'", $sql);
+            self::assertStringStartsWith("BEGIN;\n", $sql);
+            self::assertStringContainsString("COMMIT;\nSET mysql-monitor_enabled='false';", $sql);
+            self::assertStringContainsString("SET pgsql-monitor_enabled='false';", $sql);
             self::assertStringContainsString("LOAD MYSQL QUERY RULES TO RUNTIME", $sql);
             self::assertStringContainsString("LOAD PGSQL QUERY RULES TO RUNTIME", $sql);
         } finally {
@@ -56,6 +63,27 @@ final class ProxySqlConfigurationSynchronizerTest extends TestCase
                         "hostname" => $postgres,
                         "username" => $name,
                         "database" => $name,
+                        "password" => "postgres-$name",
+                    ],
+                ],
+            ],
+        ]);
+    }
+
+    private function writeLegacyProjectWithoutHostnames(ProjectRegistry $registry, string $name): void
+    {
+        mkdir($registry->projectDirectory($name), 0755, true);
+        $registry->writeProjectConfig($name, [
+            "data" => [
+                "databases" => [
+                    "mysql" => [
+                        "database" => $name,
+                        "username" => $name,
+                        "password" => "mysql-$name",
+                    ],
+                    "postgres" => [
+                        "database" => $name,
+                        "username" => $name,
                         "password" => "postgres-$name",
                     ],
                 ],

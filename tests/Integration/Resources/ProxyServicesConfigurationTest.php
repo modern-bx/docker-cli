@@ -81,6 +81,7 @@ final class ProxyServicesConfigurationTest extends TestCase
         self::assertStringContainsString("port=3306", $configuration);
         self::assertStringContainsString('address="postgres"', $configuration);
         self::assertStringContainsString("port=5432", $configuration);
+        self::assertSame(2, substr_count($configuration, "monitor_enabled=false"));
 
         $compose = $this->read("resources/compose/system/compose.yaml");
         self::assertStringContainsString("initial=--initial", $compose);
