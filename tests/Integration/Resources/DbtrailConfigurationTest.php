@@ -16,7 +16,8 @@ final class DbtrailConfigurationTest extends TestCase
         self::assertIsArray($compose);
         self::assertIsArray($compose["services"] ?? null);
         $services = $compose["services"];
-        self::assertSame("ghcr.io/dbtrail/bintrail-console:v0.84.0", $services["dbtrail"]["image"] ?? null);
+        self::assertSame("mysql:8.4", $services["dbtrail-index"]["image"] ?? null);
+        self::assertSame("ghcr.io/dbtrail/bintrail-console:0.84.0", $services["dbtrail"]["image"] ?? null);
         self::assertSame(
             '${DBTRAIL_MYSQL_USER:?DBTRAIL_MYSQL_USER is required}:' .
                 '${DBTRAIL_MYSQL_PASSWORD:?DBTRAIL_MYSQL_PASSWORD is required}@tcp(mysql:3306)/',
