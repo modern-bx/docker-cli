@@ -323,12 +323,15 @@ final class TaskRunCommand extends AbstractCommand
         if (!$registry->hasProject($project)) {
             throw new \RuntimeException(sprintf('Проект "%s" не зарегистрирован.', $project));
         }
-        $root = $registry->readProjectConfig($project)["data"]["project"]["document_root"] ?? null;
-        if (!is_string($root) || !is_dir($root)) {
-            throw new \RuntimeException(sprintf('Document root проекта "%s" не существует.', $project));
+        $projectConfig = $registry->readProjectConfig($project)["data"]["project"] ?? [];
+        $isProjectInitialization = in_array("project:init", $task["tags"] ?? [], true);
+        $directory = $projectConfig[$isProjectInitialization ? "root" : "document_root"] ?? null;
+        if (!is_string($directory) || !is_dir($directory)) {
+            $directoryName = $isProjectInitialization ? "Корневая директория" : "Document root";
+            throw new \RuntimeException(sprintf('%s проекта "%s" не существует.', $directoryName, $project));
         }
 
-        return $root;
+        return $directory;
     }
 
     /** @param array<string, mixed> $task @param array<string, string|int> $values */

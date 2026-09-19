@@ -1,0 +1,32 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Установка Laravel
+  code: core.project.init.laravel
+  type: shell
+  context: project
+  tags: [project:init]
+  description: Устанавливает стандартный скелет Laravel, настраивает MySQL и выполняет миграции.
+  action: |
+    install_directory="laravel-install-${RANDOM}-${RANDOM}"
+    trap 'rm -rf -- "$install_directory"' EXIT
+    docker-cli shell:run --project="$project" "laravel new '$install_directory' --no-interaction"
+    rm -rf -- "$install_directory/.git"
+    cp -a "$install_directory"/. .
+    rm -rf -- "$install_directory"
+    trap - EXIT
+
+    db_host=$(docker-cli project:config-get databases.mysql.hostname)
+    db_database=$(docker-cli project:config-get databases.mysql.database)
+    db_username=$(docker-cli project:config-get databases.mysql.username)
+    db_password=$(docker-cli project:config-get databases.mysql.password)
+    sed -i -E \
+      -e 's|^DB_CONNECTION=.*|DB_CONNECTION=mysql|' \
+      -e "s|^#? *DB_HOST=.*|DB_HOST=$db_host|" \
+      -e 's|^#? *DB_PORT=.*|DB_PORT=3306|' \
+      -e "s|^#? *DB_DATABASE=.*|DB_DATABASE=$db_database|" \
+      -e "s|^#? *DB_USERNAME=.*|DB_USERNAME=$db_username|" \
+      -e "s|^#? *DB_PASSWORD=.*|DB_PASSWORD=$db_password|" \
+      .env
+    docker-cli shell:run --project="$project" 'php artisan migrate --force --no-interaction'

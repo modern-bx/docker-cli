@@ -68,4 +68,23 @@ final class CoreTasksTest extends TestCase
         );
         self::assertStringContainsString("--language-version={{ language-version }}", $task["action"]);
     }
+
+    public function testLaravelProjectInitializationTask(): void
+    {
+        $repository = new TaskRepository(dirname(__DIR__, 3) . "/resources/tasks/core");
+
+        $task = $repository->find("core.project.init.laravel")["task"];
+
+        self::assertSame("Установка Laravel", $task["name"]);
+        self::assertSame("project", $task["context"]);
+        self::assertContains("project:init", $task["tags"]);
+        self::assertArrayNotHasKey("parameters", $task);
+        self::assertStringContainsString("laravel new", $task["action"]);
+        self::assertStringContainsString("DB_CONNECTION=mysql", $task["action"]);
+        self::assertStringContainsString("databases.mysql.password", $task["action"]);
+        self::assertStringEndsWith(
+            'docker-cli shell:run --project="$project" ' . "'php artisan migrate --force --no-interaction'\n",
+            $task["action"],
+        );
+    }
 }
