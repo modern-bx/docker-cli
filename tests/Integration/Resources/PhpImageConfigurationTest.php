@@ -54,6 +54,14 @@ final class PhpImageConfigurationTest extends TestCase
         }
     }
 
+    public function testLaravelOpenRestyTemplateUsesFrontController(): void
+    {
+        $configuration = $this->read("resources/compose/system/config/openresty/hosts/laravel/web.conf");
+
+        self::assertStringContainsString("index index.php index.html index.htm;", $configuration);
+        self::assertStringContainsString('try_files $uri $uri/ /index.php$is_args$args;', $configuration);
+    }
+
     #[DataProvider("phpVersions")]
     public function testPhpImageSupportsConditionalXdebugAndSpx(string $version): void
     {
