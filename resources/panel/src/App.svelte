@@ -13,7 +13,7 @@
   import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
   import { vscodeDark, vscodeLight } from '@uiw/codemirror-theme-vscode';
   import { Combobox, Dialog, Tabs, Tooltip, useListCollection } from '@skeletonlabs/skeleton-svelte';
-  import { CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Settings, Trash2, Undo2 } from '@lucide/svelte';
+  import { CircleHelp, Copy, ExternalLink, Lock, Menu, Pencil, Play, Plus, Power, RotateCw, Save, Server, Settings, Trash2, Undo2 } from '@lucide/svelte';
   import { micromark } from 'micromark';
   import AppHeader from './components/AppHeader.svelte';
   import LoginForm from './components/LoginForm.svelte';
@@ -56,7 +56,7 @@
   const modes = [
     ['light', 'Светлая'], ['dark', 'Тёмная'], ['system', 'Системная'],
   ];
-  const projectDetailTabs = ['info', 'notes', 'security', 'backups', 'scheduler', 'journal'];
+  const projectDetailTabs = ['info', 'notes', 'backups', 'scheduler', 'journal'];
   const cronTemplates = [['* * * * *', 'Каждую минуту'], ['0 * * * *', 'Каждый час'], ['0 0 * * *', 'Каждый день в полночь'], ['0 9 * * 1-5', 'По будням в 09:00'], ['0 0 * * 0', 'Каждое воскресенье'], ['0 0 1 * *', 'Первого числа месяца']];
   const scheduleStatusOptions = [{ value: 'all', label: 'Все статусы' }, { value: 'enabled', label: 'Включена' }, { value: 'disabled', label: 'Выключена' }];
   const scheduleStatusCollection = useListCollection({ items: scheduleStatusOptions });
@@ -2191,6 +2191,7 @@
                               <Tooltip.Positioner><Tooltip.Content class="project-notes-tooltip card preset-filled-surface-900-100 shadow-xl">{project.description}</Tooltip.Content></Tooltip.Positioner>
                             </Tooltip>
                           {/if}
+                          {#if project.external}<Server size={14} aria-label="Внешний сервис" />{/if}
                           {#if project.protected}<Lock size={14} aria-label="Защищённый проект" />{/if}
                         </span>
                         <span class="project-tags">
@@ -2210,7 +2211,6 @@
               <nav class="project-detail-tabs" aria-label={`Разделы проекта ${selectedProject.name}`}>
                 <a class:active={projectDetailTab === 'info'} class="project-detail-tab" href={projectHash(selectedProject.name, 'info')} aria-current={projectDetailTab === 'info' ? 'page' : undefined}>Общее</a>
                 <a class:active={projectDetailTab === 'notes'} class="project-detail-tab" href={projectHash(selectedProject.name, 'notes')} aria-current={projectDetailTab === 'notes' ? 'page' : undefined}>Заметки</a>
-                <a class:active={projectDetailTab === 'security'} class="project-detail-tab" href={projectHash(selectedProject.name, 'security')} aria-current={projectDetailTab === 'security' ? 'page' : undefined}>Безопасность</a>
                 <a class:active={projectDetailTab === 'backups'} class="project-detail-tab" href={projectHash(selectedProject.name, 'backups')} aria-current={projectDetailTab === 'backups' ? 'page' : undefined}>Бэкапы</a>
                 <a class:active={projectDetailTab === 'scheduler'} class="project-detail-tab" href={projectHash(selectedProject.name, 'scheduler')} aria-current={projectDetailTab === 'scheduler' ? 'page' : undefined}>Планировщик</a>
                 <a class:active={projectDetailTab === 'journal'} class="project-detail-tab" href={projectHash(selectedProject.name, 'journal')} aria-current={projectDetailTab === 'journal' ? 'page' : undefined}>Журнал</a>
@@ -2222,6 +2222,8 @@
                     <div><dt>Название</dt><dd>{selectedProject.name}</dd></div>
                     <div><dt>Язык</dt><dd>{selectedProject.language?.name ? `${selectedProject.language.name}${selectedProject.languageVersion ? ` ${selectedProject.languageVersion}` : ''}` : 'Не указан'}</dd></div>
                     <div><dt>Фреймворк</dt><dd>{selectedProject.framework?.name || 'Без фреймворка'}</dd></div>
+                    <div><dt>Внешний сервис</dt><dd>{selectedProject.external ? 'Да' : 'Нет'}</dd></div>
+                    {#if selectedProject.external}<div><dt>Внешний порт</dt><dd><code>{selectedProject.externalPort}</code></dd></div>{/if}
                     <div><dt>Статус</dt><dd class:enabled={selectedProject.enabled} class="status-value"><i></i>{selectedProject.enabled ? 'Включен' : 'Выключен'}</dd></div>
                     <div><dt>Основной хост</dt><dd>{#if selectedProject.url}<a class="project-host" href={selectedProject.url} target="_blank" rel="noreferrer">{selectedProject.url}<ExternalLink size={14} aria-hidden="true" /></a>{:else}Не указан{/if}</dd></div>
                     <div><dt>Хост MySQL</dt><dd><code>{selectedProject.mysqlHost || 'docker-cli-mysql'}</code></dd></div>
@@ -2245,6 +2247,19 @@
                     </button>
                   </div>
                 </section>
+                <section class="project-tab-content security-content card preset-filled-surface-100-900" aria-label="Безопасность">
+                  <h3>Безопасность</h3>
+                  <div class="security-setting">
+                    <label class="security-option">
+                      <input class="checkbox" type="checkbox" checked={selectedProject.protected} disabled={securitySaving} onchange={(event) => setProjectProtected(event.currentTarget.checked)} />
+                      <span>Защищенный проект</span>
+                    </label>
+                    <Tooltip positioning={{ placement: 'right' }}>
+                      <Tooltip.Trigger class="security-help" aria-label="О защите проекта"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
+                      <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Для защищенных проектов запрещены команды, которые могут изменить их данные - и файлы, и базы данных</Tooltip.Content></Tooltip.Positioner>
+                    </Tooltip>
+                  </div>
+                </section>
                 {:else if projectDetailTab === 'notes'}
                 <div class="project-toolbar">
                   <button class="btn preset-filled-primary-500" type="button" disabled={notesSaving} onclick={saveNotes}>
@@ -2265,17 +2280,6 @@
                     <span class="label-text">Заметки</span>
                     <textarea class="textarea notes-textarea" bind:value={noteDescription} rows="8" placeholder="Произвольные заметки о проекте"></textarea>
                   </label>
-                </section>
-                {:else if projectDetailTab === 'security'}
-                <section class="project-tab-content security-content card preset-filled-surface-100-900" aria-label="Безопасность">
-                  <label class="security-option">
-                    <input class="checkbox" type="checkbox" checked={selectedProject.protected} disabled={securitySaving} onchange={(event) => setProjectProtected(event.currentTarget.checked)} />
-                    <span>Защищенный проект</span>
-                  </label>
-                  <Tooltip positioning={{ placement: 'right' }}>
-                    <Tooltip.Trigger class="security-help" aria-label="О защите проекта"><CircleHelp size={18} aria-hidden="true" /></Tooltip.Trigger>
-                    <Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Для защищенных проектов запрещены команды, которые могут изменить их данные - и файлы, и базы данных</Tooltip.Content></Tooltip.Positioner>
-                  </Tooltip>
                 </section>
                 {:else if projectDetailTab === 'backups'}
                   <HttpRefreshBoundary coordinator={pageRefresh} refresh={refreshProjectBackups} />
