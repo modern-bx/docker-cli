@@ -88,6 +88,14 @@ docker-cli project:up shop
 
 После этого проект будет доступен в браузере на поддомене указанного вами домена.
 
+Сервис, работающий непосредственно на хост-машине, можно зарегистрировать как внешний. HTTP-трафик будет
+проксироваться на `EXTERNAL_SERVICE_PORT` из системного `.env` (по умолчанию `8080`) или на порт проекта:
+
+```bash
+docker-cli project:up api --framework=external --external-port=3000
+docker-cli project:update --framework=external --external-port=3001
+```
+
 Полная подготовка домена, DNS и браузера описана в
 [руководстве по быстрому старту](https://modern-bx.github.io/docker-cli/guide/getting-started).
 

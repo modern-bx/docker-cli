@@ -33,6 +33,7 @@ final class OpenRestyHostRenderer
         $envValues = $this->readEnvValues($compose->envFile());
         $baseHost = $this->requiredEnvValue($envValues, "BASE_HOST", $compose->envFile());
         $openRestyPort = $this->openRestyPort($envValues, $compose->envFile());
+        $externalServicePort = $this->port($envValues["EXTERNAL_SERVICE_PORT"] ?? "8080", "EXTERNAL_SERVICE_PORT");
         $httpAuthConfig = $this->httpAuthConfig($envValues, $hostsDirectory);
         $this->renderHttpAuthMap($envValues, $hostsDirectory, $httpAuthConfig !== "");
         $hostNames = [];
@@ -67,6 +68,7 @@ final class OpenRestyHostRenderer
                     "{{ php_fpm_upstream }}" => $this->phpFpmUpstream($project),
                     "{{ xdebug_client_port }}" => (string) ($project["xdebug_client_port"] ?? 9003),
                     "{{ openresty_port }}" => (string) $openRestyPort,
+                    "{{ external_service_port }}" => (string) ($project["external_port"] ?? $externalServicePort),
                     "{{ http_auth_config }}" => $httpAuthConfig,
                 ]),
             );
@@ -84,7 +86,7 @@ final class OpenRestyHostRenderer
 
     /**
      * @return list<array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?:
-     * int, language?: string, language_version?: string}>
+     * int, external_port?: int, language?: string, language_version?: string}>
      */
     private function registeredProjects(): array
     {
@@ -124,6 +126,7 @@ final class OpenRestyHostRenderer
                             : null,
                         "document_root" => $documentRoot,
                         "xdebug_client_port" => $this->xdebugClientPort($project),
+                        "external_port" => $this->optionalPort($project["external_port"] ?? null),
                     ],
                     static fn (mixed $value): bool => $value !== null,
                 );
@@ -213,10 +216,13 @@ final class OpenRestyHostRenderer
 
     /**
      * @param array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?: int,
-     * language?: string, language_version?: string} $project
+     * external_port?: int, language?: string, language_version?: string} $project
      */
     private function phpFpmUpstream(array $project): string
     {
+        if ($project["framework"] === "external") {
+            return "";
+        }
         $language = $project["language"] ?? "php";
         $version = $project["language_version"] ?? PhpLanguageVersion::default();
 
@@ -327,6 +333,27 @@ final class OpenRestyHostRenderer
         }
 
         return $portNumber;
+    }
+
+    private function port(string $port, string $name): int
+    {
+        if (!ctype_digit($port) || (int) $port < 1 || (int) $port > 65535) {
+            throw new \RuntimeException(sprintf("%s должен быть числом от 1 до 65535.", $name));
+        }
+
+        return (int) $port;
+    }
+
+    private function optionalPort(mixed $port): ?int
+    {
+        if (is_int($port)) {
+            return $this->port((string) $port, "external_port");
+        }
+        if (is_string($port)) {
+            return $this->port($port, "external_port");
+        }
+
+        return null;
     }
 
     /** @param list<string> $hostNames */

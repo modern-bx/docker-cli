@@ -119,6 +119,9 @@ final class ProjectController
                         : PhpLanguageVersion::default($this->compose))
                     : null,
                 framework: $this->concept($project["framework"] ?? null, self::FRAMEWORK_NAMES),
+                externalPort: ($project["framework"] ?? null) === "external"
+                    ? $this->externalServicePort($project["external_port"] ?? null)
+                    : null,
                 // Older project configs predate this flag and are enabled by default,
                 // just like OpenRestyHostRenderer treats them.
                 enabled: ($project["enabled"] ?? true) !== false,
@@ -805,6 +808,7 @@ final class ProjectController
         "laravel" => "Laravel",
         "bitrix" => "Bitrix",
         "bitrix24" => "Bitrix24",
+        "external" => "Внешний сервис",
     ];
 
     #[Route("GET", "/api/projects/options", EmptyRequestDto::class, ProjectOptionsDto::class)]
@@ -882,6 +886,12 @@ final class ProjectController
         ];
         if ($request->framework !== null) {
             $arguments["framework"] = ["value" => $request->framework];
+        }
+        if ($request->externalPort !== null) {
+            if ($request->framework !== "external") {
+                throw new ProjectActionException("Порт можно указать только для внешнего сервиса.", 422);
+            }
+            $arguments["external-port"] = ["value" => $request->externalPort];
         }
         if ($request->dedicatedDatabases !== []) {
             $arguments["dedicated-db"] = ["value" => implode(",", $request->dedicatedDatabases)];
@@ -1043,6 +1053,12 @@ final class ProjectController
         ) {
             throw new ProjectActionException("Фреймворк не поддерживается.", 422);
         }
+        $currentConfig = $this->projects->readProjectConfig($request->project);
+        $currentFramework = $currentConfig["data"]["project"]["framework"] ?? null;
+        $resultingFramework = $request->framework ?? $currentFramework;
+        if ($request->externalPort !== null && $resultingFramework !== "external") {
+            throw new ProjectActionException("Порт можно указать только для внешнего сервиса.", 422);
+        }
         $arguments = [];
         foreach (["name", "language", "framework"] as $option) {
             if ($request->{$option} !== null) {
@@ -1051,6 +1067,9 @@ final class ProjectController
         }
         if ($request->languageVersion !== null) {
             $arguments["language_version"] = ["value" => $request->languageVersion];
+        }
+        if ($request->externalPort !== null) {
+            $arguments["external_port"] = ["value" => $request->externalPort];
         }
         if ($request->dedicatedDatabases !== null) {
             $arguments["dedicated-db"] = [
@@ -1162,6 +1181,24 @@ final class ProjectController
             return null;
         }
         return new ConceptDto($value, $names[$value]);
+    }
+
+    private function externalServicePort(mixed $configuredPort): int
+    {
+        if (is_int($configuredPort) && $configuredPort >= 1 && $configuredPort <= 65535) {
+            return $configuredPort;
+        }
+        if (is_string($configuredPort) && ctype_digit($configuredPort)) {
+            $port = (int) $configuredPort;
+            if ($port >= 1 && $port <= 65535) {
+                return $port;
+            }
+        }
+
+        $defaultPort = ($this->compose ?? new SystemCompose())->envValue("EXTERNAL_SERVICE_PORT", "8080");
+        return ctype_digit($defaultPort) && (int) $defaultPort >= 1 && (int) $defaultPort <= 65535
+            ? (int) $defaultPort
+            : 8080;
     }
 
     private function enqueueWipe(string $name): void

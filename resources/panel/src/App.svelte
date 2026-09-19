@@ -1583,7 +1583,7 @@
       const location = projectAddOptions.locations.find((item) => item.default) || projectAddOptions.locations[0];
       const databaseLocation = projectAddOptions.databaseLocations.find((item) => item.default) ? 'default' : 'system';
       const language = projectAddOptions.languages[0];
-      projectAddDialog = { code: '', location: location?.code || '', language: language?.code || '', languageVersion: projectAddOptions.defaultLanguageVersion, framework: projectAddOptions.frameworks[language?.code]?.[0]?.code || '', deploymentScript: '', deploymentArguments: {}, dedicated: false, mysql: false, postgres: false, locationMysql: databaseLocation, locationPostgres: databaseLocation };
+      projectAddDialog = { code: '', location: location?.code || '', language: language?.code || '', languageVersion: projectAddOptions.defaultLanguageVersion, framework: projectAddOptions.frameworks[language?.code]?.[0]?.code || '', externalPort: 8080, deploymentScript: '', deploymentArguments: {}, dedicated: false, mysql: false, postgres: false, locationMysql: databaseLocation, locationPostgres: databaseLocation };
     } catch (cause) {
       errorTitle = 'Не удалось открыть добавление проекта';
       error = cause instanceof Error ? cause.message : 'Не удалось загрузить параметры проекта.';
@@ -1597,7 +1597,7 @@
       const dedicatedMysql = project.mysqlHost === `docker-cli-mysql-${project.name}`;
       const dedicatedPostgres = project.postgresHost === `docker-cli-postgres-${project.name}`;
       const databaseLocation = projectAddOptions.databaseLocations.find((item) => item.default) ? 'default' : 'system';
-      projectUpdateDialog = { project: project.name, name: project.name, language, languageVersion: project.languageVersion || projectAddOptions.defaultLanguageVersion, framework: project.framework?.code || '', dedicated: dedicatedMysql || dedicatedPostgres, dedicatedMysql, dedicatedPostgres, locationMysql: databaseLocation, locationPostgres: databaseLocation };
+      projectUpdateDialog = { project: project.name, name: project.name, language, languageVersion: project.languageVersion || projectAddOptions.defaultLanguageVersion, framework: project.framework?.code || '', externalPort: project.externalPort || 8080, dedicated: dedicatedMysql || dedicatedPostgres, dedicatedMysql, dedicatedPostgres, locationMysql: databaseLocation, locationPostgres: databaseLocation };
       projectContextMenu = null;
     } catch (cause) {
       errorTitle = 'Не удалось открыть изменение проекта';
@@ -1624,10 +1624,12 @@
     if (!projectAddDialog) return;
     projectAdding = true;
     try {
-      const data = await createProject(api, {
+      const payload = {
         ...projectAddDialog,
         dedicatedDatabases: projectAddDialog.dedicated ? ['mysql', 'postgres'].filter((driver) => projectAddDialog[driver]) : [],
-      });
+      };
+      if (projectAddDialog.framework !== 'external') delete payload.externalPort;
+      const data = await createProject(api, payload);
       projects = data.projects;
       projectAddDialog = null;
       notifyQueuedOperation('Добавление проекта');
@@ -1647,7 +1649,9 @@
     }
     projectUpdating = true;
     try {
-      const data = await updateProject(api, projectUpdateDialog.project, { name: projectUpdateDialog.name, language: projectUpdateDialog.language, languageVersion: projectUpdateDialog.languageVersion, framework: projectUpdateDialog.framework, dedicatedDatabases: projectUpdateDialog.dedicated ? [projectUpdateDialog.dedicatedMysql && 'mysql', projectUpdateDialog.dedicatedPostgres && 'postgres'].filter(Boolean) : [], locationMysql: projectUpdateDialog.locationMysql, locationPostgres: projectUpdateDialog.locationPostgres });
+      const changes = { name: projectUpdateDialog.name, language: projectUpdateDialog.language, languageVersion: projectUpdateDialog.languageVersion, framework: projectUpdateDialog.framework, dedicatedDatabases: projectUpdateDialog.dedicated ? [projectUpdateDialog.dedicatedMysql && 'mysql', projectUpdateDialog.dedicatedPostgres && 'postgres'].filter(Boolean) : [], locationMysql: projectUpdateDialog.locationMysql, locationPostgres: projectUpdateDialog.locationPostgres };
+      if (projectUpdateDialog.framework === 'external') changes.externalPort = projectUpdateDialog.externalPort;
+      const data = await updateProject(api, projectUpdateDialog.project, changes);
       projects = data.projects;
       projectUpdateDialog = null;
       notifyQueuedOperation('Изменение проекта');
@@ -2833,6 +2837,7 @@
             <label class="label"><span class="label-text">Версия PHP</span><Combobox collection={projectLanguageVersionCollection} value={[projectUpdateDialog.languageVersion]} openOnClick onValueChange={(details) => { if (details.value[0]) projectUpdateDialog.languageVersion = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languageVersions.map((version) => ({ value: version, label: version })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           {/if}
           <label class="label"><span class="label-text">Фреймворк</span><Combobox collection={projectUpdateFrameworkCollection} value={[projectUpdateDialog.framework]} openOnClick onValueChange={(details) => { projectUpdateDialog.framework = details.value[0] ?? ''; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each (projectAddOptions.frameworks[projectUpdateDialog.language] || []).map((framework) => ({ value: framework.code, label: framework.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          {#if projectUpdateDialog.framework === 'external'}<label class="label"><span class="label-text">Порт внешнего сервиса</span><input class="input" type="number" min="1" max="65535" bind:value={projectUpdateDialog.externalPort} required /></label>{/if}
           <fieldset class="project-clone-dbms project-dedicated-db"><legend class="label-text">Инстансы баз данных</legend>
             <label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectUpdateDialog.dedicated} /><span>Использовать выделенные инстансы</span></label>
             {#if projectUpdateDialog.dedicated}<div class="project-deployment-checkboxes"><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectUpdateDialog.dedicatedMysql} /><span>MySQL</span></label><label class="project-deployment-checkbox"><input class="checkbox" type="checkbox" bind:checked={projectUpdateDialog.dedicatedPostgres} /><span>PostgreSQL</span></label></div>
@@ -2860,6 +2865,7 @@
           <label class="label"><span class="label-text">Язык</span><Combobox collection={projectLanguageCollection} value={[projectAddDialog.language]} openOnClick onValueChange={(details) => { if (details.value[0]) { projectAddDialog.language = details.value[0]; projectAddDialog.framework = projectAddOptions.frameworks[projectAddDialog.language]?.[0]?.code || ''; } }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languages.map((language) => ({ value: language.code, label: language.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <label class="label"><span class="label-text">Версия PHP</span><Combobox collection={projectLanguageVersionCollection} value={[projectAddDialog.languageVersion]} openOnClick onValueChange={(details) => { if (details.value[0]) projectAddDialog.languageVersion = details.value[0]; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly required /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each projectAddOptions.languageVersions.map((version) => ({ value: version, label: version })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
           <label class="label"><span class="label-text">Фреймворк</span><Combobox collection={projectFrameworkCollection} value={[projectAddDialog.framework]} openOnClick onValueChange={(details) => { projectAddDialog.framework = details.value[0] ?? ''; }}><Combobox.Control class="font-combobox-control"><Combobox.Input class="font-combobox-input" readonly /><Combobox.Trigger class="font-combobox-trigger" /></Combobox.Control><Combobox.Positioner class="font-combobox-positioner"><Combobox.Content class="font-combobox-content card preset-filled-surface-100-900 shadow-xl">{#each (projectAddOptions.frameworks[projectAddDialog.language] || []).map((framework) => ({ value: framework.code, label: framework.name })) as item}<Combobox.Item {item} class="font-combobox-item"><Combobox.ItemText>{item.label}</Combobox.ItemText><Combobox.ItemIndicator class="font-combobox-indicator" /></Combobox.Item>{/each}</Combobox.Content></Combobox.Positioner></Combobox></label>
+          {#if projectAddDialog.framework === 'external'}<label class="label"><span class="label-text">Порт внешнего сервиса</span><input class="input" type="number" min="1" max="65535" bind:value={projectAddDialog.externalPort} required /></label>{/if}
           <fieldset class="project-clone-dbms project-dedicated-db"><legend class="label-text"><span class="project-clone-help-heading">Базы данных<Tooltip positioning={{ placement: 'right' }}><Tooltip.Trigger class="security-help" type="button" aria-label="Об инстансах баз данных проекта"><CircleHelp size={16} aria-hidden="true" /></Tooltip.Trigger><Tooltip.Positioner><Tooltip.Content class="security-tooltip card preset-filled-surface-900-100 shadow-xl">Для отмеченных СУБД будут созданы отдельные попроектные инстансы. Если опцию не включать, проект будет использовать общие системные инстансы.</Tooltip.Content></Tooltip.Positioner></Tooltip></span></legend>
             <label class="project-deployment-checkbox project-dedicated-toggle"><input class="checkbox" type="checkbox" bind:checked={projectAddDialog.dedicated} /><span>Выделенные инстансы БД</span></label>
             {#if projectAddDialog.dedicated}
