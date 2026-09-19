@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { EditorState } from '@codemirror/state';
   import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
   import { defaultKeymap, history as cmHistory, historyKeymap } from '@codemirror/commands';
@@ -161,6 +161,7 @@
   let systemConfirmation = null;
   let projectConfirmation = null;
   let projectContextMenu = null;
+  let projectContextMenuElement;
   let projectAddDialog = null;
   let projectCloneDialog = null;
   let projectCloning = false;
@@ -1516,7 +1517,7 @@
     queueOpen = false;
   }
 
-  function openProjectContextMenu(event, project) {
+  async function openProjectContextMenu(event, project) {
     if (event.ctrlKey) {
       projectContextMenu = null;
       return;
@@ -1528,8 +1529,18 @@
     navigateToProject(project.name, projectDetailTab);
     projectContextMenu = {
       project,
-      x: Math.max(8, Math.min(x, window.innerWidth - 184)),
-      y: Math.max(8, Math.min(y, window.innerHeight - 152)),
+      x,
+      y,
+    };
+    await tick();
+    if (!projectContextMenuElement || projectContextMenu?.project.name !== project.name) return;
+    const menuBounds = projectContextMenuElement.getBoundingClientRect();
+    projectContextMenu = {
+      ...projectContextMenu,
+      x: Math.max(8, Math.min(x, window.innerWidth - menuBounds.width - 8)),
+      y: y + menuBounds.height > window.innerHeight - 8
+        ? Math.max(8, y - menuBounds.height)
+        : Math.max(8, y),
     };
   }
 
@@ -2768,6 +2779,7 @@
 
 {#if projectContextMenu}
   <div
+    bind:this={projectContextMenuElement}
     class="project-context-menu card preset-filled-surface-100-900 shadow-2xl"
     role="menu"
     aria-label={`Действия с проектом ${projectContextMenu.project.name}`}
