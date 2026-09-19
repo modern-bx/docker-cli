@@ -34,6 +34,15 @@ final class ProxyServicesConfigurationTest extends TestCase
             'Host(`proxyweb.${BASE_HOST}`)',
             $services["proxyweb"]["labels"]["traefik.http.routers.proxyweb.rule"] ?? null,
         );
+        self::assertSame(
+            "https",
+            $services["proxysql"]["labels"]["traefik.http.services.proxysql.loadbalancer.server.scheme"] ?? null,
+        );
+        self::assertSame(
+            "true",
+            $services["proxysql"]["labels"]["traefik.http.serverstransports.proxysql-web.insecureskipverify"]
+                ?? null,
+        );
     }
 
     public function testProxySqlEnablesWebUiAndRegistersSystemDatabases(): void
@@ -58,6 +67,10 @@ final class ProxyServicesConfigurationTest extends TestCase
         self::assertSame("proxysql", $configuration["global"]["default_server"] ?? null);
         self::assertSame("proxysql", $configuration["servers"]["proxysql"]["dsn"][0]["host"] ?? null);
         self::assertSame(6032, $configuration["servers"]["proxysql"]["dsn"][0]["port"] ?? null);
+        self::assertFalse($configuration["auth"]["okta"]["enabled"] ?? null);
+        self::assertSame([], $configuration["misc"]["apply_config"] ?? null);
+        self::assertSame([], $configuration["misc"]["update_config"] ?? null);
+        self::assertSame([], $configuration["misc"]["adhoc_report"] ?? null);
     }
 
     private function read(string $relativePath): string

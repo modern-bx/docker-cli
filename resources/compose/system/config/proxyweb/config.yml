@@ -20,7 +20,20 @@ auth:
   admin_password: proxyweb
   readonly_user: readonly
   readonly_password: readonly
+  okta:
+    enabled: false
+    issuer: ""
+    client_id: ""
+    client_secret: ""
+    admin_group: ""
+    readonly_group: ""
+    scopes: openid profile email groups
+    disable_local_login: false
 flask:
   SECRET_KEY: 12345678901234567890
   SEND_FILE_MAX_AGE_DEFAULT: 0
   TEMPLATES_AUTO_RELOAD: true
+misc:
+  apply_config: []
+  update_config: []
+  adhoc_report: []

@@ -6,6 +6,8 @@ namespace DockerCli\Config;
 
 use function DockerCli\Util\join_path;
 
+use Symfony\Component\Yaml\Yaml;
+
 final class SystemCompose
 {
     public const PROJECT_NAME = "docker-cli";
@@ -125,6 +127,9 @@ final class SystemCompose
             $created = true;
         }
         if ($this->ensurePanelSecrets()) {
+            $created = true;
+        }
+        if ($this->ensureProxyWebConfiguration()) {
             $created = true;
         }
 
@@ -321,6 +326,49 @@ final class SystemCompose
         }
         if (!is_string($updated) || file_put_contents($envFile, $updated, LOCK_EX) === false) {
             throw new \RuntimeException(sprintf('Unable to write env file "%s".', $envFile));
+        }
+
+        return true;
+    }
+
+    private function ensureProxyWebConfiguration(): bool
+    {
+        $file = join_path($this->directory(), "config", "proxyweb", "config.yml");
+        if (!is_file($file)) {
+            return false;
+        }
+
+        $configuration = Yaml::parseFile($file);
+        if (!is_array($configuration)) {
+            throw new \RuntimeException(sprintf('Конфигурация ProxyWeb в файле "%s" имеет неверный формат.', $file));
+        }
+
+        $defaults = [
+            "auth" => [
+                "okta" => [
+                    "enabled" => false,
+                    "issuer" => "",
+                    "client_id" => "",
+                    "client_secret" => "",
+                    "admin_group" => "",
+                    "readonly_group" => "",
+                    "scopes" => "openid profile email groups",
+                    "disable_local_login" => false,
+                ],
+            ],
+            "misc" => [
+                "apply_config" => [],
+                "update_config" => [],
+                "adhoc_report" => [],
+            ],
+        ];
+        $updated = array_replace_recursive($defaults, $configuration);
+        if ($updated === $configuration) {
+            return false;
+        }
+
+        if (file_put_contents($file, Yaml::dump($updated, 8, 2), LOCK_EX) === false) {
+            throw new \RuntimeException(sprintf('Не удалось обновить конфигурацию ProxyWeb в файле "%s".', $file));
         }
 
         return true;

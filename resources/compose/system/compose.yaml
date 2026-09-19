@@ -153,6 +153,9 @@ services:
       traefik.http.routers.proxysql.tls: "true"
       traefik.http.routers.proxysql.tls.certresolver: cloudflare
       traefik.http.services.proxysql.loadbalancer.server.port: "6080"
+      traefik.http.services.proxysql.loadbalancer.server.scheme: https
+      traefik.http.services.proxysql.loadbalancer.serverstransport: proxysql-web@docker
+      traefik.http.serverstransports.proxysql-web.insecureskipverify: "true"
     networks:
       docker-cli:
         aliases:
