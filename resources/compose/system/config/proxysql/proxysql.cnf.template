@@ -13,11 +13,13 @@ admin_variables =
 mysql_variables =
 {
     interfaces="0.0.0.0:6033"
+    monitor_enabled=false
 }
 
 pgsql_variables =
 {
     interfaces="0.0.0.0:6133"
+    monitor_enabled=false
 }
 
 mysql_servers =

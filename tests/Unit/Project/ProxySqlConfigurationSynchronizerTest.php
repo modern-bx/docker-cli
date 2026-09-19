@@ -32,6 +32,9 @@ final class ProxySqlConfigurationSynchronizerTest extends TestCase
             self::assertStringContainsString("username, database, destination_hostgroup", $sql);
             self::assertStringContainsString("'alpha', 'alpha'", $sql);
             self::assertStringContainsString("'beta', 'beta'", $sql);
+            self::assertStringStartsWith("BEGIN;\n", $sql);
+            self::assertStringContainsString("COMMIT;\nSET mysql-monitor_enabled='false';", $sql);
+            self::assertStringContainsString("SET pgsql-monitor_enabled='false';", $sql);
             self::assertStringContainsString("LOAD MYSQL QUERY RULES TO RUNTIME", $sql);
             self::assertStringContainsString("LOAD PGSQL QUERY RULES TO RUNTIME", $sql);
         } finally {
