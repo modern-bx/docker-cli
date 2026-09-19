@@ -59,11 +59,25 @@ final class DbtrailConfigurationTest extends TestCase
 
     public function testDbtrailReplicationUserIsProvisionedFromEnvironment(): void
     {
-        $compose = file_get_contents(dirname(__DIR__, 3) . "/resources/compose/system/compose.yaml");
+        $composeFile = dirname(__DIR__, 3) . "/resources/compose/system/compose.yaml";
+        $compose = file_get_contents($composeFile);
 
         self::assertIsString($compose);
         self::assertStringContainsString("REPLICATION SLAVE, REPLICATION CLIENT", $compose);
         self::assertStringContainsString('$${DBTRAIL_MYSQL_USER}', $compose);
         self::assertStringContainsString('$${DBTRAIL_MYSQL_PASSWORD}', $compose);
+
+        $configuration = Yaml::parseFile($composeFile);
+        self::assertIsArray($configuration);
+        self::assertSame(
+            ["dbtrail-mysql-socket:/var/run/mysqld"],
+            $configuration["services"]["dbtrail-mysql-init"]["volumes"] ?? null,
+        );
+        self::assertContains(
+            "dbtrail-mysql-socket:/var/run/mysqld",
+            $configuration["services"]["mysql"]["volumes"] ?? [],
+        );
+        self::assertStringContainsString("--protocol=socket", $compose);
+        self::assertStringNotContainsString("mysql -h mysql -u root", $compose);
     }
 }

@@ -97,7 +97,9 @@ docker-cli project:up shop
 
 DBTrail доступен по адресу `https://dbtrail.<домен>` и отслеживает только системный MySQL. Для источника
 включены бинарный журнал, формат `ROW` и полные образы строк; отдельный пользователь репликации и пароль
-индексной базы создаются командой `config:seed`. PostgreSQL к DBTrail не подключается.
+индексной базы создаются командой `config:seed`. После обновления docker-cli выполните
+`docker-cli config:init --update --migrate --force`, чтобы установить актуальную маршрутизацию системных
+контейнеров. PostgreSQL к DBTrail не подключается.
 Пошаговое подключение проекта и поиск частых или медленных запросов описаны в
 [руководстве по ProxySQL и ProxyWeb](https://modern-bx.github.io/docker-cli/guide/proxy).
 

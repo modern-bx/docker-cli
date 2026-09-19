@@ -94,6 +94,7 @@ services:
       - type: bind
         source: ${DEFAULT_DATA_DIR_MYSQL:-data/mysql}/logs
         target: /var/log/mysql
+      - dbtrail-mysql-socket:/var/run/mysqld
     networks:
       docker-cli:
         aliases:
@@ -114,11 +115,15 @@ services:
       - /bin/sh
       - -ec
       - |
-        until MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin ping -h mysql -u root --silent; do
+        until MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin ping \
+          --protocol=socket --socket=/var/run/mysqld/mysqld.sock -u root --silent; do
           sleep 2
         done
-        MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysql -h mysql -u root \
+        MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysql \
+          --protocol=socket --socket=/var/run/mysqld/mysqld.sock -u root \
           --execute="CREATE USER IF NOT EXISTS '$${DBTRAIL_MYSQL_USER}'@'%' IDENTIFIED BY '$${DBTRAIL_MYSQL_PASSWORD}'; ALTER USER '$${DBTRAIL_MYSQL_USER}'@'%' IDENTIFIED BY '$${DBTRAIL_MYSQL_PASSWORD}'; GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$${DBTRAIL_MYSQL_USER}'@'%';"
+    volumes:
+      - dbtrail-mysql-socket:/var/run/mysqld
     networks:
       docker-cli:
     restart: "no"
@@ -597,6 +602,7 @@ networks:
 
 volumes:
   dbtrail-index-data:
+  dbtrail-mysql-socket:
   dbtrail-state:
   traefik-letsencrypt:
   playwright-node-modules:
