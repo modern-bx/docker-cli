@@ -27,6 +27,10 @@ final class CoreTasksTest extends TestCase
             $task["action"],
         );
         self::assertStringContainsString("docker-cli play:run bitrix/setup", $task["action"]);
+        self::assertStringEndsWith(
+            "rm -rf -- bitrix/cache bitrix/managed_cache bitrix/stack_cache\n",
+            $task["action"],
+        );
     }
 
     public function testBitrix24ProjectInitializationTask(): void
@@ -46,6 +50,10 @@ final class CoreTasksTest extends TestCase
             $task["action"],
         );
         self::assertStringContainsString("docker-cli play:run bitrix/setup", $task["action"]);
+        self::assertStringEndsWith(
+            "rm -rf -- bitrix/cache bitrix/managed_cache bitrix/stack_cache\n",
+            $task["action"],
+        );
     }
 
     public function testProjectUpTaskPassesLanguageVersion(): void

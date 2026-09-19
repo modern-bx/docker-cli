@@ -22,3 +22,4 @@ task:
   action: |
     docker-cli bitrix:get-installer --product=bitrix --edition="$edition" --extract
     docker-cli play:run bitrix/setup
+    rm -rf -- bitrix/cache bitrix/managed_cache bitrix/stack_cache
