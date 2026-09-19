@@ -129,6 +129,10 @@ final class BitrixGetInstallerCommand extends AbstractCommand
 
     private function resolveTargetPath(string $path, string $remoteFilename): string
     {
+        if ($path === ".") {
+            $path = getcwd() ?: ".";
+        }
+
         if ($path === "" || is_dir($path) || str_ends_with($path, DIRECTORY_SEPARATOR)) {
             return rtrim($path === "" ? "." : $path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $remoteFilename;
         }

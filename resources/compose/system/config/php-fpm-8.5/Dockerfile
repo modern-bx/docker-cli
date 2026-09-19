@@ -1,5 +1,7 @@
 FROM php:8.5-fpm
 
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+
 ARG PHP_ENABLE_XDEBUG=1
 ARG PHP_ENABLE_SPX=1
 

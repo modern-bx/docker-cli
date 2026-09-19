@@ -54,6 +54,14 @@ final class PhpImageConfigurationTest extends TestCase
         }
     }
 
+    public function testLaravelOpenRestyTemplateUsesFrontController(): void
+    {
+        $configuration = $this->read("resources/compose/system/config/openresty/hosts/laravel/web.conf");
+
+        self::assertStringContainsString("index index.php index.html index.htm;", $configuration);
+        self::assertStringContainsString('try_files $uri $uri/ /index.php$is_args$args;', $configuration);
+    }
+
     #[DataProvider("phpVersions")]
     public function testPhpImageSupportsConditionalXdebugAndSpx(string $version): void
     {
@@ -66,6 +74,10 @@ final class PhpImageConfigurationTest extends TestCase
 
         self::assertStringContainsString("ARG PHP_ENABLE_XDEBUG=1", $dockerfile);
         self::assertStringContainsString("ARG PHP_ENABLE_SPX=1", $dockerfile);
+        self::assertStringContainsString(
+            "COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer",
+            $dockerfile,
+        );
         self::assertStringContainsString('${PHP_ENABLE_XDEBUG:-1}', $installer);
         self::assertStringContainsString('${PHP_ENABLE_SPX:-1}', $installer);
         self::assertStringContainsString("php-spx-0.4.22", $installer);

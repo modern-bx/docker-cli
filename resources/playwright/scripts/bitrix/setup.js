@@ -11,7 +11,10 @@ const SITE_MANAGER_EDITION_TITLES = new Set([
   'Установка «1С-Битрикс: Управление сайтом: Бизнес»',
   'Установка «1С-Битрикс: Управление сайтом: Энтерпрайз»',
 ]);
-const BITRIX24_TITLE = 'Установка «1С-Битрикс24: Корпоративный портал»';
+const BITRIX24_TITLES = new Set([
+  'Установка «1С-Битрикс24: Корпоративный портал»',
+  'Установка «1С-Битрикс24: Энтерпрайз»',
+]);
 const logging = globalThis.dockerCli.logging;
 
 if (!Number.isFinite(ACTION_DELAY_MS) || ACTION_DELAY_MS < 0) {
@@ -220,7 +223,7 @@ const installBitrix24 = async (page) => {
       } else {
         await removeSiteManagerIndex();
       }
-    } else if (normalizeTitle(title) === BITRIX24_TITLE) {
+    } else if (BITRIX24_TITLES.has(normalizeTitle(title))) {
       const installed = await installBitrix24(page);
       if (!installed) {
         process.exitCode = 1;

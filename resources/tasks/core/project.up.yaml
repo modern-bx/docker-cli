@@ -11,6 +11,7 @@ task:
     location: { type: string, required: true }
     name: { type: string, required: true }
     language: { type: list, required: true, items: [{ name: PHP, value: php }] }
+    language-version: { type: list, required: true, items: [{ name: PHP 8.2, value: '8.2' }, { name: PHP 8.3, value: '8.3' }, { name: PHP 8.4, value: '8.4' }, { name: PHP 8.5, value: '8.5' }] }
     framework:
       type: list
       items:
@@ -25,7 +26,7 @@ task:
     project_root={{ location }}/{{ name }}
     mkdir "$project_root"
     cd "$project_root"
-    options=(--language={{ language }})
+    options=(--language={{ language }} --language-version={{ language-version }})
     [ -n "${framework:-}" ] && options+=(--framework="$framework")
     [ -n "${dedicated_db:-}" ] && options+=(--dedicated-db="$dedicated_db")
     [ -n "${location_mysql:-}" ] && options+=(--location-mysql="$location_mysql")

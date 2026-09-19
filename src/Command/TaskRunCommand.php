@@ -72,6 +72,10 @@ final class TaskRunCommand extends AbstractCommand
                 throw new \RuntimeException(sprintf('Не удалось создать временный скрипт в "%s".', $cwd));
             }
         } catch (\Throwable $exception) {
+            $this->journal[sprintf("%.6f", microtime(true))] = [
+                "message" => $exception->getMessage(),
+                "level" => MessageLevel::Error->value,
+            ];
             $this->writeMessage($output, "<error>" . $exception->getMessage() . "</error>");
 
             return Command::INVALID;
@@ -193,11 +197,11 @@ final class TaskRunCommand extends AbstractCommand
         if ($tags === null) {
             return;
         }
-        if (!is_array($tags)) {
+        if (!is_array($tags) || !array_is_list($tags)) {
             throw new \RuntimeException(sprintf("Теги %s должны быть списком.", $owner));
         }
         foreach ($tags as $tag) {
-            if (!is_string($tag) || preg_match('/^[A-Za-z][A-Za-z0-9._-]*$/', $tag) !== 1) {
+            if (!is_string($tag) || preg_match('/^[A-Za-z][A-Za-z0-9._:-]*$/', $tag) !== 1) {
                 throw new \RuntimeException(
                     sprintf(
                         'Некорректный тег %s: "%s".',
@@ -323,12 +327,18 @@ final class TaskRunCommand extends AbstractCommand
         if (!$registry->hasProject($project)) {
             throw new \RuntimeException(sprintf('Проект "%s" не зарегистрирован.', $project));
         }
-        $root = $registry->readProjectConfig($project)["data"]["project"]["document_root"] ?? null;
-        if (!is_string($root) || !is_dir($root)) {
-            throw new \RuntimeException(sprintf('Document root проекта "%s" не существует.', $project));
+        $projectConfig = $registry->readProjectConfig($project)["data"]["project"] ?? [];
+        $isProjectInitialization = in_array("project:init", $task["tags"] ?? [], true);
+        $projectRoot = $projectConfig["root"] ?? null;
+        $documentRoot = $projectConfig["document_root"] ?? null;
+        $directory = $isProjectInitialization || !is_string($documentRoot) || !is_dir($documentRoot)
+            ? $projectRoot
+            : $documentRoot;
+        if (!is_string($directory) || !is_dir($directory)) {
+            throw new \RuntimeException(sprintf('Рабочая директория проекта "%s" не существует.', $project));
         }
 
-        return $root;
+        return $directory;
     }
 
     /** @param array<string, mixed> $task @param array<string, string|int> $values */

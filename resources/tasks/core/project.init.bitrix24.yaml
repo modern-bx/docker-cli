@@ -1,0 +1,23 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Установка 1С-Битрикс24
+  code: core.project.init.bitrix24
+  type: shell
+  context: project
+  tags: [project:init]
+  description: Скачивает, распаковывает и автоматически устанавливает выбранную редакцию 1С-Битрикс24.
+  parameters:
+    edition:
+      name: Редакция
+      type: list
+      required: true
+      items:
+        - { name: Бизнес, value: business }
+        - { name: Энтерпрайз, value: enterprise }
+        - { name: Энтерпрайз PostgreSQL, value: enterprise_postgresql }
+  action: |
+    docker-cli bitrix:get-installer --product=bitrix24 --edition="$edition" --extract
+    docker-cli play:run bitrix/setup
+    rm -rf -- bitrix/cache bitrix/managed_cache bitrix/stack_cache
