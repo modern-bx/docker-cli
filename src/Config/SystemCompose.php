@@ -528,6 +528,11 @@ final class SystemCompose
                 "config",
                 "proxysql",
             ),
+            join_path($this->directory(), "config", "traefik") => join_path(
+                $composeResources,
+                "config",
+                "traefik",
+            ),
             $this->playwrightScriptsDirectory() => join_path($resources, "playwright", "scripts"),
             $this->coreTasksDirectory() => join_path($resources, "tasks", "core"),
         ];

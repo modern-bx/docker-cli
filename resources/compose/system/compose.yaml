@@ -34,6 +34,7 @@ services:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --providers.docker.network=docker-cli
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
@@ -55,6 +56,7 @@ services:
       - "${TRAEFIK_HTTPS_PORT:-443}:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
       - traefik-letsencrypt:/letsencrypt
     networks:
       docker-cli:
@@ -154,8 +156,7 @@ services:
       traefik.http.routers.proxysql.tls.certresolver: cloudflare
       traefik.http.services.proxysql.loadbalancer.server.port: "6080"
       traefik.http.services.proxysql.loadbalancer.server.scheme: https
-      traefik.http.services.proxysql.loadbalancer.serverstransport: proxysql-web@docker
-      traefik.http.serverstransports.proxysql-web.insecureskipverify: "true"
+      traefik.http.services.proxysql.loadbalancer.serverstransport: proxysql-web@file
     networks:
       docker-cli:
         aliases:

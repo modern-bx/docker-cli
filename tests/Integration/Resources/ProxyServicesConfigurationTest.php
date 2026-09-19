@@ -39,9 +39,21 @@ final class ProxyServicesConfigurationTest extends TestCase
             $services["proxysql"]["labels"]["traefik.http.services.proxysql.loadbalancer.server.scheme"] ?? null,
         );
         self::assertSame(
-            "true",
-            $services["proxysql"]["labels"]["traefik.http.serverstransports.proxysql-web.insecureskipverify"]
+            "proxysql-web@file",
+            $services["proxysql"]["labels"]["traefik.http.services.proxysql.loadbalancer.serverstransport"]
                 ?? null,
+        );
+        self::assertContains(
+            "--providers.file.filename=/etc/traefik/dynamic.yaml",
+            $services["traefik"]["command"] ?? [],
+        );
+
+        $dynamicConfiguration = Yaml::parseFile(
+            dirname(__DIR__, 3) . "/resources/compose/system/config/traefik/dynamic.yaml",
+        );
+        self::assertIsArray($dynamicConfiguration);
+        self::assertTrue(
+            $dynamicConfiguration["http"]["serversTransports"]["proxysql-web"]["insecureSkipVerify"] ?? null,
         );
     }
 
