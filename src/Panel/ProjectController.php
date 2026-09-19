@@ -854,6 +854,7 @@ final class ProjectController
         }
         if (
             $request->language !== "php" ||
+            ($request->languageVersion !== null && !PhpLanguageVersion::isSupported($request->languageVersion)) ||
             !isset($options->frameworks[$request->language]) ||
             !in_array(
                 $request->framework ?? "",
@@ -877,6 +878,7 @@ final class ProjectController
             "location" => ["value" => $location["path"]],
             "name" => ["value" => $name],
             "language" => ["value" => $request->language],
+            "language-version" => ["value" => $request->languageVersion ?? $options->defaultLanguageVersion],
         ];
         if ($request->framework !== null) {
             $arguments["framework"] = ["value" => $request->framework];

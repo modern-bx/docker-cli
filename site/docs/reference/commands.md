@@ -118,7 +118,7 @@ bin/docker-cli -- 'echo "$USER"'
 Перед выполнением стандартные профили Bash не загружаются, но при наличии явно
 подключается `/home/docker-cli/.docker-cli.profile`.
 
-### `bin/docker-cli project:up [name]`
+### `bin/docker-cli project:up [name] [--language-version]`
 
 Регистрирует Laravel, Symfony, Bitrix или Bitrix24 проект из текущей директории или вложенного пути. Опция `--force` разрешает регистрацию, даже если определить фреймворк не удалось.
 
@@ -133,6 +133,9 @@ bin/docker-cli project:up my-project
 ```bash
 bin/docker-cli project:up my-project --no-restart
 ```
+
+Опция `--language-version` выбирает версию PHP: `8.2`, `8.3`, `8.4` или `8.5`. Если опция не указана,
+используется системная версия PHP по умолчанию.
 
 Для команды поддерживаются исполняемые хуки из каталогов
 `~/.config/docker-cli/actions/hooks/commands/<код-команды>.before` и

@@ -16,6 +16,7 @@ final readonly class ProjectCreateRequestDto implements RequestDto
         public ?string $code,
         public string $location,
         public string $language,
+        public ?string $languageVersion,
         public ?string $framework,
         public ?string $deploymentScript,
         public array $deploymentArguments,
@@ -30,6 +31,7 @@ final readonly class ProjectCreateRequestDto implements RequestDto
         $code = $request->body["code"] ?? null;
         $location = $request->body["location"] ?? null;
         $language = $request->body["language"] ?? null;
+        $languageVersion = $request->body["languageVersion"] ?? null;
         $framework = $request->body["framework"] ?? null;
         $deploymentScript = $request->body["deploymentScript"] ?? null;
         $deploymentArguments = $request->body["deploymentArguments"] ?? [];
@@ -40,6 +42,7 @@ final readonly class ProjectCreateRequestDto implements RequestDto
             ($code !== null && !is_string($code)) ||
             !is_string($location) ||
             !is_string($language) ||
+            ($languageVersion !== null && !is_string($languageVersion)) ||
             ($framework !== null && !is_string($framework)) ||
             ($deploymentScript !== null && !is_string($deploymentScript)) ||
             !is_array($deploymentArguments) ||
@@ -59,6 +62,7 @@ final readonly class ProjectCreateRequestDto implements RequestDto
             $code,
             $location,
             $language,
+            is_string($languageVersion) && $languageVersion !== "" ? $languageVersion : null,
             is_string($framework) && $framework !== "" ? $framework : null,
             $deploymentScript,
             $deploymentArguments,

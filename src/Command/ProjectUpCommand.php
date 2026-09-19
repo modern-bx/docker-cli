@@ -58,6 +58,12 @@ final class ProjectUpCommand extends AbstractCommand
         );
         $this->addOption("language", null, InputOption::VALUE_REQUIRED, "Код языка проекта.");
         $this->addOption(
+            "language-version",
+            null,
+            InputOption::VALUE_REQUIRED,
+            "Версия языка проекта: " . implode(", ", PhpLanguageVersion::SUPPORTED) . ".",
+        );
+        $this->addOption(
             "framework",
             null,
             InputOption::VALUE_REQUIRED,
@@ -133,8 +139,10 @@ final class ProjectUpCommand extends AbstractCommand
             }
         }
         $languageCode = $input->getOption("language");
+        $languageVersion = $input->getOption("language-version");
         if (
             ($languageCode !== null && $languageCode !== "php") ||
+            ($languageVersion !== null && !PhpLanguageVersion::isSupported($languageVersion)) ||
             ($frameworkCode !== null && !in_array($frameworkCode, ["symfony", "laravel", "bitrix", "bitrix24"], true))
         ) {
             $this->writeMessage($output, "<error>Указан неподдерживаемый язык или фреймворк.</error>");
@@ -231,7 +239,7 @@ final class ProjectUpCommand extends AbstractCommand
                         "enabled" => true,
                         "framework" => $frameworkCode,
                         "language" => $languageCode ?? "php",
-                        "language_version" => PhpLanguageVersion::default(),
+                        "language_version" => $languageVersion ?? PhpLanguageVersion::default(),
                         "root" => $projectRoot,
                         "document_root" => $documentRoot,
                         "xdebug" => [
