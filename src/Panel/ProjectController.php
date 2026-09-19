@@ -110,6 +110,7 @@ final class ProjectController
             $project = is_array($config["data"]["project"] ?? null) ? $config["data"]["project"] : [];
             $projectName = is_string($project["name"] ?? null) && $project["name"] !== "" ? $project["name"] : $name;
             $databases = is_array($config["data"]["databases"] ?? null) ? $config["data"]["databases"] : [];
+            $external = ($project["external"] ?? false) === true || ($project["framework"] ?? null) === "external";
             $projects[] = new ProjectDto(
                 name: $projectName,
                 language: $this->concept($project["language"] ?? null, ["php" => "PHP"]),
@@ -119,7 +120,8 @@ final class ProjectController
                         : PhpLanguageVersion::default($this->compose))
                     : null,
                 framework: $this->concept($project["framework"] ?? null, self::FRAMEWORK_NAMES),
-                externalPort: ($project["framework"] ?? null) === "external"
+                external: $external,
+                externalPort: $external
                     ? $this->externalServicePort($project["external_port"] ?? null)
                     : null,
                 // Older project configs predate this flag and are enabled by default,
@@ -808,7 +810,6 @@ final class ProjectController
         "laravel" => "Laravel",
         "bitrix" => "Bitrix",
         "bitrix24" => "Bitrix24",
-        "external" => "Внешний сервис",
     ];
 
     #[Route("GET", "/api/projects/options", EmptyRequestDto::class, ProjectOptionsDto::class)]
@@ -887,8 +888,11 @@ final class ProjectController
         if ($request->framework !== null) {
             $arguments["framework"] = ["value" => $request->framework];
         }
+        if ($request->external) {
+            $arguments["external"] = ["value" => true];
+        }
         if ($request->externalPort !== null) {
-            if ($request->framework !== "external") {
+            if (!$request->external) {
                 throw new ProjectActionException("Порт можно указать только для внешнего сервиса.", 422);
             }
             $arguments["external-port"] = ["value" => $request->externalPort];
@@ -1054,9 +1058,10 @@ final class ProjectController
             throw new ProjectActionException("Фреймворк не поддерживается.", 422);
         }
         $currentConfig = $this->projects->readProjectConfig($request->project);
-        $currentFramework = $currentConfig["data"]["project"]["framework"] ?? null;
-        $resultingFramework = $request->framework ?? $currentFramework;
-        if ($request->externalPort !== null && $resultingFramework !== "external") {
+        $currentExternal = ($currentConfig["data"]["project"]["external"] ?? false) === true ||
+            ($currentConfig["data"]["project"]["framework"] ?? null) === "external";
+        $resultingExternal = $request->external ?? $currentExternal;
+        if ($request->externalPort !== null && !$resultingExternal) {
             throw new ProjectActionException("Порт можно указать только для внешнего сервиса.", 422);
         }
         $arguments = [];
@@ -1064,6 +1069,9 @@ final class ProjectController
             if ($request->{$option} !== null) {
                 $arguments[$option] = ["value" => $request->{$option}];
             }
+        }
+        if ($request->external !== null) {
+            $arguments["external"] = ["value" => $request->external];
         }
         if ($request->languageVersion !== null) {
             $arguments["language_version"] = ["value" => $request->languageVersion];

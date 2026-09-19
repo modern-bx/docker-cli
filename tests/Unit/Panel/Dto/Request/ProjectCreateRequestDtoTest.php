@@ -29,7 +29,7 @@ final class ProjectCreateRequestDtoTest extends TestCase
     {
         $request = new RequestData(
             [],
-            ["location" => "default", "language" => "php", "framework" => "external", "externalPort" => 8081],
+            ["location" => "default", "language" => "php", "external" => true, "externalPort" => 8081],
             [],
             null,
             null,
@@ -37,6 +37,7 @@ final class ProjectCreateRequestDtoTest extends TestCase
 
         $dto = ProjectCreateRequestDto::fromRequest($request);
 
+        self::assertTrue($dto->external);
         self::assertSame(8081, $dto->externalPort);
     }
 }

@@ -69,6 +69,7 @@ final class ProjectUpCommand extends AbstractCommand
             InputOption::VALUE_REQUIRED,
             "Код фреймворка. Если не указан, фреймворк " . "определяется автоматически.",
         );
+        $this->addOption("external", null, InputOption::VALUE_NONE, "Проксировать запросы на внешний сервис.");
         $this->addOption("external-port", null, InputOption::VALUE_REQUIRED, "Порт внешнего сервиса.");
         $this->addOption(
             "dedicated-db",
@@ -88,6 +89,7 @@ final class ProjectUpCommand extends AbstractCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $frameworkCode = $input->getOption("framework");
+        $external = (bool) $input->getOption("external");
         $externalPort = $input->getOption("external-port");
         $dedicatedDatabases = array_values(
             array_unique(
@@ -145,14 +147,16 @@ final class ProjectUpCommand extends AbstractCommand
         if (
             ($languageCode !== null && $languageCode !== "php") ||
             ($languageVersion !== null && !PhpLanguageVersion::isSupported($languageVersion)) ||
-            ($frameworkCode !== null &&
-                !in_array($frameworkCode, ["symfony", "laravel", "bitrix", "bitrix24", "external"], true))
+            ($frameworkCode !== null && !in_array($frameworkCode, ["symfony", "laravel", "bitrix", "bitrix24"], true))
         ) {
             $this->writeMessage($output, "<error>Указан неподдерживаемый язык или фреймворк.</error>");
             return Command::FAILURE;
         }
-        if ($externalPort !== null && $frameworkCode !== "external") {
-            $this->writeMessage($output, "<error>Опцию --external-port можно использовать только с external.</error>");
+        if ($externalPort !== null && !$external) {
+            $this->writeMessage(
+                $output,
+                "<error>Опцию --external-port можно использовать только с --external.</error>",
+            );
             return Command::INVALID;
         }
         if ($externalPort !== null && !$this->isValidPort($externalPort)) {
@@ -253,6 +257,7 @@ final class ProjectUpCommand extends AbstractCommand
                         "language_version" => $languageVersion ?? PhpLanguageVersion::default(),
                         "root" => $projectRoot,
                         "document_root" => $documentRoot,
+                        "external" => $external,
                         ...($externalPort !== null ? ["external_port" => (int) $externalPort] : []),
                         "xdebug" => [
                             "client_port" => (new XdebugPortManager())->nextPort($projectsDirectory),

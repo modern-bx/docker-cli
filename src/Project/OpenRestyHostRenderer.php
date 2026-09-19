@@ -46,7 +46,7 @@ final class OpenRestyHostRenderer
                 continue;
             }
 
-            $template = $this->templateFile($project["framework"]);
+            $template = $this->templateFile($project["external"] ? "external" : $project["framework"]);
             if (!is_file($template)) {
                 throw new \RuntimeException(
                     sprintf('OpenResty host template for framework "%s" not found.', $project["framework"]),
@@ -86,7 +86,7 @@ final class OpenRestyHostRenderer
 
     /**
      * @return list<array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?:
-     * int, external_port?: int, language?: string, language_version?: string}>
+     * int, external_port?: int, external: bool, language?: string, language_version?: string}>
      */
     private function registeredProjects(): array
     {
@@ -109,6 +109,10 @@ final class OpenRestyHostRenderer
 
             $name = $project["name"] ?? null;
             $framework = $project["framework"] ?? null;
+            $external = ($project["external"] ?? false) === true || $framework === "external";
+            if ($framework === "external") {
+                $framework = null;
+            }
             $documentRoot = $project["document_root"] ?? null;
             if (is_string($name) && $framework === null && is_string($documentRoot)) {
                 $framework = "generic";
@@ -119,6 +123,7 @@ final class OpenRestyHostRenderer
                     [
                         "name" => $name,
                         "enabled" => ($project["enabled"] ?? true) !== false,
+                        "external" => $external,
                         "framework" => $framework,
                         "language" => is_string($project["language"] ?? null) ? $project["language"] : null,
                         "language_version" => PhpLanguageVersion::isSupported($project["language_version"] ?? null)
@@ -216,11 +221,11 @@ final class OpenRestyHostRenderer
 
     /**
      * @param array{name: string, enabled: bool, framework: string, document_root: string, xdebug_client_port?: int,
-     * external_port?: int, language?: string, language_version?: string} $project
+     * external_port?: int, external: bool, language?: string, language_version?: string} $project
      */
     private function phpFpmUpstream(array $project): string
     {
-        if ($project["framework"] === "external") {
+        if ($project["external"]) {
             return "";
         }
         $language = $project["language"] ?? "php";

@@ -43,6 +43,12 @@ final class ProjectUpdateCommand extends AbstractCommand
             "Версия языка проекта: 8.2, 8.3, 8.4 или 8.5.",
         );
         $this->addOption("framework", null, InputOption::VALUE_REQUIRED, "Код фреймворка проекта.");
+        $this->addOption(
+            "external",
+            null,
+            InputOption::VALUE_NEGATABLE,
+            "Включить или отключить проксирование на внешний сервис.",
+        );
         $this->addOption("external-port", null, InputOption::VALUE_REQUIRED, "Порт внешнего сервиса.");
         $this->addOption(
             "dedicated-db",
@@ -65,6 +71,7 @@ final class ProjectUpdateCommand extends AbstractCommand
         $language = $input->getOption("language");
         $languageVersion = $input->getOption("language-version");
         $framework = $input->getOption("framework");
+        $external = $input->getOption("external");
         $externalPort = $input->getOption("external-port");
         $dedicatedOption = $input->getOption("dedicated-db");
         if (
@@ -72,13 +79,15 @@ final class ProjectUpdateCommand extends AbstractCommand
             $language === null &&
             $languageVersion === null &&
             $framework === null &&
+            $external === null &&
             $dedicatedOption === null &&
             $externalPort === null
         ) {
             $this->writeMessage(
                 $output,
                 "<comment>Не указаны изменения: используйте --name, " .
-                    "--language, --language-version, --framework, --external-port или --dedicated-db.</comment>",
+                    "--language, --language-version, --framework, --external, --external-port " .
+                    "или --dedicated-db.</comment>",
             );
             return Command::SUCCESS;
         }
@@ -91,8 +100,7 @@ final class ProjectUpdateCommand extends AbstractCommand
         }
         if (
             ($language !== null && $language !== "php") ||
-            ($framework !== null &&
-                !in_array($framework, ["", "symfony", "laravel", "bitrix", "bitrix24", "external"], true))
+            ($framework !== null && !in_array($framework, ["", "symfony", "laravel", "bitrix", "bitrix24"], true))
         ) {
             $this->writeMessage($output, "<error>Указан неподдерживаемый язык или фреймворк.</error>");
             return Command::FAILURE;
@@ -132,10 +140,12 @@ final class ProjectUpdateCommand extends AbstractCommand
             $this->writeMessage($output, "<error>Конфигурация проекта повреждена.</error>");
             return Command::FAILURE;
         }
-        $resultingFramework =
-            $framework !== null ? ($framework !== "" ? $framework : null) : ($project["framework"] ?? null);
-        if ($externalPort !== null && $resultingFramework !== "external") {
-            $this->writeMessage($output, "<error>Опцию --external-port можно использовать только с external.</error>");
+        $resultingExternal = is_bool($external) ? $external : ($project["external"] ?? false) === true;
+        if ($externalPort !== null && !$resultingExternal) {
+            $this->writeMessage(
+                $output,
+                "<error>Опцию --external-port можно использовать только с --external.</error>",
+            );
             return Command::INVALID;
         }
         if ($externalPort !== null && !$this->isValidPort($externalPort)) {
@@ -178,6 +188,7 @@ final class ProjectUpdateCommand extends AbstractCommand
                 $languageVersion !== ($project["language_version"] ?? PhpLanguageVersion::default())) ||
             ($framework !== null && ($framework !== "" ? $framework : null) !== ($project["framework"] ?? null));
         $routingChanged = $routingChanged ||
+            (is_bool($external) && $external !== (($project["external"] ?? false) === true)) ||
             ($externalPort !== null && (int) $externalPort !== ($project["external_port"] ?? null));
         $config["data"]["project"]["name"] = $newName;
         $localConfig["data"]["project"]["name"] = $newName;
@@ -189,7 +200,10 @@ final class ProjectUpdateCommand extends AbstractCommand
         }
         if (is_string($framework)) {
             $config["data"]["project"]["framework"] = $framework !== "" ? $framework : null;
-            if ($framework !== "external") {
+        }
+        if (is_bool($external)) {
+            $config["data"]["project"]["external"] = $external;
+            if (!$external) {
                 unset($config["data"]["project"]["external_port"]);
             }
         }

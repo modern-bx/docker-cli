@@ -92,8 +92,8 @@ docker-cli project:up shop
 проксироваться на `EXTERNAL_SERVICE_PORT` из системного `.env` (по умолчанию `8080`) или на порт проекта:
 
 ```bash
-docker-cli project:up api --framework=external --external-port=3000
-docker-cli project:update --framework=external --external-port=3001
+docker-cli project:up api --external --external-port=3000
+docker-cli project:update --external --external-port=3001
 ```
 
 Полная подготовка домена, DNS и браузера описана в

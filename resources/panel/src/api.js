@@ -4,6 +4,7 @@
  * @property {{code: string, name: string}|null} language Project programming language, when configured.
  * @property {string|null} languageVersion Project programming language version, resolved to the system default for legacy PHP projects.
  * @property {{code: string, name: string}|null} framework Project framework, when configured.
+ * @property {boolean} external Проксируются ли запросы на внешний сервис.
  * @property {number|null} externalPort External service port, when configured.
  * @property {boolean} enabled Whether the project is enabled.
  * @property {boolean} protected Whether destructive changes are forbidden.
