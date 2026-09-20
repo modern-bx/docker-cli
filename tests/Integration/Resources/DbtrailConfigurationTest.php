@@ -17,7 +17,7 @@ final class DbtrailConfigurationTest extends TestCase
         self::assertIsArray($compose["services"] ?? null);
         $services = $compose["services"];
         self::assertSame("mysql:8.4", $services["dbtrail-index"]["image"] ?? null);
-        self::assertSame("ghcr.io/dbtrail/bintrail-console:0.84.0", $services["dbtrail"]["image"] ?? null);
+        self::assertSame("dbtrail/Dockerfile", $services["dbtrail"]["build"]["dockerfile"] ?? null);
         self::assertSame(
             '${DBTRAIL_MYSQL_USER:?DBTRAIL_MYSQL_USER is required}:' .
                 '${DBTRAIL_MYSQL_PASSWORD:?DBTRAIL_MYSQL_PASSWORD is required}@tcp(mysql:3306)/',
@@ -56,18 +56,10 @@ final class DbtrailConfigurationTest extends TestCase
             "system-http-auth",
             $services["dbtrail"]["labels"]["traefik.http.routers.dbtrail.middlewares"] ?? null,
         );
+        self::assertSame(["dbtrail-state:/var/lib/bintrail"], $services["dbtrail"]["volumes"] ?? null);
         self::assertSame(
-            ["dbtrail-state:/var/lib/bintrail", "dbtrail-config:/run/dbtrail-config:ro"],
-            $services["dbtrail"]["volumes"] ?? null,
-        );
-        self::assertStringContainsString(
-            '--tables "$$(cat /run/dbtrail-config/tables)"',
-            implode("\n", $services["dbtrail"]["command"] ?? []),
-        );
-        self::assertStringContainsString("ulimit -s unlimited", implode("\n", $services["dbtrail"]["command"] ?? []));
-        self::assertSame(
-            ["soft" => -1, "hard" => -1],
-            $services["dbtrail"]["ulimits"]["stack"] ?? null,
+            ['exec bintrail-console watch --source-dsn "$${SOURCE_DSN}" --index-dsn "$${INDEX_DSN}"'],
+            $services["dbtrail"]["command"] ?? null,
         );
         self::assertStringNotContainsString("postgres", serialize($services["dbtrail"]));
     }
@@ -99,7 +91,7 @@ final class DbtrailConfigurationTest extends TestCase
         $configuration = Yaml::parseFile($composeFile);
         self::assertIsArray($configuration);
         self::assertSame(
-            ["dbtrail-mysql-socket:/var/run/mysqld", "dbtrail-config:/dbtrail-config"],
+            ["dbtrail-mysql-socket:/var/run/mysqld"],
             $configuration["services"]["dbtrail-mysql-init"]["volumes"] ?? null,
         );
         self::assertContains(
@@ -108,8 +100,27 @@ final class DbtrailConfigurationTest extends TestCase
         );
         self::assertStringContainsString("--protocol=socket", $compose);
         self::assertStringNotContainsString("mysql -h mysql -u root", $compose);
-        self::assertStringContainsString("t.ENGINE = 'InnoDB'", $compose);
-        self::assertStringContainsString("c.COLUMN_KEY = 'PRI'", $compose);
-        self::assertStringContainsString("dbtrail-config:/dbtrail-config", $compose);
+    }
+
+    public function testDbtrailImageUsesDegradedInitialSnapshot(): void
+    {
+        $dockerfile = $this->read("resources/compose/system/config/dbtrail/Dockerfile");
+
+        self::assertStringContainsString("DBTRAIL_VERSION=0.84.0", $dockerfile);
+        self::assertStringContainsString("DBTRAIL_ARCHIVE_SHA256=", $dockerfile);
+        self::assertStringContainsString(
+            "TakeSnapshotExcludingInvalid(sourceDB, indexDB, schemas)",
+            $dockerfile,
+        );
+        self::assertStringNotContainsString("--tables", $dockerfile);
+    }
+
+    private function read(string $relativePath): string
+    {
+        $contents = file_get_contents(dirname(__DIR__, 3) . "/" . $relativePath);
+
+        self::assertIsString($contents, sprintf("Не удалось прочитать файл %s.", $relativePath));
+
+        return $contents;
     }
 }
