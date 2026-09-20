@@ -86,6 +86,8 @@ final class DedicatedDatabaseComposeRenderer
                     "--log-bin=mysql-bin",
                     "--binlog-format=ROW",
                     "--binlog-row-image=FULL",
+                    "--binlog-row-metadata=FULL",
+                    "--binlog-rows-query-log-events=ON",
                     "--binlog-row-value-options=",
                 ],
                 "labels" => ["docker-cli.dbtrail-source" => "mysql"],

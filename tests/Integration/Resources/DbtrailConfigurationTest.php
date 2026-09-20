@@ -79,6 +79,8 @@ final class DbtrailConfigurationTest extends TestCase
         self::assertContains("--log-bin=mysql-bin", $command);
         self::assertContains("--binlog-format=ROW", $command);
         self::assertContains("--binlog-row-image=FULL", $command);
+        self::assertContains("--binlog-row-metadata=FULL", $command);
+        self::assertContains("--binlog-rows-query-log-events=ON", $command);
         self::assertContains("--binlog-row-value-options=", $command);
     }
 
@@ -152,6 +154,8 @@ final class DbtrailConfigurationTest extends TestCase
         self::assertStringContainsString('"docker-cli.dbtrail-source" => "mysql"', $renderer);
         self::assertStringContainsString('"--binlog-format=ROW"', $renderer);
         self::assertStringContainsString('"--binlog-row-image=FULL"', $renderer);
+        self::assertStringContainsString('"--binlog-row-metadata=FULL"', $renderer);
+        self::assertStringContainsString('"--binlog-rows-query-log-events=ON"', $renderer);
     }
 
     private function read(string $relativePath): string
