@@ -66,6 +66,9 @@ final class DbtrailConfigurationTest extends TestCase
             $services["dbtrail"]["command"] ?? null,
         );
         self::assertStringNotContainsString("postgres", serialize($services["dbtrail"]));
+        foreach (["dbtrail-mysql-init", "dbtrail-index", "dbtrail", "dbtrail-sync"] as $service) {
+            self::assertSame(["dbtrail"], $services[$service]["profiles"] ?? null);
+        }
     }
 
     public function testMysqlHasTheBinaryLogSettingsRequiredByDbtrail(): void

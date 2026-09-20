@@ -60,6 +60,8 @@ final class ProxyServicesConfigurationTest extends TestCase
             $services["proxysql"]["labels"] ?? [],
         );
         self::assertSame(["proxysql"], $services["proxyweb"]["depends_on"] ?? null);
+        self::assertSame(["proxysql"], $services["proxysql"]["profiles"] ?? null);
+        self::assertSame(["proxyweb"], $services["proxyweb"]["profiles"] ?? null);
     }
 
     public function testProxySqlEnablesWebUiAndRegistersSystemDatabases(): void

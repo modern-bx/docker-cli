@@ -128,6 +128,8 @@ services:
       - dbtrail-mysql-socket:/var/run/mysqld
     networks:
       docker-cli:
+    profiles:
+      - dbtrail
     restart: "no"
 
   dbtrail-index:
@@ -153,6 +155,8 @@ services:
       start_period: 30s
     networks:
       docker-cli:
+    profiles:
+      - dbtrail
     restart: unless-stopped
 
   dbtrail:
@@ -205,6 +209,8 @@ services:
         aliases:
           - dbtrail
           - dbtrail.${BASE_HOST}
+    profiles:
+      - dbtrail
     restart: unless-stopped
 
   dbtrail-sync:
@@ -223,6 +229,8 @@ services:
     networks:
       docker-cli:
     entrypoint: ["/usr/local/bin/docker-cli-dbtrail-sync"]
+    profiles:
+      - dbtrail
     restart: unless-stopped
 
   mydumper:
@@ -302,6 +310,8 @@ services:
         aliases:
           - proxysql
           - proxysql.${BASE_HOST}
+    profiles:
+      - proxysql
     restart: unless-stopped
 
   proxyweb:
@@ -334,6 +344,8 @@ services:
         aliases:
           - proxyweb
           - proxyweb.${BASE_HOST}
+    profiles:
+      - proxyweb
     restart: unless-stopped
 
   php-fpm-8.2:
