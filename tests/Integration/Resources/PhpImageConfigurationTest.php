@@ -27,7 +27,7 @@ final class PhpImageConfigurationTest extends TestCase
 
         self::assertSame(4, substr_count($compose, 'PHP_ENABLE_XDEBUG: ${PHP_ENABLE_XDEBUG:-1}'));
         self::assertSame(4, substr_count($compose, 'PHP_ENABLE_SPX: ${PHP_ENABLE_SPX:-1}'));
-        self::assertSame(4, substr_count($compose, "context: ./config\n"));
+        self::assertSame(4, substr_count($compose, "dockerfile: php-fpm-"));
     }
 
     public function testConfigInitExportsSpxStylesWithoutOverwritingUserChanges(): void

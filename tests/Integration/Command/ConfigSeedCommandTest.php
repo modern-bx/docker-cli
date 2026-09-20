@@ -11,7 +11,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 final class ConfigSeedCommandTest extends TestCase
 {
-    public function testSeedsProxyServiceCredentialsAndPreservesExistingValues(): void
+    public function testSeedsSystemServiceCredentialsAndPreservesExistingValues(): void
     {
         $previousHome = getenv("HOME");
         $temporaryHome = sys_get_temp_dir() . "/docker-cli-config-seed-" . bin2hex(random_bytes(8));
@@ -39,6 +39,10 @@ final class ConfigSeedCommandTest extends TestCase
             self::assertNotSame("", $values["PROXYSQL_WEB_PASSWORD"]);
             self::assertSame("proxyweb", $values["PROXYWEB_ADMIN_USER"]);
             self::assertNotSame("", $values["PROXYWEB_ADMIN_PASSWORD"]);
+            self::assertSame("dbtrail", $values["DBTRAIL_MYSQL_USER"]);
+            self::assertNotSame("", $values["DBTRAIL_MYSQL_PASSWORD"]);
+            self::assertNotSame("", $values["DBTRAIL_INDEX_PASSWORD"]);
+            self::assertNotSame("", $values["DBTRAIL_CONSOLE_TOKEN"]);
         } finally {
             putenv($previousHome === false ? "HOME" : "HOME=" . $previousHome);
             $this->removeDirectory($temporaryHome);

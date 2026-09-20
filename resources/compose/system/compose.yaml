@@ -50,7 +50,7 @@ services:
       - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
     environment:
       CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
-      DNSDOCK_ALIAS: ${BASE_HOST},dockhand.${BASE_HOST},adminer.${BASE_HOST},mailpit.${BASE_HOST},panel.${BASE_HOST},proxysql.${BASE_HOST},proxyweb.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
+      DNSDOCK_ALIAS: ${BASE_HOST},dockhand.${BASE_HOST},adminer.${BASE_HOST},dbtrail.${BASE_HOST},mailpit.${BASE_HOST},panel.${BASE_HOST},proxysql.${BASE_HOST},proxyweb.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
     ports:
       - "${TRAEFIK_HTTP_PORT:-80}:80"
       - "${TRAEFIK_HTTPS_PORT:-443}:443"
@@ -64,6 +64,7 @@ services:
           - traefik.${BASE_HOST}
           - dockhand.${BASE_HOST}
           - adminer.${BASE_HOST}
+          - dbtrail.${BASE_HOST}
           - mailpit.${BASE_HOST}
           - panel.${BASE_HOST}
           - proxysql.${BASE_HOST}
@@ -80,6 +81,12 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       DNSDOCK_NAME: mysql
       DNSDOCK_IMAGE: system
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --binlog-row-image=FULL
+      - --binlog-row-value-options=
     volumes:
       - type: bind
         source: ${DEFAULT_DATA_DIR_MYSQL:-data/mysql}/data
@@ -87,11 +94,133 @@ services:
       - type: bind
         source: ${DEFAULT_DATA_DIR_MYSQL:-data/mysql}/logs
         target: /var/log/mysql
+      - dbtrail-mysql-socket:/var/run/mysqld
     networks:
       docker-cli:
         aliases:
           - mysql
           - mysql.${BASE_HOST}
+    restart: unless-stopped
+
+  dbtrail-mysql-init:
+    image: mysql:8.0
+    depends_on:
+      mysql:
+        condition: service_started
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      DBTRAIL_MYSQL_USER: ${DBTRAIL_MYSQL_USER:?DBTRAIL_MYSQL_USER is required}
+      DBTRAIL_MYSQL_PASSWORD: ${DBTRAIL_MYSQL_PASSWORD:?DBTRAIL_MYSQL_PASSWORD is required}
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        until MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin ping \
+          --protocol=socket --socket=/var/run/mysqld/mysqld.sock -u root --silent; do
+          sleep 2
+        done
+        MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysql \
+          --protocol=socket --socket=/var/run/mysqld/mysqld.sock -u root \
+          --execute="CREATE USER IF NOT EXISTS '$${DBTRAIL_MYSQL_USER}'@'%' IDENTIFIED BY '$${DBTRAIL_MYSQL_PASSWORD}'; ALTER USER '$${DBTRAIL_MYSQL_USER}'@'%' IDENTIFIED BY '$${DBTRAIL_MYSQL_PASSWORD}'; GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$${DBTRAIL_MYSQL_USER}'@'%';"
+    volumes:
+      - dbtrail-mysql-socket:/var/run/mysqld
+    networks:
+      docker-cli:
+    restart: "no"
+
+  dbtrail-index:
+    image: mysql:8.4
+    container_name: docker-cli-dbtrail-index
+    command:
+      - --innodb-flush-log-at-trx-commit=2
+      - --sort-buffer-size=4M
+      - --max-allowed-packet=1G
+      - --skip-log-bin
+      - --innodb-redo-log-capacity=2147483648
+      - --innodb-flush-method=O_DIRECT
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DBTRAIL_INDEX_PASSWORD:?DBTRAIL_INDEX_PASSWORD is required}
+      MYSQL_DATABASE: bintrail_index
+    volumes:
+      - dbtrail-index-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      docker-cli:
+    restart: unless-stopped
+
+  dbtrail:
+    build:
+      context: ./config
+      dockerfile: dbtrail/Dockerfile
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/dbtrail:${SOURCE_IMAGE_TAG:-default}
+    container_name: docker-cli-dbtrail
+    depends_on:
+      dbtrail-mysql-init:
+        condition: service_completed_successfully
+      dbtrail-index:
+        condition: service_healthy
+    environment:
+      SOURCE_DSN: ${DBTRAIL_MYSQL_USER:?DBTRAIL_MYSQL_USER is required}:${DBTRAIL_MYSQL_PASSWORD:?DBTRAIL_MYSQL_PASSWORD is required}@tcp(mysql:3306)/
+      INDEX_DSN: root:${DBTRAIL_INDEX_PASSWORD:?DBTRAIL_INDEX_PASSWORD is required}@tcp(dbtrail-index:3306)/bintrail_index
+      BINTRAIL_CONSOLE_LISTEN: 0.0.0.0:8090
+      BINTRAIL_CONSOLE_ALLOWED_HOSTS: dbtrail.${BASE_HOST}
+      BINTRAIL_CONSOLE_TOKEN: ${DBTRAIL_CONSOLE_TOKEN:?DBTRAIL_CONSOLE_TOKEN is required}
+      BINTRAIL_CONSOLE_SERVERS: /var/lib/bintrail/console-servers.yaml
+      BINTRAIL_CONSOLE_AUTH: /var/lib/bintrail/console-auth.yaml
+      BINTRAIL_CONSOLE_MCP_TOKEN_FILE: /var/lib/bintrail/console-mcp-token.yaml
+      BINTRAIL_CONSOLE_ALLOW_SETUP: "1"
+      DNSDOCK_NAME: dbtrail
+      DNSDOCK_IMAGE: system
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - exec bintrail-console watch --source-dsn "$${SOURCE_DSN}" --index-dsn "$${INDEX_DSN}"
+    volumes:
+      - dbtrail-state:/var/lib/bintrail
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.dbtrail-api.rule: Host(`dbtrail.${BASE_HOST}`) && PathPrefix(`/api`)
+      traefik.http.routers.dbtrail-api.entrypoints: websecure
+      traefik.http.routers.dbtrail-api.middlewares: system-http-auth
+      traefik.http.routers.dbtrail-api.priority: "100"
+      traefik.http.routers.dbtrail-api.service: dbtrail
+      traefik.http.routers.dbtrail-api.tls: "true"
+      traefik.http.routers.dbtrail-api.tls.certresolver: cloudflare
+      traefik.http.routers.dbtrail.rule: Host(`dbtrail.${BASE_HOST}`)
+      traefik.http.routers.dbtrail.entrypoints: websecure
+      traefik.http.routers.dbtrail.middlewares: system-http-auth
+      traefik.http.routers.dbtrail.priority: "90"
+      traefik.http.routers.dbtrail.service: dbtrail
+      traefik.http.routers.dbtrail.tls: "true"
+      traefik.http.routers.dbtrail.tls.certresolver: cloudflare
+      traefik.http.services.dbtrail.loadbalancer.server.port: "8090"
+    networks:
+      docker-cli:
+        aliases:
+          - dbtrail
+          - dbtrail.${BASE_HOST}
+    restart: unless-stopped
+
+  dbtrail-sync:
+    build:
+      context: ./config/dbtrail-sync
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/dbtrail-sync:${SOURCE_IMAGE_TAG:-default}
+    container_name: docker-cli-dbtrail-sync
+    depends_on:
+      - dbtrail
+    environment:
+      DBTRAIL_API_TOKEN: ${DBTRAIL_CONSOLE_TOKEN:?DBTRAIL_CONSOLE_TOKEN is required}
+      DBTRAIL_MYSQL_USER: ${DBTRAIL_MYSQL_USER:?DBTRAIL_MYSQL_USER is required}
+      DBTRAIL_MYSQL_PASSWORD: ${DBTRAIL_MYSQL_PASSWORD:?DBTRAIL_MYSQL_PASSWORD is required}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      docker-cli:
+    entrypoint: ["/usr/local/bin/docker-cli-dbtrail-sync"]
     restart: unless-stopped
 
   mydumper:
@@ -504,5 +633,8 @@ networks:
         - subnet: ${DOCKER_CLI_NETWORK_SUBNET:-172.30.0.0/24}
 
 volumes:
+  dbtrail-index-data:
+  dbtrail-mysql-socket:
+  dbtrail-state:
   traefik-letsencrypt:
   playwright-node-modules:

@@ -523,6 +523,16 @@ final class SystemCompose
                 "php-fpm-8.5",
             ),
             join_path($this->directory(), "config", "panel") => join_path($composeResources, "config", "panel"),
+            join_path($this->directory(), "config", "dbtrail") => join_path(
+                $composeResources,
+                "config",
+                "dbtrail",
+            ),
+            join_path($this->directory(), "config", "dbtrail-sync") => join_path(
+                $composeResources,
+                "config",
+                "dbtrail-sync",
+            ),
             join_path($this->directory(), "config", "proxysql") => join_path(
                 $composeResources,
                 "config",
