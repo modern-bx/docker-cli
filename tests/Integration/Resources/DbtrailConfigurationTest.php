@@ -49,7 +49,7 @@ final class DbtrailConfigurationTest extends TestCase
             $services["dbtrail"]["labels"]["traefik.http.routers.dbtrail.service"] ?? null,
         );
         self::assertSame(
-            'dbtrail.${BASE_HOST}',
+            'dbtrail,dbtrail.${BASE_HOST}',
             $services["dbtrail"]["environment"]["BINTRAIL_CONSOLE_ALLOWED_HOSTS"] ?? null,
         );
         self::assertSame(
@@ -139,6 +139,7 @@ final class DbtrailConfigurationTest extends TestCase
         );
 
         self::assertStringContainsString("docker ps --all --filter label=docker-cli.dbtrail-source=mysql", $script);
+        self::assertStringContainsString('curl --fail --silent "$api/healthz"', $script);
         self::assertStringContainsString("request POST /servers", $script);
         self::assertStringContainsString('request POST "/servers/$id/monitor/start"', $script);
         self::assertStringContainsString('request POST "/servers/$id/monitor/stop"', $script);

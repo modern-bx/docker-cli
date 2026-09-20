@@ -168,7 +168,7 @@ services:
       SOURCE_DSN: ${DBTRAIL_MYSQL_USER:?DBTRAIL_MYSQL_USER is required}:${DBTRAIL_MYSQL_PASSWORD:?DBTRAIL_MYSQL_PASSWORD is required}@tcp(mysql:3306)/
       INDEX_DSN: root:${DBTRAIL_INDEX_PASSWORD:?DBTRAIL_INDEX_PASSWORD is required}@tcp(dbtrail-index:3306)/bintrail_index
       BINTRAIL_CONSOLE_LISTEN: 0.0.0.0:8090
-      BINTRAIL_CONSOLE_ALLOWED_HOSTS: dbtrail.${BASE_HOST}
+      BINTRAIL_CONSOLE_ALLOWED_HOSTS: dbtrail,dbtrail.${BASE_HOST}
       BINTRAIL_CONSOLE_TOKEN: ${DBTRAIL_CONSOLE_TOKEN:?DBTRAIL_CONSOLE_TOKEN is required}
       BINTRAIL_CONSOLE_SERVERS: /var/lib/bintrail/console-servers.yaml
       BINTRAIL_CONSOLE_AUTH: /var/lib/bintrail/console-auth.yaml

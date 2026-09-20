@@ -61,6 +61,10 @@ reconcile() {
         done
 }
 
+until curl --fail --silent "$api/healthz" >/dev/null; do
+    sleep 1
+done
+
 while true; do
     if ! reconcile; then
         echo "Не удалось синхронизировать выделенные MySQL с DBTrail." >&2
