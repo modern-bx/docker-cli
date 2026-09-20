@@ -64,6 +64,11 @@ final class DbtrailConfigurationTest extends TestCase
             '--tables "$$(cat /run/dbtrail-config/tables)"',
             implode("\n", $services["dbtrail"]["command"] ?? []),
         );
+        self::assertStringContainsString("ulimit -s unlimited", implode("\n", $services["dbtrail"]["command"] ?? []));
+        self::assertSame(
+            ["soft" => -1, "hard" => -1],
+            $services["dbtrail"]["ulimits"]["stack"] ?? null,
+        );
         self::assertStringNotContainsString("postgres", serialize($services["dbtrail"]));
     }
 

@@ -185,6 +185,7 @@ services:
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
+        ulimit -s unlimited
         exec bintrail-console watch \
           --source-dsn "$${SOURCE_DSN}" \
           --index-dsn "$${INDEX_DSN}" \
@@ -192,6 +193,10 @@ services:
     volumes:
       - dbtrail-state:/var/lib/bintrail
       - dbtrail-config:/run/dbtrail-config:ro
+    ulimits:
+      stack:
+        soft: -1
+        hard: -1
     labels:
       traefik.enable: "true"
       traefik.http.routers.dbtrail-api.rule: Host(`dbtrail.${BASE_HOST}`) && PathPrefix(`/api`)
