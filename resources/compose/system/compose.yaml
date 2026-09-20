@@ -122,8 +122,18 @@ services:
         MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysql \
           --protocol=socket --socket=/var/run/mysqld/mysqld.sock -u root \
           --execute="CREATE USER IF NOT EXISTS '$${DBTRAIL_MYSQL_USER}'@'%' IDENTIFIED BY '$${DBTRAIL_MYSQL_PASSWORD}'; ALTER USER '$${DBTRAIL_MYSQL_USER}'@'%' IDENTIFIED BY '$${DBTRAIL_MYSQL_PASSWORD}'; GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$${DBTRAIL_MYSQL_USER}'@'%';"
+        tables="$$(MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysql \
+          --protocol=socket --socket=/var/run/mysqld/mysqld.sock -u root \
+          --batch --skip-column-names \
+          --execute="SET SESSION group_concat_max_len = 16777216; SELECT COALESCE(GROUP_CONCAT(CONCAT(t.TABLE_SCHEMA, '.', t.TABLE_NAME) ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME), '') FROM information_schema.TABLES t WHERE t.TABLE_TYPE = 'BASE TABLE' AND t.ENGINE = 'InnoDB' AND t.TABLE_SCHEMA NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys') AND EXISTS (SELECT 1 FROM information_schema.COLUMNS c WHERE c.TABLE_SCHEMA = t.TABLE_SCHEMA AND c.TABLE_NAME = t.TABLE_NAME AND c.COLUMN_KEY = 'PRI');")"
+        if [ -z "$${tables}" ]; then
+          echo "Не найдено совместимых с DBTrail таблиц InnoDB с первичным ключом." >&2
+          exit 1
+        fi
+        printf '%s' "$${tables}" > /dbtrail-config/tables
     volumes:
       - dbtrail-mysql-socket:/var/run/mysqld
+      - dbtrail-config:/dbtrail-config
     networks:
       docker-cli:
     restart: "no"
@@ -174,9 +184,14 @@ services:
       DNSDOCK_IMAGE: system
     entrypoint: ["/bin/sh", "-ec"]
     command:
-      - exec bintrail-console watch --source-dsn "$${SOURCE_DSN}" --index-dsn "$${INDEX_DSN}"
+      - |
+        exec bintrail-console watch \
+          --source-dsn "$${SOURCE_DSN}" \
+          --index-dsn "$${INDEX_DSN}" \
+          --tables "$$(cat /run/dbtrail-config/tables)"
     volumes:
       - dbtrail-state:/var/lib/bintrail
+      - dbtrail-config:/run/dbtrail-config:ro
     labels:
       traefik.enable: "true"
       traefik.http.routers.dbtrail-api.rule: Host(`dbtrail.${BASE_HOST}`) && PathPrefix(`/api`)
@@ -611,6 +626,7 @@ networks:
         - subnet: ${DOCKER_CLI_NETWORK_SUBNET:-172.30.0.0/24}
 
 volumes:
+  dbtrail-config:
   dbtrail-index-data:
   dbtrail-mysql-socket:
   dbtrail-state:

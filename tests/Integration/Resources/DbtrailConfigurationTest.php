@@ -57,8 +57,12 @@ final class DbtrailConfigurationTest extends TestCase
             $services["dbtrail"]["labels"]["traefik.http.routers.dbtrail.middlewares"] ?? null,
         );
         self::assertSame(
-            ['exec bintrail-console watch --source-dsn "$${SOURCE_DSN}" --index-dsn "$${INDEX_DSN}"'],
-            $services["dbtrail"]["command"] ?? null,
+            ["dbtrail-state:/var/lib/bintrail", "dbtrail-config:/run/dbtrail-config:ro"],
+            $services["dbtrail"]["volumes"] ?? null,
+        );
+        self::assertStringContainsString(
+            '--tables "$$(cat /run/dbtrail-config/tables)"',
+            implode("\n", $services["dbtrail"]["command"] ?? []),
         );
         self::assertStringNotContainsString("postgres", serialize($services["dbtrail"]));
     }
@@ -90,7 +94,7 @@ final class DbtrailConfigurationTest extends TestCase
         $configuration = Yaml::parseFile($composeFile);
         self::assertIsArray($configuration);
         self::assertSame(
-            ["dbtrail-mysql-socket:/var/run/mysqld"],
+            ["dbtrail-mysql-socket:/var/run/mysqld", "dbtrail-config:/dbtrail-config"],
             $configuration["services"]["dbtrail-mysql-init"]["volumes"] ?? null,
         );
         self::assertContains(
@@ -99,5 +103,8 @@ final class DbtrailConfigurationTest extends TestCase
         );
         self::assertStringContainsString("--protocol=socket", $compose);
         self::assertStringNotContainsString("mysql -h mysql -u root", $compose);
+        self::assertStringContainsString("t.ENGINE = 'InnoDB'", $compose);
+        self::assertStringContainsString("c.COLUMN_KEY = 'PRI'", $compose);
+        self::assertStringContainsString("dbtrail-config:/dbtrail-config", $compose);
     }
 }
