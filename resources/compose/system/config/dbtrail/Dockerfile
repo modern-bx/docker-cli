@@ -17,7 +17,11 @@ RUN apt-get update \
     && sed --in-place \
         's/stats, err := TakeSnapshot(sourceDB, indexDB, schemas)/stats, err := TakeSnapshotExcludingInvalid(sourceDB, indexDB, schemas)/' \
         internal/metadata/metadata.go \
-    && ! grep --quiet 'stats, err := TakeSnapshot(sourceDB, indexDB, schemas)' internal/metadata/metadata.go
+    && sed --in-place \
+        's/return s.token == "" \&\& !s.passwordLoginEnabled()/return !s.passwordLoginEnabled()/' \
+        internal/console/auth_api.go \
+    && ! grep --quiet 'stats, err := TakeSnapshot(sourceDB, indexDB, schemas)' internal/metadata/metadata.go \
+    && grep --quiet 'return !s.passwordLoginEnabled()' internal/console/auth_api.go
 
 RUN CGO_ENABLED=1 go build \
     -ldflags="-s -w -X main.Version=${DBTRAIL_VERSION}" \

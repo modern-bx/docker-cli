@@ -30,6 +30,7 @@ bin/docker-cli config:seed
 - случайные пароли `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` и `POSTGRES_PASSWORD`;
 - администратора ProxySQL в `PROXYSQL_ADMIN_*`, пользователя его Web UI в `PROXYSQL_WEB_*` и пользователя
   ProxyWeb в `PROXYWEB_ADMIN_*`.
+- пользователя репликации, пароль индексной базы и внутренний API-токен DBTrail в `DBTRAIL_*`.
 
 Уже заполненные значения не меняются. Имена баз и пользователей MySQL/PostgreSQL предзаполнены в `.env` значением `system`, их можно поменять вручную до первого запуска.
 

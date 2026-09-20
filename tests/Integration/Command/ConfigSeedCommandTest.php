@@ -42,6 +42,7 @@ final class ConfigSeedCommandTest extends TestCase
             self::assertSame("dbtrail", $values["DBTRAIL_MYSQL_USER"]);
             self::assertNotSame("", $values["DBTRAIL_MYSQL_PASSWORD"]);
             self::assertNotSame("", $values["DBTRAIL_INDEX_PASSWORD"]);
+            self::assertNotSame("", $values["DBTRAIL_CONSOLE_TOKEN"]);
         } finally {
             putenv($previousHome === false ? "HOME" : "HOME=" . $previousHome);
             $this->removeDirectory($temporaryHome);

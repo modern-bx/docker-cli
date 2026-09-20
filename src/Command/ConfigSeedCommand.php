@@ -64,6 +64,7 @@ final class ConfigSeedCommand extends AbstractCommand
         $this->setDefaultIfEmpty($values, "DBTRAIL_MYSQL_USER", "dbtrail");
         $this->setDefaultIfEmpty($values, "DBTRAIL_MYSQL_PASSWORD", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "DBTRAIL_INDEX_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "DBTRAIL_CONSOLE_TOKEN", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "POSTGRES_PASSWORD", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "PROXYSQL_ADMIN_USER", "proxysql");
         $this->setDefaultIfEmpty($values, "PROXYSQL_ADMIN_PASSWORD", $this->randomSecret());
@@ -170,6 +171,7 @@ final class ConfigSeedCommand extends AbstractCommand
             "DBTRAIL_MYSQL_USER",
             "DBTRAIL_MYSQL_PASSWORD",
             "DBTRAIL_INDEX_PASSWORD",
+            "DBTRAIL_CONSOLE_TOKEN",
             "POSTGRES_DB",
             "POSTGRES_USER",
             "POSTGRES_PASSWORD",

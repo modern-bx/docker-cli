@@ -81,6 +81,14 @@ final class DedicatedDatabaseComposeRenderer
                     "DNSDOCK_NAME" => $hostname,
                     "DNSDOCK_IMAGE" => "system",
                 ],
+                "command" => [
+                    "--server-id=" . (1000 + (int) (sprintf("%u", crc32($hostname)) % 4294966295)),
+                    "--log-bin=mysql-bin",
+                    "--binlog-format=ROW",
+                    "--binlog-row-image=FULL",
+                    "--binlog-row-value-options=",
+                ],
+                "labels" => ["docker-cli.dbtrail-source" => "mysql"],
                 "volumes" => [
                     ["type" => "bind", "source" => $dataDirectory . "/data", "target" => "/var/lib/mysql"],
                     ["type" => "bind", "source" => $dataDirectory . "/logs", "target" => "/var/log/mysql"],

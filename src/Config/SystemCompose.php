@@ -528,6 +528,11 @@ final class SystemCompose
                 "config",
                 "dbtrail",
             ),
+            join_path($this->directory(), "config", "dbtrail-sync") => join_path(
+                $composeResources,
+                "config",
+                "dbtrail-sync",
+            ),
             join_path($this->directory(), "config", "proxysql") => join_path(
                 $composeResources,
                 "config",

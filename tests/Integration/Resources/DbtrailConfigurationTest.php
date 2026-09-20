@@ -53,6 +53,10 @@ final class DbtrailConfigurationTest extends TestCase
             $services["dbtrail"]["environment"]["BINTRAIL_CONSOLE_ALLOWED_HOSTS"] ?? null,
         );
         self::assertSame(
+            '${DBTRAIL_CONSOLE_TOKEN:?DBTRAIL_CONSOLE_TOKEN is required}',
+            $services["dbtrail"]["environment"]["BINTRAIL_CONSOLE_TOKEN"] ?? null,
+        );
+        self::assertSame(
             "system-http-auth",
             $services["dbtrail"]["labels"]["traefik.http.routers.dbtrail.middlewares"] ?? null,
         );
@@ -112,7 +116,25 @@ final class DbtrailConfigurationTest extends TestCase
             "TakeSnapshotExcludingInvalid(sourceDB, indexDB, schemas)",
             $dockerfile,
         );
+        self::assertStringContainsString('return !s.passwordLoginEnabled()', $dockerfile);
         self::assertStringNotContainsString("--tables", $dockerfile);
+    }
+
+    public function testDedicatedMysqlSynchronizerReconcilesTheCompleteContainerList(): void
+    {
+        $script = $this->read("resources/compose/system/config/dbtrail-sync/sync.sh");
+
+        self::assertStringContainsString("docker ps --all --filter label=docker-cli.dbtrail-source=mysql", $script);
+        self::assertStringContainsString("request POST /servers", $script);
+        self::assertStringContainsString('request POST "/servers/$id/monitor/start"', $script);
+        self::assertStringContainsString('request POST "/servers/$id/monitor/stop"', $script);
+        self::assertStringContainsString('request DELETE "/servers/$id"', $script);
+        self::assertStringContainsString("sleep 60", $script);
+
+        $renderer = $this->read("src/Project/DedicatedDatabaseComposeRenderer.php");
+        self::assertStringContainsString('"docker-cli.dbtrail-source" => "mysql"', $renderer);
+        self::assertStringContainsString('"--binlog-format=ROW"', $renderer);
+        self::assertStringContainsString('"--binlog-row-image=FULL"', $renderer);
     }
 
     private function read(string $relativePath): string

@@ -169,6 +169,7 @@ services:
       INDEX_DSN: root:${DBTRAIL_INDEX_PASSWORD:?DBTRAIL_INDEX_PASSWORD is required}@tcp(dbtrail-index:3306)/bintrail_index
       BINTRAIL_CONSOLE_LISTEN: 0.0.0.0:8090
       BINTRAIL_CONSOLE_ALLOWED_HOSTS: dbtrail.${BASE_HOST}
+      BINTRAIL_CONSOLE_TOKEN: ${DBTRAIL_CONSOLE_TOKEN:?DBTRAIL_CONSOLE_TOKEN is required}
       BINTRAIL_CONSOLE_SERVERS: /var/lib/bintrail/console-servers.yaml
       BINTRAIL_CONSOLE_AUTH: /var/lib/bintrail/console-auth.yaml
       BINTRAIL_CONSOLE_MCP_TOKEN_FILE: /var/lib/bintrail/console-mcp-token.yaml
@@ -202,6 +203,23 @@ services:
         aliases:
           - dbtrail
           - dbtrail.${BASE_HOST}
+    restart: unless-stopped
+
+  dbtrail-sync:
+    build:
+      context: ./config/dbtrail-sync
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/dbtrail-sync:${SOURCE_IMAGE_TAG:-default}
+    container_name: docker-cli-dbtrail-sync
+    depends_on:
+      - dbtrail
+    environment:
+      DBTRAIL_API_TOKEN: ${DBTRAIL_CONSOLE_TOKEN:?DBTRAIL_CONSOLE_TOKEN is required}
+      DBTRAIL_MYSQL_USER: ${DBTRAIL_MYSQL_USER:?DBTRAIL_MYSQL_USER is required}
+      DBTRAIL_MYSQL_PASSWORD: ${DBTRAIL_MYSQL_PASSWORD:?DBTRAIL_MYSQL_PASSWORD is required}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      docker-cli:
     restart: unless-stopped
 
   mydumper:
