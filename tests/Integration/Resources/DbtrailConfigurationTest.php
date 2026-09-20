@@ -142,6 +142,8 @@ final class DbtrailConfigurationTest extends TestCase
         self::assertStringContainsString('curl --fail --silent "$api/healthz"', $script);
         self::assertStringContainsString("request POST /servers", $script);
         self::assertStringContainsString('request POST "/servers/$id/monitor/start"', $script);
+        self::assertStringContainsString("missing_limit=3", $script);
+        self::assertStringContainsString('if [ "$misses" -lt "$missing_limit" ]', $script);
         self::assertStringContainsString('request POST "/servers/$id/monitor/stop"', $script);
         self::assertStringContainsString('request DELETE "/servers/$id"', $script);
         self::assertStringContainsString("sleep 60", $script);
