@@ -33,6 +33,9 @@ final class ConfigSeedCommandTest extends TestCase
             self::assertSame(0, $tester->execute(["--yes" => true]));
 
             $values = $this->readEnvironment($compose->envFile());
+            self::assertSame("1", $values["COMPOSE_ENABLE_PROXYSQL"]);
+            self::assertSame("1", $values["COMPOSE_ENABLE_PROXYWEB"]);
+            self::assertSame("1", $values["COMPOSE_ENABLE_DBTRAIL"]);
             self::assertSame("operator", $values["PROXYSQL_ADMIN_USER"]);
             self::assertNotSame("", $values["PROXYSQL_ADMIN_PASSWORD"]);
             self::assertSame("proxysql-web", $values["PROXYSQL_WEB_USER"]);

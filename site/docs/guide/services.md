@@ -1,5 +1,18 @@
 # Базовые сервисы
 
+## Опциональные сервисы
+
+ProxySQL, ProxyWeb и DBTrail по умолчанию включены. Их сборкой и запуском управляют feature-флаги в системном `.env`:
+
+```dotenv
+COMPOSE_ENABLE_PROXYSQL=1
+COMPOSE_ENABLE_PROXYWEB=1
+COMPOSE_ENABLE_DBTRAIL=1
+```
+
+Значения `0`, `false`, `no`, `off` и пустая строка отключают соответствующий Compose profile. ProxyWeb зависит от
+ProxySQL, поэтому при отключённом `COMPOSE_ENABLE_PROXYSQL` он также не запускается независимо от своего флага.
+
 Системный compose-файл запускает:
 
 - `dnsdock` для автоматических DNS-имён контейнеров;

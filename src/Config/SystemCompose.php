@@ -188,7 +188,29 @@ final class SystemCompose
             $environment["COMPOSE_DOCKER_CLI_BUILD"] = $buildKit;
         }
 
+        $proxySqlEnabled = $this->featureEnabled($environment, $values, "COMPOSE_ENABLE_PROXYSQL");
+        $profiles = [];
+        if ($proxySqlEnabled) {
+            $profiles[] = "proxysql";
+        }
+        if ($proxySqlEnabled && $this->featureEnabled($environment, $values, "COMPOSE_ENABLE_PROXYWEB")) {
+            $profiles[] = "proxyweb";
+        }
+        if ($this->featureEnabled($environment, $values, "COMPOSE_ENABLE_DBTRAIL")) {
+            $profiles[] = "dbtrail";
+        }
+        $environment["COMPOSE_PROFILES"] = implode(",", $profiles);
+
         return $environment;
+    }
+
+    /** @param array<string, mixed> $environment @param array<string, string> $values */
+    private function featureEnabled(array $environment, array $values, string $key): bool
+    {
+        $value = array_key_exists($key, $environment) ? $environment[$key] : ($values[$key] ?? "1");
+        $normalized = strtolower(trim(is_string($value) ? $value : (string) $value));
+
+        return !in_array($normalized, ["", "0", "false", "no", "off"], true);
     }
 
     public function envValue(string $key, string $default = ""): string

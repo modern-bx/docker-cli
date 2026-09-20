@@ -4,6 +4,8 @@ set -eu
 
 api=http://dbtrail:8090/api
 prefix=docker-cli/
+missing_directory=/tmp/docker-cli-dbtrail-sync-missing
+missing_limit=3
 
 request() {
     method=$1
@@ -42,6 +44,7 @@ reconcile() {
             request POST "/servers/$id/monitor/start" >/dev/null
             continue
         fi
+        rm -f "$missing_directory/$id"
         desired=$(printf '%s' "$servers" | jq --arg id "$id" -r \
             '.servers[] | select(.id == $id) | .monitor_desired // false')
         if [ "$desired" != true ]; then
@@ -54,12 +57,28 @@ reconcile() {
         while IFS="$(printf '\t')" read -r id name; do
             container=${name#"$prefix"}
             if printf '%s\n' "$containers" | grep --fixed-strings --line-regexp --quiet "$container"; then
+                rm -f "$missing_directory/$id"
                 continue
             fi
+            misses=0
+            if [ -f "$missing_directory/$id" ]; then
+                read -r misses < "$missing_directory/$id"
+            fi
+            misses=$((misses + 1))
+            if [ "$misses" -lt "$missing_limit" ]; then
+                printf '%s\n' "$misses" > "$missing_directory/$id"
+                continue
+            fi
+            rm -f "$missing_directory/$id"
             request POST "/servers/$id/monitor/stop" >/dev/null
             request DELETE "/servers/$id" >/dev/null
         done
 }
+
+mkdir -p "$missing_directory"
+until curl --fail --silent "$api/healthz" >/dev/null; do
+    sleep 1
+done
 
 while true; do
     if ! reconcile; then

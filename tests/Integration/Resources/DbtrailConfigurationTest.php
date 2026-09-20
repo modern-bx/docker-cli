@@ -49,7 +49,7 @@ final class DbtrailConfigurationTest extends TestCase
             $services["dbtrail"]["labels"]["traefik.http.routers.dbtrail.service"] ?? null,
         );
         self::assertSame(
-            'dbtrail.${BASE_HOST}',
+            'dbtrail,dbtrail.${BASE_HOST}',
             $services["dbtrail"]["environment"]["BINTRAIL_CONSOLE_ALLOWED_HOSTS"] ?? null,
         );
         self::assertSame(
@@ -66,6 +66,9 @@ final class DbtrailConfigurationTest extends TestCase
             $services["dbtrail"]["command"] ?? null,
         );
         self::assertStringNotContainsString("postgres", serialize($services["dbtrail"]));
+        foreach (["dbtrail-mysql-init", "dbtrail-index", "dbtrail", "dbtrail-sync"] as $service) {
+            self::assertSame(["dbtrail"], $services[$service]["profiles"] ?? null);
+        }
     }
 
     public function testMysqlHasTheBinaryLogSettingsRequiredByDbtrail(): void
@@ -79,6 +82,8 @@ final class DbtrailConfigurationTest extends TestCase
         self::assertContains("--log-bin=mysql-bin", $command);
         self::assertContains("--binlog-format=ROW", $command);
         self::assertContains("--binlog-row-image=FULL", $command);
+        self::assertContains("--binlog-row-metadata=FULL", $command);
+        self::assertContains("--binlog-rows-query-log-events=ON", $command);
         self::assertContains("--binlog-row-value-options=", $command);
     }
 
@@ -139,8 +144,11 @@ final class DbtrailConfigurationTest extends TestCase
         );
 
         self::assertStringContainsString("docker ps --all --filter label=docker-cli.dbtrail-source=mysql", $script);
+        self::assertStringContainsString('curl --fail --silent "$api/healthz"', $script);
         self::assertStringContainsString("request POST /servers", $script);
         self::assertStringContainsString('request POST "/servers/$id/monitor/start"', $script);
+        self::assertStringContainsString("missing_limit=3", $script);
+        self::assertStringContainsString('if [ "$misses" -lt "$missing_limit" ]', $script);
         self::assertStringContainsString('request POST "/servers/$id/monitor/stop"', $script);
         self::assertStringContainsString('request DELETE "/servers/$id"', $script);
         self::assertStringContainsString("sleep 60", $script);
@@ -149,6 +157,8 @@ final class DbtrailConfigurationTest extends TestCase
         self::assertStringContainsString('"docker-cli.dbtrail-source" => "mysql"', $renderer);
         self::assertStringContainsString('"--binlog-format=ROW"', $renderer);
         self::assertStringContainsString('"--binlog-row-image=FULL"', $renderer);
+        self::assertStringContainsString('"--binlog-row-metadata=FULL"', $renderer);
+        self::assertStringContainsString('"--binlog-rows-query-log-events=ON"', $renderer);
     }
 
     private function read(string $relativePath): string
