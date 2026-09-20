@@ -33,6 +33,10 @@ final class DbtrailConfigurationTest extends TestCase
             $services["dbtrail"]["labels"]["traefik.http.routers.dbtrail.rule"] ?? null,
         );
         self::assertSame(
+            'dbtrail.${BASE_HOST}',
+            $services["dbtrail"]["environment"]["BINTRAIL_CONSOLE_ALLOWED_HOSTS"] ?? null,
+        );
+        self::assertSame(
             "system-http-auth",
             $services["dbtrail"]["labels"]["traefik.http.routers.dbtrail.middlewares"] ?? null,
         );
