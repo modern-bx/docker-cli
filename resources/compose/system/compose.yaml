@@ -179,9 +179,18 @@ services:
       - dbtrail-state:/var/lib/bintrail
     labels:
       traefik.enable: "true"
+      traefik.http.routers.dbtrail-api.rule: Host(`dbtrail.${BASE_HOST}`) && PathPrefix(`/api`)
+      traefik.http.routers.dbtrail-api.entrypoints: websecure
+      traefik.http.routers.dbtrail-api.middlewares: system-http-auth
+      traefik.http.routers.dbtrail-api.priority: "100"
+      traefik.http.routers.dbtrail-api.service: dbtrail
+      traefik.http.routers.dbtrail-api.tls: "true"
+      traefik.http.routers.dbtrail-api.tls.certresolver: cloudflare
       traefik.http.routers.dbtrail.rule: Host(`dbtrail.${BASE_HOST}`)
       traefik.http.routers.dbtrail.entrypoints: websecure
       traefik.http.routers.dbtrail.middlewares: system-http-auth
+      traefik.http.routers.dbtrail.priority: "90"
+      traefik.http.routers.dbtrail.service: dbtrail
       traefik.http.routers.dbtrail.tls: "true"
       traefik.http.routers.dbtrail.tls.certresolver: cloudflare
       traefik.http.services.dbtrail.loadbalancer.server.port: "8090"
