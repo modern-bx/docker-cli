@@ -123,6 +123,20 @@ final class DbtrailConfigurationTest extends TestCase
     public function testDedicatedMysqlSynchronizerReconcilesTheCompleteContainerList(): void
     {
         $script = $this->read("resources/compose/system/config/dbtrail-sync/sync.sh");
+        $dockerfile = $this->read("resources/compose/system/config/dbtrail-sync/Dockerfile");
+
+        self::assertStringContainsString("RUN chmod 0755 /usr/local/bin/docker-cli-dbtrail-sync", $dockerfile);
+        self::assertStringContainsString(
+            'ENTRYPOINT ["/usr/local/bin/docker-cli-dbtrail-sync"]',
+            $dockerfile,
+        );
+
+        $compose = Yaml::parseFile(dirname(__DIR__, 3) . "/resources/compose/system/compose.yaml");
+        self::assertIsArray($compose);
+        self::assertSame(
+            ["/usr/local/bin/docker-cli-dbtrail-sync"],
+            $compose["services"]["dbtrail-sync"]["entrypoint"] ?? null,
+        );
 
         self::assertStringContainsString("docker ps --all --filter label=docker-cli.dbtrail-source=mysql", $script);
         self::assertStringContainsString("request POST /servers", $script);

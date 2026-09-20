@@ -220,6 +220,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       docker-cli:
+    entrypoint: ["/usr/local/bin/docker-cli-dbtrail-sync"]
     restart: unless-stopped
 
   mydumper:
