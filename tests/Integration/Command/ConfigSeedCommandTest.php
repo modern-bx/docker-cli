@@ -36,6 +36,7 @@ final class ConfigSeedCommandTest extends TestCase
             self::assertSame("1", $values["COMPOSE_ENABLE_PROXYSQL"]);
             self::assertSame("1", $values["COMPOSE_ENABLE_PROXYWEB"]);
             self::assertSame("1", $values["COMPOSE_ENABLE_DBTRAIL"]);
+            self::assertSame("1", $values["COMPOSE_ENABLE_GLITCHTIP"]);
             self::assertSame("operator", $values["PROXYSQL_ADMIN_USER"]);
             self::assertNotSame("", $values["PROXYSQL_ADMIN_PASSWORD"]);
             self::assertSame("proxysql-web", $values["PROXYSQL_WEB_USER"]);
@@ -46,6 +47,10 @@ final class ConfigSeedCommandTest extends TestCase
             self::assertNotSame("", $values["DBTRAIL_MYSQL_PASSWORD"]);
             self::assertNotSame("", $values["DBTRAIL_INDEX_PASSWORD"]);
             self::assertNotSame("", $values["DBTRAIL_CONSOLE_TOKEN"]);
+            self::assertNotSame("", $values["GLITCHTIP_SECRET_KEY"]);
+            self::assertNotSame("", $values["GLITCHTIP_POSTGRES_PASSWORD"]);
+            self::assertSame("admin@localhost", $values["GLITCHTIP_ADMIN_EMAIL"]);
+            self::assertNotSame("", $values["GLITCHTIP_ADMIN_PASSWORD"]);
         } finally {
             putenv($previousHome === false ? "HOME" : "HOME=" . $previousHome);
             $this->removeDirectory($temporaryHome);

@@ -66,6 +66,10 @@ final class ConfigSeedCommand extends AbstractCommand
         $this->setDefaultIfEmpty($values, "DBTRAIL_INDEX_PASSWORD", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "DBTRAIL_CONSOLE_TOKEN", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "POSTGRES_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_SECRET_KEY", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_POSTGRES_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_ADMIN_EMAIL", "admin@localhost");
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_ADMIN_PASSWORD", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "PROXYSQL_ADMIN_USER", "proxysql");
         $this->setDefaultIfEmpty($values, "PROXYSQL_ADMIN_PASSWORD", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "PROXYSQL_WEB_USER", "proxysql-web");
@@ -175,6 +179,10 @@ final class ConfigSeedCommand extends AbstractCommand
             "POSTGRES_DB",
             "POSTGRES_USER",
             "POSTGRES_PASSWORD",
+            "GLITCHTIP_SECRET_KEY",
+            "GLITCHTIP_POSTGRES_PASSWORD",
+            "GLITCHTIP_ADMIN_EMAIL",
+            "GLITCHTIP_ADMIN_PASSWORD",
             "PROXYSQL_ADMIN_USER",
             "PROXYSQL_ADMIN_PASSWORD",
             "PROXYSQL_WEB_USER",

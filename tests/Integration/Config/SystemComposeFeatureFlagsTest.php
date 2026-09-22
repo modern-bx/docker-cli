@@ -12,7 +12,10 @@ final class SystemComposeFeatureFlagsTest extends TestCase
     public function testOptionalServicesAreEnabledByDefault(): void
     {
         $this->withCompose(function (SystemCompose $compose): void {
-            self::assertSame("proxysql,proxyweb,dbtrail", $compose->dockerProcessEnvironment()["COMPOSE_PROFILES"]);
+            self::assertSame(
+                "proxysql,proxyweb,dbtrail,glitchtip",
+                $compose->dockerProcessEnvironment()["COMPOSE_PROFILES"],
+            );
         });
     }
 
@@ -21,8 +24,8 @@ final class SystemComposeFeatureFlagsTest extends TestCase
         $this->withCompose(function (SystemCompose $compose): void {
             $environment = (string) file_get_contents($compose->envFile());
             $environment = str_replace(
-                ["COMPOSE_ENABLE_PROXYSQL=1", "COMPOSE_ENABLE_DBTRAIL=1"],
-                ["COMPOSE_ENABLE_PROXYSQL=0", "COMPOSE_ENABLE_DBTRAIL=off"],
+                ["COMPOSE_ENABLE_PROXYSQL=1", "COMPOSE_ENABLE_DBTRAIL=1", "COMPOSE_ENABLE_GLITCHTIP=1"],
+                ["COMPOSE_ENABLE_PROXYSQL=0", "COMPOSE_ENABLE_DBTRAIL=off", "COMPOSE_ENABLE_GLITCHTIP=no"],
                 $environment,
             );
             file_put_contents($compose->envFile(), $environment);
@@ -35,7 +38,12 @@ final class SystemComposeFeatureFlagsTest extends TestCase
     private function withCompose(callable $assertions): void
     {
         $previousHome = getenv("HOME");
-        $featureKeys = ["COMPOSE_ENABLE_PROXYSQL", "COMPOSE_ENABLE_PROXYWEB", "COMPOSE_ENABLE_DBTRAIL"];
+        $featureKeys = [
+            "COMPOSE_ENABLE_PROXYSQL",
+            "COMPOSE_ENABLE_PROXYWEB",
+            "COMPOSE_ENABLE_DBTRAIL",
+            "COMPOSE_ENABLE_GLITCHTIP",
+        ];
         $previousFeatures = array_map(static fn (string $key): string|false => getenv($key), $featureKeys);
         $temporaryHome = sys_get_temp_dir() . "/docker-cli-feature-flags-" . bin2hex(random_bytes(8));
         mkdir($temporaryHome, 0755, true);

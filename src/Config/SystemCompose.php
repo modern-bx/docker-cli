@@ -199,6 +199,9 @@ final class SystemCompose
         if ($this->featureEnabled($environment, $values, "COMPOSE_ENABLE_DBTRAIL")) {
             $profiles[] = "dbtrail";
         }
+        if ($this->featureEnabled($environment, $values, "COMPOSE_ENABLE_GLITCHTIP")) {
+            $profiles[] = "glitchtip";
+        }
         $environment["COMPOSE_PROFILES"] = implode(",", $profiles);
 
         return $environment;
