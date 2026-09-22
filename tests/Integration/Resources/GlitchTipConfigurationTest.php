@@ -9,14 +9,14 @@ use Symfony\Component\Yaml\Yaml;
 
 final class GlitchTipConfigurationTest extends TestCase
 {
-    public function testGlitchTipIsIsolatedAndPublishedThroughTraefik(): void
+    public function testGlitchTipUsesSystemPostgresAndIsPublishedThroughTraefik(): void
     {
         $compose = Yaml::parseFile(dirname(__DIR__, 3) . "/resources/compose/system/compose.yaml");
 
         self::assertIsArray($compose);
         $services = $compose["services"] ?? null;
         self::assertIsArray($services);
-        foreach (["glitchtip-postgres", "glitchtip-valkey", "glitchtip-init", "glitchtip"] as $service) {
+        foreach (["glitchtip-postgres-init", "glitchtip-valkey", "glitchtip-init", "glitchtip"] as $service) {
             self::assertSame(["glitchtip"], $services[$service]["profiles"] ?? null);
         }
         self::assertSame("glitchtip/glitchtip:6.2.6", $services["glitchtip"]["image"] ?? null);
@@ -30,6 +30,19 @@ final class GlitchTipConfigurationTest extends TestCase
             $services["glitchtip"]["volumes"] ?? null,
         );
         self::assertSame("/code/uploads", $services["glitchtip"]["environment"]["MEDIA_ROOT"] ?? null);
+        self::assertStringContainsString(
+            '@postgres:5432/glitchtip',
+            $services["glitchtip"]["environment"]["DATABASE_URL"] ?? "",
+        );
+        self::assertArrayNotHasKey("glitchtip-postgres", $services);
+        self::assertSame(
+            ["condition" => "service_started"],
+            $services["glitchtip-postgres-init"]["depends_on"]["postgres"] ?? null,
+        );
+        self::assertStringContainsString(
+            "createdb --host=postgres glitchtip",
+            $services["glitchtip-postgres-init"]["command"][0] ?? "",
+        );
     }
 
     public function testAdministratorIsSynchronisedFromEnvironmentAfterMigrations(): void

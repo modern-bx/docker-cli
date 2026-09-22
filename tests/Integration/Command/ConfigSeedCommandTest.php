@@ -48,7 +48,6 @@ final class ConfigSeedCommandTest extends TestCase
             self::assertNotSame("", $values["DBTRAIL_INDEX_PASSWORD"]);
             self::assertNotSame("", $values["DBTRAIL_CONSOLE_TOKEN"]);
             self::assertNotSame("", $values["GLITCHTIP_SECRET_KEY"]);
-            self::assertNotSame("", $values["GLITCHTIP_POSTGRES_PASSWORD"]);
             self::assertSame("admin@localhost", $values["GLITCHTIP_ADMIN_EMAIL"]);
             self::assertNotSame("", $values["GLITCHTIP_ADMIN_PASSWORD"]);
         } finally {
