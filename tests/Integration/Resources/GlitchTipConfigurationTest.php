@@ -29,6 +29,14 @@ final class GlitchTipConfigurationTest extends TestCase
             ["glitchtip-uploads:/code/uploads"],
             $services["glitchtip"]["volumes"] ?? null,
         );
+        self::assertSame(
+            ["./data/glitchtip-postgres:/var/lib/postgresql"],
+            $services["glitchtip-postgres"]["volumes"] ?? null,
+        );
+        self::assertSame(
+            ["glitchtip-valkey-data:/data"],
+            $services["glitchtip-valkey"]["volumes"] ?? null,
+        );
         self::assertSame("/code/uploads", $services["glitchtip"]["environment"]["MEDIA_ROOT"] ?? null);
         self::assertStringContainsString(
             '@glitchtip-postgres:5432/glitchtip',

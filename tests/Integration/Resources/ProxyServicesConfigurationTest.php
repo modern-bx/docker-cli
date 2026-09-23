@@ -47,7 +47,7 @@ final class ProxyServicesConfigurationTest extends TestCase
             "--providers.file.filename=/etc/traefik/dynamic.yaml",
             $services["traefik"]["command"] ?? [],
         );
-
+        self::assertContains("traefik-letsencrypt:/letsencrypt", $services["traefik"]["volumes"] ?? []);
         $dynamicConfiguration = Yaml::parseFile(
             dirname(__DIR__, 3) . "/resources/compose/system/config/traefik/dynamic.yaml",
         );

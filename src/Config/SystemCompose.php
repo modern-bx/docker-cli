@@ -430,6 +430,7 @@ final class SystemCompose
 
         return [
             join_path($data, "dockhand"),
+            join_path($data, "glitchtip-postgres"),
             join_path($mysqlData, "data"),
             join_path($mysqlData, "logs"),
             join_path($postgresData, "data"),

@@ -285,7 +285,7 @@ services:
       - -c
       - max_locks_per_transaction=512
     volumes:
-      - glitchtip-postgres-data:/var/lib/postgresql
+      - ./data/glitchtip-postgres:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U glitchtip -d glitchtip"]
       interval: 5s
@@ -753,7 +753,6 @@ volumes:
   dbtrail-index-data:
   dbtrail-mysql-socket:
   dbtrail-state:
-  glitchtip-postgres-data:
   glitchtip-uploads:
   glitchtip-valkey-data:
   traefik-letsencrypt:

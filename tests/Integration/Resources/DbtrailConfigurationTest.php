@@ -61,6 +61,7 @@ final class DbtrailConfigurationTest extends TestCase
             $services["dbtrail"]["labels"]["traefik.http.routers.dbtrail.middlewares"] ?? null,
         );
         self::assertSame(["dbtrail-state:/var/lib/bintrail"], $services["dbtrail"]["volumes"] ?? null);
+        self::assertSame(["dbtrail-index-data:/var/lib/mysql"], $services["dbtrail-index"]["volumes"] ?? null);
         self::assertSame(
             ['exec bintrail-console watch --source-dsn "$${SOURCE_DSN}" --index-dsn "$${INDEX_DSN}"'],
             $services["dbtrail"]["command"] ?? null,
