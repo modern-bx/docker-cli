@@ -9,14 +9,14 @@ use Symfony\Component\Yaml\Yaml;
 
 final class GlitchTipConfigurationTest extends TestCase
 {
-    public function testGlitchTipUsesSystemPostgresAndIsPublishedThroughTraefik(): void
+    public function testGlitchTipIsIsolatedAndPublishedThroughTraefik(): void
     {
         $compose = Yaml::parseFile(dirname(__DIR__, 3) . "/resources/compose/system/compose.yaml");
 
         self::assertIsArray($compose);
         $services = $compose["services"] ?? null;
         self::assertIsArray($services);
-        foreach (["glitchtip-postgres-init", "glitchtip-valkey", "glitchtip-init", "glitchtip"] as $service) {
+        foreach (["glitchtip-postgres", "glitchtip-valkey", "glitchtip-init", "glitchtip"] as $service) {
             self::assertSame(["glitchtip"], $services[$service]["profiles"] ?? null);
         }
         self::assertSame("glitchtip/glitchtip:6.2.6", $services["glitchtip"]["image"] ?? null);
@@ -31,23 +31,20 @@ final class GlitchTipConfigurationTest extends TestCase
         );
         self::assertSame("/code/uploads", $services["glitchtip"]["environment"]["MEDIA_ROOT"] ?? null);
         self::assertStringContainsString(
-            '@postgres:5432/glitchtip',
+            '@glitchtip-postgres:5432/glitchtip',
             $services["glitchtip"]["environment"]["DATABASE_URL"] ?? "",
         );
-        self::assertArrayNotHasKey("glitchtip-postgres", $services);
         self::assertSame(
             ["condition" => "service_healthy"],
-            $services["glitchtip-postgres-init"]["depends_on"]["postgres"] ?? null,
+            $services["glitchtip-init"]["depends_on"]["glitchtip-postgres"] ?? null,
         );
-        self::assertSame("5", $services["glitchtip-postgres-init"]["environment"]["PGCONNECT_TIMEOUT"] ?? null);
         self::assertStringContainsString(
-            "createdb --host=postgres --no-password glitchtip",
-            $services["glitchtip-postgres-init"]["command"][0] ?? "",
+            "GLITCHTIP_POSTGRES_PASSWORD is required",
+            $services["glitchtip"]["environment"]["DATABASE_URL"] ?? "",
         );
-        self::assertStringNotContainsString("grep -q", $services["glitchtip-postgres-init"]["command"][0] ?? "");
         self::assertSame(
-            ["CMD-SHELL", 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'],
-            $services["postgres"]["healthcheck"]["test"] ?? null,
+            ["CMD-SHELL", "pg_isready -U glitchtip -d glitchtip"],
+            $services["glitchtip-postgres"]["healthcheck"]["test"] ?? null,
         );
     }
 

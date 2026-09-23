@@ -260,12 +260,6 @@ services:
       - type: bind
         source: ${DEFAULT_DATA_DIR_POSTGRES:-data/postgres}/logs
         target: /var/log/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 10s
     networks:
       docker-cli:
         aliases:
@@ -273,22 +267,25 @@ services:
           - postgres.${BASE_HOST}
     restart: unless-stopped
 
-  glitchtip-postgres-init:
+  glitchtip-postgres:
     image: postgres:18
-    depends_on:
-      postgres:
-        condition: service_healthy
+    container_name: docker-cli-glitchtip-postgres
     environment:
-      PGCONNECT_TIMEOUT: "5"
-      PGUSER: ${POSTGRES_USER:-system}
-      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    entrypoint: ["/bin/sh", "-ec"]
+      POSTGRES_DB: glitchtip
+      POSTGRES_USER: glitchtip
+      POSTGRES_PASSWORD: ${GLITCHTIP_POSTGRES_PASSWORD:?GLITCHTIP_POSTGRES_PASSWORD is required}
     command:
-      - |
-        database_exists="$$(psql --host=postgres --dbname=postgres --no-password --tuples-only --no-align --command="SELECT 1 FROM pg_database WHERE datname = 'glitchtip'")"
-        if [ "$${database_exists}" != "1" ]; then
-          createdb --host=postgres --no-password glitchtip
-        fi
+      - postgres
+      - -c
+      - max_locks_per_transaction=512
+    volumes:
+      - glitchtip-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glitchtip -d glitchtip"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
     networks:
       docker-cli:
     profiles:
@@ -309,10 +306,10 @@ services:
   glitchtip-init:
     image: glitchtip/glitchtip:6.2.6
     depends_on:
-      glitchtip-postgres-init:
-        condition: service_completed_successfully
+      glitchtip-postgres:
+        condition: service_healthy
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-system}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/glitchtip
+      DATABASE_URL: postgres://glitchtip:${GLITCHTIP_POSTGRES_PASSWORD:?GLITCHTIP_POSTGRES_PASSWORD is required}@glitchtip-postgres:5432/glitchtip
       SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required}
       VALKEY_URL: redis://glitchtip-valkey:6379
       DJANGO_SUPERUSER_EMAIL: ${GLITCHTIP_ADMIN_EMAIL:?GLITCHTIP_ADMIN_EMAIL is required}
@@ -337,7 +334,7 @@ services:
       glitchtip-valkey:
         condition: service_started
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-system}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/glitchtip
+      DATABASE_URL: postgres://glitchtip:${GLITCHTIP_POSTGRES_PASSWORD:?GLITCHTIP_POSTGRES_PASSWORD is required}@glitchtip-postgres:5432/glitchtip
       SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required}
       VALKEY_URL: redis://glitchtip-valkey:6379
       GLITCHTIP_DOMAIN: https://glitchtip.${BASE_HOST}
@@ -750,6 +747,7 @@ volumes:
   dbtrail-index-data:
   dbtrail-mysql-socket:
   dbtrail-state:
+  glitchtip-postgres-data:
   glitchtip-uploads:
   glitchtip-valkey-data:
   traefik-letsencrypt:
