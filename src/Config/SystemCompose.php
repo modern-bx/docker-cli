@@ -429,13 +429,19 @@ final class SystemCompose
         $postgresData = $this->dataDirectoryFromEnv("DEFAULT_DATA_DIR_POSTGRES", "data/postgres");
 
         return [
+            join_path($data, "dbtrail"),
+            join_path($data, "dbtrail-index"),
             join_path($data, "dockhand"),
+            join_path($data, "glitchtip-postgres"),
+            join_path($data, "glitchtip-uploads"),
+            join_path($data, "glitchtip-valkey"),
             join_path($mysqlData, "data"),
             join_path($mysqlData, "logs"),
             join_path($postgresData, "data"),
             join_path($postgresData, "logs"),
             join_path($data, "mailpit"),
             join_path($data, "proxysql"),
+            join_path($data, "traefik-letsencrypt"),
             join_path($this->directory(), "config", "openresty", "hosts"),
             join_path($this->directory(), "config", "ofelia"),
             join_path($this->directory(), "config", "panel"),

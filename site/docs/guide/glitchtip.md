@@ -12,6 +12,10 @@
 Системный стек публикует интерфейс по адресу `https://glitchtip.<BASE_HOST>`. GlitchTip работает независимо от
 зарегистрированных проектов docker-cli: каждый наблюдаемый проект надо один раз создать в самом GlitchTip.
 
+Данные GlitchTip хранятся в системном каталоге compose: PostgreSQL — в `data/glitchtip-postgres`, загруженные
+файлы — в `data/glitchtip-uploads`, данные Valkey — в `data/glitchtip-valkey`. Поэтому они остаются на хосте при
+пересоздании контейнеров и доступны для резервного копирования вместе с остальными системными данными.
+
 ## Первый запуск
 
 1. Откройте `https://glitchtip.<BASE_HOST>` и войдите с `GLITCHTIP_ADMIN_EMAIL` и

@@ -21,6 +21,18 @@ final class ConfigSeedCommandTest extends TestCase
         try {
             $compose = new SystemCompose();
             $compose->init();
+            foreach (
+                [
+                    "dbtrail",
+                    "dbtrail-index",
+                    "glitchtip-postgres",
+                    "glitchtip-uploads",
+                    "glitchtip-valkey",
+                    "traefik-letsencrypt",
+                ] as $dataDirectory
+            ) {
+                self::assertDirectoryExists($compose->directory() . "/data/" . $dataDirectory);
+            }
             $environment = (string) file_get_contents($compose->envFile());
             $environment = str_replace(
                 ["PROXYSQL_ADMIN_USER=", "GLITCHTIP_ADMIN_EMAIL=admin@example.com"],
