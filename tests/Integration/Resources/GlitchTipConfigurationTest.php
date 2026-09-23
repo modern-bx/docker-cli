@@ -26,7 +26,7 @@ final class GlitchTipConfigurationTest extends TestCase
             $services["glitchtip"]["labels"]["traefik.http.routers.glitchtip.rule"] ?? null,
         );
         self::assertSame(
-            ["./data/glitchtip-uploads:/code/uploads"],
+            ["glitchtip-uploads:/code/uploads"],
             $services["glitchtip"]["volumes"] ?? null,
         );
         self::assertSame(
@@ -34,7 +34,7 @@ final class GlitchTipConfigurationTest extends TestCase
             $services["glitchtip-postgres"]["volumes"] ?? null,
         );
         self::assertSame(
-            ["./data/glitchtip-valkey:/data"],
+            ["glitchtip-valkey-data:/data"],
             $services["glitchtip-valkey"]["volumes"] ?? null,
         );
         self::assertSame("/code/uploads", $services["glitchtip"]["environment"]["MEDIA_ROOT"] ?? null);

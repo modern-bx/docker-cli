@@ -57,7 +57,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./config/traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
-      - ./data/traefik-letsencrypt:/letsencrypt
+      - traefik-letsencrypt:/letsencrypt
     networks:
       docker-cli:
         aliases:
@@ -149,7 +149,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${DBTRAIL_INDEX_PASSWORD:?DBTRAIL_INDEX_PASSWORD is required}
       MYSQL_DATABASE: bintrail_index
     volumes:
-      - ./data/dbtrail-index:/var/lib/mysql
+      - dbtrail-index-data:/var/lib/mysql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 10s
@@ -189,7 +189,7 @@ services:
     command:
       - exec bintrail-console watch --source-dsn "$${SOURCE_DSN}" --index-dsn "$${INDEX_DSN}"
     volumes:
-      - ./data/dbtrail:/var/lib/bintrail
+      - dbtrail-state:/var/lib/bintrail
     labels:
       traefik.enable: "true"
       traefik.http.routers.dbtrail-api.rule: Host(`dbtrail.${BASE_HOST}`) && PathPrefix(`/api`)
@@ -302,7 +302,7 @@ services:
     image: valkey/valkey:9
     container_name: docker-cli-glitchtip-valkey
     volumes:
-      - ./data/glitchtip-valkey:/data
+      - glitchtip-valkey-data:/data
     networks:
       docker-cli:
     profiles:
@@ -352,7 +352,7 @@ services:
       DNSDOCK_NAME: glitchtip
       DNSDOCK_IMAGE: system
     volumes:
-      - ./data/glitchtip-uploads:/code/uploads
+      - glitchtip-uploads:/code/uploads
     labels:
       traefik.enable: "true"
       traefik.http.routers.glitchtip.rule: Host(`glitchtip.${BASE_HOST}`)
@@ -750,5 +750,10 @@ networks:
         - subnet: ${DOCKER_CLI_NETWORK_SUBNET:-172.30.0.0/24}
 
 volumes:
+  dbtrail-index-data:
   dbtrail-mysql-socket:
+  dbtrail-state:
+  glitchtip-uploads:
+  glitchtip-valkey-data:
+  traefik-letsencrypt:
   playwright-node-modules:
