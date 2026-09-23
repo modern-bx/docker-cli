@@ -64,13 +64,16 @@ Valkey, не связанные с базами проектов. Данные P
 синхронизируется с этими значениями:
 
 ```dotenv
-GLITCHTIP_ADMIN_EMAIL=admin@localhost
+GLITCHTIP_ADMIN_EMAIL=admin@example.com
 GLITCHTIP_ADMIN_PASSWORD=сгенерированный-пароль
 ```
 
 Перед первым запуском рекомендуется заменить email на рабочий адрес. Самостоятельная регистрация пользователей
 отключена. Чтобы полностью не запускать GlitchTip, задайте `COMPOSE_ENABLE_GLITCHTIP=0` и перезапустите системный
 стек.
+
+Адрес должен содержать полноценный домен: GlitchTip использует строгую проверку email при формировании API-ответов.
+Устаревшее значение `admin@localhost` команда `config:seed` автоматически заменяет на `admin@example.com`.
 
 ## OpenResty и проектные хосты
 

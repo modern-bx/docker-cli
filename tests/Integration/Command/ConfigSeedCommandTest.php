@@ -23,8 +23,8 @@ final class ConfigSeedCommandTest extends TestCase
             $compose->init();
             $environment = (string) file_get_contents($compose->envFile());
             $environment = str_replace(
-                "PROXYSQL_ADMIN_USER=",
-                "PROXYSQL_ADMIN_USER=operator",
+                ["PROXYSQL_ADMIN_USER=", "GLITCHTIP_ADMIN_EMAIL=admin@example.com"],
+                ["PROXYSQL_ADMIN_USER=operator", "GLITCHTIP_ADMIN_EMAIL=admin@localhost"],
                 $environment,
             );
             file_put_contents($compose->envFile(), $environment);
@@ -49,7 +49,7 @@ final class ConfigSeedCommandTest extends TestCase
             self::assertNotSame("", $values["DBTRAIL_CONSOLE_TOKEN"]);
             self::assertNotSame("", $values["GLITCHTIP_SECRET_KEY"]);
             self::assertNotSame("", $values["GLITCHTIP_POSTGRES_PASSWORD"]);
-            self::assertSame("admin@localhost", $values["GLITCHTIP_ADMIN_EMAIL"]);
+            self::assertSame("admin@example.com", $values["GLITCHTIP_ADMIN_EMAIL"]);
             self::assertNotSame("", $values["GLITCHTIP_ADMIN_PASSWORD"]);
         } finally {
             putenv($previousHome === false ? "HOME" : "HOME=" . $previousHome);

@@ -64,6 +64,7 @@ final class GlitchTipConfigurationTest extends TestCase
             $init["environment"]["DJANGO_SUPERUSER_PASSWORD"] ?? null,
         );
         self::assertStringContainsString("./bin/run-migrate.sh", $init["command"][0] ?? "");
+        self::assertStringContainsString("validate_email(email)", $init["command"][0] ?? "");
         self::assertStringContainsString("get_or_create(email=email)", $init["command"][0] ?? "");
         self::assertSame(
             ["condition" => "service_completed_successfully"],

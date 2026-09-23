@@ -318,7 +318,7 @@ services:
     command:
       - |
         ./bin/run-migrate.sh
-        python manage.py shell --command='from django.contrib.auth import get_user_model; import os; User = get_user_model(); email = os.environ["DJANGO_SUPERUSER_EMAIL"]; user, unused = User.objects.get_or_create(email=email); user.is_active = True; user.is_staff = True; user.is_superuser = True; user.set_password(os.environ["DJANGO_SUPERUSER_PASSWORD"]); user.save()'
+        python manage.py shell --command='from django.contrib.auth import get_user_model; from django.core.validators import validate_email; import os; User = get_user_model(); email = os.environ["DJANGO_SUPERUSER_EMAIL"]; validate_email(email); user, unused = User.objects.get_or_create(email=email); user.is_active = True; user.is_staff = True; user.is_superuser = True; user.set_password(os.environ["DJANGO_SUPERUSER_PASSWORD"]); user.save()'
     networks:
       docker-cli:
     profiles:

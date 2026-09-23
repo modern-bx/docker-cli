@@ -68,7 +68,10 @@ final class ConfigSeedCommand extends AbstractCommand
         $this->setDefaultIfEmpty($values, "POSTGRES_PASSWORD", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "GLITCHTIP_SECRET_KEY", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "GLITCHTIP_POSTGRES_PASSWORD", $this->randomSecret());
-        $this->setDefaultIfEmpty($values, "GLITCHTIP_ADMIN_EMAIL", "admin@localhost");
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_ADMIN_EMAIL", "admin@example.com");
+        if ($values["GLITCHTIP_ADMIN_EMAIL"] === "admin@localhost") {
+            $values["GLITCHTIP_ADMIN_EMAIL"] = "admin@example.com";
+        }
         $this->setDefaultIfEmpty($values, "GLITCHTIP_ADMIN_PASSWORD", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "PROXYSQL_ADMIN_USER", "proxysql");
         $this->setDefaultIfEmpty($values, "PROXYSQL_ADMIN_PASSWORD", $this->randomSecret());
