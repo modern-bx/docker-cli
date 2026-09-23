@@ -66,6 +66,13 @@ final class ConfigSeedCommand extends AbstractCommand
         $this->setDefaultIfEmpty($values, "DBTRAIL_INDEX_PASSWORD", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "DBTRAIL_CONSOLE_TOKEN", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "POSTGRES_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_SECRET_KEY", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_POSTGRES_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_ADMIN_EMAIL", "admin@example.com");
+        if ($values["GLITCHTIP_ADMIN_EMAIL"] === "admin@localhost") {
+            $values["GLITCHTIP_ADMIN_EMAIL"] = "admin@example.com";
+        }
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_ADMIN_PASSWORD", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "PROXYSQL_ADMIN_USER", "proxysql");
         $this->setDefaultIfEmpty($values, "PROXYSQL_ADMIN_PASSWORD", $this->randomSecret());
         $this->setDefaultIfEmpty($values, "PROXYSQL_WEB_USER", "proxysql-web");
@@ -168,6 +175,8 @@ final class ConfigSeedCommand extends AbstractCommand
             "MYSQL_DATABASE",
             "MYSQL_USER",
             "MYSQL_PASSWORD",
+            "MYSQL_CPU_LIMIT",
+            "MYSQL_MEMORY_LIMIT",
             "DBTRAIL_MYSQL_USER",
             "DBTRAIL_MYSQL_PASSWORD",
             "DBTRAIL_INDEX_PASSWORD",
@@ -175,6 +184,14 @@ final class ConfigSeedCommand extends AbstractCommand
             "POSTGRES_DB",
             "POSTGRES_USER",
             "POSTGRES_PASSWORD",
+            "POSTGRES_CPU_LIMIT",
+            "POSTGRES_MEMORY_LIMIT",
+            "GLITCHTIP_SECRET_KEY",
+            "GLITCHTIP_POSTGRES_PASSWORD",
+            "GLITCHTIP_POSTGRES_CPU_LIMIT",
+            "GLITCHTIP_POSTGRES_MEMORY_LIMIT",
+            "GLITCHTIP_ADMIN_EMAIL",
+            "GLITCHTIP_ADMIN_PASSWORD",
             "PROXYSQL_ADMIN_USER",
             "PROXYSQL_ADMIN_PASSWORD",
             "PROXYSQL_WEB_USER",

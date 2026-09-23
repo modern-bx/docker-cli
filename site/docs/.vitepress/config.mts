@@ -33,6 +33,7 @@ export default defineConfig({
         items: [
           { text: 'Быстрый старт', link: '/guide/getting-started' },
           { text: 'Базовые сервисы', link: '/guide/services' },
+          { text: 'GlitchTip', link: '/guide/glitchtip' },
           { text: 'ProxySQL и ProxyWeb', link: '/guide/proxy' },
           { text: 'DBTrail', link: '/guide/dbtrail' },
           { text: 'Домен в Cloudflare', link: '/guide/cloudflare' },

@@ -2,12 +2,13 @@
 
 ## Опциональные сервисы
 
-ProxySQL, ProxyWeb и DBTrail по умолчанию включены. Их сборкой и запуском управляют feature-флаги в системном `.env`:
+ProxySQL, ProxyWeb, DBTrail и GlitchTip по умолчанию включены. Их сборкой и запуском управляют feature-флаги в системном `.env`:
 
 ```dotenv
 COMPOSE_ENABLE_PROXYSQL=1
 COMPOSE_ENABLE_PROXYWEB=1
 COMPOSE_ENABLE_DBTRAIL=1
+COMPOSE_ENABLE_GLITCHTIP=1
 ```
 
 Значения `0`, `false`, `no`, `off` и пустая строка отключают соответствующий Compose profile. ProxyWeb зависит от
@@ -25,6 +26,7 @@ ProxySQL, поэтому при отключённом `COMPOSE_ENABLE_PROXYSQL`
 - `proxyweb` как интерфейс просмотра служебных таблиц и статистики ProxySQL;
 - `adminer` как HTTPS web-интерфейс для работы с базами данных;
 - `mailpit` как локальный SMTP-сервер и web-интерфейс для просмотра писем;
+- `glitchtip` для автономного сбора ошибок, метрик производительности и проверок доступности;
 - `openresty` для отдачи статики зарегистрированных проектов через проектные хосты вида `web-<project-name>.${BASE_HOST}`.
 
 ## Dockhand
@@ -42,6 +44,18 @@ MySQL и PostgreSQL не публикуют порты на хост: они д�
 
 Adminer публикуется только через Traefik с TLS и доступен по адресу `https://adminer.<ваш-домен>`.
 
+Для системных MySQL и PostgreSQL установлены ограничения, рассчитанные на окружение без высокой нагрузки:
+
+```dotenv
+MYSQL_CPU_LIMIT=1.0
+MYSQL_MEMORY_LIMIT=1G
+POSTGRES_CPU_LIMIT=0.5
+POSTGRES_MEMORY_LIMIT=512M
+```
+
+Если базы получают заметную нагрузку или контейнер завершается из-за нехватки памяти, увеличьте соответствующие
+значения в системном `.env` и перезапустите стек.
+
 Подключение проектов через ProxySQL и пошаговый анализ запросов в ProxyWeb описаны в отдельном
 [руководстве по ProxySQL и ProxyWeb](./proxy.md).
 
@@ -50,6 +64,38 @@ Adminer публикуется только через Traefik с TLS и дос�
 Mailpit принимает почту внутри сети `docker-cli` по адресу `mailpit:1025`. PHP-FPM настроен на этот SMTP-сервер через `msmtp`, поэтому письма, отправленные стандартной функцией PHP `mail()`, автоматически попадают в Mailpit. Web-интерфейс доступен через Traefik по адресу `https://mailpit.<ваш-домен>`.
 
 База данных Mailpit со всеми письмами хранится на хосте в `~/.config/docker-cli/compose/system/data/mailpit` и монтируется в контейнер как `/data`. Благодаря этому письма сохраняются после пересоздания контейнера.
+
+## GlitchTip
+
+GlitchTip доступен по адресу `https://glitchtip.<ваш-домен>` и использует отдельные контейнеры PostgreSQL и
+Valkey, не связанные с базами проектов. Данные PostgreSQL, Valkey и загруженные файлы сохраняются в отдельных
+именованных Docker volumes.
+
+Создание проекта, получение DSN и примеры подключения PHP-приложений описаны в отдельном
+[руководстве по GlitchTip](./glitchtip.md).
+
+Для PostgreSQL GlitchTip по умолчанию доступны `0.5` CPU и `512M` RAM. Лимиты можно изменить в системном `.env`:
+
+```dotenv
+GLITCHTIP_POSTGRES_CPU_LIMIT=0.5
+GLITCHTIP_POSTGRES_MEMORY_LIMIT=512M
+```
+
+Команда `config:seed` генерирует секрет приложения, пароль PostgreSQL и пароль администратора. Логин и пароль
+администратора задаются в системном `.env`; при каждом пересоздании init-контейнера учётная запись создаётся или
+синхронизируется с этими значениями:
+
+```dotenv
+GLITCHTIP_ADMIN_EMAIL=admin@example.com
+GLITCHTIP_ADMIN_PASSWORD=сгенерированный-пароль
+```
+
+Перед первым запуском рекомендуется заменить email на рабочий адрес. Самостоятельная регистрация пользователей
+отключена. Чтобы полностью не запускать GlitchTip, задайте `COMPOSE_ENABLE_GLITCHTIP=0` и перезапустите системный
+стек.
+
+Адрес должен содержать полноценный домен: GlitchTip использует строгую проверку email при формировании API-ответов.
+Устаревшее значение `admin@localhost` команда `config:seed` автоматически заменяет на `admin@example.com`.
 
 ## OpenResty и проектные хосты
 

@@ -50,7 +50,7 @@ services:
       - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
     environment:
       CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
-      DNSDOCK_ALIAS: ${BASE_HOST},dockhand.${BASE_HOST},adminer.${BASE_HOST},dbtrail.${BASE_HOST},mailpit.${BASE_HOST},panel.${BASE_HOST},proxysql.${BASE_HOST},proxyweb.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
+      DNSDOCK_ALIAS: ${BASE_HOST},dockhand.${BASE_HOST},adminer.${BASE_HOST},dbtrail.${BASE_HOST},glitchtip.${BASE_HOST},mailpit.${BASE_HOST},panel.${BASE_HOST},proxysql.${BASE_HOST},proxyweb.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
     ports:
       - "${TRAEFIK_HTTP_PORT:-80}:80"
       - "${TRAEFIK_HTTPS_PORT:-443}:443"
@@ -65,6 +65,7 @@ services:
           - dockhand.${BASE_HOST}
           - adminer.${BASE_HOST}
           - dbtrail.${BASE_HOST}
+          - glitchtip.${BASE_HOST}
           - mailpit.${BASE_HOST}
           - panel.${BASE_HOST}
           - proxysql.${BASE_HOST}
@@ -74,6 +75,8 @@ services:
   mysql:
     image: mysql:8.0
     container_name: docker-cli-mysql
+    cpus: ${MYSQL_CPU_LIMIT:-1.0}
+    mem_limit: ${MYSQL_MEMORY_LIMIT:-1G}
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-system}
@@ -246,6 +249,8 @@ services:
   postgres:
     image: postgres:18
     container_name: docker-cli-postgres
+    cpus: ${POSTGRES_CPU_LIMIT:-0.5}
+    mem_limit: ${POSTGRES_MEMORY_LIMIT:-512M}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-system}
       POSTGRES_USER: ${POSTGRES_USER:-system}
@@ -264,6 +269,104 @@ services:
         aliases:
           - postgres
           - postgres.${BASE_HOST}
+    restart: unless-stopped
+
+  glitchtip-postgres:
+    image: postgres:18
+    container_name: docker-cli-glitchtip-postgres
+    cpus: ${GLITCHTIP_POSTGRES_CPU_LIMIT:-0.5}
+    mem_limit: ${GLITCHTIP_POSTGRES_MEMORY_LIMIT:-512M}
+    environment:
+      POSTGRES_DB: glitchtip
+      POSTGRES_USER: glitchtip
+      POSTGRES_PASSWORD: ${GLITCHTIP_POSTGRES_PASSWORD:?GLITCHTIP_POSTGRES_PASSWORD is required}
+    command:
+      - postgres
+      - -c
+      - max_locks_per_transaction=512
+    volumes:
+      - glitchtip-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glitchtip -d glitchtip"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      docker-cli:
+    profiles:
+      - glitchtip
+    restart: unless-stopped
+
+  glitchtip-valkey:
+    image: valkey/valkey:9
+    container_name: docker-cli-glitchtip-valkey
+    volumes:
+      - glitchtip-valkey-data:/data
+    networks:
+      docker-cli:
+    profiles:
+      - glitchtip
+    restart: unless-stopped
+
+  glitchtip-init:
+    image: glitchtip/glitchtip:6.2.6
+    depends_on:
+      glitchtip-postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://glitchtip:${GLITCHTIP_POSTGRES_PASSWORD:?GLITCHTIP_POSTGRES_PASSWORD is required}@glitchtip-postgres:5432/glitchtip
+      SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required}
+      VALKEY_URL: redis://glitchtip-valkey:6379
+      DJANGO_SUPERUSER_EMAIL: ${GLITCHTIP_ADMIN_EMAIL:?GLITCHTIP_ADMIN_EMAIL is required}
+      DJANGO_SUPERUSER_PASSWORD: ${GLITCHTIP_ADMIN_PASSWORD:?GLITCHTIP_ADMIN_PASSWORD is required}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        ./bin/run-migrate.sh
+        python manage.py shell --command='from django.contrib.auth import get_user_model; from django.core.validators import validate_email; import os; User = get_user_model(); email = os.environ["DJANGO_SUPERUSER_EMAIL"]; validate_email(email); user, unused = User.objects.get_or_create(email=email); user.is_active = True; user.is_staff = True; user.is_superuser = True; user.set_password(os.environ["DJANGO_SUPERUSER_PASSWORD"]); user.save()'
+    networks:
+      docker-cli:
+    profiles:
+      - glitchtip
+    restart: "no"
+
+  glitchtip:
+    image: glitchtip/glitchtip:6.2.6
+    container_name: docker-cli-glitchtip
+    depends_on:
+      glitchtip-init:
+        condition: service_completed_successfully
+      glitchtip-valkey:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://glitchtip:${GLITCHTIP_POSTGRES_PASSWORD:?GLITCHTIP_POSTGRES_PASSWORD is required}@glitchtip-postgres:5432/glitchtip
+      SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required}
+      VALKEY_URL: redis://glitchtip-valkey:6379
+      GLITCHTIP_DOMAIN: https://glitchtip.${BASE_HOST}
+      ENABLE_USER_REGISTRATION: "false"
+      MEDIA_ROOT: /code/uploads
+      SKIP_INIT: "true"
+      EMAIL_URL: smtp://mailpit:1025
+      DEFAULT_FROM_EMAIL: glitchtip@${BASE_HOST}
+      DNSDOCK_NAME: glitchtip
+      DNSDOCK_IMAGE: system
+    volumes:
+      - glitchtip-uploads:/code/uploads
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.glitchtip.rule: Host(`glitchtip.${BASE_HOST}`)
+      traefik.http.routers.glitchtip.entrypoints: websecure
+      traefik.http.routers.glitchtip.tls: "true"
+      traefik.http.routers.glitchtip.tls.certresolver: cloudflare
+      traefik.http.services.glitchtip.loadbalancer.server.port: "8000"
+    networks:
+      docker-cli:
+        aliases:
+          - glitchtip
+          - glitchtip.${BASE_HOST}
+    profiles:
+      - glitchtip
     restart: unless-stopped
 
   proxysql:
@@ -650,5 +753,8 @@ volumes:
   dbtrail-index-data:
   dbtrail-mysql-socket:
   dbtrail-state:
+  glitchtip-postgres-data:
+  glitchtip-uploads:
+  glitchtip-valkey-data:
   traefik-letsencrypt:
   playwright-node-modules:

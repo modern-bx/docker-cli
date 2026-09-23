@@ -105,6 +105,7 @@ docker-cli project:update --external --external-port=3001
 | --- | --- |
 | [Быстрый старт](https://modern-bx.github.io/docker-cli/guide/getting-started) | Инициализация, запуск окружения и регистрация первого проекта |
 | [Базовые сервисы](https://modern-bx.github.io/docker-cli/guide/services) | Состав стека, сетевые адреса, хранилища и доступ к сервисам |
+| [GlitchTip](https://modern-bx.github.io/docker-cli/guide/glitchtip) | Ошибки, логи, производительность и PHP-интеграция |
 | [ProxySQL и ProxyWeb](https://modern-bx.github.io/docker-cli/guide/proxy) | Подключение проектов и анализ статистики запросов |
 | [Справочник команд](https://modern-bx.github.io/docker-cli/reference/commands) | Аргументы, опции и примеры всех CLI-команд |
 | [Бэкапы](https://modern-bx.github.io/docker-cli/guide/backups) | Файловые копии, MySQL, PostgreSQL и внешние хранилища |
