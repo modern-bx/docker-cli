@@ -36,12 +36,18 @@ final class GlitchTipConfigurationTest extends TestCase
         );
         self::assertArrayNotHasKey("glitchtip-postgres", $services);
         self::assertSame(
-            ["condition" => "service_started"],
+            ["condition" => "service_healthy"],
             $services["glitchtip-postgres-init"]["depends_on"]["postgres"] ?? null,
         );
+        self::assertSame("5", $services["glitchtip-postgres-init"]["environment"]["PGCONNECT_TIMEOUT"] ?? null);
         self::assertStringContainsString(
-            "createdb --host=postgres glitchtip",
+            "createdb --host=postgres --no-password glitchtip",
             $services["glitchtip-postgres-init"]["command"][0] ?? "",
+        );
+        self::assertStringNotContainsString("grep -q", $services["glitchtip-postgres-init"]["command"][0] ?? "");
+        self::assertSame(
+            ["CMD-SHELL", 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'],
+            $services["postgres"]["healthcheck"]["test"] ?? null,
         );
     }
 
