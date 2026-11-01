@@ -129,9 +129,6 @@ composer build
 build/docker-cli.phar --version
 ```
 
-Перед изменениями прочитайте [AGENTS.md](AGENTS.md): в нём описаны архитектурные
-ограничения, правила оформления и обязательные проверки проекта.
-
 ## Поддержать проект
 
 `docker-cli` развивается бесплатно и открыто.
@@ -139,7 +136,7 @@ build/docker-cli.phar --version
 
 <div align="center">
 
-[![Поддержать на Boosty](https://img.shields.io/badge/Поддержать-на_Boosty-f15f2c.svg?style=for-the-badge)](https://boosty.to/modern-bx)
+[//]: # ([![Поддержать на Boosty]&#40;https://img.shields.io/badge/Поддержать-на_Boosty-f15f2c.svg?style=for-the-badge&#41;]&#40;https://boosty.to/modern-bx&#41;)
 [![Поддержать на CloudTips](https://img.shields.io/badge/Поддержать-на_CloudTips-6496dc.svg?style=for-the-badge)](https://pay.cloudtips.ru/p/cdc00b51)
 
 Поддержка помогает уделять больше времени новым возможностям, документации и стабильным релизам.
