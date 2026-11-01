@@ -1,0 +1,23 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Инициализация конфигурации
+  code: core.config.init
+  type: shell
+  context: system
+  description: Запускает docker-cli config:init с поддержкой всех параметров команды.
+  parameters:
+    update: { type: boolean, required: false }
+    migrate: { type: boolean, required: false }
+    rebuild: { type: boolean, required: false }
+    force: { type: boolean, required: false }
+    examples: { type: boolean, required: false }
+  action: |
+    options=()
+    [ "${update:-false}" = "true" ] && options+=(--update)
+    [ "${migrate:-false}" = "true" ] && options+=(--migrate)
+    [ "${rebuild:-false}" = "true" ] && options+=(--rebuild)
+    [ "${force:-false}" = "true" ] && options+=(--force)
+    [ "${examples:-false}" = "true" ] && options+=(--examples)
+    docker-cli config:init "${options[@]}"

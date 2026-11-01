@@ -1,0 +1,41 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Изменение проекта
+  code: core.project.update
+  type: shell
+  context: project
+  description: Изменяет проект и переносит его базы между общими и выделенными инстансами.
+  parameters:
+    name: { type: string, required: false }
+    language: { type: list, required: false, items: [{ name: PHP, value: php }] }
+    language_version: { type: list, required: false, items: [{ name: PHP 8.2, value: '8.2' }, { name: PHP 8.3, value: '8.3' }, { name: PHP 8.4, value: '8.4' }, { name: PHP 8.5, value: '8.5' }] }
+    framework:
+      type: list
+      required: false
+      items:
+        - { name: Без фреймворка, value: '' }
+        - { name: Symfony, value: symfony }
+        - { name: Laravel, value: laravel }
+        - { name: Bitrix, value: bitrix }
+        - { name: Bitrix24, value: bitrix24 }
+    external: { type: boolean, required: false }
+    external_port: { type: integer, required: false, min: 1, max: 65535 }
+    dedicated-db: { type: string, required: false }
+    location_mysql: { type: string, required: false }
+    location_postgres: { type: string, required: false }
+  action: |
+    options=()
+    [ -n "${name+x}" ] && options+=(--name="$name")
+    [ -n "${language+x}" ] && options+=(--language="$language")
+    [ -n "${language_version+x}" ] && options+=(--language-version="$language_version")
+    [ -n "${framework+x}" ] && options+=(--framework="$framework")
+    if [ -n "${external+x}" ]; then
+      [ "$external" = true ] && options+=(--external) || options+=(--no-external)
+    fi
+    [ -n "${external_port+x}" ] && options+=(--external-port="$external_port")
+    [ -n "${dedicated_db+x}" ] && options+=(--dedicated-db="$dedicated_db")
+    [ -n "${location_mysql+x}" ] && options+=(--location-mysql="$location_mysql")
+    [ -n "${location_postgres+x}" ] && options+=(--location-postgres="$location_postgres")
+    docker-cli project:update "${options[@]}"

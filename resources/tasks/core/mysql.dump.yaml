@@ -1,0 +1,32 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Создание бэкапа MySQL
+  code: core.mysql.dump
+  type: shell
+  context: project
+  description: Создает параллельный бэкап MySQL-базы проекта.
+  parameters:
+    backup:
+      name: Короткое имя бэкапа
+      type: string
+    location:
+      name: Код хранилища бэкапов
+      type: string
+    strategy:
+      name: Стратегия БД
+      type: string
+    comment:
+      name: Комментарий
+      type: string
+  action: |
+    options=()
+    [ -n "${location:-}" ] && options+=(--location="$location")
+    [ -n "${strategy:-}" ] && options+=(--strategy="$strategy")
+    [ -n "${comment:-}" ] && options+=(--comment="$comment")
+    if [ -n "${backup:-}" ]; then
+      docker-cli mysql:dump --project="$project" --name="$backup" "${options[@]}"
+    else
+      docker-cli mysql:dump --project="$project"
+    fi

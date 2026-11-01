@@ -1,0 +1,227 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DockerCli\Command;
+
+use DockerCli\Config\MissingConfigException;
+use DockerCli\Config\SystemCompose;
+use DockerCli\Service\TranslatorFactory;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Question\ConfirmationQuestion;
+use Symfony\Contracts\Translation\TranslatorInterface;
+
+final class ConfigSeedCommand extends AbstractCommand
+{
+    private TranslatorInterface $translator;
+
+    public function __construct(?TranslatorInterface $translator = null)
+    {
+        $this->translator = $translator ?? TranslatorFactory::create();
+        parent::__construct("config:seed");
+        $this->setDescription($this->translator->trans("command.seed.description"));
+        $this->addOption("yes", "y", InputOption::VALUE_NONE, $this->translator->trans("command.seed.yes_option"));
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $compose = new SystemCompose();
+
+        try {
+            $compose->assertInitialized();
+        } catch (MissingConfigException) {
+            $this->writeMessage(
+                $output,
+                "<error>" .
+                    $this->translator->trans("config.missing", [
+                        "%files%" => implode(", ", $compose->missingFiles()),
+                        "%directory%" => $compose->directory(),
+                    ]) .
+                    "</error>",
+            );
+
+            return Command::FAILURE;
+        }
+
+        if (!$input->getOption("yes")) {
+            $question = new ConfirmationQuestion($this->translator->trans("command.seed.confirm") . " ", false);
+            if (!$this->getHelper("question")->ask($input, $output, $question)) {
+                $this->writeMessage(
+                    $output,
+                    "<comment>" . $this->translator->trans("command.seed.cancelled") . "</comment>",
+                );
+
+                return Command::SUCCESS;
+            }
+        }
+
+        $values = $this->readEnvFile($compose->envFile());
+        $this->setDefaultIfEmpty($values, "MYSQL_ROOT_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "MYSQL_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "DBTRAIL_MYSQL_USER", "dbtrail");
+        $this->setDefaultIfEmpty($values, "DBTRAIL_MYSQL_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "DBTRAIL_INDEX_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "DBTRAIL_CONSOLE_TOKEN", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "POSTGRES_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_SECRET_KEY", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_POSTGRES_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_ADMIN_EMAIL", "admin@example.com");
+        if ($values["GLITCHTIP_ADMIN_EMAIL"] === "admin@localhost") {
+            $values["GLITCHTIP_ADMIN_EMAIL"] = "admin@example.com";
+        }
+        $this->setDefaultIfEmpty($values, "GLITCHTIP_ADMIN_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "PROXYSQL_ADMIN_USER", "proxysql");
+        $this->setDefaultIfEmpty($values, "PROXYSQL_ADMIN_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "PROXYSQL_WEB_USER", "proxysql-web");
+        $this->setDefaultIfEmpty($values, "PROXYSQL_WEB_PASSWORD", $this->randomSecret());
+        $this->setDefaultIfEmpty($values, "PROXYWEB_ADMIN_USER", "proxyweb");
+        $this->setDefaultIfEmpty($values, "PROXYWEB_ADMIN_PASSWORD", $this->randomSecret());
+        $this->writeEnvFile($compose->envFile(), $values);
+
+        $this->writeMessage(
+            $output,
+            "<info>" .
+                $this->translator->trans("command.seed.completed", [
+                    "%file%" => $compose->envFile(),
+                ]) .
+                "</info>",
+        );
+
+        return Command::SUCCESS;
+    }
+
+    /** @return array<string, string> */
+    private function readEnvFile(string $file): array
+    {
+        $values = [];
+        foreach (file($file, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === "" || str_starts_with($line, "#") || !str_contains($line, "=")) {
+                continue;
+            }
+
+            [$key, $value] = explode("=", $line, 2);
+            $values[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
+        }
+
+        return $values;
+    }
+
+    /** @param array<string, string> $values */
+    private function writeEnvFile(string $file, array $values): void
+    {
+        $lines = file($file, FILE_IGNORE_NEW_LINES);
+        if ($lines === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $file));
+        }
+
+        $writtenKeys = [];
+        foreach ($lines as $index => $line) {
+            $trimmed = trim($line);
+            if ($trimmed === "" || str_starts_with($trimmed, "#") || !str_contains($trimmed, "=")) {
+                continue;
+            }
+
+            [$key] = explode("=", $trimmed, 2);
+            $key = trim($key);
+            if (!array_key_exists($key, $values)) {
+                continue;
+            }
+
+            $lines[$index] = $key . "=" . $values[$key];
+            $writtenKeys[$key] = true;
+        }
+
+        foreach ($this->envKeyOrder($values) as $key) {
+            if (!isset($writtenKeys[$key])) {
+                $lines[] = $key . "=" . $values[$key];
+            }
+        }
+
+        file_put_contents($file, implode(PHP_EOL, $lines) . PHP_EOL);
+    }
+
+    /**
+     * @param array<string, string> $values
+     * @return list<string>
+     */
+    private function envKeyOrder(array $values): array
+    {
+        $orderedKeys = [
+            "APP_LOCALE",
+            "BASE_HOST",
+            "PROJECT_WEB_DNSDOCK_ALIAS",
+            "OPENRESTY_PORT",
+            "HTTP_AUTH_LOGIN",
+            "HTTP_AUTH_PASSWORD",
+            "PLAYWRIGHT_IP",
+            "DOCKER_CLI_NETWORK_SUBNET",
+            "HOST_UID",
+            "HOST_GID",
+            "PHP_ENABLE_XDEBUG",
+            "PHP_ENABLE_SPX",
+            "SOURCE_IMAGE_REGISTRY",
+            "SOURCE_IMAGE_NAMESPACE",
+            "SOURCE_IMAGE_NAME",
+            "SOURCE_IMAGE_MAIN_BRANCH",
+            "SOURCE_IMAGE_TAG",
+            "SOURCE_IMAGE_DOCKER_BUILDKIT",
+            "CLOUDFLARE_DNS_API_TOKEN",
+            "ACME_EMAIL",
+            "MYSQL_ROOT_PASSWORD",
+            "MYSQL_DATABASE",
+            "MYSQL_USER",
+            "MYSQL_PASSWORD",
+            "MYSQL_CPU_LIMIT",
+            "MYSQL_MEMORY_LIMIT",
+            "DBTRAIL_MYSQL_USER",
+            "DBTRAIL_MYSQL_PASSWORD",
+            "DBTRAIL_INDEX_PASSWORD",
+            "DBTRAIL_CONSOLE_TOKEN",
+            "POSTGRES_DB",
+            "POSTGRES_USER",
+            "POSTGRES_PASSWORD",
+            "POSTGRES_CPU_LIMIT",
+            "POSTGRES_MEMORY_LIMIT",
+            "GLITCHTIP_SECRET_KEY",
+            "GLITCHTIP_POSTGRES_PASSWORD",
+            "GLITCHTIP_POSTGRES_CPU_LIMIT",
+            "GLITCHTIP_POSTGRES_MEMORY_LIMIT",
+            "GLITCHTIP_ADMIN_EMAIL",
+            "GLITCHTIP_ADMIN_PASSWORD",
+            "PROXYSQL_ADMIN_USER",
+            "PROXYSQL_ADMIN_PASSWORD",
+            "PROXYSQL_WEB_USER",
+            "PROXYSQL_WEB_PASSWORD",
+            "PROXYWEB_ADMIN_USER",
+            "PROXYWEB_ADMIN_PASSWORD",
+        ];
+
+        return array_values(
+            array_unique(
+                array_merge(
+                    array_values(
+                        array_filter($orderedKeys, static fn (string $key): bool => array_key_exists($key, $values)),
+                    ),
+                    array_keys($values),
+                ),
+            ),
+        );
+    }
+
+    /** @param array<string, string> $values */
+    private function setDefaultIfEmpty(array &$values, string $key, string $default): void
+    {
+        if (($values[$key] ?? "") === "") {
+            $values[$key] = $default;
+        }
+    }
+
+    private function randomSecret(): string
+    {
+        return rtrim(strtr(base64_encode(random_bytes(32)), "+/", "-_"), "=");
+    }
+}

@@ -1,0 +1,26 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Создание файлового бэкапа
+  code: core.tree.dump
+  type: shell
+  context: project
+  description: Создаёт файловый бэкап проекта.
+  parameters:
+    backup: { name: Короткое имя бэкапа, type: string, required: true }
+    location: { name: Расположение, type: string }
+    strategy: { name: Файловая стратегия, type: string }
+    compress: { name: Сжатие, type: string }
+    chunk-size: { name: Размер тома, type: string }
+    chunk-count: { name: Количество томов, type: string }
+    comment: { name: Комментарий, type: string }
+  action: |
+    options=()
+    [ -n "${location:-}" ] && options+=(--location="$location")
+    [ -n "${strategy:-}" ] && options+=(--strategy="$strategy")
+    [ -n "${compress:-}" ] && options+=(--compress="$compress")
+    [ -n "${chunk_size:-}" ] && options+=(--chunk-size="$chunk_size")
+    [ -n "${chunk_count:-}" ] && options+=(--chunk-count="$chunk_count")
+    [ -n "${comment:-}" ] && options+=(--comment="$comment")
+    docker-cli tree:dump --project="$project" --name="$backup" "${options[@]}"

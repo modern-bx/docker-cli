@@ -1,0 +1,19 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Удаление MySQL-бэкапа
+  code: core.mysql.backup-delete
+  type: shell
+  context: project
+  description: Удаляет выбранный MySQL-бэкап проекта.
+  parameters:
+    backup:
+      name: Короткое имя бэкапа
+      type: string
+      required: true
+    location: { name: Расположение, type: string }
+  action: |
+    options=()
+    [ -n "${location:-}" ] && options+=(--location="$location")
+    docker-cli mysql:backup-delete {{ backup }} "${options[@]}"

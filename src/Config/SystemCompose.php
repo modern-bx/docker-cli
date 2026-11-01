@@ -1,0 +1,686 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DockerCli\Config;
+
+use function DockerCli\Util\join_path;
+
+use Symfony\Component\Yaml\Yaml;
+
+final class SystemCompose
+{
+    public const PROJECT_NAME = "docker-cli";
+    public const CONFIG_RELATIVE_PATH = ".config/docker-cli/compose/system";
+    public const COMPOSE_FILE = "compose.yaml";
+    public const ENV_FILE = ".env";
+
+    public function directory(): string
+    {
+        $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
+
+        return join_path($home, self::CONFIG_RELATIVE_PATH);
+    }
+
+    public function composeFile(): string
+    {
+        return join_path($this->directory(), self::COMPOSE_FILE);
+    }
+
+    public function additionalComposeFile(string $driver): string
+    {
+        if (!in_array($driver, ["mysql", "postgres"], true)) {
+            throw new \InvalidArgumentException(sprintf('Unsupported database driver "%s".', $driver));
+        }
+
+        return join_path($this->directory(), sprintf("compose.%s.yaml", $driver));
+    }
+
+    public function databaseService(string $projectName, string $driver): string
+    {
+        return sprintf("%s-%s", $driver, $projectName);
+    }
+
+    public function dedicatedDatabaseDirectory(string $projectName, string $driver, ?string $location = null): string
+    {
+        if (!in_array($driver, ["mysql", "postgres"], true)) {
+            throw new \InvalidArgumentException(sprintf('Unsupported database driver "%s".', $driver));
+        }
+        $directory =
+            $location ??
+            $this->envValue("DEFAULT_DATA_DIR_" . strtoupper($driver), "data/" . $driver) . "-" . $projectName;
+
+        return str_starts_with($directory, DIRECTORY_SEPARATOR)
+            ? $directory
+            : join_path($this->directory(), $directory);
+    }
+
+    public function envFile(): string
+    {
+        return join_path($this->directory(), self::ENV_FILE);
+    }
+
+    public function playwrightScriptsDirectory(): string
+    {
+        $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
+
+        return join_path($home, ".config", "docker-cli", "actions", "playwright", "scripts");
+    }
+
+    public function playwrightDataDirectory(): string
+    {
+        $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
+
+        return join_path($home, ".config", "docker-cli", "actions", "playwright", "data");
+    }
+
+    public function coreTasksDirectory(): string
+    {
+        $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
+
+        return join_path($home, ".config", "docker-cli", "actions", "tasks", "core");
+    }
+
+    public function init(bool $updateStatic = false, bool $migrateEditable = false, bool $copyExamples = false): bool
+    {
+        $directory = $this->directory();
+        if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
+            throw new \RuntimeException(sprintf('Unable to create config directory "%s".', $directory));
+        }
+
+        $created = false;
+        foreach ($this->templateMap() as $target => $template) {
+            if (file_exists($target) && !is_dir($template)) {
+                continue;
+            }
+
+            $before = $this->snapshotFiles($target);
+            $this->copyTemplate($template, $target);
+            if ($before !== $this->snapshotFiles($target)) {
+                $created = true;
+            }
+        }
+
+        if ($updateStatic) {
+            foreach ($this->staticTemplateMap() as $target => $template) {
+                $this->copyTemplate($template, $target, true);
+                $created = true;
+            }
+        }
+
+        if ($copyExamples) {
+            foreach ($this->exampleTemplateMap() as $target => $template) {
+                $this->copyTemplate($template, $target, true, true);
+                $created = true;
+            }
+        }
+
+        if ($migrateEditable) {
+            foreach ($this->editableTemplateMap() as $target => $template) {
+                if ($this->migrateEnvFile($target, $template)) {
+                    $created = true;
+                }
+            }
+        }
+
+        if ($this->ensureHostIdentityEnv()) {
+            $created = true;
+        }
+        if ($this->ensurePanelSecrets()) {
+            $created = true;
+        }
+        if ($this->ensureProxyWebConfiguration()) {
+            $created = true;
+        }
+
+        foreach ($this->dataDirectories() as $dataDirectory) {
+            if (is_dir($dataDirectory)) {
+                continue;
+            }
+
+            if (!mkdir($dataDirectory, 0755, true) && !is_dir($dataDirectory)) {
+                throw new \RuntimeException(sprintf('Unable to create data directory "%s".', $dataDirectory));
+            }
+
+            $created = true;
+        }
+
+        return $created;
+    }
+
+    public function assertInitialized(): void
+    {
+        $missingFiles = $this->missingFiles();
+        if ($missingFiles !== []) {
+            throw new MissingConfigException($missingFiles, $this->directory());
+        }
+    }
+
+    /** @return list<string> */
+    public function missingFiles(): array
+    {
+        return array_values(
+            array_filter([$this->envFile(), $this->composeFile()], static fn (string $file): bool => !is_file($file)),
+        );
+    }
+
+    /** @return array<string, string> */
+    public function dockerProcessEnvironment(): array
+    {
+        $environment = getenv();
+        if (!is_array($environment)) {
+            $environment = [];
+        }
+
+        if (!is_file($this->envFile())) {
+            return $environment;
+        }
+
+        $contents = file_get_contents($this->envFile());
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $this->envFile()));
+        }
+
+        $values = $this->readEnvValues($contents);
+        $buildKit = $values["SOURCE_IMAGE_DOCKER_BUILDKIT"] ?? "";
+        if ($buildKit !== "") {
+            $environment["DOCKER_BUILDKIT"] = $buildKit;
+            $environment["COMPOSE_DOCKER_CLI_BUILD"] = $buildKit;
+        }
+
+        $proxySqlEnabled = $this->featureEnabled($environment, $values, "COMPOSE_ENABLE_PROXYSQL");
+        $profiles = [];
+        if ($proxySqlEnabled) {
+            $profiles[] = "proxysql";
+        }
+        if ($proxySqlEnabled && $this->featureEnabled($environment, $values, "COMPOSE_ENABLE_PROXYWEB")) {
+            $profiles[] = "proxyweb";
+        }
+        if ($this->featureEnabled($environment, $values, "COMPOSE_ENABLE_DBTRAIL")) {
+            $profiles[] = "dbtrail";
+        }
+        if ($this->featureEnabled($environment, $values, "COMPOSE_ENABLE_GLITCHTIP")) {
+            $profiles[] = "glitchtip";
+        }
+        $environment["COMPOSE_PROFILES"] = implode(",", $profiles);
+
+        return $environment;
+    }
+
+    /** @param array<string, mixed> $environment @param array<string, string> $values */
+    private function featureEnabled(array $environment, array $values, string $key): bool
+    {
+        $value = array_key_exists($key, $environment) ? $environment[$key] : ($values[$key] ?? "1");
+        $normalized = strtolower(trim(is_string($value) ? $value : (string) $value));
+
+        return !in_array($normalized, ["", "0", "false", "no", "off"], true);
+    }
+
+    public function envValue(string $key, string $default = ""): string
+    {
+        if (!is_file($this->envFile())) {
+            return $default;
+        }
+
+        $contents = file_get_contents($this->envFile());
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $this->envFile()));
+        }
+
+        return $this->readEnvValues($contents)[$key] ?? $default;
+    }
+
+    /** @return list<string> */
+    public function dockerComposeCommand(string $operation): array
+    {
+        $command = [
+            "docker",
+            "compose",
+            "--project-name",
+            self::PROJECT_NAME,
+            "--env-file",
+            $this->envFile(),
+            "--file",
+            $this->composeFile(),
+        ];
+        foreach (["mysql", "postgres"] as $driver) {
+            $file = $this->additionalComposeFile($driver);
+            if (is_file($file)) {
+                array_push($command, "--file", $file);
+            }
+        }
+        $command[] = $operation;
+
+        return $command;
+    }
+
+    /** @return list<string> */
+    private function snapshotFiles(string $path): array
+    {
+        if (!file_exists($path)) {
+            return [];
+        }
+
+        if (is_file($path)) {
+            return [$path];
+        }
+
+        $files = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+        );
+        foreach ($iterator as $file) {
+            if ($file instanceof \SplFileInfo && $file->isFile()) {
+                $files[] = $file->getPathname();
+            }
+        }
+
+        sort($files);
+
+        return $files;
+    }
+
+    private function ensureHostIdentityEnv(): bool
+    {
+        $envFile = $this->envFile();
+        if (!is_file($envFile)) {
+            return false;
+        }
+
+        $contents = file_get_contents($envFile);
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $envFile));
+        }
+
+        $replacements = [
+            "HOST_UID" => (string) $this->hostUserId(),
+            "HOST_GID" => (string) $this->hostGroupId(),
+        ];
+        $currentValues = $this->readEnvValues($contents);
+        $updated = $contents;
+        foreach ($replacements as $key => $value) {
+            if (($currentValues[$key] ?? "") !== "") {
+                continue;
+            }
+
+            if (preg_match("/^" . $key . '=.*$/m', $updated) === 1) {
+                $updated = preg_replace("/^" . $key . '=.*$/m', $key . "=" . $value, $updated) ?? $updated;
+                continue;
+            }
+
+            $separator = str_ends_with($updated, PHP_EOL) || $updated === "" ? "" : PHP_EOL;
+            $updated .= $separator . $key . "=" . $value . PHP_EOL;
+        }
+
+        if ($updated === $contents) {
+            return false;
+        }
+
+        file_put_contents($envFile, $updated);
+
+        return true;
+    }
+
+    private function ensurePanelSecrets(): bool
+    {
+        $envFile = $this->envFile();
+        if (!is_file($envFile)) {
+            return false;
+        }
+
+        $contents = file_get_contents($envFile);
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $envFile));
+        }
+        $updated = $contents;
+        $values = $this->readEnvValues($contents);
+        foreach (["PANEL_PASSWORD_SALT", "PANEL_JWT_SECRET"] as $key) {
+            if (($values[$key] ?? "") !== "") {
+                continue;
+            }
+            $line = $key . "=" . bin2hex(random_bytes(32));
+            if (preg_match("/^" . $key . '=.*$/m', $updated) === 1) {
+                $updated = preg_replace("/^" . $key . '=.*$/m', $line, $updated) ?? $updated;
+            } else {
+                $separator = str_ends_with($updated, PHP_EOL) || $updated === "" ? "" : PHP_EOL;
+                $updated .= $separator . $line . PHP_EOL;
+            }
+        }
+        if ($updated === $contents) {
+            return false;
+        }
+        if (!is_string($updated) || file_put_contents($envFile, $updated, LOCK_EX) === false) {
+            throw new \RuntimeException(sprintf('Unable to write env file "%s".', $envFile));
+        }
+
+        return true;
+    }
+
+    private function ensureProxyWebConfiguration(): bool
+    {
+        $file = join_path($this->directory(), "config", "proxyweb", "config.yml");
+        if (!is_file($file)) {
+            return false;
+        }
+
+        $configuration = Yaml::parseFile($file);
+        if (!is_array($configuration)) {
+            throw new \RuntimeException(sprintf('Конфигурация ProxyWeb в файле "%s" имеет неверный формат.', $file));
+        }
+
+        $defaults = [
+            "auth" => [
+                "okta" => [
+                    "enabled" => false,
+                    "issuer" => "",
+                    "client_id" => "",
+                    "client_secret" => "",
+                    "admin_group" => "",
+                    "readonly_group" => "",
+                    "scopes" => "openid profile email groups",
+                    "disable_local_login" => false,
+                ],
+            ],
+            "misc" => [
+                "apply_config" => [],
+                "update_config" => [],
+                "adhoc_report" => [],
+            ],
+        ];
+        $updated = array_replace_recursive($defaults, $configuration);
+        if ($updated === $configuration) {
+            return false;
+        }
+
+        if (file_put_contents($file, Yaml::dump($updated, 8, 2), LOCK_EX) === false) {
+            throw new \RuntimeException(sprintf('Не удалось обновить конфигурацию ProxyWeb в файле "%s".', $file));
+        }
+
+        return true;
+    }
+
+    private function hostUserId(): int
+    {
+        if (function_exists("posix_getuid")) {
+            return posix_getuid();
+        }
+
+        $uid = getenv("UID");
+
+        return is_string($uid) && ctype_digit($uid) ? (int) $uid : 1000;
+    }
+
+    private function hostGroupId(): int
+    {
+        if (function_exists("posix_getgid")) {
+            return posix_getgid();
+        }
+
+        $gid = getenv("GID");
+
+        return is_string($gid) && ctype_digit($gid) ? (int) $gid : 1000;
+    }
+
+    /** @return list<string> */
+    private function dataDirectories(): array
+    {
+        $data = join_path($this->directory(), "data");
+        $mysqlData = $this->dataDirectoryFromEnv("DEFAULT_DATA_DIR_MYSQL", "data/mysql");
+        $postgresData = $this->dataDirectoryFromEnv("DEFAULT_DATA_DIR_POSTGRES", "data/postgres");
+
+        return [
+            join_path($data, "dockhand"),
+            join_path($data, "glitchtip-postgres"),
+            join_path($mysqlData, "data"),
+            join_path($mysqlData, "logs"),
+            join_path($postgresData, "data"),
+            join_path($postgresData, "logs"),
+            join_path($data, "mailpit"),
+            join_path($data, "proxysql"),
+            join_path($this->directory(), "config", "openresty", "hosts"),
+            join_path($this->directory(), "config", "ofelia"),
+            join_path($this->directory(), "config", "panel"),
+            join_path($this->directory(), "config", "php-fpm-8.2", "php", "conf.d"),
+            join_path($this->directory(), "config", "php-fpm-8.2", "php-fpm.d"),
+            join_path($this->directory(), "config", "php-fpm-8.3", "php", "conf.d"),
+            join_path($this->directory(), "config", "php-fpm-8.3", "php-fpm.d"),
+            join_path($this->directory(), "config", "php-fpm-8.4", "php", "conf.d"),
+            join_path($this->directory(), "config", "php-fpm-8.4", "php-fpm.d"),
+            join_path($this->directory(), "config", "php-fpm-8.5", "php", "conf.d"),
+            join_path($this->directory(), "config", "php-fpm-8.5", "php-fpm.d"),
+            $this->playwrightScriptsDirectory(),
+        ];
+    }
+
+    private function dataDirectoryFromEnv(string $key, string $default): string
+    {
+        $directory = $this->envValue($key, $default);
+        if ($directory === "") {
+            $directory = $default;
+        }
+
+        return str_starts_with($directory, DIRECTORY_SEPARATOR)
+            ? $directory
+            : join_path($this->directory(), $directory);
+    }
+
+    /** @return array<string, string> */
+    private function templateMap(): array
+    {
+        return $this->editableTemplateMap()
+            + $this->customizableTemplateMap()
+            + $this->staticTemplateMap()
+            + $this->playwrightDataTemplateMap();
+    }
+
+    private function copyTemplate(
+        string $source,
+        string $target,
+        bool $overwrite = false,
+        bool $preservePermissions = false,
+    ): void {
+        if (is_dir($source)) {
+            if (!is_dir($target) && !mkdir($target, 0755, true) && !is_dir($target)) {
+                throw new \RuntimeException(sprintf('Unable to create config directory "%s".', $target));
+            }
+
+            foreach (scandir($source) ?: [] as $entry) {
+                if ($entry === "." || $entry === "..") {
+                    continue;
+                }
+
+                $this->copyTemplate(
+                    join_path($source, $entry),
+                    join_path($target, $entry),
+                    $overwrite,
+                    $preservePermissions,
+                );
+            }
+
+            return;
+        }
+
+        if (file_exists($target) && !$overwrite) {
+            return;
+        }
+
+        $targetDirectory = dirname($target);
+        if (!is_dir($targetDirectory) && !mkdir($targetDirectory, 0755, true) && !is_dir($targetDirectory)) {
+            throw new \RuntimeException(sprintf('Unable to create config directory "%s".', $targetDirectory));
+        }
+
+        copy($source, $target);
+        if ($preservePermissions) {
+            chmod($target, fileperms($source) & 0777);
+        }
+    }
+
+    /** @return array<string, string> */
+    private function staticTemplateMap(): array
+    {
+        $resources = join_path(dirname(__DIR__, 2), "resources");
+        $composeResources = join_path($resources, "compose", "system");
+
+        return [
+            $this->composeFile() => join_path($composeResources, self::COMPOSE_FILE),
+            join_path($this->directory(), "config", "playwright") => join_path(
+                $composeResources,
+                "config",
+                "playwright",
+            ),
+            join_path($this->directory(), "config", "php-fpm-8.2") => join_path(
+                $composeResources,
+                "config",
+                "php-fpm-8.2",
+            ),
+            join_path($this->directory(), "config", "php-fpm-8.3") => join_path(
+                $composeResources,
+                "config",
+                "php-fpm-8.3",
+            ),
+            join_path($this->directory(), "config", "php-fpm-8.4") => join_path(
+                $composeResources,
+                "config",
+                "php-fpm-8.4",
+            ),
+            join_path($this->directory(), "config", "php-fpm-8.5") => join_path(
+                $composeResources,
+                "config",
+                "php-fpm-8.5",
+            ),
+            join_path($this->directory(), "config", "panel") => join_path($composeResources, "config", "panel"),
+            join_path($this->directory(), "config", "dbtrail") => join_path(
+                $composeResources,
+                "config",
+                "dbtrail",
+            ),
+            join_path($this->directory(), "config", "dbtrail-sync") => join_path(
+                $composeResources,
+                "config",
+                "dbtrail-sync",
+            ),
+            join_path($this->directory(), "config", "proxysql") => join_path(
+                $composeResources,
+                "config",
+                "proxysql",
+            ),
+            join_path($this->directory(), "config", "traefik") => join_path(
+                $composeResources,
+                "config",
+                "traefik",
+            ),
+            $this->playwrightScriptsDirectory() => join_path($resources, "playwright", "scripts"),
+            $this->coreTasksDirectory() => join_path($resources, "tasks", "core"),
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function playwrightDataTemplateMap(): array
+    {
+        $resources = join_path(dirname(__DIR__, 2), "resources");
+
+        return [
+            $this->playwrightDataDirectory() => join_path($resources, "playwright", "data"),
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function exampleTemplateMap(): array
+    {
+        $resources = join_path(dirname(__DIR__, 2), "resources");
+
+        return [
+            $this->hooksDirectory() => join_path($resources, "actions", "hooks"),
+        ];
+    }
+
+    public function hooksDirectory(): string
+    {
+        $home = getenv("HOME") ?: throw new \RuntimeException("HOME environment variable is not set.");
+
+        return join_path($home, ".config", "docker-cli", "actions", "hooks");
+    }
+
+    /** @return array<string, string> */
+    private function editableTemplateMap(): array
+    {
+        $resources = join_path(dirname(__DIR__, 2), "resources", "compose", "system");
+
+        return [
+            $this->envFile() => join_path($resources, self::ENV_FILE),
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function customizableTemplateMap(): array
+    {
+        $resources = join_path(dirname(__DIR__, 2), "resources", "compose", "system", "config");
+
+        return [
+            join_path($this->directory(), "config", "php-spx", "settings.css") => join_path(
+                $resources,
+                "php-spx",
+                "settings.css",
+            ),
+            join_path($this->directory(), "config", "proxyweb", "config.yml") => join_path(
+                $resources,
+                "proxyweb",
+                "config.yml",
+            ),
+        ];
+    }
+
+    private function migrateEnvFile(string $target, string $template): bool
+    {
+        if (!is_file($target)) {
+            copy($template, $target);
+
+            return true;
+        }
+
+        $currentContents = file_get_contents($target);
+        if ($currentContents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env file "%s".', $target));
+        }
+
+        $templateContents = file_get_contents($template);
+        if ($templateContents === false) {
+            throw new \RuntimeException(sprintf('Unable to read env template "%s".', $template));
+        }
+
+        $currentValues = $this->readEnvValues($currentContents);
+        $templateValues = $this->readEnvValues($templateContents);
+        $missingLines = [];
+        foreach ($templateValues as $key => $value) {
+            if (!array_key_exists($key, $currentValues)) {
+                $missingLines[] = $key . "=" . $value;
+            }
+        }
+
+        if ($missingLines === []) {
+            return false;
+        }
+
+        $separator = str_ends_with($currentContents, PHP_EOL) || $currentContents === "" ? "" : PHP_EOL;
+        file_put_contents($target, $currentContents . $separator . implode(PHP_EOL, $missingLines) . PHP_EOL);
+
+        return true;
+    }
+
+    /** @return array<string, string> */
+    private function readEnvValues(string $contents): array
+    {
+        $values = [];
+        foreach (explode(PHP_EOL, $contents) as $line) {
+            $line = trim($line);
+            if ($line === "" || str_starts_with($line, "#") || !str_contains($line, "=")) {
+                continue;
+            }
+
+            [$key, $value] = explode("=", $line, 2);
+            $values[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
+        }
+
+        return $values;
+    }
+}

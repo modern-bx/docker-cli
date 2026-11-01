@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru" data-theme="vox">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      html[data-font='ubuntu'] input { font-family: Ubuntu, sans-serif !important; }
+      html[data-font='noto'] input { font-family: "Noto Sans", sans-serif !important; }
+      html[data-font='ubuntu'] input:-webkit-autofill { font-family: Ubuntu, sans-serif !important; }
+      html[data-font='noto'] input:-webkit-autofill { font-family: "Noto Sans", sans-serif !important; }
+    </style>
+    <script>
+      (() => {
+        const mode = localStorage.getItem('docker-cli-panel-theme') || 'system';
+        const theme = localStorage.getItem('docker-cli-panel-color-theme') || 'vox';
+        const font = localStorage.getItem('docker-cli-panel-font') || 'ubuntu';
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.dataset.font = font === 'noto' ? 'noto' : 'ubuntu';
+        document.documentElement.classList.toggle('dark', mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches));
+      })();
+    </script>
+    <title>docker-cli</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

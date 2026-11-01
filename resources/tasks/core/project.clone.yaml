@@ -1,0 +1,37 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Клонирование проекта
+  code: core.project.clone
+  type: shell
+  context: system
+  description: Клонирует файлы, регистрацию и выбранные базы данных проекта.
+  parameters:
+    force: { type: boolean }
+    from: { type: string }
+    to: { type: string }
+    location: { type: string }
+    here: { type: boolean }
+    exclude: { type: string }
+    mirror: { type: string }
+    skip-db: { type: boolean }
+    dbms: { type: string }
+    dedicated-db: { type: string }
+    location-mysql: { type: string }
+    location-postgres: { type: string }
+  action: |
+    options=()
+    [ "${force:-false}" = true ] && options+=(--force)
+    [ -n "${from:-}" ] && options+=(--from="$from")
+    [ -n "${to:-}" ] && options+=(--to="$to")
+    [ -n "${location:-}" ] && options+=(--location="$location")
+    [ "${here:-false}" = true ] && options+=(--here)
+    [ -n "${exclude:-}" ] && options+=(--exclude="$exclude")
+    [ "${mirror+x}" = x ] && options+=(--mirror="$mirror")
+    [ "${skip_db:-false}" = true ] && options+=(--skip-db)
+    [ -n "${dbms:-}" ] && options+=(--dbms="$dbms")
+    [ -n "${dedicated_db:-}" ] && options+=(--dedicated-db="$dedicated_db")
+    [ -n "${location_mysql:-}" ] && options+=(--location-mysql="$location_mysql")
+    [ -n "${location_postgres:-}" ] && options+=(--location-postgres="$location_postgres")
+    docker-cli project:clone "${options[@]}"

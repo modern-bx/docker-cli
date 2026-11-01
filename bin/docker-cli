@@ -1,0 +1,14 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use DockerCli\Bootstrap\ApplicationFactory;
+use DockerCli\Bootstrap\ArgvNormalizer;
+
+require __DIR__ . "/../vendor/autoload.php";
+
+$argv = (new ArgvNormalizer())->normalize($argv);
+$_SERVER["argv"] = $argv;
+
+exit(ApplicationFactory::createDefault()->create()->run());

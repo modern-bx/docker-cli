@@ -1,0 +1,13 @@
+--- a/assets/web-ui/js/profileData.js
++++ b/assets/web-ui/js/profileData.js
+@@ -1284,6 +1284,10 @@
+         }
+ 
+         const frame = this.stack.pop();
++        if (frame === undefined) {
++            console.warn("SPX: пропущено событие завершения вызова без соответствующего события начала.");
++            return;
++        }
+ 
+         frame.endEventIdx = this.eventCount++;
+ 

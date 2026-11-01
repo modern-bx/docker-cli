@@ -1,0 +1,759 @@
+name: docker-cli
+
+services:
+  ofelia:
+    image: mcuadros/ofelia:0.3.22
+    container_name: docker-cli-ofelia
+    command: ["daemon", "--config=/etc/ofelia/config.ini"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/ofelia/config.ini:/etc/ofelia/config.ini:ro
+    networks:
+      docker-cli:
+    restart: unless-stopped
+
+  dnsdock:
+    image: aacebedo/dnsdock:v1.18.0-rc2-amd64
+    container_name: docker-cli-dnsdock
+    command: ["--domain", "${BASE_HOST}"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "172.17.0.1:53:53/udp"
+    networks:
+      docker-cli:
+        aliases:
+          - dnsdock.${BASE_HOST}
+    restart: unless-stopped
+
+  traefik:
+    image: traefik:v3.6
+    container_name: docker-cli-traefik
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=docker-cli
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls.certresolver=cloudflare
+      - --entrypoints.websecure.http.tls.domains[0].main=${BASE_HOST}
+      - --entrypoints.websecure.http.tls.domains[0].sans=*.${BASE_HOST}
+      - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.cloudflare.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.cloudflare.acme.dnschallenge=true
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+    environment:
+      CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
+      DNSDOCK_ALIAS: ${BASE_HOST},dockhand.${BASE_HOST},adminer.${BASE_HOST},dbtrail.${BASE_HOST},glitchtip.${BASE_HOST},mailpit.${BASE_HOST},panel.${BASE_HOST},proxysql.${BASE_HOST},proxyweb.${BASE_HOST}${PROJECT_WEB_DNSDOCK_ALIAS:+,${PROJECT_WEB_DNSDOCK_ALIAS}}
+    ports:
+      - "${TRAEFIK_HTTP_PORT:-80}:80"
+      - "${TRAEFIK_HTTPS_PORT:-443}:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
+      - traefik-letsencrypt:/letsencrypt
+    networks:
+      docker-cli:
+        aliases:
+          - traefik.${BASE_HOST}
+          - dockhand.${BASE_HOST}
+          - adminer.${BASE_HOST}
+          - dbtrail.${BASE_HOST}
+          - glitchtip.${BASE_HOST}
+          - mailpit.${BASE_HOST}
+          - panel.${BASE_HOST}
+          - proxysql.${BASE_HOST}
+          - proxyweb.${BASE_HOST}
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: docker-cli-mysql
+    cpus: ${MYSQL_CPU_LIMIT:-1.0}
+    mem_limit: ${MYSQL_MEMORY_LIMIT:-1G}
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-system}
+      MYSQL_USER: ${MYSQL_USER:-system}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      DNSDOCK_NAME: mysql
+      DNSDOCK_IMAGE: system
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --binlog-row-image=FULL
+      - --binlog-row-metadata=FULL
+      - --binlog-rows-query-log-events=ON
+      - --binlog-row-value-options=
+    volumes:
+      - type: bind
+        source: ${DEFAULT_DATA_DIR_MYSQL:-data/mysql}/data
+        target: /var/lib/mysql
+      - type: bind
+        source: ${DEFAULT_DATA_DIR_MYSQL:-data/mysql}/logs
+        target: /var/log/mysql
+      - dbtrail-mysql-socket:/var/run/mysqld
+    networks:
+      docker-cli:
+        aliases:
+          - mysql
+          - mysql.${BASE_HOST}
+    restart: unless-stopped
+
+  dbtrail-mysql-init:
+    image: mysql:8.0
+    depends_on:
+      mysql:
+        condition: service_started
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      DBTRAIL_MYSQL_USER: ${DBTRAIL_MYSQL_USER:?DBTRAIL_MYSQL_USER is required}
+      DBTRAIL_MYSQL_PASSWORD: ${DBTRAIL_MYSQL_PASSWORD:?DBTRAIL_MYSQL_PASSWORD is required}
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        until MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin ping \
+          --protocol=socket --socket=/var/run/mysqld/mysqld.sock -u root --silent; do
+          sleep 2
+        done
+        MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysql \
+          --protocol=socket --socket=/var/run/mysqld/mysqld.sock -u root \
+          --execute="CREATE USER IF NOT EXISTS '$${DBTRAIL_MYSQL_USER}'@'%' IDENTIFIED BY '$${DBTRAIL_MYSQL_PASSWORD}'; ALTER USER '$${DBTRAIL_MYSQL_USER}'@'%' IDENTIFIED BY '$${DBTRAIL_MYSQL_PASSWORD}'; GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$${DBTRAIL_MYSQL_USER}'@'%';"
+    volumes:
+      - dbtrail-mysql-socket:/var/run/mysqld
+    networks:
+      docker-cli:
+    profiles:
+      - dbtrail
+    restart: "no"
+
+  dbtrail-index:
+    image: mysql:8.4
+    container_name: docker-cli-dbtrail-index
+    command:
+      - --innodb-flush-log-at-trx-commit=2
+      - --sort-buffer-size=4M
+      - --max-allowed-packet=1G
+      - --skip-log-bin
+      - --innodb-redo-log-capacity=2147483648
+      - --innodb-flush-method=O_DIRECT
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DBTRAIL_INDEX_PASSWORD:?DBTRAIL_INDEX_PASSWORD is required}
+      MYSQL_DATABASE: bintrail_index
+    volumes:
+      - dbtrail-index-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      docker-cli:
+    profiles:
+      - dbtrail
+    restart: unless-stopped
+
+  dbtrail:
+    build:
+      context: ./config
+      dockerfile: dbtrail/Dockerfile
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/dbtrail:${SOURCE_IMAGE_TAG:-default}
+    container_name: docker-cli-dbtrail
+    depends_on:
+      dbtrail-mysql-init:
+        condition: service_completed_successfully
+      dbtrail-index:
+        condition: service_healthy
+    environment:
+      SOURCE_DSN: ${DBTRAIL_MYSQL_USER:?DBTRAIL_MYSQL_USER is required}:${DBTRAIL_MYSQL_PASSWORD:?DBTRAIL_MYSQL_PASSWORD is required}@tcp(mysql:3306)/
+      INDEX_DSN: root:${DBTRAIL_INDEX_PASSWORD:?DBTRAIL_INDEX_PASSWORD is required}@tcp(dbtrail-index:3306)/bintrail_index
+      BINTRAIL_CONSOLE_LISTEN: 0.0.0.0:8090
+      BINTRAIL_CONSOLE_ALLOWED_HOSTS: dbtrail,dbtrail.${BASE_HOST}
+      BINTRAIL_CONSOLE_TOKEN: ${DBTRAIL_CONSOLE_TOKEN:?DBTRAIL_CONSOLE_TOKEN is required}
+      BINTRAIL_CONSOLE_SERVERS: /var/lib/bintrail/console-servers.yaml
+      BINTRAIL_CONSOLE_AUTH: /var/lib/bintrail/console-auth.yaml
+      BINTRAIL_CONSOLE_MCP_TOKEN_FILE: /var/lib/bintrail/console-mcp-token.yaml
+      BINTRAIL_CONSOLE_ALLOW_SETUP: "1"
+      DNSDOCK_NAME: dbtrail
+      DNSDOCK_IMAGE: system
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - exec bintrail-console watch --source-dsn "$${SOURCE_DSN}" --index-dsn "$${INDEX_DSN}"
+    volumes:
+      - dbtrail-state:/var/lib/bintrail
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.dbtrail-api.rule: Host(`dbtrail.${BASE_HOST}`) && PathPrefix(`/api`)
+      traefik.http.routers.dbtrail-api.entrypoints: websecure
+      traefik.http.routers.dbtrail-api.middlewares: system-http-auth
+      traefik.http.routers.dbtrail-api.priority: "100"
+      traefik.http.routers.dbtrail-api.service: dbtrail
+      traefik.http.routers.dbtrail-api.tls: "true"
+      traefik.http.routers.dbtrail-api.tls.certresolver: cloudflare
+      traefik.http.routers.dbtrail.rule: Host(`dbtrail.${BASE_HOST}`)
+      traefik.http.routers.dbtrail.entrypoints: websecure
+      traefik.http.routers.dbtrail.middlewares: system-http-auth
+      traefik.http.routers.dbtrail.priority: "90"
+      traefik.http.routers.dbtrail.service: dbtrail
+      traefik.http.routers.dbtrail.tls: "true"
+      traefik.http.routers.dbtrail.tls.certresolver: cloudflare
+      traefik.http.services.dbtrail.loadbalancer.server.port: "8090"
+    networks:
+      docker-cli:
+        aliases:
+          - dbtrail
+          - dbtrail.${BASE_HOST}
+    profiles:
+      - dbtrail
+    restart: unless-stopped
+
+  dbtrail-sync:
+    build:
+      context: ./config/dbtrail-sync
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/dbtrail-sync:${SOURCE_IMAGE_TAG:-default}
+    container_name: docker-cli-dbtrail-sync
+    depends_on:
+      - dbtrail
+    environment:
+      DBTRAIL_API_TOKEN: ${DBTRAIL_CONSOLE_TOKEN:?DBTRAIL_CONSOLE_TOKEN is required}
+      DBTRAIL_MYSQL_USER: ${DBTRAIL_MYSQL_USER:?DBTRAIL_MYSQL_USER is required}
+      DBTRAIL_MYSQL_PASSWORD: ${DBTRAIL_MYSQL_PASSWORD:?DBTRAIL_MYSQL_PASSWORD is required}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      docker-cli:
+    entrypoint: ["/usr/local/bin/docker-cli-dbtrail-sync"]
+    profiles:
+      - dbtrail
+    restart: unless-stopped
+
+  mydumper:
+    image: mydumper/mydumper:v1.0.3-1
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    networks:
+      docker-cli:
+    profiles:
+      - tools
+    restart: "no"
+
+  postgres:
+    image: postgres:18
+    container_name: docker-cli-postgres
+    cpus: ${POSTGRES_CPU_LIMIT:-0.5}
+    mem_limit: ${POSTGRES_MEMORY_LIMIT:-512M}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-system}
+      POSTGRES_USER: ${POSTGRES_USER:-system}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DNSDOCK_NAME: postgres
+      DNSDOCK_IMAGE: system
+    volumes:
+      - type: bind
+        source: ${DEFAULT_DATA_DIR_POSTGRES:-data/postgres}/data
+        target: /var/lib/postgresql
+      - type: bind
+        source: ${DEFAULT_DATA_DIR_POSTGRES:-data/postgres}/logs
+        target: /var/log/postgresql
+    networks:
+      docker-cli:
+        aliases:
+          - postgres
+          - postgres.${BASE_HOST}
+    restart: unless-stopped
+
+  glitchtip-postgres:
+    image: postgres:18
+    container_name: docker-cli-glitchtip-postgres
+    cpus: ${GLITCHTIP_POSTGRES_CPU_LIMIT:-0.5}
+    mem_limit: ${GLITCHTIP_POSTGRES_MEMORY_LIMIT:-512M}
+    environment:
+      POSTGRES_DB: glitchtip
+      POSTGRES_USER: glitchtip
+      POSTGRES_PASSWORD: ${GLITCHTIP_POSTGRES_PASSWORD:?GLITCHTIP_POSTGRES_PASSWORD is required}
+    command:
+      - postgres
+      - -c
+      - max_locks_per_transaction=512
+    volumes:
+      - ./data/glitchtip-postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glitchtip -d glitchtip"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      docker-cli:
+    profiles:
+      - glitchtip
+    restart: unless-stopped
+
+  glitchtip-valkey:
+    image: valkey/valkey:9
+    container_name: docker-cli-glitchtip-valkey
+    volumes:
+      - glitchtip-valkey-data:/data
+    networks:
+      docker-cli:
+    profiles:
+      - glitchtip
+    restart: unless-stopped
+
+  glitchtip-init:
+    image: glitchtip/glitchtip:6.2.6
+    depends_on:
+      glitchtip-postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://glitchtip:${GLITCHTIP_POSTGRES_PASSWORD:?GLITCHTIP_POSTGRES_PASSWORD is required}@glitchtip-postgres:5432/glitchtip
+      SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required}
+      VALKEY_URL: redis://glitchtip-valkey:6379
+      DJANGO_SUPERUSER_EMAIL: ${GLITCHTIP_ADMIN_EMAIL:?GLITCHTIP_ADMIN_EMAIL is required}
+      DJANGO_SUPERUSER_PASSWORD: ${GLITCHTIP_ADMIN_PASSWORD:?GLITCHTIP_ADMIN_PASSWORD is required}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        ./bin/run-migrate.sh
+        python manage.py shell --command='from django.contrib.auth import get_user_model; from django.core.validators import validate_email; import os; User = get_user_model(); email = os.environ["DJANGO_SUPERUSER_EMAIL"]; validate_email(email); user, unused = User.objects.get_or_create(email=email); user.is_active = True; user.is_staff = True; user.is_superuser = True; user.set_password(os.environ["DJANGO_SUPERUSER_PASSWORD"]); user.save()'
+    networks:
+      docker-cli:
+    profiles:
+      - glitchtip
+    restart: "no"
+
+  glitchtip:
+    image: glitchtip/glitchtip:6.2.6
+    container_name: docker-cli-glitchtip
+    depends_on:
+      glitchtip-init:
+        condition: service_completed_successfully
+      glitchtip-valkey:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://glitchtip:${GLITCHTIP_POSTGRES_PASSWORD:?GLITCHTIP_POSTGRES_PASSWORD is required}@glitchtip-postgres:5432/glitchtip
+      SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required}
+      VALKEY_URL: redis://glitchtip-valkey:6379
+      GLITCHTIP_DOMAIN: https://glitchtip.${BASE_HOST}
+      ENABLE_USER_REGISTRATION: "false"
+      MEDIA_ROOT: /code/uploads
+      SKIP_INIT: "true"
+      EMAIL_URL: smtp://mailpit:1025
+      DEFAULT_FROM_EMAIL: glitchtip@${BASE_HOST}
+      DNSDOCK_NAME: glitchtip
+      DNSDOCK_IMAGE: system
+    volumes:
+      - glitchtip-uploads:/code/uploads
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.glitchtip.rule: Host(`glitchtip.${BASE_HOST}`)
+      traefik.http.routers.glitchtip.entrypoints: websecure
+      traefik.http.routers.glitchtip.tls: "true"
+      traefik.http.routers.glitchtip.tls.certresolver: cloudflare
+      traefik.http.services.glitchtip.loadbalancer.server.port: "8000"
+    networks:
+      docker-cli:
+        aliases:
+          - glitchtip
+          - glitchtip.${BASE_HOST}
+    profiles:
+      - glitchtip
+    restart: unless-stopped
+
+  proxysql:
+    image: proxysql/proxysql:3.0.11
+    container_name: docker-cli-proxysql
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        sed \
+          -e "s|__PROXYSQL_ADMIN_USER__|$${PROXYSQL_ADMIN_USER}|g" \
+          -e "s|__PROXYSQL_ADMIN_PASSWORD__|$${PROXYSQL_ADMIN_PASSWORD}|g" \
+          -e "s|__PROXYSQL_WEB_USER__|$${PROXYSQL_WEB_USER}|g" \
+          -e "s|__PROXYSQL_WEB_PASSWORD__|$${PROXYSQL_WEB_PASSWORD}|g" \
+          /etc/proxysql/proxysql.cnf.template > /tmp/proxysql.cnf
+        initial=""
+        marker=/var/lib/proxysql/.docker-cli-admin-credentials-v3
+        if [ -f /var/lib/proxysql/proxysql.db ] && [ ! -f "$${marker}" ]; then
+          initial=--initial
+        fi
+        touch "$${marker}"
+        exec proxysql -f --idle-threads -D /var/lib/proxysql -c /tmp/proxysql.cnf $${initial}
+    environment:
+      PROXYSQL_ADMIN_USER: ${PROXYSQL_ADMIN_USER:?PROXYSQL_ADMIN_USER is required}
+      PROXYSQL_ADMIN_PASSWORD: ${PROXYSQL_ADMIN_PASSWORD:?PROXYSQL_ADMIN_PASSWORD is required}
+      PROXYSQL_WEB_USER: ${PROXYSQL_WEB_USER:?PROXYSQL_WEB_USER is required}
+      PROXYSQL_WEB_PASSWORD: ${PROXYSQL_WEB_PASSWORD:?PROXYSQL_WEB_PASSWORD is required}
+      DNSDOCK_NAME: proxysql
+      DNSDOCK_IMAGE: system
+    volumes:
+      - ./config/proxysql/proxysql.cnf.template:/etc/proxysql/proxysql.cnf.template:ro
+      - ./data/proxysql:/var/lib/proxysql
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.proxysql.rule: Host(`proxysql.${BASE_HOST}`)
+      traefik.http.routers.proxysql.entrypoints: websecure
+      traefik.http.routers.proxysql.tls: "true"
+      traefik.http.routers.proxysql.tls.certresolver: cloudflare
+      traefik.http.services.proxysql.loadbalancer.server.port: "6080"
+      traefik.http.services.proxysql.loadbalancer.server.scheme: https
+      traefik.http.services.proxysql.loadbalancer.serverstransport: proxysql-web@file
+    networks:
+      docker-cli:
+        aliases:
+          - proxysql
+          - proxysql.${BASE_HOST}
+    profiles:
+      - proxysql
+    restart: unless-stopped
+
+  proxyweb:
+    image: proxyweb/proxyweb:2.3.0
+    container_name: docker-cli-proxyweb
+    depends_on:
+      - proxysql
+    environment:
+      PROXYWEB_ADMIN_USER: ${PROXYWEB_ADMIN_USER:?PROXYWEB_ADMIN_USER is required}
+      PROXYWEB_ADMIN_PASSWORD: ${PROXYWEB_ADMIN_PASSWORD:?PROXYWEB_ADMIN_PASSWORD is required}
+      PROXYWEB_SERVER_PROXYSQL_USER: ${PROXYSQL_ADMIN_USER:?PROXYSQL_ADMIN_USER is required}
+      PROXYWEB_SERVER_PROXYSQL_PASSWORD: ${PROXYSQL_ADMIN_PASSWORD:?PROXYSQL_ADMIN_PASSWORD is required}
+      PROXYWEB_SERVER_PROXYSQL_HOST: proxysql
+      PROXYWEB_SERVER_PROXYSQL_PORT: "6032"
+      PROXYWEB_SERVER_PROXYSQL_DATABASE: main
+      DNSDOCK_NAME: proxyweb
+      DNSDOCK_IMAGE: system
+    volumes:
+      - ./config/proxyweb/config.yml:/app/config/config.yml
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.proxyweb.rule: Host(`proxyweb.${BASE_HOST}`)
+      traefik.http.routers.proxyweb.entrypoints: websecure
+      traefik.http.routers.proxyweb.middlewares: system-http-auth
+      traefik.http.routers.proxyweb.tls: "true"
+      traefik.http.routers.proxyweb.tls.certresolver: cloudflare
+      traefik.http.services.proxyweb.loadbalancer.server.port: "5000"
+    networks:
+      docker-cli:
+        aliases:
+          - proxyweb
+          - proxyweb.${BASE_HOST}
+    profiles:
+      - proxyweb
+    restart: unless-stopped
+
+  php-fpm-8.2:
+    build:
+      context: ./config
+      dockerfile: php-fpm-8.2/Dockerfile
+      network: host
+      args:
+        PHP_ENABLE_XDEBUG: ${PHP_ENABLE_XDEBUG:-1}
+        PHP_ENABLE_SPX: ${PHP_ENABLE_SPX:-1}
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/php-fpm-8.2:${SOURCE_IMAGE_TAG:-default}
+    container_name: docker-cli-php-fpm-8.2
+    environment:
+      DNSDOCK_NAME: php-fpm-8.2
+      DNSDOCK_IMAGE: system
+      HOST_UID: ${HOST_UID:-1000}
+      HOST_GID: ${HOST_GID:-1000}
+    command: ["docker-cli-setup-runtime-user"]
+    volumes:
+      - ./config/php-fpm-8.2/php/conf.d:/docker-cli/php/conf.d:ro
+      - ./config/php-fpm-8.2/php-fpm.d:/docker-cli/php-fpm.d:ro
+      - ${HOME}:${HOME}
+      - ${HOME}:/home/docker-cli
+      - /:/host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "9000"
+    networks:
+      docker-cli:
+        aliases:
+          - php-fpm-8.2
+          - php-fpm-8.2.${BASE_HOST}
+    restart: unless-stopped
+
+  php-fpm-8.3:
+    build:
+      context: ./config
+      dockerfile: php-fpm-8.3/Dockerfile
+      network: host
+      args:
+        PHP_ENABLE_XDEBUG: ${PHP_ENABLE_XDEBUG:-1}
+        PHP_ENABLE_SPX: ${PHP_ENABLE_SPX:-1}
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/php-fpm-8.3:${SOURCE_IMAGE_TAG:-default}
+    container_name: docker-cli-php-fpm-8.3
+    environment:
+      DNSDOCK_NAME: php-fpm-8.3
+      DNSDOCK_IMAGE: system
+      HOST_UID: ${HOST_UID:-1000}
+      HOST_GID: ${HOST_GID:-1000}
+    command: ["docker-cli-setup-runtime-user"]
+    volumes:
+      - ./config/php-fpm-8.3/php/conf.d:/docker-cli/php/conf.d:ro
+      - ./config/php-fpm-8.3/php-fpm.d:/docker-cli/php-fpm.d:ro
+      - ${HOME}:${HOME}
+      - ${HOME}:/home/docker-cli
+      - /:/host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "9000"
+    networks:
+      docker-cli:
+        aliases:
+          - php-fpm-8.3
+          - php-fpm-8.3.${BASE_HOST}
+    restart: unless-stopped
+
+  php-fpm-8.4:
+    build:
+      context: ./config
+      dockerfile: php-fpm-8.4/Dockerfile
+      network: host
+      args:
+        PHP_ENABLE_XDEBUG: ${PHP_ENABLE_XDEBUG:-1}
+        PHP_ENABLE_SPX: ${PHP_ENABLE_SPX:-1}
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/php-fpm-8.4:${SOURCE_IMAGE_TAG:-default}
+    container_name: docker-cli-php-fpm-8.4
+    environment:
+      DNSDOCK_NAME: php-fpm-8.4
+      DNSDOCK_IMAGE: system
+      HOST_UID: ${HOST_UID:-1000}
+      HOST_GID: ${HOST_GID:-1000}
+    command: ["docker-cli-setup-runtime-user"]
+    volumes:
+      - ./config/php-fpm-8.4/php/conf.d:/docker-cli/php/conf.d:ro
+      - ./config/php-fpm-8.4/php-fpm.d:/docker-cli/php-fpm.d:ro
+      - ${HOME}:${HOME}
+      - ${HOME}:/home/docker-cli
+      - /:/host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "9000"
+    networks:
+      docker-cli:
+        aliases:
+          - php-fpm-8.4
+          - php-fpm-8.4.${BASE_HOST}
+    restart: unless-stopped
+
+  php-fpm-8.5:
+    build:
+      context: ./config
+      dockerfile: php-fpm-8.5/Dockerfile
+      network: host
+      args:
+        PHP_ENABLE_XDEBUG: ${PHP_ENABLE_XDEBUG:-1}
+        PHP_ENABLE_SPX: ${PHP_ENABLE_SPX:-1}
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/php-fpm-8.5:${SOURCE_IMAGE_TAG:-default}
+    container_name: docker-cli-php-fpm-8.5
+    environment:
+      DNSDOCK_NAME: php-fpm-8.5
+      DNSDOCK_IMAGE: system
+      HOST_UID: ${HOST_UID:-1000}
+      HOST_GID: ${HOST_GID:-1000}
+    command: ["docker-cli-setup-runtime-user"]
+    volumes:
+      - ./config/php-fpm-8.5/php/conf.d:/docker-cli/php/conf.d:ro
+      - ./config/php-fpm-8.5/php-fpm.d:/docker-cli/php-fpm.d:ro
+      - ${HOME}:${HOME}
+      - ${HOME}:/home/docker-cli
+      - /:/host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "9000"
+    networks:
+      docker-cli:
+        aliases:
+          - php-fpm-8.5
+          - php-fpm-8.5.${BASE_HOST}
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: docker-cli-mailpit
+    environment:
+      DNSDOCK_NAME: mailpit
+      DNSDOCK_IMAGE: system
+      MP_DATABASE: /data/mailpit.db
+    volumes:
+      - ./data/mailpit:/data
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.mailpit.rule: Host(`mailpit.${BASE_HOST}`)
+      traefik.http.routers.mailpit.entrypoints: websecure
+      traefik.http.routers.mailpit.middlewares: system-http-auth
+      traefik.http.routers.mailpit.tls: "true"
+      traefik.http.routers.mailpit.tls.certresolver: cloudflare
+      traefik.http.services.mailpit.loadbalancer.server.port: "8025"
+    networks:
+      docker-cli:
+        aliases:
+          - mailpit
+          - mailpit.${BASE_HOST}
+    restart: unless-stopped
+
+  openresty:
+    image: openresty/openresty:1.27.1.2-alpine
+    container_name: docker-cli-openresty
+    environment:
+      DNSDOCK_NAME: openresty
+      DNSDOCK_IMAGE: system
+    command:
+      - sh
+      - -ec
+      - |
+        tmp_conf="$$(mktemp)"
+        {
+          echo 'user root;'
+          sed '/^[[:space:]]*user[[:space:]]/d' /usr/local/openresty/nginx/conf/nginx.conf
+        } > "$${tmp_conf}"
+        cat "$${tmp_conf}" > /usr/local/openresty/nginx/conf/nginx.conf
+        exec /usr/local/openresty/bin/openresty -g 'daemon off;'
+    volumes:
+      - ./config/openresty/hosts:/etc/nginx/conf.d:ro
+      - /home:/home:ro
+      - /:/host:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.openresty-http.rule: Host(`${BASE_HOST}`) || HostRegexp(`^web-.+\.${BASE_HOST}$`)
+      traefik.http.routers.openresty-http.entrypoints: web
+      traefik.http.routers.openresty-http.middlewares: openresty-https-redirect
+      traefik.http.routers.openresty-http.service: openresty
+      traefik.http.routers.openresty.rule: Host(`${BASE_HOST}`) || HostRegexp(`^web-.+\.${BASE_HOST}$`)
+      traefik.http.routers.openresty.entrypoints: websecure
+      traefik.http.routers.openresty.tls: "true"
+      traefik.http.routers.openresty.tls.certresolver: cloudflare
+      traefik.http.routers.openresty.tls.domains[0].main: ${BASE_HOST}
+      traefik.http.routers.openresty.tls.domains[0].sans: '*.${BASE_HOST}'
+      traefik.http.routers.fallback.rule: HostRegexp(`^(.+\.)?${BASE_HOST}$`)
+      traefik.http.routers.fallback.entrypoints: websecure
+      traefik.http.routers.fallback.tls: "true"
+      traefik.http.routers.fallback.tls.certresolver: cloudflare
+      traefik.http.routers.fallback.service: openresty
+      traefik.http.routers.fallback.priority: "1"
+      traefik.http.middlewares.openresty-https-redirect.redirectscheme.scheme: https
+      traefik.http.middlewares.openresty-https-redirect.redirectscheme.permanent: "true"
+      traefik.http.services.openresty.loadbalancer.server.port: "${OPENRESTY_PORT:-80}"
+    networks:
+      docker-cli:
+    restart: unless-stopped
+
+  adminer:
+    image: adminer:latest
+    container_name: docker-cli-adminer
+    environment:
+      ADMINER_DEFAULT_SERVER: mysql
+      DNSDOCK_NAME: adminer
+      DNSDOCK_IMAGE: system
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.adminer.rule: Host(`adminer.${BASE_HOST}`)
+      traefik.http.routers.adminer.entrypoints: websecure
+      traefik.http.routers.adminer.middlewares: system-http-auth
+      traefik.http.routers.adminer.tls: "true"
+      traefik.http.routers.adminer.tls.certresolver: cloudflare
+      traefik.http.services.adminer.loadbalancer.server.port: "8080"
+    networks:
+      docker-cli:
+    restart: unless-stopped
+
+  panel-gateway:
+    image: nginx:1.29-alpine
+    container_name: docker-cli-panel-gateway
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./config/panel/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./config/panel:/etc/nginx/panel:ro
+    labels:
+      traefik.enable: "true"
+      traefik.http.middlewares.system-http-auth.forwardauth.address: http://panel-gateway:8080/http-auth
+      traefik.http.routers.panel.rule: Host(`panel.${BASE_HOST}`)
+      traefik.http.routers.panel.entrypoints: websecure
+      traefik.http.routers.panel.tls: "true"
+      traefik.http.routers.panel.tls.certresolver: cloudflare
+      traefik.http.services.panel.loadbalancer.server.port: "8080"
+    networks:
+      docker-cli:
+    restart: unless-stopped
+
+  dockhand:
+    image: fnsys/dockhand:latest
+    container_name: docker-cli-dockhand
+    environment:
+      DNSDOCK_NAME: dockhand-app
+      DNSDOCK_IMAGE: system
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data/dockhand:/app/data
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.dockhand.rule: Host(`dockhand.${BASE_HOST}`)
+      traefik.http.routers.dockhand.entrypoints: websecure
+      traefik.http.routers.dockhand.middlewares: system-http-auth
+      traefik.http.routers.dockhand.tls.certresolver: cloudflare
+      traefik.http.services.dockhand.loadbalancer.server.port: "3000"
+    networks:
+      docker-cli:
+    restart: unless-stopped
+
+  playwright:
+    build:
+      context: ./config/playwright
+      args:
+        PLAYWRIGHT_IMAGE: ${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright:v1.61.0-noble}
+    image: ${SOURCE_IMAGE_REGISTRY:-ghcr.io}/${SOURCE_IMAGE_NAMESPACE:?SOURCE_IMAGE_NAMESPACE is required}/${SOURCE_IMAGE_NAME:-docker-cli}/playwright:${SOURCE_IMAGE_TAG:-default}
+    container_name: docker-cli-playwright
+    environment:
+      HOME: /root
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      NODE_PATH: /docker-cli/playwright/runtime/node_modules
+      PLAYWRIGHT_VERSION: ${PLAYWRIGHT_VERSION:-1.61.0}
+    volumes:
+      - ../../actions/playwright/scripts:/docker-cli/playwright/scripts:ro
+      - playwright-node-modules:/docker-cli/playwright/runtime
+      - /home:/home
+      - /:/host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      docker-cli:
+        ipv4_address: ${PLAYWRIGHT_IP:-172.30.0.254}
+    ipc: host
+    profiles:
+      - tools
+    restart: "no"
+
+networks:
+  docker-cli:
+    name: docker-cli
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${DOCKER_CLI_NETWORK_SUBNET:-172.30.0.0/24}
+
+volumes:
+  dbtrail-index-data:
+  dbtrail-mysql-socket:
+  dbtrail-state:
+  glitchtip-uploads:
+  glitchtip-valkey-data:
+  traefik-letsencrypt:
+  playwright-node-modules:

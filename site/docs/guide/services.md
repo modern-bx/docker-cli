@@ -1,0 +1,230 @@
+# Базовые сервисы
+
+## Опциональные сервисы
+
+ProxySQL, ProxyWeb, DBTrail и GlitchTip по умолчанию включены. Их сборкой и запуском управляют feature-флаги в системном `.env`:
+
+```dotenv
+COMPOSE_ENABLE_PROXYSQL=1
+COMPOSE_ENABLE_PROXYWEB=1
+COMPOSE_ENABLE_DBTRAIL=1
+COMPOSE_ENABLE_GLITCHTIP=1
+```
+
+Значения `0`, `false`, `no`, `off` и пустая строка отключают соответствующий Compose profile. ProxyWeb зависит от
+ProxySQL, поэтому при отключённом `COMPOSE_ENABLE_PROXYSQL` он также не запускается независимо от своего флага.
+
+Системный compose-файл запускает:
+
+- `dnsdock` для автоматических DNS-имён контейнеров;
+- `traefik` для HTTPS-доступа и выпуска сертификатов через Cloudflare DNS challenge;
+- `dockhand` как веб-интерфейс мониторинга и управления Docker и compose-стеками;
+- `mysql` на образе `mysql:8.0`;
+- `mydumper` на образе `mydumper/mydumper:v1.0.3-1` (профиль `tools`, запускается только командами дампа и загрузки);
+- `postgres` на образе `postgres:18`, актуальной стабильной ветке PostgreSQL на 12 июля 2026 года;
+- `proxysql` как прокси MySQL/PostgreSQL и сборщик статистики запросов;
+- `proxyweb` как интерфейс просмотра служебных таблиц и статистики ProxySQL;
+- `adminer` как HTTPS web-интерфейс для работы с базами данных;
+- `mailpit` как локальный SMTP-сервер и web-интерфейс для просмотра писем;
+- `glitchtip` для автономного сбора ошибок, метрик производительности и проверок доступности;
+- `openresty` для отдачи статики зарегистрированных проектов через проектные хосты вида `web-<project-name>.${BASE_HOST}`.
+
+## Dockhand
+
+После настройки `BASE_HOST` Dockhand доступен по адресу `https://dockhand.<ваш-домен>`. При первом открытии интерфейс предложит создать локального администратора. Все данные Dockhand, включая настройки окружений, хранятся на хосте в `~/.config/docker-cli/compose/system/data/dockhand` и монтируются в контейнер как `/app/data`.
+
+## MySQL, PostgreSQL и Adminer
+
+MySQL и PostgreSQL не публикуют порты на хост: они доступны только из сети `docker-cli` по стандартным портам `3306` и `5432` и коротким алиасам `mysql` / `postgres` либо DNS-именам `mysql.${BASE_HOST}` / `postgres.${BASE_HOST}`.
+
+Файлы, генерируемые системными контейнерами баз данных, лежат рядом с системным compose-файлом в `~/.config/docker-cli/compose/system/data`:
+
+- для MySQL используются `data/mysql/data` и `data/mysql/logs`;
+- для PostgreSQL — `data/postgres/data` и `data/postgres/logs`.
+
+Adminer публикуется только через Traefik с TLS и доступен по адресу `https://adminer.<ваш-домен>`.
+
+Для системных MySQL и PostgreSQL установлены ограничения, рассчитанные на окружение без высокой нагрузки:
+
+```dotenv
+MYSQL_CPU_LIMIT=1.0
+MYSQL_MEMORY_LIMIT=1G
+POSTGRES_CPU_LIMIT=0.5
+POSTGRES_MEMORY_LIMIT=512M
+```
+
+Если базы получают заметную нагрузку или контейнер завершается из-за нехватки памяти, увеличьте соответствующие
+значения в системном `.env` и перезапустите стек.
+
+Подключение проектов через ProxySQL и пошаговый анализ запросов в ProxyWeb описаны в отдельном
+[руководстве по ProxySQL и ProxyWeb](./proxy.md).
+
+## Mailpit
+
+Mailpit принимает почту внутри сети `docker-cli` по адресу `mailpit:1025`. PHP-FPM настроен на этот SMTP-сервер через `msmtp`, поэтому письма, отправленные стандартной функцией PHP `mail()`, автоматически попадают в Mailpit. Web-интерфейс доступен через Traefik по адресу `https://mailpit.<ваш-домен>`.
+
+База данных Mailpit со всеми письмами хранится на хосте в `~/.config/docker-cli/compose/system/data/mailpit` и монтируется в контейнер как `/data`. Благодаря этому письма сохраняются после пересоздания контейнера.
+
+## GlitchTip
+
+GlitchTip доступен по адресу `https://glitchtip.<ваш-домен>` и использует отдельные контейнеры PostgreSQL и
+Valkey, не связанные с базами проектов. Данные PostgreSQL, Valkey и загруженные файлы сохраняются в отдельных
+именованных Docker volumes.
+
+Создание проекта, получение DSN и примеры подключения PHP-приложений описаны в отдельном
+[руководстве по GlitchTip](./glitchtip.md).
+
+Для PostgreSQL GlitchTip по умолчанию доступны `0.5` CPU и `512M` RAM. Лимиты можно изменить в системном `.env`:
+
+```dotenv
+GLITCHTIP_POSTGRES_CPU_LIMIT=0.5
+GLITCHTIP_POSTGRES_MEMORY_LIMIT=512M
+```
+
+Команда `config:seed` генерирует секрет приложения, пароль PostgreSQL и пароль администратора. Логин и пароль
+администратора задаются в системном `.env`; при каждом пересоздании init-контейнера учётная запись создаётся или
+синхронизируется с этими значениями:
+
+```dotenv
+GLITCHTIP_ADMIN_EMAIL=admin@example.com
+GLITCHTIP_ADMIN_PASSWORD=сгенерированный-пароль
+```
+
+Перед первым запуском рекомендуется заменить email на рабочий адрес. Самостоятельная регистрация пользователей
+отключена. Чтобы полностью не запускать GlitchTip, задайте `COMPOSE_ENABLE_GLITCHTIP=0` и перезапустите системный
+стек.
+
+Адрес должен содержать полноценный домен: GlitchTip использует строгую проверку email при формировании API-ответов.
+Устаревшее значение `admin@localhost` команда `config:seed` автоматически заменяет на `admin@example.com`.
+
+## OpenResty и проектные хосты
+
+OpenResty отдаёт статику зарегистрированных проектов через проектные хосты вида `web-<project-name>.${BASE_HOST}`. HTTP-запросы к таким хостам автоматически перенаправляются на HTTPS.
+
+Перед стартом OpenResty явно записывает `user root;` в основной `nginx.conf`, чтобы именно nginx worker, а не только master-процесс, работал от root. Это нужно потому, что проектные файлы монтируются read-only из контейнера, а локальные директории проектов часто лежат внутри домашней директории с правами, недоступными пользователю `nobody` внутри контейнера.
+
+Для проектов в `/home` путь монтируется в контейнер без префикса, чтобы абсолютные пути и symlink-и внутри проекта резолвились так же, как на хосте. Остальные пути доступны через fallback-mount `/host`.
+
+
+### Порт OpenResty
+
+Порт, на котором OpenResty слушает проектные virtual host-и внутри compose-сети, задаётся переменной `OPENRESTY_PORT` в системном `.env`:
+
+```dotenv
+OPENRESTY_PORT=80
+```
+
+Значение по умолчанию — `80`.
+
+HTTP Basic Auth для всех OpenResty-хостов и panel-gateway включается только когда в системном `.env` заполнены оба параметра:
+
+```dotenv
+HTTP_AUTH_LOGIN=
+HTTP_AUTH_PASSWORD=
+```
+
+По умолчанию логин и пароль пустые, поэтому авторизация не добавляется. После заполнения обоих значений пересоберите хосты командой `docker-cli config:init --rebuild`: она создаст файлы паролей для OpenResty и panel-gateway, добавит `auth_basic` во все сгенерированные host-конфиги и подключит защиту панели. Если очистить логин или пароль и снова выполнить пересборку, HTTP-авторизация будет отключена.
+
+Если порт или параметры HTTP Basic Auth меняются в уже инициализированном окружении, выполните:
+
+```bash
+docker-cli config:init --migrate --rebuild
+docker-cli system:restart
+```
+
+`--rebuild` пересобирает конфиги `config/openresty/hosts/*.web.conf` с новым `listen`-портом, а `system:restart` перезапускает OpenResty и прокси-слой.
+
+### Внешний OpenResty на хост-машине
+
+Если порты `80` и `443` на хост-машине занимает внешний OpenResty вне контейнеров, он должен только маршрутизировать нужный wildcard-хост на внутренний прокси без терминации TLS. В этом режиме сертификаты остаются внутри docker-cli окружения, а внешний OpenResty передаёт TCP-трафик «как есть».
+
+1. В системном `.env` docker-cli укажите свободные published-порты внутреннего прокси, например:
+
+   ```dotenv
+   # пример: внутренний прокси опубликован на localhost и не конфликтует с внешним OpenResty
+   TRAEFIK_HTTP_PORT=127.0.0.1:8080
+   TRAEFIK_HTTPS_PORT=127.0.0.1:8443
+   ```
+
+2. Во внешнем OpenResty используйте обычный `http`-proxy для порта `80` и `stream` с `ssl_preread` для порта `443`, чтобы TLS передавался внутрь без терминации:
+
+   ```nginx
+   http {
+       server {
+           listen 80;
+           server_name example.test *.example.test;
+
+           location / {
+               proxy_pass http://127.0.0.1:8080;
+               proxy_set_header Host $host;
+               proxy_set_header X-Real-IP $remote_addr;
+               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+               proxy_set_header X-Forwarded-Proto $scheme;
+           }
+       }
+   }
+
+   stream {
+       map $ssl_preread_server_name $docker_cli_https_upstream {
+           ~^(.+\.)?example\.test$ 127.0.0.1:8443;
+           default 127.0.0.1:8443;
+       }
+
+       server {
+           listen 443;
+           ssl_preread on;
+           proxy_pass $docker_cli_https_upstream;
+       }
+   }
+   ```
+
+   Замените `example.test` на значение `BASE_HOST`. Для wildcard-домена `*.example.test` регулярное выражение `~^(.+\.)?example\.test$` пропускает и сам базовый домен, и любые поддомены. Внешний OpenResty не должен содержать директивы `ssl_certificate` для этого wildcard-хоста: TLS-сессия должна завершаться внутри docker-cli окружения.
+
+## Traefik, DNS-алиасы и TLS
+
+`BASE_HOST` не должен оставаться пустым: укажите собственный домен перед запуском окружения. Подготовка зоны Cloudflare описана в разделе [Настройка домена в Cloudflare](./cloudflare.md).
+
+DNS-имена Adminer и проектные имена вида `web-<project-name>.${BASE_HOST}` регистрируются на контейнер Traefik через `DNSDOCK_ALIAS`, поэтому браузер попадает в HTTPS-router Traefik, а не напрямую в контейнер приложения.
+
+Для `websecure` и router-а OpenResty явно указан wildcard-домен `*.${BASE_HOST}` через Cloudflare DNS challenge, чтобы regex-router проектных доменов получал Let's Encrypt сертификат, а не дефолтный самоподписанный сертификат Traefik.
+
+ACME DNS challenge использует публичные резолверы `1.1.1.1` и `8.8.8.8`, чтобы Traefik не определял локальную зону dnsdock как Cloudflare-зону.
+
+### Traefik не может выпустить сертификат из-за DNS
+
+Если в логах `docker-cli-traefik` ошибка `Unable to obtain ACME certificate`, а её подробности содержат
+`DNS call error`, `connection refused` или `i/o timeout` для `1.1.1.1:53` и `8.8.8.8:53`, проблема не связана
+с каталогом хранения сертификатов. Traefik начал выпуск или продление сертификата, но контейнер не смог
+обратиться к публичным DNS-резолверам и проверить DNS-01 challenge.
+
+Проверьте логи:
+
+```bash
+docker logs docker-cli-traefik
+```
+
+Затем проверьте, не блокируют ли исходящие DNS-запросы контейнеров:
+
+- firewall хоста или сети;
+- VPN либо корпоративная политика, запрещающая прямые обращения к публичным DNS;
+- защитное ПО хоста;
+- правила Docker network или внешнего маршрутизатора.
+
+Для DNS-01 контейнеру нужен исходящий доступ к `1.1.1.1:53` и `8.8.8.8:53` по UDP и TCP. Разрешите этот
+трафик и перезапустите Traefik:
+
+```bash
+bin/docker-cli system:restart
+```
+
+Если сеть разрешает только собственные DNS-серверы, укажите в параметре
+`--certificatesresolvers.cloudflare.acme.dnschallenge.resolvers` доступные из Docker-сети рекурсивные
+резолверы. Они должны получать публичные ответы Cloudflare для зоны `BASE_HOST`, а не локальные записи dnsdock.
+
+Файл `acme.json` хранится в именованном volume `traefik-letsencrypt`. Его отсутствие заставляет Traefik
+запросить сертификаты заново, но само по себе не вызывает ошибку соединения с DNS. Не удаляйте этот volume
+при обычном пересоздании контейнеров.
+
+## Локализация CLI
+
+Язык сообщений CLI задаётся параметром `APP_LOCALE` в сгенерированном `.env`. По умолчанию используется русский (`ru`).

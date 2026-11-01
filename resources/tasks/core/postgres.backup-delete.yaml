@@ -1,0 +1,19 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Удаление PostgreSQL-бэкапа
+  code: core.postgres.backup-delete
+  type: shell
+  context: project
+  description: Удаляет выбранный PostgreSQL-бэкап проекта.
+  parameters:
+    backup:
+      name: Короткое имя бэкапа
+      type: string
+      required: true
+    location: { name: Расположение, type: string }
+  action: |
+    options=()
+    [ -n "${location:-}" ] && options+=(--location="$location")
+    docker-cli postgres:backup-delete {{ backup }} "${options[@]}"

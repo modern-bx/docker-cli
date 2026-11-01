@@ -1,0 +1,17 @@
+form#config {
+  float: left;
+  width: 49%;
+  max-height: 100vh;
+  overflow-y: scroll;
+}
+
+div#reports {
+  float: right;
+  width: 49%;
+  max-height: 100vh;
+  overflow-y: scroll;
+}
+
+h1 {
+  display: none;
+}

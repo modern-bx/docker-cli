@@ -1,0 +1,32 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Создание бэкапа PostgreSQL
+  code: core.postgres.dump
+  type: shell
+  context: project
+  description: Создает параллельный бэкап PostgreSQL-базы проекта.
+  parameters:
+    backup:
+      name: Короткое имя бэкапа
+      type: string
+    location:
+      name: Код хранилища бэкапов
+      type: string
+    strategy:
+      name: Стратегия БД
+      type: string
+    comment:
+      name: Комментарий
+      type: string
+  action: |
+    options=()
+    [ -n "${location:-}" ] && options+=(--location="$location")
+    [ -n "${strategy:-}" ] && options+=(--strategy="$strategy")
+    [ -n "${comment:-}" ] && options+=(--comment="$comment")
+    if [ -n "${backup:-}" ]; then
+      docker-cli postgres:dump --project="$project" --name="$backup" "${options[@]}"
+    else
+      docker-cli postgres:dump --project="$project"
+    fi

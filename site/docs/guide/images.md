@@ -1,0 +1,97 @@
+# Сборка и публикация образов
+
+Кастомные образы из исходников собираются командой:
+
+```bash
+docker-cli image:build
+```
+
+Публикация в registry выполняется отдельно:
+
+```bash
+docker-cli image:publish
+```
+
+Команды собирают и публикуют два кастомных образа: `php-fpm-8.2` и `playwright`.
+
+## Registry, vendor/namespace и тег
+
+Перед сборкой или публикацией укажите registry и свой vendor/namespace в системном `.env`:
+
+```dotenv
+SOURCE_IMAGE_REGISTRY=ghcr.io
+SOURCE_IMAGE_NAMESPACE=<ваш-vendor-or-namespace>
+SOURCE_IMAGE_NAME=docker-cli
+```
+
+`SOURCE_IMAGE_NAMESPACE` обязателен. Если он не задан, команды сборки и публикации завершаются ошибкой, чтобы не публиковать и не тегировать образы в чужой namespace.
+
+Публикуемый ref выглядит так:
+
+```text
+<SOURCE_IMAGE_REGISTRY>/<SOURCE_IMAGE_NAMESPACE>/<SOURCE_IMAGE_NAME>/php-fpm-8.2:<tag>
+<SOURCE_IMAGE_REGISTRY>/<SOURCE_IMAGE_NAMESPACE>/<SOURCE_IMAGE_NAME>/playwright:<tag>
+```
+
+Тег выбирается так:
+
+1. берётся из `SOURCE_IMAGE_TAG`, если он задан;
+2. иначе используется самый новый semver-тег, достижимый из текущей ветки git-репозитория, без префикса `v`;
+3. если подходящий git-тег не найден, используется `default`.
+
+Для ручной проверки команд без запуска Docker используйте:
+
+```bash
+docker-cli image:build --dry-run
+docker-cli image:publish --dry-run
+```
+
+Для явного тега используйте:
+
+```bash
+docker-cli image:build --tag=1.0.0
+docker-cli image:publish --tag=1.0.0
+```
+
+## Настройки
+
+Настройки сборки и публикации лежат в системном `.env`:
+
+- `SOURCE_IMAGE_REGISTRY` — registry для образов, например `ghcr.io`;
+- `SOURCE_IMAGE_NAMESPACE` — ваш vendor, GitHub namespace или organization;
+- `SOURCE_IMAGE_NAME` — имя приложения в пути образа, по умолчанию `docker-cli`;
+- `SOURCE_IMAGE_MAIN_BRANCH` — основная ветка для релиза самообновления, по умолчанию `main`;
+- `SOURCE_IMAGE_TAG`;
+- `SOURCE_IMAGE_DOCKER_BUILDKIT`.
+- `PHP_ENABLE_XDEBUG` — добавляет Xdebug во все PHP-FPM-образы, по умолчанию `1`;
+- `PHP_ENABLE_SPX` — добавляет PHP-SPX во все PHP-FPM-образы, по умолчанию `1`.
+
+По умолчанию `SOURCE_IMAGE_DOCKER_BUILDKIT=0`, чтобы обойти сетевые проблемы BuildKit при сборке PHP-FPM.
+Флаги PHP-расширений применяются при сборке сразу ко всем версиям; после их изменения используйте
+`docker-cli image:build --no-cache`.
+
+Во все PHP-FPM-образы предустановлен Composer. Глобальные пакеты Composer устанавливаются от имени
+пользователя `docker-cli` при первом использовании соответствующего инструмента.
+
+Общая настройка стилей страницы PHP-SPX находится в
+`~/.config/docker-cli/compose/system/config/php-spx/settings.css`. `config:init` создаёт файл один раз и не
+перезаписывает пользовательские изменения; CSS включается во все PHP-FPM-образы при следующей сборке.
+
+## Публикация в GHCR
+
+Для публикации нужен GitHub Personal Access Token с правами `write:packages` и, если образ приватный, `read:packages`.
+
+Войдите в GHCR под своим GitHub-логином:
+
+```bash
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u <github-login> --password-stdin
+```
+
+После логина задайте свой GitHub namespace или organization в `SOURCE_IMAGE_NAMESPACE`, соберите и опубликуйте образы:
+
+```bash
+docker-cli image:build
+docker-cli image:publish
+```
+
+Для проверки без Docker-команд используйте `docker-cli image:build --dry-run` и `docker-cli image:publish --dry-run`.

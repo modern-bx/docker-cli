@@ -1,0 +1,18 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Восстановление файлов из бэкапа
+  code: core.tree.load
+  type: shell
+  context: project
+  description: Восстанавливает файлы проекта из файлового бэкапа.
+  parameters:
+    path: { name: Путь к бэкапу, type: string, required: true }
+    force: { name: Перезаписывать файлы, type: boolean }
+    wipe: { name: Предварительно стереть все файлы, type: boolean }
+  action: |
+    options=()
+    [ "${force:-false}" = true ] && options+=(--force)
+    [ "${wipe:-false}" = true ] && options+=(--wipe)
+    docker-cli tree:load --project="$project" --path={{ path }} "${options[@]}"

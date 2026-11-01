@@ -1,0 +1,39 @@
+{
+  "name": "docker-cli-panel",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "svelte-check --tsconfig ./jsconfig.json"
+  },
+  "devDependencies": {
+    "@skeletonlabs/skeleton": "^5.0.0",
+    "@skeletonlabs/skeleton-svelte": "^5.0.0",
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "@tailwindcss/vite": "^4.1.18",
+    "svelte": "^5.56.8",
+    "svelte-check": "^4.3.6",
+    "tailwindcss": "^4.1.18",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.29.7",
+    "@codemirror/commands": "^6.10.4",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/legacy-modes": "^6.5.3",
+    "@codemirror/state": "^6.7.1",
+    "@codemirror/view": "^6.43.8",
+    "@internationalized/date": "^3.12.2",
+    "@lucide/svelte": "^1.27.0",
+    "@uiw/codemirror-theme-aura": "^4.25.11",
+    "@uiw/codemirror-theme-eclipse": "^4.25.11",
+    "@uiw/codemirror-theme-github": "^4.25.11",
+    "@uiw/codemirror-theme-material": "^4.25.11",
+    "@uiw/codemirror-theme-monokai": "^4.25.11",
+    "@uiw/codemirror-theme-tokyo-night": "^4.25.11",
+    "@uiw/codemirror-theme-vscode": "^4.25.11",
+    "micromark": "^4.0.2"
+  }
+}

@@ -1,0 +1,25 @@
+meta:
+  schema: task
+  version: 0.1
+task:
+  name: Установка 1С-Битрикс
+  code: core.project.init.bitrix
+  type: shell
+  context: project
+  tags: [project:init]
+  description: Скачивает, распаковывает и автоматически устанавливает выбранную редакцию 1С-Битрикс.
+  parameters:
+    edition:
+      name: Редакция
+      type: list
+      required: true
+      items:
+        - { name: Старт, value: start }
+        - { name: Стандарт, value: standard }
+        - { name: Малый бизнес, value: small_business }
+        - { name: Эксперт, value: expert }
+        - { name: Бизнес, value: business }
+  action: |
+    docker-cli bitrix:get-installer --product=bitrix --edition="$edition" --extract
+    docker-cli play:run bitrix/setup
+    rm -rf -- bitrix/cache bitrix/managed_cache bitrix/stack_cache
